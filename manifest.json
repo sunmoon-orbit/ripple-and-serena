@@ -1,0 +1,22 @@
+{
+  "name": "苏堤柳塔罗 · Willow Tarot",
+  "short_name": "苏堤柳塔罗",
+  "description": "清新自然系韦特塔罗 · 抽牌与牌义图鉴",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#F5F0E8",
+  "theme_color": "#5B7B5D",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}
