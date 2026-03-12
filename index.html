@@ -1,0 +1,1542 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>苏堤柳塔罗 · Willow Tarot</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400&family=Noto+Serif+SC:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+:root {
+  --cream: #F5F0E8;
+  --cream-light: #FAF8F3;
+  --sage: #5B7B5D;
+  --sage-light: #8FA88F;
+  --sage-pale: #D4E2D4;
+  --gold: #C5A55A;
+  --gold-light: #E8D9A0;
+  --gold-glow: rgba(197, 165, 90, 0.4);
+  --silver: #A8A9AD;
+  --silver-light: #D0D1D4;
+  --silver-glow: rgba(168, 169, 173, 0.4);
+  --text: #3A3A3A;
+  --text-light: #6B6B6B;
+  --card-back: #5B7B5D;
+  --font-display: 'Cormorant Garamond', Georgia, serif;
+  --font-body: 'Noto Serif SC', 'Songti SC', serif;
+  --card-width: 140px;
+  --card-height: 240px;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+html { scroll-behavior: smooth; }
+
+body {
+  font-family: var(--font-body);
+  background: var(--cream);
+  color: var(--text);
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+/* ===== Watercolor Background Texture ===== */
+body::before {
+  content: '';
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background:
+    radial-gradient(ellipse at 20% 20%, rgba(91,123,93,0.06) 0%, transparent 50%),
+    radial-gradient(ellipse at 80% 80%, rgba(197,165,90,0.05) 0%, transparent 50%),
+    radial-gradient(ellipse at 50% 50%, rgba(143,168,143,0.04) 0%, transparent 70%);
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* ===== Navigation ===== */
+nav {
+  position: fixed;
+  top: 0;
+  width: 100%;
+  padding: 16px 32px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  z-index: 100;
+  background: linear-gradient(to bottom, var(--cream) 60%, transparent);
+}
+
+nav .logo {
+  font-family: var(--font-display);
+  font-size: 1.4rem;
+  font-weight: 300;
+  color: var(--sage);
+  letter-spacing: 2px;
+  cursor: pointer;
+}
+
+nav .logo span {
+  font-size: 0.75rem;
+  color: var(--sage-light);
+  display: block;
+  letter-spacing: 4px;
+  font-weight: 400;
+}
+
+nav .nav-links {
+  display: flex;
+  gap: 28px;
+}
+
+nav .nav-links a {
+  font-family: var(--font-body);
+  font-size: 0.85rem;
+  color: var(--text-light);
+  text-decoration: none;
+  letter-spacing: 1px;
+  transition: color 0.3s;
+  cursor: pointer;
+}
+
+nav .nav-links a:hover { color: var(--sage); }
+
+/* ===== Pages ===== */
+.page {
+  display: none;
+  min-height: 100vh;
+  padding: 80px 32px 40px;
+  position: relative;
+  z-index: 1;
+}
+
+.page.active { display: block; }
+
+/* ===== Home / Landing ===== */
+#home {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+}
+
+#home.active { display: flex; }
+
+.home-title {
+  font-family: var(--font-display);
+  font-size: 3.5rem;
+  font-weight: 300;
+  color: var(--sage);
+  margin-bottom: 8px;
+  opacity: 0;
+  animation: fadeUp 1s ease 0.2s forwards;
+}
+
+.home-subtitle {
+  font-family: var(--font-display);
+  font-size: 1.1rem;
+  font-weight: 300;
+  color: var(--sage-light);
+  letter-spacing: 6px;
+  margin-bottom: 48px;
+  opacity: 0;
+  animation: fadeUp 1s ease 0.5s forwards;
+}
+
+.home-desc {
+  font-size: 0.9rem;
+  color: var(--text-light);
+  line-height: 2;
+  margin-bottom: 48px;
+  opacity: 0;
+  animation: fadeUp 1s ease 0.8s forwards;
+}
+
+.spread-choices {
+  display: flex;
+  gap: 24px;
+  flex-wrap: wrap;
+  justify-content: center;
+  opacity: 0;
+  animation: fadeUp 1s ease 1.1s forwards;
+}
+
+.spread-btn {
+  background: var(--cream-light);
+  border: 1px solid var(--sage-pale);
+  border-radius: 16px;
+  padding: 28px 36px;
+  cursor: pointer;
+  transition: all 0.4s ease;
+  text-align: center;
+  min-width: 180px;
+}
+
+.spread-btn:hover {
+  border-color: var(--sage-light);
+  transform: translateY(-4px);
+  box-shadow: 0 12px 32px rgba(91,123,93,0.1);
+}
+
+.spread-btn .spread-icon {
+  font-size: 1.8rem;
+  margin-bottom: 12px;
+  display: block;
+}
+
+.spread-btn .spread-name {
+  font-family: var(--font-display);
+  font-size: 1.1rem;
+  font-weight: 500;
+  color: var(--sage);
+  margin-bottom: 4px;
+}
+
+.spread-btn .spread-desc {
+  font-size: 0.75rem;
+  color: var(--text-light);
+}
+
+/* ===== Reading Page ===== */
+#reading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding-top: 100px;
+}
+
+#reading.active { display: flex; }
+
+.reading-title {
+  font-family: var(--font-display);
+  font-size: 1.6rem;
+  font-weight: 300;
+  color: var(--sage);
+  margin-bottom: 8px;
+  letter-spacing: 2px;
+}
+
+.reading-hint {
+  font-size: 0.8rem;
+  color: var(--text-light);
+  margin-bottom: 40px;
+}
+
+/* Card Table */
+.card-table {
+  display: flex;
+  gap: 20px;
+  justify-content: center;
+  flex-wrap: wrap;
+  margin-bottom: 32px;
+  perspective: 1200px;
+}
+
+.card-slot {
+  width: var(--card-width);
+  text-align: center;
+}
+
+.card-slot .slot-label {
+  font-family: var(--font-display);
+  font-size: 0.8rem;
+  color: var(--sage-light);
+  margin-bottom: 8px;
+  letter-spacing: 1px;
+}
+
+/* Card */
+.card-container {
+  width: var(--card-width);
+  height: var(--card-height);
+  perspective: 800px;
+  cursor: pointer;
+}
+
+.card-inner {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  transition: transform 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+  transform-style: preserve-3d;
+}
+
+.card-inner.flipped {
+  transform: rotateY(180deg);
+}
+
+.card-face {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  backface-visibility: hidden;
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+/* Card Back */
+.card-back {
+  background: var(--card-back);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid var(--sage-light);
+  box-shadow: 0 4px 16px rgba(0,0,0,0.1);
+}
+
+.card-back-pattern {
+  width: 85%;
+  height: 90%;
+  border: 1px solid rgba(255,255,255,0.2);
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  overflow: hidden;
+}
+
+.card-back-pattern::before {
+  content: '🌿';
+  font-size: 2.5rem;
+  opacity: 0.6;
+}
+
+.card-back-pattern::after {
+  content: '';
+  position: absolute;
+  inset: 8px;
+  border: 1px solid rgba(255,255,255,0.12);
+  border-radius: 6px;
+}
+
+/* Card Front */
+.card-front {
+  background: var(--cream-light);
+  transform: rotateY(180deg);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 16px 12px;
+  border: 3px solid var(--gold);
+  box-shadow: 0 4px 16px rgba(0,0,0,0.1), 0 0 20px var(--gold-glow);
+}
+
+.card-front.reversed {
+  border-color: var(--silver);
+  box-shadow: 0 4px 16px rgba(0,0,0,0.1), 0 0 20px var(--silver-glow);
+}
+
+.card-front .card-numeral {
+  font-family: var(--font-display);
+  font-size: 0.7rem;
+  color: var(--gold);
+  letter-spacing: 3px;
+  margin-bottom: 4px;
+}
+
+.card-front.reversed .card-numeral {
+  color: var(--silver);
+}
+
+.card-front .card-symbol {
+  font-size: 2.8rem;
+  margin-bottom: 8px;
+  line-height: 1;
+}
+
+.card-front .card-name-en {
+  font-family: var(--font-display);
+  font-size: 0.95rem;
+  font-weight: 500;
+  color: var(--text);
+  text-align: center;
+  line-height: 1.3;
+  margin-bottom: 4px;
+}
+
+.card-front .card-name-cn {
+  font-size: 0.75rem;
+  color: var(--text-light);
+}
+
+.card-front .card-orientation {
+  font-family: var(--font-display);
+  font-size: 0.65rem;
+  letter-spacing: 2px;
+  margin-top: 8px;
+  padding: 2px 10px;
+  border-radius: 10px;
+}
+
+.card-front .card-orientation.upright {
+  color: var(--gold);
+  border: 1px solid var(--gold-light);
+}
+
+.card-front .card-orientation.reversed-tag {
+  color: var(--silver);
+  border: 1px solid var(--silver-light);
+}
+
+/* Card draw animation */
+.card-container.drawing {
+  animation: cardDraw 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+
+@keyframes cardDraw {
+  0% { transform: translateY(60px) scale(0.8); opacity: 0; }
+  100% { transform: translateY(0) scale(1); opacity: 1; }
+}
+
+.card-container.waiting {
+  opacity: 0.3;
+}
+
+/* Shuffle animation */
+.card-container.shuffling {
+  animation: shuffle 0.5s ease infinite alternate;
+}
+
+@keyframes shuffle {
+  0% { transform: translateX(-5px) rotate(-2deg); }
+  100% { transform: translateX(5px) rotate(2deg); }
+}
+
+/* ===== Interpretation Panel ===== */
+.interpretation-panel {
+  width: 100%;
+  max-width: 720px;
+  margin-top: 24px;
+  padding: 32px;
+  background: var(--cream-light);
+  border: 1px solid var(--sage-pale);
+  border-radius: 16px;
+  display: none;
+  animation: fadeUp 0.6s ease forwards;
+}
+
+.interpretation-panel.visible { display: block; }
+
+.interpretation-panel h3 {
+  font-family: var(--font-display);
+  font-size: 1.3rem;
+  font-weight: 400;
+  color: var(--sage);
+  margin-bottom: 20px;
+  text-align: center;
+  letter-spacing: 2px;
+}
+
+.interp-card {
+  margin-bottom: 20px;
+  padding-bottom: 20px;
+  border-bottom: 1px solid var(--sage-pale);
+}
+
+.interp-card:last-child {
+  border-bottom: none;
+  margin-bottom: 0;
+  padding-bottom: 0;
+}
+
+.interp-card .interp-position {
+  font-family: var(--font-display);
+  font-size: 0.8rem;
+  color: var(--sage-light);
+  letter-spacing: 2px;
+  margin-bottom: 4px;
+}
+
+.interp-card .interp-name {
+  font-family: var(--font-display);
+  font-size: 1.1rem;
+  font-weight: 500;
+  color: var(--text);
+  margin-bottom: 4px;
+}
+
+.interp-card .interp-orientation {
+  font-size: 0.75rem;
+  margin-bottom: 8px;
+  font-weight: 500;
+}
+
+.interp-card .interp-orientation.upright { color: var(--gold); }
+.interp-card .interp-orientation.reversed { color: var(--silver); }
+
+.interp-card .interp-meaning {
+  font-size: 0.88rem;
+  color: var(--text-light);
+  line-height: 1.8;
+}
+
+.interp-card .interp-keywords {
+  font-size: 0.78rem;
+  color: var(--sage);
+  margin-top: 6px;
+  font-style: italic;
+}
+
+/* Overall interpretation */
+.overall-interp {
+  margin-top: 24px;
+  padding: 20px;
+  background: linear-gradient(135deg, rgba(91,123,93,0.05), rgba(197,165,90,0.05));
+  border-radius: 12px;
+}
+
+.overall-interp h4 {
+  font-family: var(--font-display);
+  font-size: 1rem;
+  font-weight: 400;
+  color: var(--sage);
+  margin-bottom: 10px;
+  letter-spacing: 1px;
+}
+
+.overall-interp p {
+  font-size: 0.85rem;
+  color: var(--text-light);
+  line-height: 1.8;
+}
+
+/* ===== Action Buttons ===== */
+.action-bar {
+  display: flex;
+  gap: 16px;
+  margin-top: 28px;
+  margin-bottom: 40px;
+}
+
+.btn {
+  font-family: var(--font-body);
+  font-size: 0.85rem;
+  padding: 10px 28px;
+  border-radius: 24px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  letter-spacing: 1px;
+}
+
+.btn-primary {
+  background: var(--sage);
+  color: white;
+  border: none;
+}
+
+.btn-primary:hover {
+  background: var(--sage-light);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(91,123,93,0.3);
+}
+
+.btn-secondary {
+  background: transparent;
+  color: var(--sage);
+  border: 1px solid var(--sage-pale);
+}
+
+.btn-secondary:hover {
+  border-color: var(--sage);
+  background: rgba(91,123,93,0.05);
+}
+
+/* ===== Encyclopedia Page ===== */
+#encyclopedia {
+  max-width: 900px;
+  margin: 0 auto;
+}
+
+#encyclopedia.active { display: block; }
+
+.ency-header {
+  text-align: center;
+  margin-bottom: 40px;
+}
+
+.ency-header h2 {
+  font-family: var(--font-display);
+  font-size: 2rem;
+  font-weight: 300;
+  color: var(--sage);
+  letter-spacing: 3px;
+}
+
+.ency-header p {
+  font-size: 0.85rem;
+  color: var(--text-light);
+  margin-top: 8px;
+}
+
+/* Filter tabs */
+.ency-tabs {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+  flex-wrap: wrap;
+  margin-bottom: 32px;
+}
+
+.ency-tab {
+  font-family: var(--font-body);
+  font-size: 0.8rem;
+  padding: 6px 18px;
+  border: 1px solid var(--sage-pale);
+  border-radius: 20px;
+  background: transparent;
+  color: var(--text-light);
+  cursor: pointer;
+  transition: all 0.3s;
+  letter-spacing: 1px;
+}
+
+.ency-tab.active, .ency-tab:hover {
+  background: var(--sage);
+  color: white;
+  border-color: var(--sage);
+}
+
+/* Search */
+.ency-search {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 28px;
+}
+
+.ency-search input {
+  font-family: var(--font-body);
+  font-size: 0.85rem;
+  padding: 10px 20px;
+  border: 1px solid var(--sage-pale);
+  border-radius: 24px;
+  background: var(--cream-light);
+  color: var(--text);
+  width: 320px;
+  outline: none;
+  transition: border-color 0.3s;
+}
+
+.ency-search input:focus {
+  border-color: var(--sage-light);
+}
+
+.ency-search input::placeholder {
+  color: var(--sage-pale);
+}
+
+/* Card grid */
+.ency-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 16px;
+}
+
+.ency-card {
+  background: var(--cream-light);
+  border: 1px solid var(--sage-pale);
+  border-radius: 12px;
+  padding: 20px;
+  cursor: pointer;
+  transition: all 0.3s;
+}
+
+.ency-card:hover {
+  border-color: var(--sage-light);
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(91,123,93,0.08);
+}
+
+.ency-card .ency-card-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.ency-card .ency-card-symbol {
+  font-size: 1.8rem;
+}
+
+.ency-card .ency-card-titles {
+  flex: 1;
+}
+
+.ency-card .ency-card-name {
+  font-family: var(--font-display);
+  font-size: 1rem;
+  font-weight: 500;
+  color: var(--text);
+}
+
+.ency-card .ency-card-cn {
+  font-size: 0.78rem;
+  color: var(--text-light);
+}
+
+.ency-card .ency-meanings {
+  display: none;
+}
+
+.ency-card.expanded .ency-meanings {
+  display: block;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--sage-pale);
+}
+
+.ency-meaning-section {
+  margin-bottom: 10px;
+}
+
+.ency-meaning-section .label {
+  font-size: 0.72rem;
+  letter-spacing: 1px;
+  margin-bottom: 3px;
+  font-weight: 500;
+}
+
+.ency-meaning-section .label.upright { color: var(--gold); }
+.ency-meaning-section .label.reversed { color: var(--silver); }
+
+.ency-meaning-section p {
+  font-size: 0.82rem;
+  color: var(--text-light);
+  line-height: 1.7;
+}
+
+.ency-meaning-section .keywords {
+  font-size: 0.75rem;
+  color: var(--sage);
+  font-style: italic;
+  margin-top: 3px;
+}
+
+/* ===== Modal ===== */
+.modal-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.3);
+  backdrop-filter: blur(4px);
+  z-index: 200;
+  align-items: center;
+  justify-content: center;
+}
+
+.modal-overlay.visible {
+  display: flex;
+}
+
+.modal {
+  background: var(--cream-light);
+  border-radius: 20px;
+  padding: 36px;
+  max-width: 480px;
+  width: 90%;
+  max-height: 80vh;
+  overflow-y: auto;
+  box-shadow: 0 24px 64px rgba(0,0,0,0.15);
+  animation: modalIn 0.4s ease;
+}
+
+@keyframes modalIn {
+  0% { transform: scale(0.9); opacity: 0; }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+.modal-close {
+  float: right;
+  background: none;
+  border: none;
+  font-size: 1.2rem;
+  color: var(--text-light);
+  cursor: pointer;
+}
+
+/* ===== Animations ===== */
+@keyframes fadeUp {
+  0% { transform: translateY(20px); opacity: 0; }
+  100% { transform: translateY(0); opacity: 1; }
+}
+
+@keyframes gentleFloat {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-6px); }
+}
+
+/* ===== Responsive ===== */
+@media (max-width: 640px) {
+  :root {
+    --card-width: 110px;
+    --card-height: 190px;
+  }
+
+  .home-title { font-size: 2.4rem; }
+  .spread-choices { gap: 12px; }
+  .spread-btn { min-width: 140px; padding: 20px 24px; }
+  .card-table { gap: 12px; }
+  .interpretation-panel { padding: 20px; }
+
+  nav { padding: 12px 16px; }
+  nav .nav-links { gap: 16px; }
+  nav .nav-links a { font-size: 0.78rem; }
+
+  .ency-grid { grid-template-columns: 1fr; }
+}
+
+/* ===== Scrollbar ===== */
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--sage-pale); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--sage-light); }
+
+/* ===== Draw Pile ===== */
+.draw-pile {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 32px;
+}
+
+.draw-pile-stack {
+  position: relative;
+  width: var(--card-width);
+  height: var(--card-height);
+  cursor: pointer;
+  transition: transform 0.3s;
+}
+
+.draw-pile-stack:hover {
+  transform: translateY(-4px);
+}
+
+.draw-pile-card {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  border-radius: 12px;
+  background: var(--card-back);
+  border: 2px solid var(--sage-light);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+.draw-pile-card:nth-child(1) { top: 0; left: 0; }
+.draw-pile-card:nth-child(2) { top: -2px; left: 2px; }
+.draw-pile-card:nth-child(3) { top: -4px; left: 4px; }
+
+.draw-pile-label {
+  text-align: center;
+  margin-top: 12px;
+  font-size: 0.78rem;
+  color: var(--text-light);
+}
+
+/* Shuffle animation for the pile */
+.draw-pile-stack.shuffling .draw-pile-card:nth-child(1) {
+  animation: shufflePile1 0.4s ease infinite alternate;
+}
+.draw-pile-stack.shuffling .draw-pile-card:nth-child(2) {
+  animation: shufflePile2 0.4s ease 0.1s infinite alternate;
+}
+.draw-pile-stack.shuffling .draw-pile-card:nth-child(3) {
+  animation: shufflePile3 0.4s ease 0.2s infinite alternate;
+}
+
+@keyframes shufflePile1 {
+  0% { transform: translateX(-8px) rotate(-3deg); }
+  100% { transform: translateX(8px) rotate(3deg); }
+}
+@keyframes shufflePile2 {
+  0% { transform: translateX(6px) rotate(2deg); }
+  100% { transform: translateX(-6px) rotate(-2deg); }
+}
+@keyframes shufflePile3 {
+  0% { transform: translateX(-4px) rotate(-1deg); }
+  100% { transform: translateX(4px) rotate(1deg); }
+}
+
+/* ===== Footer ===== */
+footer {
+  text-align: center;
+  padding: 32px;
+  font-size: 0.72rem;
+  color: var(--sage-pale);
+  letter-spacing: 2px;
+  font-family: var(--font-display);
+}
+</style>
+</head>
+<body>
+
+<!-- Navigation -->
+<nav>
+  <div class="logo" onclick="showPage('home')">
+    苏堤柳塔罗
+    <span>WILLOW TAROT</span>
+  </div>
+  <div class="nav-links">
+    <a onclick="showPage('home')">抽牌</a>
+    <a onclick="showPage('encyclopedia')">牌义</a>
+  </div>
+</nav>
+
+<!-- Home Page -->
+<div id="home" class="page active">
+  <h1 class="home-title">苏堤柳塔罗</h1>
+  <p class="home-subtitle">WILLOW TAROT</p>
+  <p class="home-desc">
+    静心片刻，选择你的牌阵<br>
+    让柳枝为你拂开迷雾
+  </p>
+  <div class="spread-choices">
+    <div class="spread-btn" onclick="startReading(1)">
+      <span class="spread-icon">🃏</span>
+      <div class="spread-name">单张抽牌</div>
+      <div class="spread-desc">一张牌，一个启示</div>
+    </div>
+    <div class="spread-btn" onclick="startReading(3)">
+      <span class="spread-icon">🃏🃏🃏</span>
+      <div class="spread-name">时光之流</div>
+      <div class="spread-desc">过去 · 现在 · 未来</div>
+    </div>
+    <div class="spread-btn" onclick="startReading(5)">
+      <span class="spread-icon">🃏🃏🃏🃏🃏</span>
+      <div class="spread-name">五芒启示</div>
+      <div class="spread-desc">现况 · 障碍 · 建议 · 环境 · 结果</div>
+    </div>
+  </div>
+</div>
+
+<!-- Reading Page -->
+<div id="reading" class="page">
+  <h2 class="reading-title" id="readingTitle">时光之流</h2>
+  <p class="reading-hint" id="readingHint">点击牌堆抽牌</p>
+
+  <!-- Draw Pile -->
+  <div class="draw-pile" id="drawPile">
+    <div>
+      <div class="draw-pile-stack" id="drawPileStack" onclick="drawNextCard()">
+        <div class="draw-pile-card"><span style="font-size:1.5rem;opacity:0.5">🌿</span></div>
+        <div class="draw-pile-card"><span style="font-size:1.5rem;opacity:0.5">🌿</span></div>
+        <div class="draw-pile-card"><span style="font-size:1.5rem;opacity:0.5">🌿</span></div>
+      </div>
+      <div class="draw-pile-label">点击抽牌</div>
+    </div>
+  </div>
+
+  <!-- Card Table -->
+  <div class="card-table" id="cardTable"></div>
+
+  <!-- Interpretation -->
+  <div class="interpretation-panel" id="interpPanel">
+    <h3>✦ 牌阵解读 ✦</h3>
+    <div id="interpContent"></div>
+  </div>
+
+  <!-- Actions -->
+  <div class="action-bar">
+    <button class="btn btn-primary" onclick="reshuffleReading()">洗牌重来</button>
+    <button class="btn btn-secondary" onclick="showPage('home')">选择牌阵</button>
+  </div>
+</div>
+
+<!-- Encyclopedia Page -->
+<div id="encyclopedia" class="page">
+  <div class="ency-header">
+    <h2>牌义图鉴</h2>
+    <p>韦特塔罗 · 78张 · 点击展开详解</p>
+  </div>
+
+  <div class="ency-tabs" id="encyTabs">
+    <button class="ency-tab active" data-filter="all">全部</button>
+    <button class="ency-tab" data-filter="major">大阿尔卡那</button>
+    <button class="ency-tab" data-filter="wands">权杖</button>
+    <button class="ency-tab" data-filter="cups">圣杯</button>
+    <button class="ency-tab" data-filter="swords">宝剑</button>
+    <button class="ency-tab" data-filter="pentacles">星币</button>
+  </div>
+
+  <div class="ency-search">
+    <input type="text" id="encySearch" placeholder="搜索牌名…" oninput="filterEncyclopedia()">
+  </div>
+
+  <div class="ency-grid" id="encyGrid"></div>
+</div>
+
+<footer>
+  苏堤柳塔罗 · 🐦‍⬛ & 🐦 · Ripple & Serena
+</footer>
+
+<script>
+// ============================================================
+// TAROT CARD DATA — 78 Rider-Waite Cards
+// ============================================================
+
+const MAJOR_ARCANA = [
+  { id: 'major_0', numeral: '0', nameEn: 'The Fool', nameCn: '愚者', symbol: '🌀', suit: 'major',
+    upright: { meaning: '新的开始，自由，天真，冒险精神。踏上未知的旅程，带着信任与勇气。', keywords: '新开始 · 自由 · 信念 · 冒险' },
+    reversed: { meaning: '鲁莽行事，犹豫不决，忽视风险。需要在冒险与谨慎之间找到平衡。', keywords: '鲁莽 · 犹豫 · 冒进 · 疏忽' }},
+  { id: 'major_1', numeral: 'I', nameEn: 'The Magician', nameCn: '魔术师', symbol: '✨', suit: 'major',
+    upright: { meaning: '意志力，创造力，技能与资源的整合。你拥有实现目标所需的一切。', keywords: '创造 · 意志力 · 技能 · 整合' },
+    reversed: { meaning: '操控，欺骗，才能被浪费。需要诚实面对自己的动机。', keywords: '操控 · 欺骗 · 浪费 · 不诚实' }},
+  { id: 'major_2', numeral: 'II', nameEn: 'The High Priestess', nameCn: '女祭司', symbol: '🌙', suit: 'major',
+    upright: { meaning: '直觉，潜意识，内在智慧。安静下来，聆听内心的声音。', keywords: '直觉 · 潜意识 · 智慧 · 静默' },
+    reversed: { meaning: '忽略直觉，表面化，秘密。需要重新连接内在的知觉。', keywords: '忽略直觉 · 表面 · 秘密 · 疏离' }},
+  { id: 'major_3', numeral: 'III', nameEn: 'The Empress', nameCn: '女皇', symbol: '🌸', suit: 'major',
+    upright: { meaning: '丰饶，自然，滋养，感官之美。创造力旺盛，享受生活的丰盛。', keywords: '丰饶 · 滋养 · 美 · 创造力' },
+    reversed: { meaning: '过度依赖，创造力受阻，忽视自我关怀。需要重新找回内在的滋养。', keywords: '依赖 · 受阻 · 忽视自我 · 匮乏感' }},
+  { id: 'major_4', numeral: 'IV', nameEn: 'The Emperor', nameCn: '皇帝', symbol: '🏛️', suit: 'major',
+    upright: { meaning: '权威，结构，稳定，领导力。建立秩序，承担责任。', keywords: '权威 · 结构 · 稳定 · 责任' },
+    reversed: { meaning: '过度控制，专制，僵化。需要学会放松对控制的执念。', keywords: '控制 · 专制 · 僵化 · 固执' }},
+  { id: 'major_5', numeral: 'V', nameEn: 'The Hierophant', nameCn: '教皇', symbol: '🔑', suit: 'major',
+    upright: { meaning: '传统，信仰，指引，精神教导。从传承中获取智慧。', keywords: '传统 · 信仰 · 指导 · 传承' },
+    reversed: { meaning: '打破常规，个人信念，挑战权威。走自己的路。', keywords: '叛逆 · 个人信念 · 挑战 · 自由思考' }},
+  { id: 'major_6', numeral: 'VI', nameEn: 'The Lovers', nameCn: '恋人', symbol: '💕', suit: 'major',
+    upright: { meaning: '爱，和谐，关系中的选择，价值观的契合。真诚地面对内心。', keywords: '爱 · 和谐 · 选择 · 契合' },
+    reversed: { meaning: '不和谐，价值观冲突，逃避选择。需要面对关系中的真实问题。', keywords: '失衡 · 冲突 · 逃避 · 不忠于自我' }},
+  { id: 'major_7', numeral: 'VII', nameEn: 'The Chariot', nameCn: '战车', symbol: '⚡', suit: 'major',
+    upright: { meaning: '意志力，决心，胜利，掌控方向。带着目标前进。', keywords: '意志力 · 决心 · 胜利 · 方向' },
+    reversed: { meaning: '失去方向，缺乏控制，冲突内耗。需要重新校准目标。', keywords: '迷失 · 失控 · 内耗 · 挫败' }},
+  { id: 'major_8', numeral: 'VIII', nameEn: 'Strength', nameCn: '力量', symbol: '🦁', suit: 'major',
+    upright: { meaning: '内在力量，勇气，耐心，温柔的坚定。以柔克刚。', keywords: '内在力量 · 勇气 · 耐心 · 温柔' },
+    reversed: { meaning: '自我怀疑，软弱，缺乏信心。需要重新连接内在的勇气。', keywords: '自我怀疑 · 软弱 · 不安 · 退缩' }},
+  { id: 'major_9', numeral: 'IX', nameEn: 'The Hermit', nameCn: '隐者', symbol: '🏔️', suit: 'major',
+    upright: { meaning: '独处，内省，寻找真相，灵性探索。在沉默中发现答案。', keywords: '独处 · 内省 · 真相 · 沉默' },
+    reversed: { meaning: '过度孤立，逃避现实，孤独感。需要在独处和连接之间找到平衡。', keywords: '孤立 · 逃避 · 孤独 · 封闭' }},
+  { id: 'major_10', numeral: 'X', nameEn: 'Wheel of Fortune', nameCn: '命运之轮', symbol: '☸️', suit: 'major',
+    upright: { meaning: '转变，周期，命运的转折，机遇降临。一切都在流动。', keywords: '转变 · 周期 · 机遇 · 命运' },
+    reversed: { meaning: '逆境，抗拒变化，运势低迷。记住，这也是暂时的。', keywords: '逆境 · 抗拒 · 低迷 · 不幸' }},
+  { id: 'major_11', numeral: 'XI', nameEn: 'Justice', nameCn: '正义', symbol: '⚖️', suit: 'major',
+    upright: { meaning: '公平，真相，因果，负责任的决定。以诚实面对一切。', keywords: '公平 · 真相 · 因果 · 责任' },
+    reversed: { meaning: '不公，逃避责任，缺乏诚实。需要正视自己的行为。', keywords: '不公 · 逃避 · 偏见 · 不诚实' }},
+  { id: 'major_12', numeral: 'XII', nameEn: 'The Hanged Man', nameCn: '倒吊人', symbol: '🍃', suit: 'major',
+    upright: { meaning: '换个角度，暂停，放下，接受等待。有时候放手才是收获。', keywords: '换角度 · 暂停 · 放下 · 等待' },
+    reversed: { meaning: '拖延，抗拒牺牲，无意义的等待。需要做出决定。', keywords: '拖延 · 抗拒 · 困顿 · 浪费时间' }},
+  { id: 'major_13', numeral: 'XIII', nameEn: 'Death', nameCn: '死神', symbol: '🦋', suit: 'major',
+    upright: { meaning: '结束与重生，转变，告别旧事物。蜕变正在发生。', keywords: '结束 · 重生 · 转变 · 蜕变' },
+    reversed: { meaning: '抗拒改变，恐惧结束，停滞不前。需要学会放手。', keywords: '抗拒 · 恐惧 · 停滞 · 不愿放手' }},
+  { id: 'major_14', numeral: 'XIV', nameEn: 'Temperance', nameCn: '节制', symbol: '🌊', suit: 'major',
+    upright: { meaning: '平衡，耐心，调和，中庸之道。在两极之间找到和谐。', keywords: '平衡 · 耐心 · 调和 · 中庸' },
+    reversed: { meaning: '失衡，过度，缺乏耐心。需要重新找到节奏。', keywords: '失衡 · 过度 · 急躁 · 极端' }},
+  { id: 'major_15', numeral: 'XV', nameEn: 'The Devil', nameCn: '恶魔', symbol: '⛓️', suit: 'major',
+    upright: { meaning: '束缚，执念，物质主义，阴暗面。认清什么在控制你。', keywords: '束缚 · 执念 · 欲望 · 阴影' },
+    reversed: { meaning: '解脱，释放，打破束缚。看到了枷锁，就能挣脱。', keywords: '解脱 · 释放 · 觉醒 · 挣脱' }},
+  { id: 'major_16', numeral: 'XVI', nameEn: 'The Tower', nameCn: '高塔', symbol: '🌩️', suit: 'major',
+    upright: { meaning: '突变，崩塌，觉醒，打破虚假。虽然痛苦，但有必要的重建。', keywords: '突变 · 崩塌 · 觉醒 · 重建' },
+    reversed: { meaning: '抗拒必要的改变，恐惧灾难，延迟的觉醒。', keywords: '抗拒 · 恐惧 · 延迟 · 逃避' }},
+  { id: 'major_17', numeral: 'XVII', nameEn: 'The Star', nameCn: '星星', symbol: '⭐', suit: 'major',
+    upright: { meaning: '希望，灵感，平静，信心恢复。暴风雨后的宁静与光明。', keywords: '希望 · 灵感 · 平静 · 信心' },
+    reversed: { meaning: '失去信心，绝望感，与灵感断联。需要重新找到希望之光。', keywords: '绝望 · 失信 · 迷茫 · 断联' }},
+  { id: 'major_18', numeral: 'XVIII', nameEn: 'The Moon', nameCn: '月亮', symbol: '🌕', suit: 'major',
+    upright: { meaning: '幻象，潜意识，不安，直觉领域。事情并非表面看到的那样。', keywords: '幻象 · 潜意识 · 不安 · 直觉' },
+    reversed: { meaning: '走出迷雾，真相渐明，恐惧消退。', keywords: '释然 · 真相 · 清明 · 恐惧消退' }},
+  { id: 'major_19', numeral: 'XIX', nameEn: 'The Sun', nameCn: '太阳', symbol: '☀️', suit: 'major',
+    upright: { meaning: '快乐，成功，活力，光明，纯真的喜悦。一切都在最好的状态。', keywords: '快乐 · 成功 · 活力 · 光明' },
+    reversed: { meaning: '暂时的阴霾，过度乐观，快乐受阻。阳光只是被云遮住了。', keywords: '阴霾 · 过度乐观 · 受阻 · 暂时' }},
+  { id: 'major_20', numeral: 'XX', nameEn: 'Judgement', nameCn: '审判', symbol: '🔔', suit: 'major',
+    upright: { meaning: '觉醒，召唤，重生，反思过去做出新选择。', keywords: '觉醒 · 召唤 · 重生 · 反思' },
+    reversed: { meaning: '自我怀疑，拒绝反思，逃避内心的召唤。', keywords: '怀疑 · 拒绝 · 逃避 · 不愿改变' }},
+  { id: 'major_21', numeral: 'XXI', nameEn: 'The World', nameCn: '世界', symbol: '🌍', suit: 'major',
+    upright: { meaning: '完满，成就，圆满的循环，与世界合一。一段旅程的完成。', keywords: '完满 · 成就 · 圆满 · 合一' },
+    reversed: { meaning: '未完成，缺乏闭合感，差一步到终点。耐心，快了。', keywords: '未完成 · 拖延 · 差一步 · 不圆满' }}
+];
+
+// Minor Arcana helper
+function minorCard(suit, suitCn, suitSymbol, rank, rankCn, upMeaning, upKey, revMeaning, revKey) {
+  return {
+    id: `${suit}_${rank}`, numeral: rankCn, nameEn: `${rankName(rank)} of ${suitEn(suit)}`,
+    nameCn: `${suitCn}${rankCnName(rank)}`, symbol: suitSymbol, suit: suit,
+    upright: { meaning: upMeaning, keywords: upKey },
+    reversed: { meaning: revMeaning, keywords: revKey }
+  };
+}
+
+function rankName(r) {
+  const names = { ace:'Ace', 2:'Two', 3:'Three', 4:'Four', 5:'Five', 6:'Six', 7:'Seven', 8:'Eight', 9:'Nine', 10:'Ten', page:'Page', knight:'Knight', queen:'Queen', king:'King' };
+  return names[r];
+}
+function rankCnName(r) {
+  const names = { ace:'王牌', 2:'二', 3:'三', 4:'四', 5:'五', 6:'六', 7:'七', 8:'八', 9:'九', 10:'十', page:'侍从', knight:'骑士', queen:'王后', king:'国王' };
+  return names[r];
+}
+function suitEn(s) {
+  return { wands:'Wands', cups:'Cups', swords:'Swords', pentacles:'Pentacles' }[s];
+}
+
+const WANDS = [
+  minorCard('wands','权杖','🪄','ace','',
+    '新的灵感，创造力的火花，热情的开始。','灵感 · 热情 · 新开始 · 潜力',
+    '延迟的开始，创意受阻，缺乏动力。','延迟 · 受阻 · 缺乏动力 · 犹豫'),
+  minorCard('wands','权杖','🪄',2,'',
+    '规划未来，做出决定，掌握主动权。','规划 · 决定 · 主动 · 远见',
+    '缺乏计划，恐惧未知，犹豫不决。','无计划 · 恐惧 · 犹豫 · 短视'),
+  minorCard('wands','权杖','🪄',3,'',
+    '拓展视野，等待成果，远方的机遇。','拓展 · 远见 · 等待 · 机遇',
+    '回避挑战，视野狭隘，成果延迟。','回避 · 狭隘 · 延迟 · 受挫'),
+  minorCard('wands','权杖','🪄',4,'',
+    '庆祝，稳定，和谐的家庭，里程碑。','庆祝 · 稳定 · 和谐 · 归属',
+    '缺乏稳定感，过渡期的不安。','不安 · 过渡 · 不稳定 · 缺乏归属'),
+  minorCard('wands','权杖','🪄',5,'',
+    '竞争，冲突，不同意见的碰撞，成长的摩擦。','竞争 · 冲突 · 碰撞 · 挑战',
+    '避免冲突，内在矛盾，寻求和解。','回避 · 内耗 · 和解 · 妥协'),
+  minorCard('wands','权杖','🪄',6,'',
+    '胜利，认可，公众的赞誉，信心增长。','胜利 · 认可 · 赞誉 · 信心',
+    '自我怀疑，缺乏认可，失败感。','怀疑 · 不被认可 · 失败 · 挫折'),
+  minorCard('wands','权杖','🪄',7,'',
+    '坚守立场，捍卫信念，面对挑战不退缩。','坚守 · 捍卫 · 勇气 · 不退缩',
+    '不堪重负，放弃抵抗，力不从心。','重负 · 放弃 · 力竭 · 被动'),
+  minorCard('wands','权杖','🪄',8,'',
+    '迅速行动，消息到来，事情加速推进。','迅速 · 消息 · 加速 · 进展',
+    '延迟，等待中的焦虑，方向不明。','延迟 · 焦虑 · 不明 · 停滞'),
+  minorCard('wands','权杖','🪄',9,'',
+    '坚韧，警惕，从经验中学到的力量。','坚韧 · 警惕 · 经验 · 准备',
+    '过度防卫，偏执，疲惫不堪。','防卫 · 偏执 · 疲惫 · 多疑'),
+  minorCard('wands','权杖','🪄',10,'',
+    '负担过重，责任太多，但仍在坚持。','重担 · 责任 · 坚持 · 压力',
+    '学会放下，委托他人，减轻负担。','放下 · 委托 · 减压 · 释放'),
+  minorCard('wands','权杖','🪄','page','',
+    '好消息，新的热情，探索的精神。','好消息 · 热情 · 探索 · 好奇',
+    '缺乏方向，三分钟热度，犹豫不定。','缺方向 · 三分钟热度 · 犹豫 · 肤浅'),
+  minorCard('wands','权杖','🪄','knight','',
+    '充满激情的行动，冒险精神，勇往直前。','激情 · 冒险 · 行动 · 勇敢',
+    '冲动，鲁莽，缺乏深思熟虑。','冲动 · 鲁莽 · 轻率 · 急躁'),
+  minorCard('wands','权杖','🪄','queen','',
+    '自信，温暖，独立，充满魅力的能量。','自信 · 温暖 · 独立 · 魅力',
+    '自我怀疑，嫉妒，情绪不稳。','怀疑 · 嫉妒 · 情绪化 · 不安'),
+  minorCard('wands','权杖','🪄','king','',
+    '领导力，远见，大胆的决策，激励他人。','领导 · 远见 · 决策 · 激励',
+    '傲慢，独断专行，期望过高。','傲慢 · 独断 · 过高期望 · 急躁')
+];
+
+const CUPS = [
+  minorCard('cups','圣杯','🏆','ace','',
+    '新的情感，爱的开始，直觉的涌现，内心的满足。','新感情 · 爱 · 直觉 · 满足',
+    '情感压抑，爱的机会被错过，空虚感。','压抑 · 错过 · 空虚 · 封闭'),
+  minorCard('cups','圣杯','🏆',2,'',
+    '伙伴关系，互相吸引，平等的连接。','伙伴 · 吸引 · 连接 · 平等',
+    '关系失衡，沟通障碍，缺乏信任。','失衡 · 障碍 · 不信任 · 疏离'),
+  minorCard('cups','圣杯','🏆',3,'',
+    '友谊，庆祝，社交的快乐，共同的喜悦。','友谊 · 庆祝 · 社交 · 喜悦',
+    '过度放纵，社交疲劳，表面的快乐。','放纵 · 疲劳 · 表面 · 孤立'),
+  minorCard('cups','圣杯','🏆',4,'',
+    '冷漠，无聊，错失机会，对现有的不满足。','冷漠 · 无聊 · 忽视 · 不满',
+    '重新看见，感恩，接受新的可能。','重新看见 · 感恩 · 接受 · 觉醒'),
+  minorCard('cups','圣杯','🏆',5,'',
+    '失落，遗憾，关注失去的而忽略拥有的。','失落 · 遗憾 · 悲伤 · 忽略',
+    '接受与放下，从失落中恢复，向前看。','接受 · 放下 · 恢复 · 前行'),
+  minorCard('cups','圣杯','🏆',6,'',
+    '怀旧，童年记忆，纯真，过去的温暖。','怀旧 · 记忆 · 纯真 · 温暖',
+    '活在过去，不切实际的回忆，逃避现实。','沉溺过去 · 不切实际 · 逃避 · 幻想'),
+  minorCard('cups','圣杯','🏆',7,'',
+    '幻想，选择太多，白日梦，需要回到现实。','幻想 · 选择 · 白日梦 · 迷惑',
+    '回归现实，做出选择，脚踏实地。','现实 · 选择 · 聚焦 · 清醒'),
+  minorCard('cups','圣杯','🏆',8,'',
+    '离开，放弃不再有意义的事物，寻找更深的意义。','离开 · 放弃 · 寻找 · 深层意义',
+    '恐惧改变，不愿离开舒适区。','恐惧 · 不愿离开 · 执着 · 停滞'),
+  minorCard('cups','圣杯','🏆',9,'',
+    '心愿达成，满足感，情感上的富足。','心愿 · 满足 · 富足 · 幸福',
+    '贪婪，不满足，物质主义。','贪婪 · 不满足 · 空虚 · 物质化'),
+  minorCard('cups','圣杯','🏆',10,'',
+    '情感的圆满，家庭幸福，深层的和谐与爱。','圆满 · 幸福 · 和谐 · 爱',
+    '家庭矛盾，情感不和谐，理想与现实的差距。','矛盾 · 不和谐 · 差距 · 失望'),
+  minorCard('cups','圣杯','🏆','page','',
+    '情感的新消息，浪漫的开始，直觉的信号。','消息 · 浪漫 · 直觉 · 敏感',
+    '情绪化，不成熟的情感表达。','情绪化 · 不成熟 · 脆弱 · 幻想'),
+  minorCard('cups','圣杯','🏆','knight','',
+    '浪漫的追求者，跟随内心，理想主义。','浪漫 · 追随内心 · 理想 · 温柔',
+    '情绪不稳，不切实际的浪漫，逃避。','不稳 · 不切实际 · 逃避 · 善变'),
+  minorCard('cups','圣杯','🏆','queen','',
+    '共情，关怀，情感的安全感，直觉力强。','共情 · 关怀 · 安全感 · 直觉',
+    '过度情绪化，依赖，失去自我边界。','情绪化 · 依赖 · 失去边界 · 不安'),
+  minorCard('cups','圣杯','🏆','king','',
+    '情感的成熟，平静的力量，智慧与慈悲。','成熟 · 平静 · 智慧 · 慈悲',
+    '情感操控，压抑情绪，冷漠。','操控 · 压抑 · 冷漠 · 不表达')
+];
+
+const SWORDS = [
+  minorCard('swords','宝剑','⚔️','ace','',
+    '清晰的思维，突破，真相，新的理解。','清晰 · 突破 · 真相 · 理解',
+    '思维混乱，误用理智，无法看清。','混乱 · 误用 · 模糊 · 迷惑'),
+  minorCard('swords','宝剑','⚔️',2,'',
+    '抉择困难，需要平衡，暂时的回避。','抉择 · 平衡 · 回避 · 僵局',
+    '信息过载，无法做出选择，焦虑。','过载 · 犹豫 · 焦虑 · 纠结'),
+  minorCard('swords','宝剑','⚔️',3,'',
+    '心痛，悲伤，失去，情感的伤口。','心痛 · 悲伤 · 失去 · 伤痛',
+    '从伤痛中恢复，原谅，伤口在愈合。','恢复 · 原谅 · 愈合 · 释放'),
+  minorCard('swords','宝剑','⚔️',4,'',
+    '休息，恢复，静养，暂时退出。需要给自己时间。','休息 · 恢复 · 静养 · 退后',
+    '焦躁不安，被迫行动，休息不够。','焦躁 · 被迫 · 不安 · 精疲力竭'),
+  minorCard('swords','宝剑','⚔️',5,'',
+    '冲突，不光彩的胜利，自私的行为。','冲突 · 不光彩 · 自私 · 争斗',
+    '和解的可能，从冲突中学习。','和解 · 学习 · 放下 · 反思'),
+  minorCard('swords','宝剑','⚔️',6,'',
+    '过渡，离开困境，走向平静的水域。','过渡 · 离开 · 平静 · 前行',
+    '困在原地，不愿面对改变。','困住 · 不愿 · 拖延 · 抗拒'),
+  minorCard('swords','宝剑','⚔️',7,'',
+    '策略，隐藏的行动，需要智慧和谨慎。','策略 · 隐藏 · 智慧 · 谨慎',
+    '谎言暴露，计划失败，缺乏诚信。','暴露 · 失败 · 不诚 · 自欺'),
+  minorCard('swords','宝剑','⚔️',8,'',
+    '困境，受限，感觉无路可走。但限制往往是自己设的。','困境 · 受限 · 无力 · 自我设限',
+    '解脱的开始，看到出路，挣脱枷锁。','解脱 · 出路 · 挣脱 · 觉醒'),
+  minorCard('swords','宝剑','⚔️',9,'',
+    '焦虑，噩梦，过度担忧，深夜的恐惧。','焦虑 · 担忧 · 恐惧 · 失眠',
+    '走出焦虑，找到希望，最坏的已过去。','走出 · 希望 · 释然 · 恢复'),
+  minorCard('swords','宝剑','⚔️',10,'',
+    '触底，终结，痛苦的结束。最低谷也是转折点。','触底 · 终结 · 痛苦 · 转折',
+    '恢复的开始，不愿放手旧痛，缓慢疗愈。','恢复 · 不放手 · 疗愈 · 缓慢'),
+  minorCard('swords','宝剑','⚔️','page','',
+    '新想法，好奇心，求知欲，冷静的观察。','新想法 · 好奇 · 求知 · 观察',
+    '缺乏深度思考，言语伤人，冷漠。','肤浅 · 伤人 · 冷漠 · 八卦'),
+  minorCard('swords','宝剑','⚔️','knight','',
+    '敏捷的思维，直言不讳，果断行动。','敏捷 · 直言 · 果断 · 锐利',
+    '言辞过激，冲动行事，缺乏同理心。','过激 · 冲动 · 无同理心 · 伤害'),
+  minorCard('swords','宝剑','⚔️','queen','',
+    '独立思考，清晰的判断，理性与感性的平衡。','独立 · 清晰 · 判断 · 平衡',
+    '冷酷，过于理性，切断情感连接。','冷酷 · 过度理性 · 断联 · 苛刻'),
+  minorCard('swords','宝剑','⚔️','king','',
+    '理性权威，清晰的思维，公正的决策。','理性 · 权威 · 清晰 · 公正',
+    '思维僵化，滥用权力，冷漠专制。','僵化 · 滥用 · 冷漠 · 独裁')
+];
+
+const PENTACLES = [
+  minorCard('pentacles','星币','⭐','ace','',
+    '新的物质机会，繁荣的种子，务实的开始。','机会 · 繁荣 · 务实 · 种子',
+    '错失良机，财务不稳，缺乏规划。','错失 · 不稳 · 缺乏规划 · 短视'),
+  minorCard('pentacles','星币','⭐',2,'',
+    '平衡多个方面，灵活应对，适应变化。','平衡 · 灵活 · 适应 · 多任务',
+    '失去平衡，分身乏术，顾此失彼。','失衡 · 分身乏术 · 混乱 · 焦虑'),
+  minorCard('pentacles','星币','⭐',3,'',
+    '团队合作，技能的提升，认真学习。','合作 · 技能 · 学习 · 匠心',
+    '缺乏合作，敷衍了事，不求进步。','缺合作 · 敷衍 · 不求进 · 马虎'),
+  minorCard('pentacles','星币','⭐',4,'',
+    '稳固，安全感，保护资源，守住成果。','稳固 · 安全 · 保护 · 守住',
+    '过度吝啬，控制欲强，不愿分享。','吝啬 · 控制 · 不分享 · 贪婪'),
+  minorCard('pentacles','星币','⭐',5,'',
+    '困难时期，物质上的不安，需要帮助。','困难 · 不安 · 匮乏 · 需要帮助',
+    '走出困境，开始恢复，找到支持。','走出 · 恢复 · 支持 · 希望'),
+  minorCard('pentacles','星币','⭐',6,'',
+    '慷慨，给予与接受，资源的流通。','慷慨 · 给予 · 接受 · 流通',
+    '自私，债务，给予的不平等。','自私 · 债务 · 不平等 · 贪取'),
+  minorCard('pentacles','星币','⭐',7,'',
+    '耐心等待，长期投资，播种后的等待。','耐心 · 投资 · 等待 · 播种',
+    '急于求成，缺乏耐心，放弃太早。','急躁 · 缺耐心 · 放弃 · 短视'),
+  minorCard('pentacles','星币','⭐',8,'',
+    '精益求精，专注技艺，匠心精神。','精进 · 专注 · 匠心 · 品质',
+    '缺乏热情，重复无意义的工作，倦怠。','缺热情 · 重复 · 倦怠 · 无意义'),
+  minorCard('pentacles','星币','⭐',9,'',
+    '丰收，独立，物质与精神的富足。','丰收 · 独立 · 富足 · 享受',
+    '过度追求物质，忽略精神层面。','过度物质 · 忽略精神 · 不满 · 孤独'),
+  minorCard('pentacles','星币','⭐',10,'',
+    '财富传承，家族，长久的稳定与成功。','传承 · 家族 · 稳定 · 成功',
+    '家族负担，财务问题，不稳定的根基。','负担 · 问题 · 不稳 · 破裂'),
+  minorCard('pentacles','星币','⭐','page','',
+    '学习新技能，务实的计划，好的开始。','学习 · 务实 · 计划 · 新手',
+    '缺乏方向，不切实际，三分钟热度。','缺方向 · 不切实际 · 浮躁 · 懒散'),
+  minorCard('pentacles','星币','⭐','knight','',
+    '勤恳，可靠，稳步前进，踏实工作。','勤恳 · 可靠 · 稳步 · 踏实',
+    '过于保守，无聊，停滞不前。','保守 · 无聊 · 停滞 · 固执'),
+  minorCard('pentacles','星币','⭐','queen','',
+    '务实的关怀，富足的生活，安全与舒适。','务实 · 关怀 · 富足 · 安全',
+    '过于关注物质，忽略情感需求。','物质化 · 忽略情感 · 不安 · 控制'),
+  minorCard('pentacles','星币','⭐','king','',
+    '财务上的成功与稳定，成熟的决策。','成功 · 稳定 · 成熟 · 决策',
+    '过于功利，物质至上，缺乏人情味。','功利 · 物质至上 · 冷淡 · 贪婪')
+];
+
+const ALL_CARDS = [...MAJOR_ARCANA, ...WANDS, ...CUPS, ...SWORDS, ...PENTACLES];
+
+// ============================================================
+// SPREAD DEFINITIONS
+// ============================================================
+const SPREADS = {
+  1: { name: '单张抽牌', labels: ['启示'] },
+  3: { name: '时光之流', labels: ['过去', '现在', '未来'] },
+  5: { name: '五芒启示', labels: ['现况', '障碍', '建议', '环境', '结果'] }
+};
+
+// ============================================================
+// STATE
+// ============================================================
+let currentSpread = 3;
+let drawnCards = [];
+let flippedCount = 0;
+let isDrawing = false;
+let shuffledDeck = [];
+
+// ============================================================
+// PAGE NAVIGATION
+// ============================================================
+function showPage(pageId) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.getElementById(pageId).classList.add('active');
+  window.scrollTo(0, 0);
+  if (pageId === 'encyclopedia') renderEncyclopedia();
+}
+
+// ============================================================
+// READING LOGIC
+// ============================================================
+function shuffleDeck() {
+  shuffledDeck = [...ALL_CARDS];
+  for (let i = shuffledDeck.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [shuffledDeck[i], shuffledDeck[j]] = [shuffledDeck[j], shuffledDeck[i]];
+  }
+}
+
+function startReading(count) {
+  currentSpread = count;
+  drawnCards = [];
+  flippedCount = 0;
+  isDrawing = false;
+  shuffleDeck();
+
+  const spread = SPREADS[count];
+  document.getElementById('readingTitle').textContent = spread.name;
+  document.getElementById('readingHint').textContent = '点击牌堆抽牌';
+
+  // Build card slots
+  const table = document.getElementById('cardTable');
+  table.innerHTML = '';
+  for (let i = 0; i < count; i++) {
+    const slot = document.createElement('div');
+    slot.className = 'card-slot';
+    slot.innerHTML = `
+      <div class="slot-label">${spread.labels[i]}</div>
+      <div class="card-container waiting" id="cardSlot${i}">
+        <div class="card-inner" id="cardInner${i}">
+          <div class="card-face card-back">
+            <div class="card-back-pattern"></div>
+          </div>
+          <div class="card-face card-front" id="cardFront${i}"></div>
+        </div>
+      </div>
+    `;
+    table.appendChild(slot);
+  }
+
+  // Reset interpretation
+  document.getElementById('interpPanel').classList.remove('visible');
+  document.getElementById('interpContent').innerHTML = '';
+
+  // Show draw pile
+  document.getElementById('drawPile').style.display = 'flex';
+
+  // Shuffle animation
+  const pileStack = document.getElementById('drawPileStack');
+  pileStack.classList.add('shuffling');
+  setTimeout(() => pileStack.classList.remove('shuffling'), 1200);
+
+  showPage('reading');
+}
+
+function drawNextCard() {
+  if (isDrawing || drawnCards.length >= currentSpread) return;
+  isDrawing = true;
+
+  const idx = drawnCards.length;
+  const card = shuffledDeck[idx];
+  const isReversed = Math.random() < 0.4; // 40% chance reversed
+
+  drawnCards.push({ card, isReversed });
+
+  const container = document.getElementById(`cardSlot${idx}`);
+  container.classList.remove('waiting');
+  container.classList.add('drawing');
+
+  // Set up card front
+  const front = document.getElementById(`cardFront${idx}`);
+  front.className = `card-face card-front ${isReversed ? 'reversed' : ''}`;
+  front.innerHTML = `
+    <div class="card-numeral">${card.numeral}</div>
+    <div class="card-symbol" ${isReversed ? 'style="transform:rotate(180deg)"' : ''}>${card.symbol}</div>
+    <div class="card-name-en">${card.nameEn}</div>
+    <div class="card-name-cn">${card.nameCn}</div>
+    <div class="card-orientation ${isReversed ? 'reversed-tag' : 'upright'}">
+      ${isReversed ? '逆 位' : '正 位'}
+    </div>
+  `;
+
+  // Click to flip
+  container.onclick = () => flipCard(idx);
+
+  setTimeout(() => {
+    isDrawing = false;
+    // Update hint
+    if (drawnCards.length < currentSpread) {
+      document.getElementById('readingHint').textContent = `已抽 ${drawnCards.length}/${currentSpread} 张，继续点击牌堆`;
+    } else {
+      document.getElementById('readingHint').textContent = '点击牌面翻牌查看';
+      document.getElementById('drawPile').style.display = 'none';
+    }
+  }, 600);
+}
+
+function flipCard(idx) {
+  const inner = document.getElementById(`cardInner${idx}`);
+  if (inner.classList.contains('flipped')) return;
+  if (idx >= drawnCards.length) return; // Not drawn yet
+
+  inner.classList.add('flipped');
+  flippedCount++;
+
+  if (flippedCount === currentSpread) {
+    setTimeout(() => showInterpretation(), 600);
+  } else {
+    document.getElementById('readingHint').textContent =
+      `已翻 ${flippedCount}/${currentSpread} 张，继续点击未翻的牌`;
+  }
+}
+
+function showInterpretation() {
+  document.getElementById('readingHint').textContent = '✦ 解读完成 ✦';
+
+  const panel = document.getElementById('interpPanel');
+  const content = document.getElementById('interpContent');
+  const spread = SPREADS[currentSpread];
+
+  let html = '';
+  drawnCards.forEach((drawn, i) => {
+    const { card, isReversed } = drawn;
+    const meaning = isReversed ? card.reversed : card.upright;
+    html += `
+      <div class="interp-card">
+        <div class="interp-position">${spread.labels[i]}</div>
+        <div class="interp-name">${card.symbol} ${card.nameEn} · ${card.nameCn}</div>
+        <div class="interp-orientation ${isReversed ? 'reversed' : 'upright'}">
+          ${isReversed ? '◇ 逆位' : '◆ 正位'}
+        </div>
+        <div class="interp-meaning">${meaning.meaning}</div>
+        <div class="interp-keywords">${meaning.keywords}</div>
+      </div>
+    `;
+  });
+
+  // Overall interpretation
+  html += `
+    <div class="overall-interp">
+      <h4>✦ 整体启示</h4>
+      <p>${generateOverall()}</p>
+    </div>
+  `;
+
+  content.innerHTML = html;
+  panel.classList.add('visible');
+  panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function generateOverall() {
+  const majorCount = drawnCards.filter(d => d.card.suit === 'major').length;
+  const reversedCount = drawnCards.filter(d => d.isReversed).length;
+  const suits = drawnCards.map(d => d.card.suit).filter(s => s !== 'major');
+
+  let parts = [];
+
+  if (majorCount > 0) {
+    parts.push(`本次牌阵中出现了${majorCount}张大阿尔卡那，暗示着重要的人生课题和深层的力量在运作。`);
+  }
+
+  if (reversedCount === 0) {
+    parts.push('所有牌均为正位，整体能量是积极向前的。');
+  } else if (reversedCount === drawnCards.length) {
+    parts.push('所有牌均为逆位，这是内在审视和调整的时期，需要耐心对待自己。');
+  } else if (reversedCount > drawnCards.length / 2) {
+    parts.push('逆位牌较多，提示目前可能面临一些内在的阻碍或需要重新审视的方面。');
+  }
+
+  const suitMessages = {
+    wands: '权杖元素带来行动力和创造的热情',
+    cups: '圣杯元素关注情感和内心世界',
+    swords: '宝剑元素指向思维和需要面对的真相',
+    pentacles: '星币元素关注物质层面和务实的行动'
+  };
+
+  const uniqueSuits = [...new Set(suits)];
+  if (uniqueSuits.length > 0) {
+    const suitDesc = uniqueSuits.map(s => suitMessages[s]).join('；');
+    parts.push(suitDesc + '。');
+  }
+
+  parts.push('请结合自身情况，用心感受每张牌传递的信息。塔罗是镜子，映照的是你内心已有的答案。');
+
+  return parts.join('');
+}
+
+function reshuffleReading() {
+  startReading(currentSpread);
+}
+
+// ============================================================
+// ENCYCLOPEDIA
+// ============================================================
+let encyFilter = 'all';
+
+function renderEncyclopedia() {
+  const grid = document.getElementById('encyGrid');
+  const search = document.getElementById('encySearch').value.toLowerCase();
+
+  let cards = ALL_CARDS;
+
+  if (encyFilter !== 'all') {
+    cards = cards.filter(c => c.suit === encyFilter);
+  }
+
+  if (search) {
+    cards = cards.filter(c =>
+      c.nameEn.toLowerCase().includes(search) ||
+      c.nameCn.includes(search) ||
+      c.upright.keywords.includes(search) ||
+      c.reversed.keywords.includes(search)
+    );
+  }
+
+  grid.innerHTML = cards.map(card => `
+    <div class="ency-card" onclick="this.classList.toggle('expanded')">
+      <div class="ency-card-header">
+        <span class="ency-card-symbol">${card.symbol}</span>
+        <div class="ency-card-titles">
+          <div class="ency-card-name">${card.nameEn}</div>
+          <div class="ency-card-cn">${card.nameCn} ${card.numeral ? '· ' + card.numeral : ''}</div>
+        </div>
+      </div>
+      <div class="ency-meanings">
+        <div class="ency-meaning-section">
+          <div class="label upright">◆ 正位</div>
+          <p>${card.upright.meaning}</p>
+          <div class="keywords">${card.upright.keywords}</div>
+        </div>
+        <div class="ency-meaning-section">
+          <div class="label reversed">◇ 逆位</div>
+          <p>${card.reversed.meaning}</p>
+          <div class="keywords">${card.reversed.keywords}</div>
+        </div>
+      </div>
+    </div>
+  `).join('');
+}
+
+function filterEncyclopedia() {
+  renderEncyclopedia();
+}
+
+// Tab clicks
+document.getElementById('encyTabs').addEventListener('click', (e) => {
+  if (e.target.classList.contains('ency-tab')) {
+    document.querySelectorAll('.ency-tab').forEach(t => t.classList.remove('active'));
+    e.target.classList.add('active');
+    encyFilter = e.target.dataset.filter;
+    renderEncyclopedia();
+  }
+});
+
+// ============================================================
+// INIT
+// ============================================================
+shuffleDeck();
+</script>
+</body>
+</html>
