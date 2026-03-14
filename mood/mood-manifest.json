@@ -2,7 +2,7 @@
   "name": "心境手帖 · Mood Journal",
   "short_name": "心境手帖",
   "description": "每日心情记录 · Daily mood journal",
-  "start_url": "./mood.html",
+  "start_url": "./index.html",
   "display": "standalone",
   "background_color": "#FFF8F0",
   "theme_color": "#F4A683",
