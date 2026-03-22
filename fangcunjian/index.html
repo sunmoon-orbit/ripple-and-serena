@@ -534,9 +534,37 @@
     min-height: 0;
   }
 
-  .msg { display: flex; flex-direction: column; margin-bottom: 14px; position: relative; }
-  .msg.user { align-items: flex-end; }
-  .msg.claude { align-items: flex-start; }
+  .msg { display: flex; margin-bottom: 14px; position: relative; gap: 8px; }
+  .msg.user { flex-direction: row-reverse; }
+  .msg.claude { flex-direction: row; }
+
+  .msg-avatar {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 13px;
+    font-weight: 600;
+    color: #fff;
+    overflow: hidden;
+    margin-top: 18px;
+  }
+
+  .msg-avatar img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+
+  .msg.user .msg-avatar { background: var(--user-bubble); }
+  .msg.claude .msg-avatar { background: var(--accent-light); }
+
+  .msg-content { display: flex; flex-direction: column; min-width: 0; max-width: 80%; }
+  .msg.user .msg-content { align-items: flex-end; }
+  .msg.claude .msg-content { align-items: flex-start; }
 
   .msg-meta {
     font-size: 11px;
@@ -564,7 +592,6 @@
   }
 
   .msg-bubble {
-    max-width: 80%;
     padding: 10px 14px;
     font-size: 14px;
     line-height: 1.65;
@@ -766,12 +793,26 @@
 <!-- Settings Modal -->
 <div class="modal-overlay hidden" id="settings-modal">
   <div class="modal">
-    <h3>设置名称</h3>
+    <h3>设置名称与头像</h3>
+    <div style="display:flex;gap:16px;margin-bottom:16px;">
+      <div style="text-align:center;">
+        <div id="preview-user-avatar" style="width:48px;height:48px;border-radius:50%;background:var(--user-bubble);color:#fff;display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:600;overflow:hidden;cursor:pointer;margin:0 auto 4px;" title="点击更换头像"></div>
+        <div style="font-size:11px;color:var(--text-muted)">User</div>
+        <input type="file" id="avatar-user-input" accept="image/*" style="display:none">
+      </div>
+      <div style="text-align:center;">
+        <div id="preview-claude-avatar" style="width:48px;height:48px;border-radius:50%;background:var(--accent-light);color:#fff;display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:600;overflow:hidden;cursor:pointer;margin:0 auto 4px;" title="点击更换头像"></div>
+        <div style="font-size:11px;color:var(--text-muted)">Claude</div>
+        <input type="file" id="avatar-claude-input" accept="image/*" style="display:none">
+      </div>
+    </div>
     <label>User 名称</label>
     <input id="input-user-name" value="阿颖">
     <label>Claude 名称</label>
     <input id="input-claude-name" value="涟言">
+    <div style="font-size:11px;color:var(--text-muted);margin-bottom:8px;">点击头像可上传自定义图片，支持 jpg/png</div>
     <div class="modal-actions">
+      <button class="modal-cancel" id="avatar-reset" style="color:var(--danger)">重置头像</button>
       <button class="modal-cancel" id="modal-cancel">取消</button>
       <button class="modal-save" id="modal-save">保存</button>
     </div>
@@ -802,6 +843,8 @@ let userName = "阿颖";
 let claudeName = "涟言";
 let bookmarks = []; // { convUuid, msgIndex, text, sender, convName, time }
 let notes = {};     // { convUuid: "note text" }
+let userAvatar = "";   // base64 data URL or empty
+let claudeAvatar = ""; // base64 data URL or empty
 let activeTab = "list";
 
 const $ = (id) => document.getElementById(id);
@@ -829,6 +872,8 @@ function saveLocal() {
     localStorage.setItem("fcj_notes", JSON.stringify(notes));
     localStorage.setItem("fcj_userName", userName);
     localStorage.setItem("fcj_claudeName", claudeName);
+    localStorage.setItem("fcj_userAvatar", userAvatar);
+    localStorage.setItem("fcj_claudeAvatar", claudeAvatar);
   } catch(e) {}
 }
 
@@ -842,6 +887,10 @@ function loadLocal() {
     if (u) userName = u;
     const c = localStorage.getItem("fcj_claudeName");
     if (c) claudeName = c;
+    const ua = localStorage.getItem("fcj_userAvatar");
+    if (ua) userAvatar = ua;
+    const ca = localStorage.getItem("fcj_claudeAvatar");
+    if (ca) claudeAvatar = ca;
   } catch(e) {}
 }
 
@@ -1102,6 +1151,15 @@ function renderList() {
   });
 }
 
+function getAvatarHtml(isUser) {
+  const avatar = isUser ? userAvatar : claudeAvatar;
+  const name = isUser ? userName : claudeName;
+  if (avatar) {
+    return `<img src="${avatar}" alt="">`;
+  }
+  return escapeHtml(name.charAt(0));
+}
+
 // ===== Render: Chat =====
 function renderChat() {
   const conv = conversations.find(c => c.uuid === selectedUuid);
@@ -1146,12 +1204,15 @@ function renderChat() {
     const bm = isBookmarked(conv.uuid, i);
     const bmClass = bm ? " active" : "";
     return `<div class="msg ${cls}">
-      <div class="msg-meta">
-        <span class="name">${escapeHtml(name)}</span>
-        <span>${formatTime(m.created_at)}</span>
-        <button class="msg-bookmark-btn${bmClass}" data-conv="${conv.uuid}" data-idx="${i}" title="收藏">🔖</button>
+      <div class="msg-avatar">${getAvatarHtml(isUser)}</div>
+      <div class="msg-content">
+        <div class="msg-meta">
+          <span class="name">${escapeHtml(name)}</span>
+          <span>${formatTime(m.created_at)}</span>
+          <button class="msg-bookmark-btn${bmClass}" data-conv="${conv.uuid}" data-idx="${i}" title="收藏">🔖</button>
+        </div>
+        <div class="msg-bubble">${highlightText(text, searchQuery)}</div>
       </div>
-      <div class="msg-bubble">${highlightText(text, searchQuery)}</div>
     </div>`;
   }).join("");
 
@@ -1411,10 +1472,71 @@ $("back-btn").addEventListener("click", () => {
 });
 
 // Settings
+let tempUserAvatar = "";
+let tempClaudeAvatar = "";
+
+function updateAvatarPreviews() {
+  const uPrev = $("preview-user-avatar");
+  const cPrev = $("preview-claude-avatar");
+  uPrev.innerHTML = tempUserAvatar ? `<img src="${tempUserAvatar}" style="width:100%;height:100%;object-fit:cover">` : escapeHtml(userName.charAt(0));
+  cPrev.innerHTML = tempClaudeAvatar ? `<img src="${tempClaudeAvatar}" style="width:100%;height:100%;object-fit:cover">` : escapeHtml(claudeName.charAt(0));
+}
+
+function readImageAsBase64(file, maxSize, callback) {
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    const img = new Image();
+    img.onload = () => {
+      const canvas = document.createElement("canvas");
+      const size = Math.min(img.width, img.height);
+      // Crop to square center
+      const sx = (img.width - size) / 2;
+      const sy = (img.height - size) / 2;
+      canvas.width = maxSize;
+      canvas.height = maxSize;
+      const ctx = canvas.getContext("2d");
+      ctx.drawImage(img, sx, sy, size, size, 0, 0, maxSize, maxSize);
+      callback(canvas.toDataURL("image/jpeg", 0.85));
+    };
+    img.src = e.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+
 $("settings-btn").addEventListener("click", () => {
   $("input-user-name").value = userName;
   $("input-claude-name").value = claudeName;
+  tempUserAvatar = userAvatar;
+  tempClaudeAvatar = claudeAvatar;
+  updateAvatarPreviews();
   settingsModal.classList.remove("hidden");
+});
+
+$("preview-user-avatar").addEventListener("click", () => $("avatar-user-input").click());
+$("preview-claude-avatar").addEventListener("click", () => $("avatar-claude-input").click());
+
+$("avatar-user-input").addEventListener("change", (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+  readImageAsBase64(file, 128, (data) => {
+    tempUserAvatar = data;
+    updateAvatarPreviews();
+  });
+});
+
+$("avatar-claude-input").addEventListener("change", (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+  readImageAsBase64(file, 128, (data) => {
+    tempClaudeAvatar = data;
+    updateAvatarPreviews();
+  });
+});
+
+$("avatar-reset").addEventListener("click", () => {
+  tempUserAvatar = "";
+  tempClaudeAvatar = "";
+  updateAvatarPreviews();
 });
 
 $("modal-cancel").addEventListener("click", () => settingsModal.classList.add("hidden"));
@@ -1425,6 +1547,8 @@ settingsModal.addEventListener("click", (e) => {
 $("modal-save").addEventListener("click", () => {
   userName = $("input-user-name").value || "User";
   claudeName = $("input-claude-name").value || "Claude";
+  userAvatar = tempUserAvatar;
+  claudeAvatar = tempClaudeAvatar;
   settingsModal.classList.add("hidden");
   saveLocal();
   if (selectedUuid) renderChat();
