@@ -32,6 +32,7 @@
     --danger: #c4756e;
     --export-btn: #5b7a5e;
     --highlight: #f0d87080;
+    --bookmark: #d4a054;
   }
 
   * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -107,7 +108,6 @@
   /* ===== Main Layout ===== */
   #main-screen { display: none; height: 100vh; height: 100dvh; }
 
-  /* Desktop: side by side */
   @media (min-width: 768px) {
     #main-screen { display: none; flex-direction: row; }
     #main-screen.active { display: flex; }
@@ -116,13 +116,14 @@
     #back-btn { display: none; }
   }
 
-  /* Mobile: stack */
   @media (max-width: 767px) {
     #main-screen { display: none; flex-direction: column; }
     #main-screen.active { display: flex; }
     #sidebar { width: 100%; flex: 1; display: flex; flex-direction: column; }
     #chat-panel { position: absolute; inset: 0; z-index: 10; display: none; flex-direction: column; background: var(--chat-bg); }
     #chat-panel.open { display: flex; }
+    .overlay-panel { position: absolute; inset: 0; z-index: 20; display: none; flex-direction: column; background: var(--chat-bg); }
+    .overlay-panel.open { display: flex; }
   }
 
   /* ===== Sidebar ===== */
@@ -133,7 +134,7 @@
   }
 
   .sidebar-header {
-    padding: 20px 16px 12px;
+    padding: 16px 16px 10px;
     border-bottom: 1px solid var(--border);
   }
 
@@ -150,7 +151,35 @@
     margin-top: 4px;
   }
 
-  .search-area { padding: 12px 16px 8px; }
+  /* Tab bar */
+  .tab-bar {
+    display: flex;
+    border-bottom: 1px solid var(--border);
+    background: var(--sidebar);
+  }
+
+  .tab-btn {
+    flex: 1;
+    padding: 8px 0;
+    font-size: 12px;
+    border: none;
+    background: transparent;
+    color: var(--text-muted);
+    cursor: pointer;
+    font-family: inherit;
+    border-bottom: 2px solid transparent;
+    transition: all 0.15s;
+  }
+
+  .tab-btn.active {
+    color: var(--accent);
+    border-bottom-color: var(--accent);
+  }
+
+  .tab-content { display: none; flex: 1; overflow: hidden; flex-direction: column; }
+  .tab-content.active { display: flex; }
+
+  .search-area { padding: 10px 16px 6px; }
 
   .search-input {
     width: 100%;
@@ -183,10 +212,10 @@
     color: #fff;
   }
 
-  .conv-list { flex: 1; overflow-y: auto; padding: 4px 0; }
+  .conv-list { flex: 1; overflow-y: auto; padding: 4px 0; -webkit-overflow-scrolling: touch; }
 
   .conv-item {
-    padding: 12px 16px;
+    padding: 10px 16px;
     cursor: pointer;
     border-left: 3px solid transparent;
     transition: background 0.15s ease;
@@ -206,10 +235,20 @@
     white-space: nowrap;
   }
 
+  .conv-item-note {
+    font-size: 11px;
+    color: var(--accent);
+    margin-top: 2px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-style: italic;
+  }
+
   .conv-item-meta {
     font-size: 11px;
     color: var(--text-muted);
-    margin-top: 4px;
+    margin-top: 3px;
     display: flex;
     gap: 8px;
   }
@@ -242,6 +281,156 @@
 
   .sidebar-bottom .close-btn { color: var(--danger); }
 
+  /* ===== Timeline Tab ===== */
+  .timeline-container {
+    flex: 1;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    padding: 16px;
+  }
+
+  .timeline-month {
+    margin-bottom: 16px;
+  }
+
+  .timeline-month-label {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: 8px;
+  }
+
+  .timeline-bars {
+    display: flex;
+    gap: 2px;
+    align-items: flex-end;
+    height: 60px;
+  }
+
+  .timeline-bar {
+    flex: 1;
+    min-width: 3px;
+    background: var(--accent-light);
+    border-radius: 2px 2px 0 0;
+    cursor: pointer;
+    transition: background 0.15s;
+    position: relative;
+  }
+
+  .timeline-bar:hover {
+    background: var(--accent);
+  }
+
+  .timeline-bar-tip {
+    display: none;
+    position: absolute;
+    bottom: calc(100% + 4px);
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--text-primary);
+    color: #fff;
+    font-size: 10px;
+    padding: 2px 6px;
+    border-radius: 4px;
+    white-space: nowrap;
+    pointer-events: none;
+    z-index: 5;
+  }
+
+  .timeline-bar:hover .timeline-bar-tip { display: block; }
+
+  .timeline-summary {
+    font-size: 11px;
+    color: var(--text-muted);
+    margin-top: 4px;
+  }
+
+  /* ===== Word Cloud Tab ===== */
+  .wordcloud-container {
+    flex: 1;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    padding: 16px;
+  }
+
+  .wordcloud-area {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px 10px;
+    justify-content: center;
+    align-items: center;
+    padding: 16px 8px;
+  }
+
+  .wc-word {
+    cursor: pointer;
+    transition: opacity 0.15s;
+    line-height: 1.2;
+  }
+
+  .wc-word:hover { opacity: 0.7; }
+
+  .wordcloud-info {
+    font-size: 11px;
+    color: var(--text-muted);
+    text-align: center;
+    margin-bottom: 12px;
+  }
+
+  /* ===== Bookmarks Tab ===== */
+  .bookmarks-container {
+    flex: 1;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    padding: 8px 0;
+  }
+
+  .bookmark-item {
+    padding: 10px 16px;
+    border-bottom: 1px solid var(--border);
+    cursor: pointer;
+    transition: background 0.15s;
+  }
+
+  .bookmark-item:hover { background: var(--sidebar-hover); }
+
+  .bookmark-from {
+    font-size: 11px;
+    color: var(--accent);
+    margin-bottom: 4px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .bookmark-remove {
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    cursor: pointer;
+    font-size: 14px;
+    padding: 0 4px;
+  }
+
+  .bookmark-remove:hover { color: var(--danger); }
+
+  .bookmark-sender {
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--text-secondary);
+    margin-bottom: 2px;
+  }
+
+  .bookmark-text {
+    font-size: 13px;
+    color: var(--text-primary);
+    line-height: 1.5;
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
   /* ===== Chat Panel ===== */
   #chat-panel {
     background: var(--chat-bg);
@@ -250,13 +439,13 @@
   }
 
   .chat-header {
-    padding: 14px 20px;
+    padding: 12px 16px;
     border-bottom: 1px solid var(--border);
     background: var(--bg);
     display: flex;
     justify-content: space-between;
     align-items: flex-start;
-    gap: 12px;
+    gap: 8px;
   }
 
   #back-btn {
@@ -279,26 +468,52 @@
     white-space: nowrap;
   }
 
+  .chat-header-note {
+    font-size: 12px;
+    color: var(--accent);
+    font-style: italic;
+    margin-top: 2px;
+    cursor: pointer;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .chat-header-note:hover { text-decoration: underline; }
+
   .chat-header-meta {
     font-size: 11px;
     color: var(--text-secondary);
-    margin-top: 4px;
+    margin-top: 3px;
     display: flex;
     gap: 10px;
     flex-wrap: wrap;
   }
 
-  .export-btn {
-    padding: 6px 14px;
+  .chat-header-actions {
+    display: flex;
+    gap: 6px;
+    flex-shrink: 0;
+  }
+
+  .action-btn {
+    padding: 5px 10px;
     font-size: 12px;
-    border: none;
+    border: 1px solid var(--border);
     border-radius: 6px;
-    background: var(--export-btn);
-    color: #fff;
+    background: transparent;
+    color: var(--text-secondary);
     cursor: pointer;
     font-family: inherit;
     white-space: nowrap;
-    flex-shrink: 0;
+  }
+
+  .action-btn:hover { background: var(--sidebar-hover); }
+
+  .action-btn.primary {
+    border: none;
+    background: var(--export-btn);
+    color: #fff;
   }
 
   .chat-empty {
@@ -315,23 +530,38 @@
     flex: 1;
     overflow-y: auto;
     -webkit-overflow-scrolling: touch;
-    padding: 20px;
+    padding: 16px;
     min-height: 0;
   }
 
-  .msg { display: flex; flex-direction: column; margin-bottom: 16px; }
+  .msg { display: flex; flex-direction: column; margin-bottom: 14px; position: relative; }
   .msg.user { align-items: flex-end; }
   .msg.claude { align-items: flex-start; }
 
   .msg-meta {
     font-size: 11px;
     color: var(--text-muted);
-    margin-bottom: 4px;
+    margin-bottom: 3px;
     display: flex;
     gap: 6px;
+    align-items: center;
   }
 
   .msg-meta .name { font-weight: 500; }
+
+  .msg-bookmark-btn {
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-size: 12px;
+    padding: 0 2px;
+    opacity: 0.3;
+    transition: opacity 0.15s;
+  }
+
+  .msg-bookmark-btn:hover, .msg-bookmark-btn.active {
+    opacity: 1;
+  }
 
   .msg-bubble {
     max-width: 80%;
@@ -361,7 +591,7 @@
     padding: 0 1px;
   }
 
-  /* ===== Settings Modal ===== */
+  /* ===== Modals ===== */
   .modal-overlay {
     position: fixed;
     inset: 0;
@@ -375,7 +605,7 @@
   .modal {
     background: var(--chat-bg);
     border-radius: 12px;
-    padding: 28px;
+    padding: 24px;
     width: 340px;
     max-width: 90vw;
     box-shadow: 0 8px 32px rgba(0,0,0,0.15);
@@ -384,7 +614,7 @@
   .modal h3 {
     font-size: 16px;
     font-weight: 600;
-    margin-bottom: 20px;
+    margin-bottom: 16px;
   }
 
   .modal label {
@@ -394,7 +624,7 @@
     margin-bottom: 4px;
   }
 
-  .modal input {
+  .modal input, .modal textarea {
     width: 100%;
     padding: 8px 12px;
     border: 1px solid var(--border);
@@ -404,14 +634,20 @@
     color: var(--text-primary);
     font-family: inherit;
     outline: none;
-    margin-bottom: 14px;
+    margin-bottom: 12px;
+  }
+
+  .modal textarea {
+    height: 80px;
+    resize: vertical;
+    line-height: 1.5;
   }
 
   .modal-actions {
     display: flex;
     gap: 8px;
     justify-content: flex-end;
-    margin-top: 6px;
+    margin-top: 4px;
   }
 
   .modal-actions button {
@@ -436,7 +672,6 @@
 
   .hidden { display: none !important; }
 
-  /* Scrollbar */
   ::-webkit-scrollbar { width: 6px; }
   ::-webkit-scrollbar-track { background: transparent; }
   ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
@@ -445,7 +680,7 @@
 </head>
 <body>
 
-<!-- ===== Upload Screen ===== -->
+<!-- Upload Screen -->
 <div id="upload-screen">
   <div class="upload-title">方寸间</div>
   <div class="upload-subtitle">Claude 聊天记录拆分工具</div>
@@ -458,23 +693,50 @@
   <div class="upload-note">从 Claude 网页版导出的 conversations.json · 数据仅在本地处理</div>
 </div>
 
-<!-- ===== Main Screen ===== -->
+<!-- Main Screen -->
 <div id="main-screen">
-  <!-- Sidebar -->
   <div id="sidebar">
     <div class="sidebar-header">
       <h2>方寸间</h2>
       <div class="count" id="conv-count">共 0 个对话</div>
     </div>
-    <div class="search-area">
-      <input type="text" class="search-input" id="search-input" placeholder="搜索对话内容...">
-      <div class="sort-buttons">
-        <button class="sort-btn active" data-sort="newest">最新</button>
-        <button class="sort-btn" data-sort="oldest">最早</button>
-        <button class="sort-btn" data-sort="most_messages">最多消息</button>
-      </div>
+
+    <!-- Tabs -->
+    <div class="tab-bar">
+      <button class="tab-btn active" data-tab="list">对话</button>
+      <button class="tab-btn" data-tab="timeline">时间轴</button>
+      <button class="tab-btn" data-tab="wordcloud">词云</button>
+      <button class="tab-btn" data-tab="bookmarks">书签</button>
     </div>
-    <div class="conv-list" id="conv-list"></div>
+
+    <!-- Tab: Conversation List -->
+    <div class="tab-content active" id="tab-list">
+      <div class="search-area">
+        <input type="text" class="search-input" id="search-input" placeholder="搜索对话内容...">
+        <div class="sort-buttons">
+          <button class="sort-btn active" data-sort="newest">最新</button>
+          <button class="sort-btn" data-sort="oldest">最早</button>
+          <button class="sort-btn" data-sort="most_messages">最多消息</button>
+        </div>
+      </div>
+      <div class="conv-list" id="conv-list"></div>
+    </div>
+
+    <!-- Tab: Timeline -->
+    <div class="tab-content" id="tab-timeline">
+      <div class="timeline-container" id="timeline-container"></div>
+    </div>
+
+    <!-- Tab: Word Cloud -->
+    <div class="tab-content" id="tab-wordcloud">
+      <div class="wordcloud-container" id="wordcloud-container"></div>
+    </div>
+
+    <!-- Tab: Bookmarks -->
+    <div class="tab-content" id="tab-bookmarks">
+      <div class="bookmarks-container" id="bookmarks-container"></div>
+    </div>
+
     <div class="sidebar-bottom">
       <button id="settings-btn">⚙ 设置</button>
       <button id="export-all-btn">📦 全部导出</button>
@@ -489,15 +751,19 @@
       <button id="back-btn">←</button>
       <div class="chat-header-info">
         <div class="chat-header-title" id="chat-title"></div>
+        <div class="chat-header-note" id="chat-note" title="点击编辑备注"></div>
         <div class="chat-header-meta" id="chat-meta"></div>
       </div>
-      <button class="export-btn" id="export-btn">导出 TXT</button>
+      <div class="chat-header-actions">
+        <button class="action-btn" id="note-btn" title="编辑备注">📝</button>
+        <button class="action-btn primary" id="export-btn">导出</button>
+      </div>
     </div>
     <div class="chat-messages hidden" id="chat-messages"></div>
   </div>
 </div>
 
-<!-- ===== Settings Modal ===== -->
+<!-- Settings Modal -->
 <div class="modal-overlay hidden" id="settings-modal">
   <div class="modal">
     <h3>设置名称</h3>
@@ -512,6 +778,20 @@
   </div>
 </div>
 
+<!-- Note Modal -->
+<div class="modal-overlay hidden" id="note-modal">
+  <div class="modal">
+    <h3>窗口备注</h3>
+    <label>为这个对话添加备注</label>
+    <textarea id="input-note" placeholder="比如：这是裴莺时窗口、这次聊了搬家的事……"></textarea>
+    <div class="modal-actions">
+      <button class="modal-cancel" id="note-cancel">取消</button>
+      <button class="modal-save" id="note-clear" style="background:var(--danger)">清除</button>
+      <button class="modal-save" id="note-save">保存</button>
+    </div>
+  </div>
+</div>
+
 <script>
 // ===== State =====
 let conversations = [];
@@ -520,8 +800,10 @@ let searchQuery = "";
 let sortBy = "newest";
 let userName = "阿颖";
 let claudeName = "涟言";
+let bookmarks = []; // { convUuid, msgIndex, text, sender, convName, time }
+let notes = {};     // { convUuid: "note text" }
+let activeTab = "list";
 
-// ===== DOM refs =====
 const $ = (id) => document.getElementById(id);
 const uploadScreen = $("upload-screen");
 const mainScreen = $("main-screen");
@@ -535,8 +817,35 @@ const chatEmpty = $("chat-empty");
 const chatHeader = $("chat-header");
 const chatMessages = $("chat-messages");
 const chatTitle = $("chat-title");
+const chatNote = $("chat-note");
 const chatMeta = $("chat-meta");
 const settingsModal = $("settings-modal");
+const noteModal = $("note-modal");
+
+// ===== LocalStorage =====
+function saveLocal() {
+  try {
+    localStorage.setItem("fcj_bookmarks", JSON.stringify(bookmarks));
+    localStorage.setItem("fcj_notes", JSON.stringify(notes));
+    localStorage.setItem("fcj_userName", userName);
+    localStorage.setItem("fcj_claudeName", claudeName);
+  } catch(e) {}
+}
+
+function loadLocal() {
+  try {
+    const b = localStorage.getItem("fcj_bookmarks");
+    if (b) bookmarks = JSON.parse(b);
+    const n = localStorage.getItem("fcj_notes");
+    if (n) notes = JSON.parse(n);
+    const u = localStorage.getItem("fcj_userName");
+    if (u) userName = u;
+    const c = localStorage.getItem("fcj_claudeName");
+    if (c) claudeName = c;
+  } catch(e) {}
+}
+
+loadLocal();
 
 // ===== Utilities =====
 function formatDate(dateStr) {
@@ -553,29 +862,26 @@ function formatTime(dateStr) {
   return d.toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit" });
 }
 
+function formatMonth(dateStr) {
+  if (!dateStr) return "";
+  const d = new Date(dateStr);
+  if (isNaN(d)) return "";
+  return d.toLocaleDateString("zh-CN", { year: "numeric", month: "long" });
+}
+
 function getMessages(conv) {
-  // Try different field names that Claude export might use
   return conv.chat_messages || conv.messages || [];
 }
 
 function getMessageText(msg) {
-  // Direct text field
   if (typeof msg.text === "string" && msg.text.trim()) return msg.text;
-  // Content array (Claude format)
   if (msg.content && Array.isArray(msg.content)) {
     const texts = msg.content.filter(c => c.type === "text" && c.text).map(c => c.text);
     if (texts.length) return texts.join("\n");
   }
-  // Content as string
   if (typeof msg.content === "string" && msg.content.trim()) return msg.content;
-  // Body field
   if (typeof msg.body === "string" && msg.body.trim()) return msg.body;
   return "";
-}
-
-function hasVisibleContent(conv) {
-  const msgs = getMessages(conv);
-  return msgs.some(m => getMessageText(m).trim().length > 0);
 }
 
 function countWords(text) {
@@ -590,15 +896,14 @@ function getStats(conv) {
   let totalWords = 0, userWords = 0, claudeWords = 0, userMsgs = 0, claudeMsgs = 0;
   msgs.forEach(m => {
     const text = getMessageText(m);
-    if (!text.trim()) return; // skip empty messages
+    if (!text.trim()) return;
     const wc = countWords(text);
     totalWords += wc;
     if (m.sender === "human") { userWords += wc; userMsgs++; }
     else { claudeWords += wc; claudeMsgs++; }
   });
-  const visibleCount = userMsgs + claudeMsgs;
   return {
-    totalMessages: visibleCount, userMsgs, claudeMsgs,
+    totalMessages: userMsgs + claudeMsgs, userMsgs, claudeMsgs,
     totalWords, userWords, claudeWords,
     firstDate: msgs[0]?.created_at || conv.created_at,
     lastDate: msgs[msgs.length - 1]?.created_at || conv.updated_at,
@@ -632,25 +937,123 @@ function downloadText(content, filename) {
 function exportConv(conv) {
   const stats = getStats(conv);
   const msgs = getMessages(conv);
+  const note = notes[conv.uuid];
   let txt = `${conv.name || "未命名对话"}\n${"=".repeat(40)}\n`;
+  if (note) txt += `备注：${note}\n`;
   txt += `时间：${formatDate(stats.firstDate)} ~ ${formatDate(stats.lastDate)}\n`;
   txt += `消息数：${stats.totalMessages} | 字数：${stats.totalWords}\n${"=".repeat(40)}\n\n`;
   msgs.forEach(m => {
     const name = m.sender === "human" ? userName : claudeName;
     const text = getMessageText(m);
+    if (!text.trim()) return;
     txt += `[${name}] ${formatTime(m.created_at)}\n${text}\n\n`;
   });
   return txt;
 }
 
-// ===== Render =====
+// ===== Bookmarks =====
+function isBookmarked(convUuid, msgIndex) {
+  return bookmarks.some(b => b.convUuid === convUuid && b.msgIndex === msgIndex);
+}
+
+function toggleBookmark(convUuid, msgIndex) {
+  const idx = bookmarks.findIndex(b => b.convUuid === convUuid && b.msgIndex === msgIndex);
+  if (idx >= 0) {
+    bookmarks.splice(idx, 1);
+  } else {
+    const conv = conversations.find(c => c.uuid === convUuid);
+    if (!conv) return;
+    const msgs = getMessages(conv);
+    const msg = msgs[msgIndex];
+    if (!msg) return;
+    bookmarks.push({
+      convUuid,
+      msgIndex,
+      text: getMessageText(msg).slice(0, 200),
+      sender: msg.sender,
+      convName: conv.name || "未命名对话",
+      time: msg.created_at,
+    });
+  }
+  saveLocal();
+}
+
+// ===== Word Cloud =====
+function buildWordCloud() {
+  // Chinese: extract 2-4 char phrases; skip very common words
+  const stopWords = new Set(["的","了","是","在","我","你","有","不","这","他","她","它","们","个","会","就","也","和","要","人","都","说","而","去","能","到","让","对","以","那","把","很","没","看","为","用","好","又","来","但","还","比","被","着","吧","吗","呢","啊","哦","嗯","哈","呀","什么","怎么","可以","如果","因为","所以","已经","这个","那个","自己","知道","一个","时候","现在","觉得","应该","可能","需要","一下","关于","通过","这样","那样","一些","其他","之后","之前","然后","或者","但是","不过","虽然","如何","which","the","and","for","that","this","with","from","have","not","are","was","were","been","will","would","could","should","can","may","but","all","any","each","has","had","into","than","then","them","they","their","what","when","how","about","just","like","also","more","some","only","other","over","such","after","before","between","being","does","did","here","there","these","those","because","through","during","while"]);
+
+  const freq = {};
+  conversations.forEach(conv => {
+    getMessages(conv).forEach(m => {
+      const text = getMessageText(m);
+      if (!text.trim()) return;
+
+      // Chinese 2-3 char segments (simple n-gram approach)
+      const chineseChars = text.replace(/[^\u4e00-\u9fff]/g, "");
+      for (let len = 2; len <= 3; len++) {
+        for (let i = 0; i <= chineseChars.length - len; i++) {
+          const w = chineseChars.slice(i, i + len);
+          if (!stopWords.has(w)) {
+            freq[w] = (freq[w] || 0) + 1;
+          }
+        }
+      }
+
+      // English words
+      const engWords = text.replace(/[\u4e00-\u9fff]/g, " ").toLowerCase().match(/[a-z]{3,}/g);
+      if (engWords) {
+        engWords.forEach(w => {
+          if (!stopWords.has(w)) {
+            freq[w] = (freq[w] || 0) + 1;
+          }
+        });
+      }
+    });
+  });
+
+  // Sort by frequency, take top 80
+  return Object.entries(freq)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 80);
+}
+
+// ===== Timeline =====
+function buildTimeline() {
+  // Group conversations by month
+  const months = {};
+  conversations.forEach(conv => {
+    const date = new Date(conv.created_at);
+    if (isNaN(date)) return;
+    const key = `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2, "0")}`;
+    if (!months[key]) months[key] = [];
+    months[key].push(conv);
+  });
+
+  return Object.entries(months).sort((a,b) => a[0].localeCompare(b[0]));
+}
+
+// ===== Render: Tabs =====
+function switchTab(tab) {
+  activeTab = tab;
+  document.querySelectorAll(".tab-btn").forEach(b => b.classList.toggle("active", b.dataset.tab === tab));
+  document.querySelectorAll(".tab-content").forEach(t => t.classList.remove("active"));
+  $("tab-" + tab).classList.add("active");
+
+  if (tab === "timeline") renderTimeline();
+  if (tab === "wordcloud") renderWordCloud();
+  if (tab === "bookmarks") renderBookmarks();
+}
+
+// ===== Render: List =====
 function getFilteredSorted() {
   let list = [...conversations];
   if (searchQuery.trim()) {
     const q = searchQuery.toLowerCase();
     list = list.filter(conv => {
       if ((conv.name || "").toLowerCase().includes(q)) return true;
-      return (getMessages(conv)).some(m => getMessageText(m).toLowerCase().includes(q));
+      if ((notes[conv.uuid] || "").toLowerCase().includes(q)) return true;
+      return getMessages(conv).some(m => getMessageText(m).toLowerCase().includes(q));
     });
   }
   list.sort((a, b) => {
@@ -674,8 +1077,11 @@ function renderList() {
   convList.innerHTML = list.map(conv => {
     const stats = getStats(conv);
     const active = conv.uuid === selectedUuid ? " active" : "";
+    const note = notes[conv.uuid];
+    const noteHtml = note ? `<div class="conv-item-note">${escapeHtml(note)}</div>` : "";
     return `<div class="conv-item${active}" data-uuid="${conv.uuid}">
       <div class="conv-item-name">${escapeHtml(conv.name || "未命名对话")}</div>
+      ${noteHtml}
       <div class="conv-item-meta">
         <span>${formatDate(stats.firstDate)}</span>
         <span>·</span>
@@ -686,18 +1092,17 @@ function renderList() {
     </div>`;
   }).join("");
 
-  // Bind clicks
   convList.querySelectorAll(".conv-item").forEach(el => {
     el.addEventListener("click", () => {
       selectedUuid = el.dataset.uuid;
       renderList();
       renderChat();
-      // Mobile: show chat panel
       chatPanel.classList.add("open");
     });
   });
 }
 
+// ===== Render: Chat =====
 function renderChat() {
   const conv = conversations.find(c => c.uuid === selectedUuid);
   if (!conv) {
@@ -713,30 +1118,196 @@ function renderChat() {
 
   const stats = getStats(conv);
   chatTitle.textContent = conv.name || "未命名对话";
+
+  const note = notes[conv.uuid];
+  if (note) {
+    chatNote.textContent = note;
+    chatNote.classList.remove("hidden");
+  } else {
+    chatNote.textContent = "点击添加备注";
+    chatNote.style.opacity = "0.5";
+    chatNote.classList.remove("hidden");
+  }
+
   chatMeta.innerHTML = `
     <span>${formatDate(stats.firstDate)} ~ ${formatDate(stats.lastDate)}</span>
     <span>${stats.totalMessages} 条</span>
     <span>${stats.totalWords} 字</span>
-    <span>${userName}: ${stats.userWords} 字 / ${claudeName}: ${stats.claudeWords} 字</span>
   `;
 
   const msgs = getMessages(conv);
-  chatMessages.innerHTML = msgs.map(m => {
+  let visibleIdx = 0;
+  chatMessages.innerHTML = msgs.map((m, i) => {
     const isUser = m.sender === "human";
     const text = getMessageText(m);
     if (!text.trim()) return "";
     const cls = isUser ? "user" : "claude";
     const name = isUser ? userName : claudeName;
+    const bm = isBookmarked(conv.uuid, i);
+    const bmClass = bm ? " active" : "";
     return `<div class="msg ${cls}">
       <div class="msg-meta">
         <span class="name">${escapeHtml(name)}</span>
         <span>${formatTime(m.created_at)}</span>
+        <button class="msg-bookmark-btn${bmClass}" data-conv="${conv.uuid}" data-idx="${i}" title="收藏">🔖</button>
       </div>
       <div class="msg-bubble">${highlightText(text, searchQuery)}</div>
     </div>`;
   }).join("");
 
+  // Bind bookmark buttons
+  chatMessages.querySelectorAll(".msg-bookmark-btn").forEach(btn => {
+    btn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      toggleBookmark(btn.dataset.conv, parseInt(btn.dataset.idx));
+      btn.classList.toggle("active");
+      if (activeTab === "bookmarks") renderBookmarks();
+    });
+  });
+
   chatMessages.scrollTop = 0;
+}
+
+// ===== Render: Timeline =====
+function renderTimeline() {
+  const data = buildTimeline();
+  if (data.length === 0) {
+    $("timeline-container").innerHTML = '<div class="conv-list-empty">没有数据</div>';
+    return;
+  }
+
+  const maxPerMonth = Math.max(...data.map(([, convs]) => convs.length));
+
+  $("timeline-container").innerHTML = data.map(([monthKey, convs]) => {
+    const d = new Date(monthKey + "-01");
+    const monthLabel = formatMonth(d);
+    const totalWords = convs.reduce((sum, c) => sum + getStats(c).totalWords, 0);
+
+    // Group by day
+    const days = {};
+    convs.forEach(c => {
+      const cd = new Date(c.created_at);
+      const day = cd.getDate();
+      if (!days[day]) days[day] = [];
+      days[day].push(c);
+    });
+
+    const daysInMonth = new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate();
+    const maxDay = Math.max(...Object.values(days).map(arr => arr.length), 1);
+
+    let barsHtml = "";
+    for (let day = 1; day <= daysInMonth; day++) {
+      const dayConvs = days[day] || [];
+      const h = dayConvs.length > 0 ? Math.max(8, (dayConvs.length / maxDay) * 55) : 0;
+      if (dayConvs.length > 0) {
+        const names = dayConvs.map(c => c.name || "未命名").join(", ");
+        barsHtml += `<div class="timeline-bar" style="height:${h}px" data-uuid="${dayConvs[0].uuid}">
+          <div class="timeline-bar-tip">${day}日 · ${dayConvs.length}个对话</div>
+        </div>`;
+      } else {
+        barsHtml += `<div style="flex:1;min-width:3px;height:2px;background:var(--border);border-radius:1px;align-self:flex-end;"></div>`;
+      }
+    }
+
+    return `<div class="timeline-month">
+      <div class="timeline-month-label">${monthLabel}</div>
+      <div class="timeline-bars">${barsHtml}</div>
+      <div class="timeline-summary">${convs.length} 个对话 · ${totalWords.toLocaleString()} 字</div>
+    </div>`;
+  }).join("");
+
+  // Click bars to jump to conversation
+  $("timeline-container").querySelectorAll(".timeline-bar[data-uuid]").forEach(bar => {
+    bar.addEventListener("click", () => {
+      selectedUuid = bar.dataset.uuid;
+      switchTab("list");
+      renderList();
+      renderChat();
+      chatPanel.classList.add("open");
+    });
+  });
+}
+
+// ===== Render: Word Cloud =====
+function renderWordCloud() {
+  const words = buildWordCloud();
+  if (words.length === 0) {
+    $("wordcloud-container").innerHTML = '<div class="conv-list-empty">没有足够的数据</div>';
+    return;
+  }
+
+  const maxFreq = words[0][1];
+  const minSize = 12;
+  const maxSize = 36;
+  const colors = ["#5b7a5e", "#7d6b5d", "#8a7060", "#6b8a7a", "#9a7b6a", "#5a7080", "#887a60", "#6a7d5e", "#8a6570", "#7a8565"];
+
+  // Shuffle for visual variety
+  const shuffled = [...words].sort(() => Math.random() - 0.5);
+
+  const cloudHtml = shuffled.map(([word, freq]) => {
+    const size = minSize + ((freq / maxFreq) * (maxSize - minSize));
+    const color = colors[Math.floor(Math.random() * colors.length)];
+    const weight = freq > maxFreq * 0.5 ? 700 : freq > maxFreq * 0.2 ? 500 : 400;
+    return `<span class="wc-word" style="font-size:${size}px;color:${color};font-weight:${weight}" data-word="${escapeHtml(word)}" title="${word}: ${freq}次">${escapeHtml(word)}</span>`;
+  }).join("");
+
+  $("wordcloud-container").innerHTML = `
+    <div class="wordcloud-info">基于所有对话的高频词（点击可搜索）</div>
+    <div class="wordcloud-area">${cloudHtml}</div>
+  `;
+
+  // Click word to search
+  $("wordcloud-container").querySelectorAll(".wc-word").forEach(el => {
+    el.addEventListener("click", () => {
+      searchInput.value = el.dataset.word;
+      searchQuery = el.dataset.word;
+      switchTab("list");
+      renderList();
+    });
+  });
+}
+
+// ===== Render: Bookmarks =====
+function renderBookmarks() {
+  if (bookmarks.length === 0) {
+    $("bookmarks-container").innerHTML = '<div class="conv-list-empty">还没有收藏的消息<br><span style="font-size:11px;margin-top:4px;display:block">在聊天气泡旁点 🔖 来收藏</span></div>';
+    return;
+  }
+
+  $("bookmarks-container").innerHTML = bookmarks.map((bm, i) => {
+    const senderName = bm.sender === "human" ? userName : claudeName;
+    return `<div class="bookmark-item" data-conv="${bm.convUuid}" data-idx="${bm.msgIndex}">
+      <div class="bookmark-from">
+        <span>${escapeHtml(bm.convName)}</span>
+        <button class="bookmark-remove" data-bm="${i}" title="取消收藏">✕</button>
+      </div>
+      <div class="bookmark-sender">${escapeHtml(senderName)} · ${formatTime(bm.time)}</div>
+      <div class="bookmark-text">${escapeHtml(bm.text)}</div>
+    </div>`;
+  }).join("");
+
+  // Click to jump
+  $("bookmarks-container").querySelectorAll(".bookmark-item").forEach(el => {
+    el.addEventListener("click", (e) => {
+      if (e.target.classList.contains("bookmark-remove")) return;
+      selectedUuid = el.dataset.conv;
+      switchTab("list");
+      renderList();
+      renderChat();
+      chatPanel.classList.add("open");
+    });
+  });
+
+  // Remove bookmark
+  $("bookmarks-container").querySelectorAll(".bookmark-remove").forEach(btn => {
+    btn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      const idx = parseInt(btn.dataset.bm);
+      bookmarks.splice(idx, 1);
+      saveLocal();
+      renderBookmarks();
+    });
+  });
 }
 
 // ===== File Loading =====
@@ -752,7 +1323,6 @@ function loadFile(file) {
       }
       conversations = data.filter(conv => {
         const msgs = getMessages(conv);
-        // Keep only conversations that have at least one message with visible text
         return msgs.length > 0 && msgs.some(m => getMessageText(m).trim().length > 0);
       });
       selectedUuid = null;
@@ -781,6 +1351,11 @@ uploadZone.addEventListener("drop", (e) => {
   loadFile(e.dataTransfer.files[0]);
 });
 fileInput.addEventListener("change", (e) => loadFile(e.target.files[0]));
+
+// Tabs
+document.querySelectorAll(".tab-btn").forEach(btn => {
+  btn.addEventListener("click", () => switchTab(btn.dataset.tab));
+});
 
 // Search
 let searchTimer;
@@ -843,7 +1418,6 @@ $("settings-btn").addEventListener("click", () => {
 });
 
 $("modal-cancel").addEventListener("click", () => settingsModal.classList.add("hidden"));
-
 settingsModal.addEventListener("click", (e) => {
   if (e.target === settingsModal) settingsModal.classList.add("hidden");
 });
@@ -852,10 +1426,49 @@ $("modal-save").addEventListener("click", () => {
   userName = $("input-user-name").value || "User";
   claudeName = $("input-claude-name").value || "Claude";
   settingsModal.classList.add("hidden");
+  saveLocal();
   if (selectedUuid) renderChat();
 });
 
-// Register service worker for PWA
+// Notes
+function openNoteModal() {
+  if (!selectedUuid) return;
+  $("input-note").value = notes[selectedUuid] || "";
+  noteModal.classList.remove("hidden");
+}
+
+$("note-btn").addEventListener("click", openNoteModal);
+chatNote.addEventListener("click", openNoteModal);
+
+$("note-cancel").addEventListener("click", () => noteModal.classList.add("hidden"));
+noteModal.addEventListener("click", (e) => {
+  if (e.target === noteModal) noteModal.classList.add("hidden");
+});
+
+$("note-save").addEventListener("click", () => {
+  if (!selectedUuid) return;
+  const val = $("input-note").value.trim();
+  if (val) {
+    notes[selectedUuid] = val;
+  } else {
+    delete notes[selectedUuid];
+  }
+  saveLocal();
+  noteModal.classList.add("hidden");
+  renderChat();
+  renderList();
+});
+
+$("note-clear").addEventListener("click", () => {
+  if (!selectedUuid) return;
+  delete notes[selectedUuid];
+  saveLocal();
+  noteModal.classList.add("hidden");
+  renderChat();
+  renderList();
+});
+
+// Service worker
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker.register('./sw.js').catch(() => {});
 }
