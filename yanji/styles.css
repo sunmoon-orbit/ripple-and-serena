@@ -471,7 +471,7 @@ body.app-layout {
   width: 100%;
   min-height: 80px;
   padding: 10px;
-  background: rgba(0,0,0,0.2);
+  background: #f0ebe3;
   border: 1px solid #7d6b5d;
   border-radius: 8px;
   color: #3a3632;
@@ -570,7 +570,7 @@ body.app-layout {
 .modal-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(0,0,0,0.7);
+  background: rgba(0,0,0,0.3);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1238,7 +1238,7 @@ body.app-layout {
 
 .memory-time {
   font-size: 11px;
-  color: #666;
+  color: #8a8275;
   white-space: nowrap;
 }
 
@@ -1315,7 +1315,7 @@ body.app-layout {
 }
 
 .message-content pre {
-  background: #1e1e1e;
+  background: #f5f0e8;
   border-radius: 8px;
   padding: 12px;
   overflow-x: auto;
@@ -1346,7 +1346,7 @@ body.app-layout {
   border-left: 3px solid #7d6b5d;
   margin: 0.8em 0;
   padding-left: 12px;
-  color: #aaa;
+  color: #8a8275;
 }
 
 .message-content table {
@@ -1433,7 +1433,7 @@ body.app-layout {
 .msg-action-btn {
   background: rgba(255, 255, 255, 0.1);
   border: none;
-  color: #888;
+  color: #8a8275;
   font-size: 12px;
   padding: 4px 8px;
   border-radius: 4px;
@@ -1453,10 +1453,10 @@ body.app-layout {
   right: 10px;
   width: 320px;
   max-height: 70vh;
-  background: #1a1a1a;
+  background: #fff8f0;
   border: 1px solid #d9d0c0;
   border-radius: 12px;
-  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+  box-shadow: 0 10px 40px rgba(60, 50, 40, 0.15);
   z-index: 100;
   overflow: hidden;
 }
@@ -1488,7 +1488,7 @@ body.app-layout {
 .model-switch-section label {
   display: block;
   font-size: 12px;
-  color: #888;
+  color: #8a8275;
   margin-bottom: 8px;
 }
 
@@ -1505,7 +1505,7 @@ body.app-layout {
   align-items: center;
   gap: 8px;
   padding: 8px 12px;
-  background: #252525;
+  background: #f5f0e8;
   border: 1px solid transparent;
   border-radius: 6px;
   cursor: pointer;
@@ -1513,8 +1513,8 @@ body.app-layout {
 }
 
 .model-item:hover {
-  background: #303030;
-  border-color: #444;
+  background: #ebe5d9;
+  border-color: #d9d0c0;
 }
 
 .model-item.active {
@@ -1532,7 +1532,7 @@ body.app-layout {
 
 .model-item-provider {
   font-size: 11px;
-  color: #666;
+  color: #8a8275;
   padding: 2px 6px;
   background: #d9d0c0;
   border-radius: 4px;
@@ -1570,7 +1570,7 @@ body.app-layout {
 .search-preview-area {
   padding: 8px 12px;
   border-bottom: 1px solid #d9d0c0;
-  background: #1a1a1a;
+  background: #fff8f0;
 }
 
 .search-preview-header {
@@ -1579,13 +1579,13 @@ body.app-layout {
   align-items: center;
   margin-bottom: 8px;
   font-size: 12px;
-  color: #888;
+  color: #8a8275;
 }
 
 .icon-btn-small {
   background: transparent;
   border: none;
-  color: #666;
+  color: #8a8275;
   cursor: pointer;
   padding: 2px 6px;
   font-size: 12px;
@@ -1597,7 +1597,7 @@ body.app-layout {
 
 .search-preview-content {
   font-size: 13px;
-  color: #ccc;
+  color: #5a5348;
   max-height: 150px;
   overflow-y: auto;
   line-height: 1.5;
@@ -1618,7 +1618,7 @@ body.app-layout {
 }
 
 .search-result-snippet {
-  color: #888;
+  color: #8a8275;
   font-size: 12px;
   margin-top: 2px;
 }
