@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>LLM Hub · 连接</title>
+  <link rel="stylesheet" href="styles.css">
+  <meta name="theme-color" content="#09090b">
+</head>
+<body>
+  <header class="top-nav">
+    <div class="top-nav-left">
+      <span class="app-logo">LLM Hub</span>
+      <span class="top-nav-page">连接</span>
+    </div>
+    <nav class="top-nav-links">
+      <a href="index.html">💬 聊天</a>
+      <a href="connections.html" class="active">连接</a>
+      <a href="memory.html">记忆</a>
+      <a href="data.html">数据</a>
+    </nav>
+  </header>
+
+  <div class="settings-page">
+    <header class="settings-header">
+      <h1>API 连接管理</h1>
+      <p>这里配置 ChatGPT / Gemini / Claude / DeepSeek / 公益中转等不同线路。</p>
+    </header>
+
+    <section class="settings-body">
+      <div class="connections-layout">
+        <div class="connections-list-block">
+          <div class="side-section-header">
+            <span>已保存连接</span>
+            <button id="addConnectionButton" class="small-button">添加</button>
+          </div>
+          <div id="connectionList" class="list-container empty-hint">
+            <div class="empty-text">还没有连接，先添加一个吧。</div>
+          </div>
+        </div>
+
+        <div class="connections-editor-block">
+          <div id="connectionEditor" class="editor-panel hidden">
+            <h3 id="connectionEditorTitle">新建连接</h3>
+            <label class="field">
+              <span>连接名称</span>
+              <input id="connNameInput" type="text" placeholder="比如：Gemini 主号 / Claude 公益站">
+            </label>
+
+            <label class="field">
+              <span>提供商</span>
+              <select id="connProviderInput">
+                <option value="openai">OpenAI 兼容 / DeepSeek / 公益中转</option>
+                <option value="gemini">Gemini 官方</option>
+                <option value="anthropic">Claude 官方</option>
+              </select>
+            </label>
+
+            <label class="field">
+              <span>Base URL</span>
+              <input id="connBaseUrlInput" type="text" placeholder="按提示自动填，也可以改成中转站">
+              <small class="field-hint" id="connBaseUrlHint"></small>
+            </label>
+
+            <label class="field">
+              <span>API Key</span>
+              <input id="connApiKeyInput" type="password" autocomplete="off" placeholder="只保存在你本地 / 你自己的云">
+            </label>
+
+            <label class="field">
+              <span>默认模型</span>
+              <button type="button" id="openModelPickerButton" class="secondary-button small-button">从列表选择默认模型</button>
+              <input id="connDefaultModelInput" type="text" placeholder="手动输入模型名（如果列表里没有，就填这里）">
+              <small class="field-hint">列表选择会自动填入；你也可以直接手动输入覆盖。</small>
+            </label>
+
+            <label class="field">
+              <span>可选模型列表（逗号分隔，可空）</span>
+              <input id="connModelListInput" type="text" placeholder="gpt-4.1,gpt-4.1-mini,deepseek-chat">
+            </label>
+
+            <div class="editor-buttons">
+              <button id="testConnectionButton" class="secondary-button">测试连接</button>
+              <div class="spacer"></div>
+              <button id="cancelConnectionEditButton" class="ghost-button">取消</button>
+              <button id="saveConnectionButton" class="primary-button">保存</button>
+            </div>
+            <div id="connectionTestResult" class="test-result"></div>
+          </div>
+
+          <div id="connectionEmptyHint" class="editor-empty-hint">
+            <p class="field-hint">左侧选择一个连接进行编辑，或点击“添加”新建。</p>
+          </div>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <div id="modelPickerOverlay" class="modal-overlay hidden">
+    <div class="modal-panel">
+      <div class="modal-header">
+        <span class="modal-title">选择模型</span>
+        <button type="button" id="closeModelPickerButton" class="icon-button close-button">×</button>
+      </div>
+      
+            <div class="modal-body">
+        <div class="field">
+          <span>常用模型（OpenAI / 兼容）</span>
+          <div class="model-picker-list">
+            <button type="button" class="model-chip" data-model="gpt-4.1">gpt-4.1</button>
+            <button type="button" class="model-chip" data-model="gpt-4.1-mini">gpt-4.1-mini</button>
+            <button type="button" class="model-chip" data-model="gpt-4o">gpt-4o</button>
+            <button type="button" class="model-chip" data-model="gpt-4o-mini">gpt-4o-mini</button>
+            <button type="button" class="model-chip" data-model="o3-mini">o3-mini</button>
+            <button type="button" class="model-chip" data-model="o1">o1</button>
+            <button type="button" class="model-chip" data-model="o1-mini">o1-mini</button>
+          </div>
+        </div>
+
+        <div class="field">
+          <span>常用模型（Gemini）</span>
+          <div class="model-picker-list">
+            <button type="button" class="model-chip" data-model="gemini-2.0-flash">gemini-2.0-flash</button>
+            <button type="button" class="model-chip" data-model="gemini-1.5-flash">gemini-1.5-flash</button>
+            <button type="button" class="model-chip" data-model="gemini-1.5-pro">gemini-1.5-pro</button>
+          </div>
+        </div>
+
+        <div class="field">
+          <span>常用模型（Claude）</span>
+          <div class="model-picker-list">
+            <button type="button" class="model-chip" data-model="claude-sonnet-4-20250514">claude-sonnet-4</button>
+            <button type="button" class="model-chip" data-model="claude-3-5-sonnet-20241022">claude-3.5-sonnet</button>
+            <button type="button" class="model-chip" data-model="claude-3-opus-20240229">claude-3-opus</button>
+            <button type="button" class="model-chip" data-model="claude-3-haiku-20240307">claude-3-haiku</button>
+          </div>
+        </div>
+
+        <div class="field">
+          <span>常用模型（DeepSeek）</span>
+          <div class="model-picker-list">
+            <button type="button" class="model-chip" data-model="deepseek-chat">deepseek-chat</button>
+            <button type="button" class="model-chip" data-model="deepseek-reasoner">deepseek-reasoner</button>
+          </div>
+        </div>
+
+        <div class="field">
+          <span>你填写的可选模型</span>
+          <div id="modelPickerCustomList" class="model-picker-list">
+            <div class="empty-text small">（你还没填"可选模型列表"）</div>
+          </div>
+        </div>
+
+        <small class="field-hint">如果列表里没有你要的，就关闭弹窗，在页面的"默认模型"输入框里手动写模型名。</small>
+      </div>
+
+      <div class="modal-footer">
+        <button type="button" id="modelPickerCancelButton" class="ghost-button">取消</button>
+        <button type="button" id="modelPickerConfirmButton" class="primary-button">确定</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="config.js"></script>
+  <script src="state.js"></script>
+  <script src="connections.js"></script>
+  <script src="version.js"></script>
+  <script src="sw-register.js"></script>
+
+</body>
+</html>
