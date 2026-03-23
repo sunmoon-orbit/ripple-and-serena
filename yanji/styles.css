@@ -9,8 +9,8 @@ html, body {
   height: 100dvh;
   width: 100%;
   font-family: system-ui, -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", sans-serif;
-  background: #09090b;
-  color: #e5e7eb;
+  background: #f5f0e8;
+  color: #3a3632;
   overflow: hidden;
 }
 
@@ -26,8 +26,8 @@ body.app-layout {
   min-width: 280px;
   height: 100vh;
   height: 100dvh;
-  background: #0f0f12;
-  border-right: 1px solid rgba(255,255,255,0.08);
+  background: #ebe5d9;
+  border-right: 1px solid rgba(60,50,40,0.10);
   display: flex;
   flex-direction: column;
   transition: transform 0.25s ease, opacity 0.25s ease;
@@ -45,13 +45,13 @@ body.app-layout {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  border-bottom: 1px solid rgba(255,255,255,0.06);
+  border-bottom: 1px solid rgba(60,50,40,0.08);
 }
 
 .app-logo {
   font-size: 18px;
   font-weight: 600;
-  color: #fff;
+  color: #3a3632;
 }
 
 .icon-btn {
@@ -59,7 +59,7 @@ body.app-layout {
   height: 32px;
   border: none;
   background: transparent;
-  color: #9ca3af;
+  color: #8a8275;
   font-size: 16px;
   cursor: pointer;
   border-radius: 6px;
@@ -70,14 +70,14 @@ body.app-layout {
 }
 
 .icon-btn:hover {
-  background: rgba(255,255,255,0.08);
-  color: #fff;
+  background: rgba(60,50,40,0.10);
+  color: #3a3632;
 }
 
 .new-chat-btn {
   margin: 12px 16px;
   padding: 10px 16px;
-  background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+  background: #7d6b5d;
   color: #fff;
   border: none;
   border-radius: 8px;
@@ -89,7 +89,7 @@ body.app-layout {
 
 .new-chat-btn:hover {
   transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(99, 102, 241, 0.4);
+  box-shadow: 0 4px 12px rgba(125, 107, 93, 0.4);
 }
 
 .sidebar-search {
@@ -99,20 +99,20 @@ body.app-layout {
 .sidebar-search input {
   width: 100%;
   padding: 8px 12px;
-  background: rgba(255,255,255,0.05);
-  border: 1px solid rgba(255,255,255,0.08);
+  background: rgba(60,50,40,0.05);
+  border: 1px solid rgba(60,50,40,0.10);
   border-radius: 6px;
-  color: #e5e7eb;
+  color: #3a3632;
   font-size: 13px;
 }
 
 .sidebar-search input::placeholder {
-  color: #6b7280;
+  color: #b0a898;
 }
 
 .sidebar-search input:focus {
   outline: none;
-  border-color: #6366f1;
+  border-color: #7d6b5d;
 }
 
 /* 聊天列表 */
@@ -134,11 +134,11 @@ body.app-layout {
 }
 
 .chat-item:hover {
-  background: rgba(255,255,255,0.06);
+  background: rgba(60,50,40,0.08);
 }
 
 .chat-item.active {
-  background: rgba(99, 102, 241, 0.15);
+  background: rgba(125, 107, 93, 0.15);
 }
 
 .chat-item-content {
@@ -148,7 +148,7 @@ body.app-layout {
 
 .chat-item-title {
   font-size: 14px;
-  color: #e5e7eb;
+  color: #3a3632;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -156,7 +156,7 @@ body.app-layout {
 
 .chat-item-meta {
   font-size: 11px;
-  color: #6b7280;
+  color: #b0a898;
   margin-top: 2px;
 }
 
@@ -174,7 +174,7 @@ body.app-layout {
   height: 24px;
   border: none;
   background: transparent;
-  color: #9ca3af;
+  color: #8a8275;
   font-size: 12px;
   cursor: pointer;
   border-radius: 4px;
@@ -184,19 +184,19 @@ body.app-layout {
 }
 
 .chat-item-btn:hover {
-  background: rgba(255,255,255,0.1);
-  color: #fff;
+  background: rgba(60,50,40,0.12);
+  color: #3a3632;
 }
 
 .chat-item-btn.delete:hover {
   background: rgba(239, 68, 68, 0.2);
-  color: #ef4444;
+  color: #c4756e;
 }
 
 /* 侧边栏底部导航 */
 .sidebar-footer {
   padding: 12px;
-  border-top: 1px solid rgba(255,255,255,0.06);
+  border-top: 1px solid rgba(60,50,40,0.08);
   display: flex;
   justify-content: space-around;
 }
@@ -209,14 +209,14 @@ body.app-layout {
   padding: 8px 12px;
   border-radius: 8px;
   text-decoration: none;
-  color: #9ca3af;
+  color: #8a8275;
   font-size: 12px;
   transition: all 0.15s;
 }
 
 .sidebar-nav-item:hover {
-  background: rgba(255,255,255,0.06);
-  color: #fff;
+  background: rgba(60,50,40,0.08);
+  color: #3a3632;
 }
 
 .sidebar-nav-item .nav-icon {
@@ -231,7 +231,7 @@ body.app-layout {
   height: 100vh;
   height: 100dvh;
   min-width: 0;
-  background: #09090b;
+  background: #f5f0e8;
 }
 
 /* 聊天头部 */
@@ -241,7 +241,7 @@ body.app-layout {
   display: flex;
   align-items: center;
   gap: 12px;
-  border-bottom: 1px solid rgba(255,255,255,0.06);
+  border-bottom: 1px solid rgba(60,50,40,0.08);
   background: rgba(15, 15, 18, 0.8);
   backdrop-filter: blur(8px);
 }
@@ -261,7 +261,7 @@ body.app-layout {
 .chat-title {
   font-size: 15px;
   font-weight: 500;
-  color: #fff;
+  color: #3a3632;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -270,8 +270,8 @@ body.app-layout {
 .connection-badge {
   font-size: 11px;
   padding: 3px 8px;
-  background: rgba(99, 102, 241, 0.15);
-  color: #a5b4fc;
+  background: rgba(125, 107, 93, 0.15);
+  color: #7d6b5d;
   border-radius: 4px;
   white-space: nowrap;
 }
@@ -287,10 +287,10 @@ body.app-layout {
   top: 56px;
   right: 16px;
   width: 280px;
-  background: #1a1a1f;
-  border: 1px solid rgba(255,255,255,0.1);
+  background: #fff8f0;
+  border: 1px solid rgba(60,50,40,0.12);
   border-radius: 12px;
-  box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+  box-shadow: 0 8px 32px rgba(0,0,0,0.25);
   z-index: 100;
   padding: 16px;
 }
@@ -302,7 +302,7 @@ body.app-layout {
 .model-switch-content label {
   display: block;
   font-size: 12px;
-  color: #9ca3af;
+  color: #8a8275;
   margin-bottom: 6px;
   margin-top: 12px;
 }
@@ -315,17 +315,17 @@ body.app-layout {
 .model-switch-content input {
   width: 100%;
   padding: 8px 10px;
-  background: rgba(255,255,255,0.05);
-  border: 1px solid rgba(255,255,255,0.1);
+  background: rgba(60,50,40,0.05);
+  border: 1px solid rgba(60,50,40,0.12);
   border-radius: 6px;
-  color: #e5e7eb;
+  color: #3a3632;
   font-size: 13px;
 }
 
 .model-switch-content select:focus,
 .model-switch-content input:focus {
   outline: none;
-  border-color: #6366f1;
+  border-color: #7d6b5d;
 }
 
 .model-switch-actions {
@@ -349,7 +349,7 @@ body.app-layout {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  color: #6b7280;
+  color: #b0a898;
   text-align: center;
 }
 
@@ -361,7 +361,7 @@ body.app-layout {
 .empty-state h2 {
   font-size: 20px;
   font-weight: 500;
-  color: #e5e7eb;
+  color: #3a3632;
   margin: 0 0 8px;
 }
 
@@ -386,7 +386,7 @@ body.app-layout {
 }
 
 .message.user .message-bubble {
-  background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+  background: #5b7a5e;
   color: #fff;
   margin-left: auto;
   max-width: 80%;
@@ -394,10 +394,11 @@ body.app-layout {
 }
 
 .message.assistant .message-bubble {
-  background: rgba(255,255,255,0.05);
-  color: #e5e7eb;
-  border: 1px solid rgba(255,255,255,0.08);
+  background: #fff;
+  color: #3a3632;
+  border: 1px solid #ddd5c8;
   border-bottom-left-radius: 4px;
+  box-shadow: 0 1px 3px rgba(60,50,40,0.06);
 }
 
 .message-meta {
@@ -406,7 +407,7 @@ body.app-layout {
   gap: 8px;
   margin-top: 6px;
   font-size: 11px;
-  color: #6b7280;
+  color: #b0a898;
 }
 
 .message.user .message-meta {
@@ -424,17 +425,17 @@ body.app-layout {
 
 .message-action-btn {
   padding: 2px 6px;
-  background: rgba(255,255,255,0.05);
+  background: rgba(60,50,40,0.05);
   border: none;
   border-radius: 4px;
-  color: #9ca3af;
+  color: #8a8275;
   font-size: 11px;
   cursor: pointer;
 }
 
 .message-action-btn:hover {
-  background: rgba(255,255,255,0.1);
-  color: #fff;
+  background: rgba(60,50,40,0.12);
+  color: #3a3632;
 }
 
 /* 消息内容格式化 */
@@ -447,11 +448,12 @@ body.app-layout {
 }
 
 .message-bubble pre {
-  background: rgba(0,0,0,0.3);
+  background: #f0ebe3;
   padding: 12px;
   border-radius: 8px;
   overflow-x: auto;
   margin: 12px 0;
+  border: 1px solid #ddd5c8;
 }
 
 .message-bubble code {
@@ -470,9 +472,9 @@ body.app-layout {
   min-height: 80px;
   padding: 10px;
   background: rgba(0,0,0,0.2);
-  border: 1px solid #6366f1;
+  border: 1px solid #7d6b5d;
   border-radius: 8px;
-  color: #e5e7eb;
+  color: #3a3632;
   font-size: 14px;
   font-family: inherit;
   resize: vertical;
@@ -489,7 +491,7 @@ body.app-layout {
 .input-area {
   padding: 16px 20px 20px;
   padding-bottom: calc(20px + env(safe-area-inset-bottom, 0px));
-  background: linear-gradient(to top, #09090b 0%, transparent 100%);
+  background: linear-gradient(to top, #f5f0e8 0%, transparent 100%);
   flex-shrink: 0;
 }
 
@@ -499,22 +501,22 @@ body.app-layout {
   display: flex;
   align-items: flex-end;
   gap: 10px;
-  background: rgba(255,255,255,0.05);
-  border: 1px solid rgba(255,255,255,0.1);
+  background: rgba(60,50,40,0.05);
+  border: 1px solid rgba(60,50,40,0.12);
   border-radius: 16px;
   padding: 8px 12px;
   transition: border-color 0.2s;
 }
 
 .input-wrapper:focus-within {
-  border-color: #6366f1;
+  border-color: #7d6b5d;
 }
 
 .input-wrapper textarea {
   flex: 1;
   background: transparent;
   border: none;
-  color: #e5e7eb;
+  color: #3a3632;
   font-size: 14px;
   font-family: inherit;
   resize: none;
@@ -523,7 +525,7 @@ body.app-layout {
 }
 
 .input-wrapper textarea::placeholder {
-  color: #6b7280;
+  color: #b0a898;
 }
 
 .input-wrapper textarea:focus {
@@ -534,7 +536,7 @@ body.app-layout {
   width: 36px;
   height: 36px;
   border: none;
-  background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+  background: #7d6b5d;
   color: #fff;
   border-radius: 10px;
   font-size: 16px;
@@ -559,7 +561,7 @@ body.app-layout {
   max-width: 720px;
   margin: 8px auto 0;
   font-size: 12px;
-  color: #6b7280;
+  color: #b0a898;
   text-align: center;
   min-height: 18px;
 }
@@ -581,8 +583,8 @@ body.app-layout {
 }
 
 .modal-panel {
-  background: #1a1a1f;
-  border: 1px solid rgba(255,255,255,0.1);
+  background: #fff8f0;
+  border: 1px solid rgba(60,50,40,0.12);
   border-radius: 16px;
   width: 90%;
   max-width: 480px;
@@ -598,7 +600,7 @@ body.app-layout {
 
 .modal-header {
   padding: 16px 20px;
-  border-bottom: 1px solid rgba(255,255,255,0.06);
+  border-bottom: 1px solid rgba(60,50,40,0.08);
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -613,21 +615,21 @@ body.app-layout {
 .modal-body input {
   width: 100%;
   padding: 10px 12px;
-  background: rgba(255,255,255,0.05);
-  border: 1px solid rgba(255,255,255,0.1);
+  background: rgba(60,50,40,0.05);
+  border: 1px solid rgba(60,50,40,0.12);
   border-radius: 8px;
-  color: #e5e7eb;
+  color: #3a3632;
   font-size: 14px;
 }
 
 .modal-body input:focus {
   outline: none;
-  border-color: #6366f1;
+  border-color: #7d6b5d;
 }
 
 .modal-footer {
   padding: 16px 20px;
-  border-top: 1px solid rgba(255,255,255,0.06);
+  border-top: 1px solid rgba(60,50,40,0.08);
   display: flex;
   justify-content: flex-end;
   gap: 10px;
@@ -636,7 +638,7 @@ body.app-layout {
 /* ========== 按钮 ========== */
 .primary-button {
   padding: 8px 16px;
-  background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+  background: #7d6b5d;
   color: #fff;
   border: none;
   border-radius: 8px;
@@ -648,7 +650,7 @@ body.app-layout {
 
 .primary-button:hover {
   transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(99, 102, 241, 0.4);
+  box-shadow: 0 4px 12px rgba(125, 107, 93, 0.4);
 }
 
 .primary-button:disabled {
@@ -659,9 +661,9 @@ body.app-layout {
 
 .secondary-button {
   padding: 8px 16px;
-  background: rgba(255,255,255,0.08);
-  color: #e5e7eb;
-  border: 1px solid rgba(255,255,255,0.1);
+  background: rgba(60,50,40,0.10);
+  color: #3a3632;
+  border: 1px solid rgba(60,50,40,0.12);
   border-radius: 8px;
   font-size: 14px;
   cursor: pointer;
@@ -675,7 +677,7 @@ body.app-layout {
 .ghost-button {
   padding: 8px 16px;
   background: transparent;
-  color: #9ca3af;
+  color: #8a8275;
   border: none;
   border-radius: 8px;
   font-size: 14px;
@@ -684,14 +686,14 @@ body.app-layout {
 }
 
 .ghost-button:hover {
-  background: rgba(255,255,255,0.06);
-  color: #e5e7eb;
+  background: rgba(60,50,40,0.08);
+  color: #3a3632;
 }
 
 .danger-button {
   padding: 8px 16px;
   background: rgba(239, 68, 68, 0.15);
-  color: #ef4444;
+  color: #c4756e;
   border: 1px solid rgba(239, 68, 68, 0.3);
   border-radius: 8px;
   font-size: 14px;
@@ -709,8 +711,8 @@ body.app-layout {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  border-bottom: 1px solid rgba(255,255,255,0.06);
-  background: #0f0f12;
+  border-bottom: 1px solid rgba(60,50,40,0.08);
+  background: #ebe5d9;
 }
 
 .top-nav-left {
@@ -721,7 +723,7 @@ body.app-layout {
 
 .top-nav-page {
   font-size: 14px;
-  color: #9ca3af;
+  color: #8a8275;
 }
 
 .top-nav-links {
@@ -731,7 +733,7 @@ body.app-layout {
 
 .top-nav-links a {
   padding: 6px 12px;
-  color: #9ca3af;
+  color: #8a8275;
   text-decoration: none;
   font-size: 14px;
   border-radius: 6px;
@@ -739,13 +741,13 @@ body.app-layout {
 }
 
 .top-nav-links a:hover {
-  background: rgba(255,255,255,0.06);
-  color: #fff;
+  background: rgba(60,50,40,0.08);
+  color: #3a3632;
 }
 
 .top-nav-links a.active {
-  background: rgba(99, 102, 241, 0.15);
-  color: #a5b4fc;
+  background: rgba(125, 107, 93, 0.15);
+  color: #7d6b5d;
 }
 
 .settings-page {
@@ -765,7 +767,7 @@ body.app-layout {
 }
 
 .settings-header p {
-  color: #9ca3af;
+  color: #8a8275;
   margin: 0;
   font-size: 14px;
 }
@@ -793,7 +795,7 @@ body.app-layout {
 
 .field-hint {
   font-size: 12px;
-  color: #6b7280;
+  color: #b0a898;
   margin: 0;
 }
 
@@ -803,10 +805,10 @@ body.app-layout {
 .field textarea,
 .field select {
   padding: 10px 12px;
-  background: rgba(255,255,255,0.05);
-  border: 1px solid rgba(255,255,255,0.1);
+  background: rgba(60,50,40,0.05);
+  border: 1px solid rgba(60,50,40,0.12);
   border-radius: 8px;
-  color: #e5e7eb;
+  color: #3a3632;
   font-size: 14px;
   font-family: inherit;
 }
@@ -815,17 +817,17 @@ body.app-layout {
 .field textarea:focus,
 .field select:focus {
   outline: none;
-  border-color: #6366f1;
+  border-color: #7d6b5d;
 }
 
 .field input::placeholder,
 .field textarea::placeholder {
-  color: #6b7280;
+  color: #b0a898;
 }
 
 .settings-separator {
   border: none;
-  border-top: 1px solid rgba(255,255,255,0.06);
+  border-top: 1px solid rgba(60,50,40,0.08);
   margin: 8px 0;
 }
 
@@ -837,8 +839,8 @@ body.app-layout {
 }
 
 .connection-card {
-  background: rgba(255,255,255,0.03);
-  border: 1px solid rgba(255,255,255,0.08);
+  background: rgba(60,50,40,0.03);
+  border: 1px solid rgba(60,50,40,0.10);
   border-radius: 12px;
   padding: 16px;
   cursor: pointer;
@@ -846,13 +848,13 @@ body.app-layout {
 }
 
 .connection-card:hover {
-  background: rgba(255,255,255,0.05);
+  background: rgba(60,50,40,0.05);
   border-color: rgba(255,255,255,0.12);
 }
 
 .connection-card.active {
-  border-color: #6366f1;
-  background: rgba(99, 102, 241, 0.08);
+  border-color: #7d6b5d;
+  background: rgba(125, 107, 93, 0.08);
 }
 
 .connection-card-header {
@@ -870,14 +872,14 @@ body.app-layout {
 .connection-card-badge {
   font-size: 11px;
   padding: 2px 6px;
-  background: rgba(99, 102, 241, 0.15);
-  color: #a5b4fc;
+  background: rgba(125, 107, 93, 0.15);
+  color: #7d6b5d;
   border-radius: 4px;
 }
 
 .connection-card-model {
   font-size: 13px;
-  color: #9ca3af;
+  color: #8a8275;
   margin-bottom: 12px;
 }
 
@@ -898,8 +900,8 @@ body.app-layout {
   align-items: flex-start;
   gap: 10px;
   padding: 12px;
-  background: rgba(255,255,255,0.03);
-  border: 1px solid rgba(255,255,255,0.08);
+  background: rgba(60,50,40,0.03);
+  border: 1px solid rgba(60,50,40,0.10);
   border-radius: 8px;
 }
 
@@ -908,7 +910,7 @@ body.app-layout {
   height: 20px;
   border: none;
   background: transparent;
-  color: #10b981;
+  color: #5b7a5e;
   font-size: 14px;
   cursor: pointer;
   flex-shrink: 0;
@@ -916,14 +918,14 @@ body.app-layout {
 }
 
 .memory-item-toggle.disabled {
-  color: #6b7280;
+  color: #b0a898;
 }
 
 .memory-item-content {
   flex: 1;
   font-size: 14px;
   line-height: 1.5;
-  color: #e5e7eb;
+  color: #3a3632;
   min-width: 0;
   word-break: break-word;
 }
@@ -946,7 +948,7 @@ body.app-layout {
   padding: 8px 16px;
   background: transparent;
   border: none;
-  color: #9ca3af;
+  color: #8a8275;
   cursor: pointer;
   font-size: 14px;
   border-bottom: 2px solid transparent;
@@ -954,12 +956,12 @@ body.app-layout {
 }
 
 .auth-tab.active {
-  color: #e5e7eb;
-  border-bottom-color: #6366f1;
+  color: #3a3632;
+  border-bottom-color: #7d6b5d;
 }
 
 .auth-tab:hover {
-  color: #e5e7eb;
+  color: #3a3632;
 }
 
 .auth-form {
@@ -997,12 +999,12 @@ body.app-layout {
 
 .sync-user {
   font-size: 14px;
-  color: #e5e7eb;
+  color: #3a3632;
 }
 
 .sync-indicator {
   font-size: 12px;
-  color: #6b7280;
+  color: #b0a898;
 }
 
 .sync-indicator.syncing {
@@ -1011,11 +1013,11 @@ body.app-layout {
 }
 
 .sync-indicator.success {
-  color: #10b981;
+  color: #5b7a5e;
 }
 
 .sync-indicator.error {
-  color: #ef4444;
+  color: #c4756e;
 }
 
 @keyframes pulse {
@@ -1045,7 +1047,7 @@ body.app-layout {
   min-width: 60px;
   text-align: right;
   font-size: 14px;
-  color: #a5b4fc;
+  color: #7d6b5d;
 }
 
 /* ========== 模型选择器 ========== */
@@ -1057,28 +1059,28 @@ body.app-layout {
 
 .model-chip {
   padding: 6px 12px;
-  background: rgba(255,255,255,0.05);
-  border: 1px solid rgba(255,255,255,0.1);
+  background: rgba(60,50,40,0.05);
+  border: 1px solid rgba(60,50,40,0.12);
   border-radius: 6px;
-  color: #e5e7eb;
+  color: #3a3632;
   font-size: 13px;
   cursor: pointer;
   transition: all 0.15s;
 }
 
 .model-chip:hover {
-  background: rgba(99, 102, 241, 0.15);
-  border-color: #6366f1;
+  background: rgba(125, 107, 93, 0.15);
+  border-color: #7d6b5d;
 }
 
 .model-chip.selected {
-  background: rgba(99, 102, 241, 0.2);
-  border-color: #6366f1;
-  color: #a5b4fc;
+  background: rgba(125, 107, 93, 0.2);
+  border-color: #7d6b5d;
+  color: #7d6b5d;
 }
 
 .empty-text {
-  color: #6b7280;
+  color: #b0a898;
   font-size: 14px;
 }
 
@@ -1160,7 +1162,7 @@ body.app-layout {
 .sidebar-backdrop {
   position: fixed;
   inset: 0;
-  background: rgba(0,0,0,0.5);
+  background: rgba(0,0,0,0.25);
   z-index: 199;
   display: none;
 }
@@ -1180,7 +1182,7 @@ body.app-layout {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: rgba(255,255,255,0.15);
+  background: rgba(60,50,40,0.15);
   border-radius: 3px;
 }
 
@@ -1200,27 +1202,27 @@ body.app-layout {
 .toggle-row input[type="checkbox"] {
   width: 18px;
   height: 18px;
-  accent-color: #6366f1;
+  accent-color: #7d6b5d;
   cursor: pointer;
 }
 
 /* 自动提取的记忆标记 */
 .memory-item.auto-extracted {
-  border-left: 3px solid #6366f1;
+  border-left: 3px solid #7d6b5d;
 }
 
 .memory-auto-badge {
   font-size: 10px;
   padding: 1px 5px;
-  background: rgba(99, 102, 241, 0.2);
-  color: #a5b4fc;
+  background: rgba(125, 107, 93, 0.2);
+  color: #7d6b5d;
   border-radius: 3px;
   margin-left: 6px;
 }
 
 /* ========== RAG 自然记忆样式 ========== */
 .rag-memory {
-  border-left: 3px solid #10b981;
+  border-left: 3px solid #5b7a5e;
   display: grid;
   grid-template-columns: auto 1fr auto auto;
   gap: 8px;
@@ -1229,7 +1231,7 @@ body.app-layout {
 
 .memory-strength {
   font-size: 10px;
-  color: #10b981;
+  color: #5b7a5e;
   letter-spacing: -1px;
   cursor: help;
 }
@@ -1257,7 +1259,7 @@ body.app-layout {
 
 .image-preview-area {
   padding: 8px 12px;
-  border-bottom: 1px solid #333;
+  border-bottom: 1px solid #d9d0c0;
 }
 
 .image-preview-list {
@@ -1287,7 +1289,7 @@ body.app-layout {
   right: -4px;
   width: 18px;
   height: 18px;
-  background: #ef4444;
+  background: #c4756e;
   border: none;
   border-radius: 50%;
   color: white;
@@ -1341,7 +1343,7 @@ body.app-layout {
 }
 
 .message-content blockquote {
-  border-left: 3px solid #6366f1;
+  border-left: 3px solid #7d6b5d;
   margin: 0.8em 0;
   padding-left: 12px;
   color: #aaa;
@@ -1372,7 +1374,7 @@ body.app-layout {
 .message-content h3 { font-size: 1.1em; }
 
 .message-content a {
-  color: #818cf8;
+  color: #8a7a6a;
 }
 
 .message-content hr {
@@ -1406,7 +1408,7 @@ body.app-layout {
   display: inline-block;
   width: 8px;
   height: 16px;
-  background: #6366f1;
+  background: #7d6b5d;
   margin-left: 2px;
   animation: blink 0.8s infinite;
   vertical-align: text-bottom;
@@ -1441,7 +1443,7 @@ body.app-layout {
 
 .msg-action-btn:hover {
   background: rgba(255, 255, 255, 0.2);
-  color: #fff;
+  color: #3a3632;
 }
 
 /* ========== 模型切换面板优化 ========== */
@@ -1452,7 +1454,7 @@ body.app-layout {
   width: 320px;
   max-height: 70vh;
   background: #1a1a1a;
-  border: 1px solid #333;
+  border: 1px solid #d9d0c0;
   border-radius: 12px;
   box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
   z-index: 100;
@@ -1470,13 +1472,13 @@ body.app-layout {
   justify-content: space-between;
   align-items: center;
   padding: 12px 16px;
-  border-bottom: 1px solid #333;
+  border-bottom: 1px solid #d9d0c0;
   font-weight: 500;
 }
 
 .model-switch-section {
   padding: 12px 16px;
-  border-bottom: 1px solid #2a2a2a;
+  border-bottom: 1px solid #e8e0d4;
 }
 
 .model-switch-section:last-child {
@@ -1516,8 +1518,8 @@ body.app-layout {
 }
 
 .model-item.active {
-  background: rgba(99, 102, 241, 0.2);
-  border-color: #6366f1;
+  background: rgba(125, 107, 93, 0.2);
+  border-color: #7d6b5d;
 }
 
 .model-item-name {
@@ -1532,7 +1534,7 @@ body.app-layout {
   font-size: 11px;
   color: #666;
   padding: 2px 6px;
-  background: #333;
+  background: #d9d0c0;
   border-radius: 4px;
 }
 
@@ -1553,21 +1555,21 @@ body.app-layout {
 .connection-badge {
   font-size: 12px;
   padding: 2px 8px;
-  background: rgba(99, 102, 241, 0.2);
-  color: #a5b4fc;
+  background: rgba(125, 107, 93, 0.2);
+  color: #7d6b5d;
   border-radius: 4px;
   cursor: pointer;
   transition: background 0.2s;
 }
 
 .connection-badge:hover {
-  background: rgba(99, 102, 241, 0.3);
+  background: rgba(125, 107, 93, 0.3);
 }
 
 /* ========== 搜索预览区域 ========== */
 .search-preview-area {
   padding: 8px 12px;
-  border-bottom: 1px solid #333;
+  border-bottom: 1px solid #d9d0c0;
   background: #1a1a1a;
 }
 
@@ -1590,7 +1592,7 @@ body.app-layout {
 }
 
 .icon-btn-small:hover {
-  color: #fff;
+  color: #3a3632;
 }
 
 .search-preview-content {
@@ -1603,7 +1605,7 @@ body.app-layout {
 
 .search-result-item {
   padding: 6px 0;
-  border-bottom: 1px solid #2a2a2a;
+  border-bottom: 1px solid #e8e0d4;
 }
 
 .search-result-item:last-child {
@@ -1611,7 +1613,7 @@ body.app-layout {
 }
 
 .search-result-title {
-  color: #818cf8;
+  color: #8a7a6a;
   font-weight: 500;
 }
 
@@ -1638,8 +1640,8 @@ body.app-layout {
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  background: rgba(99, 102, 241, 0.2);
-  color: #a5b4fc;
+  background: rgba(125, 107, 93, 0.2);
+  color: #7d6b5d;
   padding: 2px 8px;
   border-radius: 4px;
   font-size: 12px;
@@ -1647,6 +1649,6 @@ body.app-layout {
 
 /* 输入按钮激活状态 */
 .input-action-btn.active {
-  color: #6366f1;
+  color: #7d6b5d;
   opacity: 1;
 }
