@@ -560,25 +560,28 @@ body {
     <div class="panel-header">设置 <button class="panel-close" onclick="closePanel()">✕</button></div>
     <div class="panel-body">
       <div class="s-group">
-        <div class="s-label">API 提供商</div>
+        <div class="s-label">API 格式（决定请求格式，不是地址）</div>
         <select class="s-select" id="s-provider">
-          <option value="anthropic">Anthropic (Claude)</option>
-          <option value="openai">OpenAI (GPT)</option>
-          <option value="deepseek">DeepSeek</option>
-          <option value="custom">自定义 API</option>
+          <option value="anthropic">Anthropic 格式 (Claude)</option>
+          <option value="openai">OpenAI 兼容格式 (GPT / DeepSeek / 中转站等)</option>
         </select>
+      </div>
+      <div class="s-group">
+        <div class="s-label">API 地址（完整 URL，必须手动填写）</div>
+        <input class="s-input" id="s-custom-url" placeholder="例如 https://api.openai.com/v1/chat/completions">
+        <div style="font-size:11px;color:var(--text3);margin-top:4px;line-height:1.5;">
+          Anthropic 官方：https://api.anthropic.com/v1/messages<br>
+          OpenAI 官方：https://api.openai.com/v1/chat/completions<br>
+          中转站 / 公益站：填对方给你的完整地址
+        </div>
       </div>
       <div class="s-group">
         <div class="s-label">API Key</div>
         <input class="s-input" id="s-apikey" type="password" placeholder="sk-...">
       </div>
       <div class="s-group">
-        <div class="s-label">模型</div>
-        <input class="s-input" id="s-model" placeholder="例如 claude-sonnet-4-20250514">
-      </div>
-      <div class="s-group" id="s-custom-url-group" style="display:none">
-        <div class="s-label">自定义 API URL</div>
-        <input class="s-input" id="s-custom-url" placeholder="https://...">
+        <div class="s-label">模型名称</div>
+        <input class="s-input" id="s-model" placeholder="例如 claude-sonnet-4-20250514 或 gpt-4o">
       </div>
       <hr style="border:none;border-top:1px solid var(--border);margin:20px 0;">
       <div class="s-group">
@@ -829,7 +832,6 @@ function loadSettingsForm() {
   $('s-my-name').value = cfg.myName;
   $('s-system').value = cfg.system;
   updateAvatarPreviews();
-  toggleCustomUrl();
 }
 
 function updateAvatarPreviews() {
@@ -841,15 +843,15 @@ function updateAvatarPreviews() {
   mp.style.background = cfg.myAvatar ? 'transparent' : 'var(--my-bubble)';
 }
 
-function toggleCustomUrl() {
-  $('s-custom-url-group').style.display = $('s-provider').value === 'custom' ? 'block' : 'none';
-}
 $('s-provider').addEventListener('change', () => {
-  toggleCustomUrl();
-  // Set default model
   const p = $('s-provider').value;
-  const defaults = { anthropic: 'claude-sonnet-4-20250514', openai: 'gpt-4o', deepseek: 'deepseek-chat', custom: '' };
-  $('s-model').value = defaults[p] || '';
+  if (p === 'anthropic') {
+    $('s-model').value = 'claude-sonnet-4-20250514';
+    $('s-custom-url').value = 'https://api.anthropic.com/v1/messages';
+  } else {
+    $('s-model').value = 'gpt-4o';
+    if (!$('s-custom-url').value) $('s-custom-url').value = 'https://api.openai.com/v1/chat/completions';
+  }
 });
 
 $('s-their-avatar-file').addEventListener('change', e => {
@@ -883,10 +885,15 @@ function saveSettings() {
 
 // ===== API Call =====
 function getApiConfig() {
+  const url = cfg.customUrl;
+  if (!url) return null;
+
   const p = cfg.provider;
+
+  // Anthropic 格式
   if (p === 'anthropic') {
     return {
-      url: 'https://api.anthropic.com/v1/messages',
+      url,
       headers: {
         'Content-Type': 'application/json',
         'x-api-key': cfg.apiKey,
@@ -901,28 +908,14 @@ function getApiConfig() {
       }),
       extractText: (data) => {
         if (data.content) return data.content.filter(c=>c.type==='text').map(c=>c.text).join('\n');
-        return data.error?.message || 'Error';
+        return data.error?.message || JSON.stringify(data);
       }
     };
   }
-  if (p === 'openai' || p === 'deepseek') {
-    const baseUrl = p === 'deepseek' ? 'https://api.deepseek.com/v1/chat/completions' : 'https://api.openai.com/v1/chat/completions';
-    return {
-      url: baseUrl,
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${cfg.apiKey}`,
-      },
-      buildBody: (msgs) => {
-        const allMsgs = cfg.system ? [{ role: 'system', content: cfg.system }, ...msgs] : msgs;
-        return { model: cfg.model, messages: allMsgs };
-      },
-      extractText: (data) => data.choices?.[0]?.message?.content || data.error?.message || 'Error',
-    };
-  }
-  // Custom
+
+  // OpenAI 兼容格式（OpenAI / DeepSeek / 中转站 / 公益站等）
   return {
-    url: cfg.customUrl,
+    url,
     headers: {
       'Content-Type': 'application/json',
       'Authorization': `Bearer ${cfg.apiKey}`,
@@ -931,7 +924,11 @@ function getApiConfig() {
       const allMsgs = cfg.system ? [{ role: 'system', content: cfg.system }, ...msgs] : msgs;
       return { model: cfg.model, messages: allMsgs };
     },
-    extractText: (data) => data.choices?.[0]?.message?.content || data.content?.[0]?.text || 'Error',
+    extractText: (data) => {
+      if (data.choices?.[0]?.message?.content) return data.choices[0].message.content;
+      if (data.content?.[0]?.text) return data.content[0].text;
+      return data.error?.message || JSON.stringify(data);
+    },
   };
 }
 
@@ -949,13 +946,29 @@ async function sendToApi() {
     });
 
     const api = getApiConfig();
+    if (!api) {
+      messages.push({ role: 'assistant', content: '[请先在设置中填写 API 地址]' });
+      renderChat();
+      isGenerating = false;
+      $('typing').classList.remove('show');
+      return;
+    }
     const resp = await fetch(api.url, {
       method: 'POST',
       headers: api.headers,
       body: JSON.stringify(api.buildBody(apiMsgs)),
     });
 
+    const contentType = resp.headers.get('content-type') || '';
+    if (!contentType.includes('json')) {
+      const text = await resp.text();
+      throw new Error(`服务器返回了非JSON内容（状态码 ${resp.status}）。请检查 API 地址是否正确。`);
+    }
+
     const data = await resp.json();
+    if (!resp.ok) {
+      throw new Error(data.error?.message || `API 错误 ${resp.status}: ${JSON.stringify(data).slice(0, 200)}`);
+    }
     let text = api.extractText(data);
 
     // Check if AI wants to send sticker or red packet
