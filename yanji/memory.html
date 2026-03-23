@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>LLM Hub · 记忆</title>
+  <link rel="stylesheet" href="styles.css">
+  <meta name="theme-color" content="#09090b">
+</head>
+<body>
+  <header class="top-nav">
+    <div class="top-nav-left">
+      <span class="app-logo">LLM Hub</span>
+      <span class="top-nav-page">记忆</span>
+    </div>
+    <nav class="top-nav-links">
+      <a href="index.html">💬 聊天</a>
+      <a href="connections.html">连接</a>
+      <a href="memory.html" class="active">记忆</a>
+      <a href="data.html">数据</a>
+    </nav>
+  </header>
+
+  <div class="settings-page">
+    <header class="settings-header">
+      <h1>自定义指令 & 跨窗口记忆</h1>
+      <p>这里写全局指令、管理每个会话的摘要，以后可以做成真正的“跨窗口大脑”。</p>
+    </header>
+
+    <section class="settings-body narrow">
+      <label class="field">
+        <span>全局自定义指令（所有请求都会带上）</span>
+        <textarea id="globalInstructionInput" rows="4" placeholder="例如：你是我的专属助手，说话风格偏轻松、有一点嘴碎。"></textarea>
+      </label>
+
+      <hr class="settings-separator">
+
+      <div class="field">
+        <span>🤖 自动记忆</span>
+        <p class="field-hint">开启后，AI 会自动从对话中提取值得记住的信息，无需手动添加。</p>
+      </div>
+
+      <div class="field">
+        <label class="toggle-row">
+          <input type="checkbox" id="autoMemoryEnabled">
+          <span>开启自动记忆提取</span>
+        </label>
+      </div>
+
+      <div class="field" id="autoMemoryIntervalField" style="display: none;">
+        <div class="slider-label-row">
+          <span>提取频率（每隔几轮对话）</span>
+          <span class="slider-value" id="autoMemoryIntervalValue">3</span>
+        </div>
+        <input id="autoMemoryIntervalSlider" type="range" min="1" max="10" step="1">
+        <p class="field-hint">数字越小提取越频繁，但也会消耗更多 token。</p>
+      </div>
+
+      <hr class="settings-separator">
+
+      <div class="field">
+        <span>🧠 自然记忆（RAG）</span>
+        <p class="field-hint">
+          像人脑一样的记忆：自动形成，只在相关时浮现，常用的记得牢，不用的慢慢淡忘。<br>
+          <strong>需要：</strong>① 登录 Supabase ② 执行数据库设置脚本 ③ 有 OpenAI 或 Gemini API
+        </p>
+      </div>
+
+      <div class="field">
+        <label class="toggle-row">
+          <input type="checkbox" id="ragMemoryEnabled">
+          <span>开启自然记忆</span>
+        </label>
+      </div>
+
+      <div id="ragMemorySection" style="display: none;">
+        <div class="field">
+          <span>已形成的记忆</span>
+          <p class="field-hint">这些记忆会在相关话题时自然浮现，不会机械地列举。</p>
+        </div>
+        
+        <div id="ragMemoriesList" class="memory-items-list">
+          <div class="empty-text">还没有自然记忆，聊几轮后会自动形成。</div>
+        </div>
+        
+        <div class="editor-buttons" style="justify-content: flex-start; margin-bottom: 1rem;">
+          <button id="refreshRagMemoriesBtn" class="secondary-button">🔄 刷新列表</button>
+          <button id="addRagMemoryBtn" class="secondary-button">➕ 手动添加</button>
+        </div>
+      </div>
+
+      <hr class="settings-separator">
+
+      <div class="field">
+        <span>📝 记忆条目（传统）</span>
+        <p class="field-hint">一条条添加你希望AI记住的信息，可以随时编辑、删除、开关。发请求时会自动拼到提示词里。</p>
+      </div>
+
+      <div id="memoryItemsList" class="memory-items-list">
+        <div class="empty-text">还没有记忆条目，点下方按钮添加。</div>
+      </div>
+
+      <div class="editor-buttons" style="justify-content: flex-start; margin-bottom: 1.5rem;">
+        <button id="addMemoryItemButton" class="secondary-button">➕ 添加记忆</button>
+      </div>
+
+      <hr class="settings-separator">
+
+      <div class="field">
+        <span>生成参数（全局，对所有模型生效）</span>
+        <p class="field-hint">调一调下面几个滑块，可以控制话多话少、敢不敢跑题、回得长不长。</p>
+      </div>
+
+      <div class="field slider-field">
+        <div class="slider-label-row">
+          <span>温度（temperature）</span>
+          <span class="slider-value" id="temperatureValue">0.7</span>
+          <button type="button" class="icon-button tiny" data-help="temperature">？</button>
+        </div>
+        <input id="temperatureSlider" type="range" min="0" max="1.5" step="0.05">
+      </div>
+
+      <div class="field slider-field">
+        <div class="slider-label-row">
+          <span>最大回复长度（max_tokens）</span>
+          <span class="slider-value" id="maxTokensValue">4096</span>
+          <button type="button" class="icon-button tiny" data-help="max_tokens">？</button>
+        </div>
+        <input id="maxTokensSlider" type="range" min="256" max="8192" step="256">
+      </div>
+
+      <div class="field slider-field">
+        <div class="slider-label-row">
+          <span>重复惩罚（frequency_penalty）</span>
+          <span class="slider-value" id="frequencyPenaltyValue">0</span>
+          <button type="button" class="icon-button tiny" data-help="frequency_penalty">？</button>
+        </div>
+        <input id="frequencyPenaltySlider" type="range" min="0" max="2" step="0.1">
+      </div>
+
+      <div class="field slider-field">
+        <div class="slider-label-row">
+          <span>话题新鲜度（presence_penalty）</span>
+          <span class="slider-value" id="presencePenaltyValue">0</span>
+          <button type="button" class="icon-button tiny" data-help="presence_penalty">？</button>
+        </div>
+        <input id="presencePenaltySlider" type="range" min="0" max="2" step="0.1">
+      </div>
+
+      <hr class="settings-separator">
+
+      <div class="field">
+        <span>上下文限制（滑动窗口）</span>
+        <p class="field-hint">限制发送给模型的历史对话长度，省钱又避免超限。超出部分会自动从最早的对话开始丢弃。</p>
+      </div>
+
+      <div class="field">
+        <label class="field">
+          <span>限制模式</span>
+          <select id="contextLimitMode">
+            <option value="none">不限制（发送全部历史）</option>
+            <option value="rounds">按轮数限制</option>
+            <option value="tokens">按 Token 限制</option>
+          </select>
+        </label>
+      </div>
+
+      <div id="contextLimitRoundsField" class="field slider-field" style="display: none;">
+        <div class="slider-label-row">
+          <span>保留最近对话轮数</span>
+          <span class="slider-value" id="maxRoundsValue">50</span>
+        </div>
+        <input id="maxRoundsSlider" type="range" min="5" max="200" step="5">
+        <small class="field-hint">一轮 = 你发一条 + AI回一条</small>
+      </div>
+
+      <div id="contextLimitTokensField" class="field slider-field" style="display: none;">
+        <div class="slider-label-row">
+          <span>最大上下文 Token 数</span>
+          <span class="slider-value" id="maxContextTokensValue">30000</span>
+        </div>
+        <input id="maxContextTokensSlider" type="range" min="5000" max="200000" step="5000">
+        <small class="field-hint">粗略估算：1000 tokens ≈ 500-600 中文字</small>
+      </div>
+
+      <hr class="settings-separator">
+
+      <div class="field">
+        <span>选择要编辑摘要的会话</span>
+        <select id="summaryChatSelect"></select>
+        <p class="field-hint">通常选最近在用的几个窗口，给它们写一句话简介，就像你给每条时间线写“目录”。</p>
+      </div>
+
+      <label class="field">
+        <span>当前会话摘要</span>
+        <textarea id="chatSummaryInput" rows="8" placeholder="可以手动写，也可以点击下面按钮让模型来总结。"></textarea>
+      </label>
+
+      <div class="editor-buttons">
+        <button id="generateSummaryButton" class="secondary-button">用当前连接的模型生成摘要</button>
+        <button id="saveSummaryButton" class="primary-button">保存摘要</button>
+      </div>
+    </section>
+  </div>
+
+  <!-- 编辑记忆条目弹窗 -->
+  <div id="memoryItemModal" class="modal-overlay hidden">
+    <div class="modal-panel" style="max-width: 500px;">
+      <div class="modal-header">
+        <span class="modal-title" id="memoryItemModalTitle">添加记忆</span>
+        <button type="button" id="closeMemoryItemModal" class="icon-button close-button">×</button>
+      </div>
+      <div class="modal-body">
+        <label class="field">
+          <span>记忆内容</span>
+          <textarea id="memoryItemContent" rows="4" placeholder="例如：我喜欢黑金配色、不要用敬语和我说话..."></textarea>
+        </label>
+      </div>
+      <div class="modal-footer">
+        <button type="button" id="memoryItemCancelButton" class="ghost-button">取消</button>
+        <button type="button" id="memoryItemSaveButton" class="primary-button">保存</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="config.js"></script>
+  <script src="state.js"></script>
+  <script src="memory.js"></script>
+  <script src="version.js"></script>
+  <script src="sw-register.js"></script>
+
+</body>
+</html>
