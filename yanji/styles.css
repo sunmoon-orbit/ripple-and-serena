@@ -6,10 +6,12 @@ html, body {
   margin: 0;
   padding: 0;
   height: 100%;
+  height: 100dvh;
   width: 100%;
   font-family: system-ui, -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", sans-serif;
   background: #09090b;
   color: #e5e7eb;
+  overflow: hidden;
 }
 
 /* ========== 新布局：侧边栏 + 主区域 ========== */
@@ -23,6 +25,7 @@ body.app-layout {
   width: 280px;
   min-width: 280px;
   height: 100vh;
+  height: 100dvh;
   background: #0f0f12;
   border-right: 1px solid rgba(255,255,255,0.08);
   display: flex;
@@ -226,6 +229,7 @@ body.app-layout {
   display: flex;
   flex-direction: column;
   height: 100vh;
+  height: 100dvh;
   min-width: 0;
   background: #09090b;
 }
@@ -484,7 +488,9 @@ body.app-layout {
 /* 输入区域 */
 .input-area {
   padding: 16px 20px 20px;
+  padding-bottom: calc(20px + env(safe-area-inset-bottom, 0px));
   background: linear-gradient(to top, #09090b 0%, transparent 100%);
+  flex-shrink: 0;
 }
 
 .input-wrapper {
@@ -1088,6 +1094,8 @@ body.app-layout {
     top: 0;
     z-index: 200;
     transform: translateX(-100%);
+    height: 100vh;
+    height: 100dvh;
   }
   
   .sidebar.open {
@@ -1100,6 +1108,8 @@ body.app-layout {
   
   .main-area {
     width: 100%;
+    height: 100vh;
+    height: 100dvh;
   }
   
   .model-switch-panel {
@@ -1113,20 +1123,36 @@ body.app-layout {
   }
   
   .top-nav {
-    padding: 0 12px;
+    padding: 0 8px;
+    height: 48px;
   }
   
   .top-nav-links {
-    gap: 4px;
+    gap: 2px;
   }
   
   .top-nav-links a {
     padding: 6px 8px;
-    font-size: 13px;
+    font-size: 12px;
   }
   
+  .chat-header {
+    height: 48px;
+    padding: 0 10px;
+  }
+
+  .input-area {
+    padding: 10px 12px 14px;
+    padding-bottom: calc(14px + env(safe-area-inset-bottom, 0px));
+  }
+
   .settings-page {
     padding: 20px 16px;
+  }
+
+  .modal-panel {
+    max-height: 85vh;
+    max-height: 85dvh;
   }
 }
 
