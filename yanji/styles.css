@@ -754,6 +754,11 @@ body.app-layout {
   max-width: 720px;
   margin: 0 auto;
   padding: 32px 20px;
+  padding-bottom: calc(32px + env(safe-area-inset-bottom, 0px));
+  height: calc(100vh - 56px);
+  height: calc(100dvh - 56px);
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
 }
 
 .settings-header {
@@ -1150,6 +1155,9 @@ body.app-layout {
 
   .settings-page {
     padding: 20px 16px;
+    padding-bottom: calc(20px + env(safe-area-inset-bottom, 0px));
+    height: calc(100vh - 48px);
+    height: calc(100dvh - 48px);
   }
 
   .modal-panel {
