@@ -116,7 +116,22 @@
     content.innerHTML = `
       <div class="moon-memory-tip">已找到 ${rows.length} 条相关记忆，并会加入下一条消息上下文。</div>
       ${items}
+      <div class="moon-memory-actions">
+        <button id="moonMemoryUseBtn" class="moon-memory-use-btn" type="button">使用这些记忆并返回输入</button>
+      </div>
     `;
+
+    const useBtn = $("moonMemoryUseBtn");
+    if (useBtn) {
+      useBtn.addEventListener("click", (event) => {
+        event.preventDefault();
+        closePanel();
+        const input = $("userInput");
+        if (input) {
+          setTimeout(() => input.focus(), 80);
+        }
+      });
+    }
   }
 
   async function searchFromPanel() {
@@ -142,6 +157,15 @@
     const panel = getPanel();
 
     if (!btn || !panel) return false;
+
+  // moonMemoryCloseDelegationFix: make the X close button reliable on mobile.
+  document.addEventListener("click", (event) => {
+    const closeHit = event.target && event.target.closest && event.target.closest("#clearMoonMemoryBtn, .moon-memory-close, [data-moon-memory-close]");
+    if (!closeHit) return;
+    event.preventDefault();
+    event.stopPropagation();
+    closePanel();
+  }, true);
 
     // Capture-phase delegation: works even if another script stops bubbling later.
     document.addEventListener("click", (event) => {
