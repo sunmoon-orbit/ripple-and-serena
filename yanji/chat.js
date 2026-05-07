@@ -1001,19 +1001,23 @@
 
   async function handleSend() {
     if (isSending) return;
-    
-    let content = els.userInput.value.trim();
-    if (!content) return;
-    
-    // 附加搜索结果到消息
+
+    const visibleContent = els.userInput.value.trim();
+    if (!visibleContent) return;
+
+    // content 是实际发给模型的内容；visibleContent 是界面里保存/显示的用户消息。
+    // 月亮记忆和搜索结果只作为本轮上下文注入给模型，不再显示在聊天气泡里。
+    let content = visibleContent;
+
+    // 附加搜索结果到 API 上下文
     const searchContext = getSearchContext();
     if (searchContext) {
       content += searchContext;
     }
 
-    if (els.moonMemoryAutoToggle && els.moonMemoryAutoToggle.checked && !pendingMoonMemoryContext) {
+    if (els.moonMemoryAutoToggle && els.moonMemoryAutoToggle.checked && !getMoonMemoryContext()) {
       try {
-        await autoFetchMoonMemoryForContent(content);
+        await autoFetchMoonMemoryForContent(visibleContent);
       } catch (e) {
         console.warn("Moon Memory 自动检索失败:", e);
       }
@@ -1024,9 +1028,9 @@
       content += moonMemoryContext;
       clearMoonMemoryContext();
     }
-    
+
     let chat = getActiveChat(state);
-    
+
     // 如果没有当前对话，创建一个
     if (!chat) {
       const conn = getActiveConnection(state);
@@ -1034,63 +1038,63 @@
         alert("请先在【连接】页面配置一个 API 连接。");
         return;
       }
-      
+
       chat = {
         id: uuid(),
-        title: content.slice(0, 30) + (content.length > 30 ? "..." : ""),
+        title: visibleContent.slice(0, 30) + (visibleContent.length > 30 ? "..." : ""),
         connectionId: conn.id,
         model: conn.defaultModel || "",
         createdAt: Date.now(),
         updatedAt: Date.now(),
       };
-      
+
       state.chats.push(chat);
       state.activeChatId = chat.id;
       state.messagesByChatId[chat.id] = [];
     }
-    
+
     const conn = state.connections.find((c) => c.id === chat.connectionId);
     if (!conn) {
       alert("找不到该对话关联的连接配置。");
       return;
     }
-    
+
     // 收集待发送的图片
     const images = [...pendingImages];
     clearPendingImages();
     clearSearchResults();
-    
-    // 添加用户消息（包含图片）
+
+    // 添加用户消息：只显示原始输入，不显示 Moon Memory 上下文
     const userMsg = {
       id: uuid(),
       role: "user",
-      content: content,
+      content: visibleContent,
       createdAt: Date.now(),
     };
-    
+
     if (images.length > 0) {
       userMsg.images = images;
     }
-    
+
     state.messagesByChatId[chat.id].push(userMsg);
-    
-    // 如果是第一条消息，用它作为标题
+
+    // 如果是第一条消息，用原始输入作为标题
     if (state.messagesByChatId[chat.id].length === 1) {
-      chat.title = content.slice(0, 30) + (content.length > 30 ? "..." : "");
+      chat.title = visibleContent.slice(0, 30) + (visibleContent.length > 30 ? "..." : "");
     }
-    
+
     chat.updatedAt = Date.now();
     saveState(state);
-    
+
     els.userInput.value = "";
     autoResizeInput();
     renderChatList();
     renderMessages();
-    
-    // 调用 API
+
+    // 调用 API：传给模型的是增强后的 content，但界面只显示 visibleContent。
     isSending = true;
     setStatus("思考中...");
-    
+
     await sendMessage(chat, conn, content, images);
   }
   
@@ -1104,6 +1108,18 @@
       }));
       
       const limitedMsgs = applyContextLimit(historyMsgs);
+
+      // 如果本轮有联网搜索/月亮记忆上下文，只注入给 API，不写进可见聊天记录。
+      // 做法：把即将发送给 API 的最后一条用户消息替换为增强后的 userText。
+      for (let i = limitedMsgs.length - 1; i >= 0; i--) {
+        if (limitedMsgs[i].role === "user") {
+          limitedMsgs[i] = {
+            ...limitedMsgs[i],
+            content: userText
+          };
+          break;
+        }
+      }
       
       // RAG 记忆检索（自然方式）
       let ragMemoryPrompt = "";
