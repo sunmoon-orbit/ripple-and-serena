@@ -2450,3 +2450,20 @@ select:focus,
     max-height: 30dvh;
   }
 }
+
+
+/* Moon Memory mobile auto-collapse hint */
+@media (max-width: 768px) {
+  .moon-memory-preview-area {
+    max-height: 58dvh !important;
+  }
+
+  .moon-memory-content {
+    max-height: 24dvh !important;
+  }
+
+  .moon-memory-item {
+    max-height: 160px;
+    overflow: hidden;
+  }
+}
