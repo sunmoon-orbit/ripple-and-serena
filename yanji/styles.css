@@ -2388,3 +2388,65 @@ select:focus,
   z-index: 20;
   pointer-events: auto;
 }
+
+
+/* Moon Memory mobile usability patch */
+.moon-memory-preview-area {
+  max-height: min(72vh, 640px);
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+}
+
+.moon-memory-preview-area.moon-memory-open {
+  display: block !important;
+  pointer-events: auto;
+}
+
+.moon-memory-results,
+#moonMemoryContent {
+  max-height: 42vh;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+  padding-bottom: 12px;
+}
+
+.moon-memory-actions {
+  position: sticky;
+  bottom: 0;
+  z-index: 3;
+  display: flex;
+  gap: 10px;
+  padding-top: 10px;
+  background: linear-gradient(to top, rgba(255, 248, 236, 0.98), rgba(255, 248, 236, 0.85));
+}
+
+.moon-memory-use-btn {
+  width: 100%;
+  border: 0;
+  border-radius: 18px;
+  padding: 14px 16px;
+  font-size: 16px;
+  font-weight: 800;
+  background: #a8845d;
+  color: #fffaf2;
+  box-shadow: 0 10px 22px rgba(120, 88, 54, 0.18);
+}
+
+@media (max-width: 768px) {
+  .moon-memory-preview-area {
+    position: fixed !important;
+    left: 12px;
+    right: 12px;
+    bottom: 92px;
+    top: auto;
+    max-height: 68dvh;
+    z-index: 80;
+    border-radius: 22px;
+  }
+
+  #moonMemoryContent {
+    max-height: 30dvh;
+  }
+}
