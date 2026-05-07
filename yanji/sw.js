@@ -4,7 +4,7 @@
    - SW 里用该版本号做 cache 名称，避免旧缓存“死锁”
 */
 const VERSION = new URL(self.location.href).searchParams.get("v") || "v1";
-const CACHE_NAME = "yanji-cache-moonfix5" + VERSION;
+const CACHE_NAME = "yanji-cache-moonfix6" + VERSION;
 
 const ASSETS = [
   "./",

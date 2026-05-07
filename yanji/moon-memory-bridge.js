@@ -7,6 +7,10 @@
     return document.getElementById(id);
   }
 
+  function isMobileViewport() {
+    return window.matchMedia && window.matchMedia("(max-width: 768px)").matches;
+  }
+
   function escapeHtml(value) {
     return String(value ?? "").replace(/[&<>"']/g, (c) => ({
       "&": "&amp;",
@@ -132,6 +136,21 @@
         }
       });
     }
+
+    // 手机端空间太小：检索成功后自动收起面板，避免挡住输入框。
+    // 记忆上下文仍然保留，会加入下一条消息。
+    if (isMobileViewport()) {
+      const status = $("statusBar");
+      if (status) status.textContent = `🌙 已加入 ${Math.min(rows.length, 8)} 条月亮记忆上下文`;
+      setTimeout(() => {
+        closePanel();
+        const input = $("userInput");
+        if (input) input.focus();
+        setTimeout(() => {
+          if (status && status.textContent.includes("月亮记忆")) status.textContent = "";
+        }, 2800);
+      }, 650);
+    }
   }
 
   async function searchFromPanel() {
@@ -166,6 +185,16 @@
     event.stopPropagation();
     closePanel();
   }, true);
+
+
+    // touchstartMoonMemoryFix6: make panel controls reliable on mobile touch browsers.
+    document.addEventListener("touchstart", (event) => {
+      const closeHit = event.target && event.target.closest && event.target.closest("#clearMoonMemoryBtn, .moon-memory-close, [data-moon-memory-close]");
+      if (!closeHit) return;
+      event.preventDefault();
+      event.stopPropagation();
+      closePanel();
+    }, { capture: true, passive: false });
 
     // Capture-phase delegation: works even if another script stops bubbling later.
     document.addEventListener("click", (event) => {
