@@ -15,6 +15,7 @@
   const els = {};
   let isSending = false;
   let pendingImages = []; // 待发送的图片
+  let pendingMoonMemoryContext = ""; // 手动选择加入本轮上下文的月亮记忆
 
   // ========== DOM 引用 ==========
   function initDomRefs() {
@@ -58,6 +59,16 @@
     els.searchPreviewArea = document.getElementById("searchPreviewArea");
     els.searchPreviewContent = document.getElementById("searchPreviewContent");
     els.clearSearchBtn = document.getElementById("clearSearchBtn");
+
+    // Moon Memory 外部记忆库
+    els.moonMemoryBtn = document.getElementById("moonMemoryBtn");
+    els.moonMemoryPreviewArea = document.getElementById("moonMemoryPreviewArea");
+    els.moonMemoryTokenInput = document.getElementById("moonMemoryTokenInput");
+    els.moonMemoryQueryInput = document.getElementById("moonMemoryQueryInput");
+    els.moonMemorySearchBtn = document.getElementById("moonMemorySearchBtn");
+    els.moonMemoryAutoToggle = document.getElementById("moonMemoryAutoToggle");
+    els.moonMemoryContent = document.getElementById("moonMemoryContent");
+    els.clearMoonMemoryBtn = document.getElementById("clearMoonMemoryBtn");
     
     // 重命名弹窗
     els.renameChatModal = document.getElementById("renameChatModal");
@@ -998,6 +1009,12 @@
     const searchContext = getSearchContext();
     if (searchContext) {
       content += searchContext;
+    }
+
+    const moonMemoryContext = getMoonMemoryContext();
+    if (moonMemoryContext) {
+      content += moonMemoryContext;
+      clearMoonMemoryContext();
     }
     
     let chat = getActiveChat(state);
@@ -2691,6 +2708,7 @@ ${conversationText}
   function init() {
     initDomRefs();
     initEventListeners();
+    initMoonMemoryUI();
     
     renderChatList();
     renderMessages();
