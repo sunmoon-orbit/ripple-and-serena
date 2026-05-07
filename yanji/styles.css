@@ -2273,3 +2273,102 @@ select:focus,
     width: 100%;
   }
 }
+
+/* Moon Memory 外部记忆库 */
+.moon-memory-preview-area {
+  margin: 0 0 10px;
+  padding: 12px;
+  border: 1px solid rgba(168, 132, 93, 0.22);
+  border-radius: 18px;
+  background: rgba(255, 250, 242, 0.96);
+  box-shadow: 0 10px 28px rgba(120, 90, 60, 0.08);
+}
+
+.moon-memory-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  font-weight: 700;
+  color: var(--text-primary, #3f3328);
+  margin-bottom: 10px;
+}
+
+.moon-memory-config {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.moon-memory-config input[type="password"],
+.moon-memory-config input[type="text"] {
+  width: 100%;
+  border: 1px solid rgba(168, 132, 93, 0.22);
+  border-radius: 14px;
+  padding: 10px 12px;
+  background: rgba(255, 253, 248, 0.95);
+  font-size: 14px;
+  outline: none;
+}
+
+.moon-memory-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+}
+
+.moon-memory-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--text-secondary, #75675a);
+  font-size: 13px;
+  user-select: none;
+}
+
+.moon-memory-content {
+  display: grid;
+  gap: 8px;
+  color: var(--text-secondary, #75675a);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.moon-memory-tip,
+.moon-memory-empty {
+  padding: 10px 12px;
+  border-radius: 14px;
+  background: rgba(245, 240, 232, 0.8);
+}
+
+.moon-memory-item {
+  border: 1px solid rgba(168, 132, 93, 0.18);
+  border-radius: 14px;
+  padding: 10px 12px;
+  background: rgba(255, 253, 248, 0.88);
+}
+
+.moon-memory-meta {
+  color: var(--text-muted, #8a7a6b);
+  font-size: 12px;
+  margin-bottom: 5px;
+}
+
+.moon-memory-text {
+  color: var(--text-primary, #3f3328);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 720px) {
+  .moon-memory-row {
+    grid-template-columns: 1fr;
+  }
+  .moon-memory-row button {
+    width: 100%;
+  }
+  .moon-memory-config input[type="password"],
+  .moon-memory-config input[type="text"] {
+    font-size: 16px;
+  }
+}

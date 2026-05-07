@@ -43,6 +43,13 @@
     },
     // 自动工具调用
     autoTools: true, // 是否让模型自动决定何时搜索/获取位置
+    // Moon Memory 外部记忆库配置（只读检索第一版）
+    moonMemory: {
+      enabled: false,
+      baseUrl: "https://memory.ravenlove.cc",
+      apiToken: "",
+      limit: 5,
+    },
   };
 
   function uuid() {
@@ -88,6 +95,12 @@
         maxRounds: 50,
         maxTokens: 30000,
       };
+    }
+    // Moon Memory 外部记忆库配置
+    if (!state.moonMemory || typeof state.moonMemory !== "object") {
+      state.moonMemory = Object.assign({}, defaultState.moonMemory);
+    } else {
+      state.moonMemory = Object.assign({}, defaultState.moonMemory, state.moonMemory);
     }
     return state;
   }
