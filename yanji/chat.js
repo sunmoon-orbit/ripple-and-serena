@@ -1011,6 +1011,14 @@
       content += searchContext;
     }
 
+    if (els.moonMemoryAutoToggle && els.moonMemoryAutoToggle.checked && !pendingMoonMemoryContext) {
+      try {
+        await autoFetchMoonMemoryForContent(content);
+      } catch (e) {
+        console.warn("Moon Memory 自动检索失败:", e);
+      }
+    }
+
     const moonMemoryContext = getMoonMemoryContext();
     if (moonMemoryContext) {
       content += moonMemoryContext;
@@ -2544,6 +2552,171 @@
         }
       }
     });
+  }
+
+
+  // ========== Moon Memory 外部记忆库（只读） ==========
+  const MOON_MEMORY_BASE_URL = "https://memory.ravenlove.cc";
+
+  function initMoonMemoryUI() {
+    if (!els.moonMemoryBtn || !els.moonMemoryPreviewArea) return;
+
+    const savedToken = localStorage.getItem("yanji_moon_memory_token") || localStorage.getItem("moon_memory_token") || "";
+    if (els.moonMemoryTokenInput && savedToken) els.moonMemoryTokenInput.value = savedToken;
+
+    const savedAuto = localStorage.getItem("yanji_moon_memory_auto") === "true";
+    if (els.moonMemoryAutoToggle) els.moonMemoryAutoToggle.checked = savedAuto;
+
+    els.moonMemoryBtn.addEventListener("click", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      toggleMoonMemoryPanel();
+    });
+
+    if (els.moonMemorySearchBtn) {
+      els.moonMemorySearchBtn.addEventListener("click", () => searchMoonMemoryFromPanel());
+    }
+
+    if (els.moonMemoryQueryInput) {
+      els.moonMemoryQueryInput.addEventListener("keydown", (e) => {
+        if (e.key === "Enter") {
+          e.preventDefault();
+          searchMoonMemoryFromPanel();
+        }
+      });
+    }
+
+    if (els.clearMoonMemoryBtn) {
+      els.clearMoonMemoryBtn.addEventListener("click", () => {
+        clearMoonMemoryContext();
+        els.moonMemoryPreviewArea.style.display = "none";
+      });
+    }
+
+    if (els.moonMemoryTokenInput) {
+      els.moonMemoryTokenInput.addEventListener("change", () => {
+        const t = els.moonMemoryTokenInput.value.trim();
+        if (t) localStorage.setItem("yanji_moon_memory_token", t);
+      });
+    }
+
+    if (els.moonMemoryAutoToggle) {
+      els.moonMemoryAutoToggle.addEventListener("change", () => {
+        localStorage.setItem("yanji_moon_memory_auto", String(els.moonMemoryAutoToggle.checked));
+      });
+    }
+  }
+
+  function toggleMoonMemoryPanel() {
+    if (!els.moonMemoryPreviewArea) return;
+    const isOpen = els.moonMemoryPreviewArea.style.display !== "none";
+    els.moonMemoryPreviewArea.style.display = isOpen ? "none" : "block";
+    if (!isOpen && els.moonMemoryQueryInput) {
+      setTimeout(() => els.moonMemoryQueryInput.focus(), 60);
+    }
+  }
+
+  function getMoonMemoryToken() {
+    const t = els.moonMemoryTokenInput ? els.moonMemoryTokenInput.value.trim() : "";
+    if (t) {
+      localStorage.setItem("yanji_moon_memory_token", t);
+      return t;
+    }
+    return localStorage.getItem("yanji_moon_memory_token") || localStorage.getItem("moon_memory_token") || "";
+  }
+
+  async function fetchMoonMemories(query, limit = 8) {
+    const token = getMoonMemoryToken();
+    if (!token) throw new Error("请先填写 Moon Memory API Token。");
+
+    const params = new URLSearchParams();
+    if (query && query.trim()) params.set("q", query.trim());
+    params.set("limit", String(limit));
+
+    const resp = await fetch(`${MOON_MEMORY_BASE_URL}/memories/filter?${params.toString()}`, {
+      method: "GET",
+      headers: {
+        "Authorization": `Bearer ${token}`,
+        "Accept": "application/json"
+      }
+    });
+
+    if (!resp.ok) {
+      const text = await resp.text();
+      throw new Error(`Moon Memory 读取失败：${resp.status} ${text}`);
+    }
+
+    return await resp.json();
+  }
+
+  async function searchMoonMemoryFromPanel() {
+    if (!els.moonMemoryContent) return;
+    const query = (els.moonMemoryQueryInput && els.moonMemoryQueryInput.value.trim()) || (els.userInput && els.userInput.value.trim()) || "";
+    els.moonMemoryContent.innerHTML = `<div class="moon-memory-tip">正在检索月亮记忆库……</div>`;
+
+    try {
+      const rows = await fetchMoonMemories(query, 8);
+      renderMoonMemoryResults(rows, query);
+    } catch (e) {
+      els.moonMemoryContent.innerHTML = `<div class="moon-memory-empty">${escapeHtml(e.message)}<br>如果这里提示 CORS，请告诉阿曜，需要给 Moon Memory 后端加跨域允许。</div>`;
+    }
+  }
+
+  async function autoFetchMoonMemoryForContent(content) {
+    if (!content || !els.moonMemoryAutoToggle || !els.moonMemoryAutoToggle.checked) return;
+    const token = getMoonMemoryToken();
+    if (!token) return;
+    const query = content.slice(0, 80);
+    const rows = await fetchMoonMemories(query, 5);
+    if (rows && rows.length) {
+      pendingMoonMemoryContext = formatMoonMemoryContext(rows);
+      if (els.moonMemoryPreviewArea) els.moonMemoryPreviewArea.style.display = "block";
+      if (els.moonMemoryContent) renderMoonMemoryResults(rows, query, true);
+    }
+  }
+
+  function renderMoonMemoryResults(rows, query, auto = false) {
+    if (!els.moonMemoryContent) return;
+    if (!Array.isArray(rows) || rows.length === 0) {
+      els.moonMemoryContent.innerHTML = `<div class="moon-memory-empty">没有找到相关记忆${query ? "：" + escapeHtml(query) : ""}。</div>`;
+      return;
+    }
+
+    const context = formatMoonMemoryContext(rows);
+    pendingMoonMemoryContext = context;
+
+    const items = rows.map((m, idx) => `
+      <div class="moon-memory-item">
+        <div class="moon-memory-meta">#${escapeHtml(m.id)} · ${escapeHtml(m.type || "memory")} · ${escapeHtml(m.agent || "")} · ${escapeHtml(m.scope || "")}</div>
+        <div class="moon-memory-text">${escapeHtml(m.content || "").slice(0, 260)}</div>
+      </div>
+    `).join("");
+
+    els.moonMemoryContent.innerHTML = `
+      <div class="moon-memory-tip">${auto ? "已自动" : "已"}找到 ${rows.length} 条相关记忆，并会加入下一条消息上下文。</div>
+      ${items}
+    `;
+  }
+
+  function formatMoonMemoryContext(rows) {
+    if (!Array.isArray(rows) || rows.length === 0) return "";
+    let text = "\n\n【Moon Memory 相关记忆】\n";
+    rows.slice(0, 8).forEach((m, i) => {
+      const meta = [m.type, m.agent, m.scope, m.tags].filter(Boolean).join(" | ");
+      text += `${i + 1}. ${m.content || ""}${meta ? `\n   元信息：${meta}` : ""}\n`;
+    });
+    return text;
+  }
+
+  function getMoonMemoryContext() {
+    return pendingMoonMemoryContext || "";
+  }
+
+  function clearMoonMemoryContext() {
+    pendingMoonMemoryContext = "";
+    if (els.moonMemoryContent) {
+      els.moonMemoryContent.innerHTML = `<div class="moon-memory-tip">已清空本轮月亮记忆上下文。可以重新检索。</div>`;
+    }
   }
 
   // ========== 自动记忆提取 ==========
