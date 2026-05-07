@@ -16,6 +16,7 @@ const ASSETS = [
   "./state.js",
   "./config.js",
   "./chat.js",
+  "./moon-memory-bridge.js",
   "./connections.js",
   "./memory.js",
   "./data.js",
