@@ -185,8 +185,8 @@
   }
 
   function escapeHtml(str) {
-    if (!str) return "";
-    return str.replace(/[&<>"']/g, (m) => ({
+    if (str === null || str === undefined) return "";
+    return String(str).replace(/[&<>"']/g, (m) => ({
       "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
     }[m]));
   }
@@ -2709,11 +2709,12 @@
   }
 
   function getMoonMemoryContext() {
-    return pendingMoonMemoryContext || "";
+    return pendingMoonMemoryContext || window.__YANJI_MOON_MEMORY_CONTEXT || "";
   }
 
   function clearMoonMemoryContext() {
     pendingMoonMemoryContext = "";
+    window.__YANJI_MOON_MEMORY_CONTEXT = "";
     if (els.moonMemoryContent) {
       els.moonMemoryContent.innerHTML = `<div class="moon-memory-tip">已清空本轮月亮记忆上下文。可以重新检索。</div>`;
     }
