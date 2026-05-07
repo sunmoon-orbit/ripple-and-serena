@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-  <title>LLM Hub</title>
+  <title>言叽</title>
   <link rel="stylesheet" href="styles.css">
   <meta name="theme-color" content="#f5f0e8">
   <link rel="manifest" href="manifest.json">
@@ -28,7 +28,7 @@
   <!-- 侧边栏 -->
   <aside id="sidebar" class="sidebar">
     <div class="sidebar-header">
-      <span class="app-logo">LLM Hub</span>
+      <span class="app-logo">言叽</span>
       <button id="closeSidebarBtn" class="icon-btn" title="收起侧边栏">✕</button>
     </div>
     
@@ -64,7 +64,7 @@
     <header class="chat-header">
       <button id="openSidebarBtn" class="icon-btn hamburger" title="展开侧边栏">☰</button>
       <div class="chat-header-info">
-        <span id="currentChatTitle" class="chat-title">新对话</span>
+        <span id="currentChatTitle" class="chat-title">新的闲聊</span>
         <span id="currentConnectionName" class="connection-badge"></span>
       </div>
       <div class="chat-header-actions">
@@ -105,9 +105,9 @@
     <!-- 消息区域 -->
     <div id="messagesContainer" class="messages-container">
       <div id="emptyState" class="empty-state">
-        <div class="empty-icon">💬</div>
-        <h2>开始新对话</h2>
-        <p>在下方输入消息，开始与 AI 聊天</p>
+        <div class="empty-icon">✦</div>
+        <h2>今天想聊点什么？</h2>
+        <p>选择连接和模型，然后把想法交给言叽。</p>
       </div>
     </div>
     
@@ -130,7 +130,7 @@
         <button id="locationBtn" class="input-action-btn" title="获取位置">📍</button>
         <button id="searchBtn" class="input-action-btn" title="联网搜索">🔍</button>
         <input type="file" id="imageInput" accept="image/*" multiple style="display: none;">
-        <textarea id="userInput" placeholder="输入消息..." rows="1"></textarea>
+        <textarea id="userInput" placeholder="写下想说的话……" rows="1"></textarea>
         <button id="sendButton" class="send-btn" title="发送">➤</button>
       </div>
       <div id="statusBar" class="status-bar"></div>
