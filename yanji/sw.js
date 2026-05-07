@@ -4,7 +4,7 @@
    - SW 里用该版本号做 cache 名称，避免旧缓存“死锁”
 */
 const VERSION = new URL(self.location.href).searchParams.get("v") || "v1";
-const CACHE_NAME = "llm-hub-" + VERSION;
+const CACHE_NAME = "yanji-cache-moonfix3" + VERSION;
 
 const ASSETS = [
   "./",
@@ -16,6 +16,7 @@ const ASSETS = [
   "./state.js",
   "./config.js",
   "./chat.js",
+  "./moon-memory-bridge.js",
   "./connections.js",
   "./memory.js",
   "./data.js",
