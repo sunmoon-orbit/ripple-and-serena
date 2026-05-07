@@ -125,10 +125,30 @@
         </div>
         <div id="searchPreviewContent" class="search-preview-content"></div>
       </div>
+      <!-- Moon Memory 记忆库检索 -->
+      <div id="moonMemoryPreviewArea" class="moon-memory-preview-area" style="display: none;">
+        <div class="moon-memory-header">
+          <span>🌙 月亮记忆库</span>
+          <button id="clearMoonMemoryBtn" class="icon-btn-small">✕</button>
+        </div>
+        <div class="moon-memory-config">
+          <input id="moonMemoryTokenInput" type="password" placeholder="Moon Memory API Token，只保存在本机浏览器">
+          <div class="moon-memory-row">
+            <input id="moonMemoryQueryInput" type="text" placeholder="输入关键词，或留空使用当前消息">
+            <button id="moonMemorySearchBtn" class="secondary-button" type="button">检索</button>
+          </div>
+          <label class="moon-memory-toggle">
+            <input id="moonMemoryAutoToggle" type="checkbox">
+            <span>发送消息时自动检索相关记忆</span>
+          </label>
+        </div>
+        <div id="moonMemoryContent" class="moon-memory-content">填写 Token 后，可以读取 Moon Memory 的相关记忆。第一版只读，不会写入或删除。</div>
+      </div>
       <div class="input-wrapper">
         <button id="imageUploadBtn" class="input-action-btn" title="上传图片">🖼️</button>
         <button id="locationBtn" class="input-action-btn" title="获取位置">📍</button>
         <button id="searchBtn" class="input-action-btn" title="联网搜索">🔍</button>
+        <button id="moonMemoryBtn" class="input-action-btn" title="月亮记忆库">🌙</button>
         <input type="file" id="imageInput" accept="image/*" multiple style="display: none;">
         <textarea id="userInput" placeholder="写下想说的话……" rows="1"></textarea>
         <button id="sendButton" class="send-btn" title="发送">➤</button>
