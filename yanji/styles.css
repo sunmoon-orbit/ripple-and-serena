@@ -2372,3 +2372,19 @@ select:focus,
     font-size: 16px;
   }
 }
+
+
+/* Moon Memory click/open safety patch */
+#moonMemoryBtn {
+  pointer-events: auto !important;
+  touch-action: manipulation;
+  position: relative;
+  z-index: 5;
+}
+
+.moon-memory-preview-area.moon-memory-open {
+  display: block !important;
+  position: relative;
+  z-index: 20;
+  pointer-events: auto;
+}
