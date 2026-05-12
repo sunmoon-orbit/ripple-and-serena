@@ -4,6 +4,12 @@
   const LOCAL_KEY = "llm_hub_state_v1";
   const SUMMARY_SENTINEL = "[Yanji conversation summary]";
 
+  function getRequestUrl(input) {
+    if (typeof input === "string") return input;
+    if (input && typeof input.url === "string") return input.url;
+    return "";
+  }
+
   function readState() {
     try {
       const raw = window.localStorage && window.localStorage.getItem(LOCAL_KEY);
@@ -33,8 +39,28 @@
   }
 
   function isAnthropicRequest(input) {
-    const url = typeof input === "string" ? input : (input && input.url) || "";
-    return /anthropic|claude/i.test(url);
+    return /anthropic|claude/i.test(getRequestUrl(input));
+  }
+
+  function isKnownNonModelRequest(input) {
+    return /memory\.ravenlove\.cc|nominatim\.openstreetmap\.org/i.test(getRequestUrl(input));
+  }
+
+  function isLikelyModelPayload(input, payload) {
+    const url = getRequestUrl(input);
+    if (/\/chat\/completions|\/responses|openai|deepseek/i.test(url)) return true;
+    if (payload && typeof payload.model === "string" && Array.isArray(payload.messages)) return true;
+    return false;
+  }
+
+  function findSummaryInsertIndex(messages) {
+    let index = 0;
+    while (index < messages.length) {
+      const role = messages[index] && messages[index].role;
+      if (role !== "system" && role !== "developer") break;
+      index += 1;
+    }
+    return index;
   }
 
   function addSummaryToMessages(messages) {
@@ -53,29 +79,24 @@
     };
 
     const nextMessages = messages.slice();
-    const firstRole = nextMessages[0] && nextMessages[0].role;
-    const insertAt = firstRole === "system" || firstRole === "developer" ? 1 : 0;
-    nextMessages.splice(insertAt, 0, summaryMessage);
+    nextMessages.splice(findSummaryInsertIndex(nextMessages), 0, summaryMessage);
     return nextMessages;
   }
 
-  function shouldPatchRequest(input, init, body) {
-    if (!body || isAnthropicRequest(input)) return false;
+  function shouldParseBody(input, body) {
+    if (!body || isAnthropicRequest(input) || isKnownNonModelRequest(input)) return false;
     if (typeof body !== "string") return false;
     if (!body.trim().startsWith("{")) return false;
-
-    const url = typeof input === "string" ? input : (input && input.url) || "";
-    if (/memory\.ravenlove\.cc|nominatim\.openstreetmap\.org/i.test(url)) return false;
-
     return true;
   }
 
   function patchJsonBody(input, init, body) {
-    if (!shouldPatchRequest(input, init, body)) return body;
+    if (!shouldParseBody(input, body)) return body;
 
     try {
       const payload = JSON.parse(body);
       if (!Array.isArray(payload.messages)) return body;
+      if (!isLikelyModelPayload(input, payload)) return body;
 
       const patchedMessages = addSummaryToMessages(payload.messages);
       if (patchedMessages === payload.messages) return body;
