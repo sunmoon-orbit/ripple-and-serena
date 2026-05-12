@@ -3,11 +3,34 @@
 
   const LOCAL_KEY = "llm_hub_state_v1";
   const SUMMARY_SENTINEL = "[Yanji conversation summary]";
+  const DEBUG_FLAG = "__YANJI_CONTEXT_CACHE_DEBUG__";
+  const LAST_PATCH_KEY = "__YANJI_CONTEXT_CACHE_LAST_PATCH__";
 
   function getRequestUrl(input) {
     if (typeof input === "string") return input;
     if (input && typeof input.url === "string") return input.url;
     return "";
+  }
+
+  function getSafeRequestPath(input) {
+    const url = getRequestUrl(input);
+    try {
+      const parsed = new URL(url, window.location.href);
+      return parsed.origin + parsed.pathname;
+    } catch (e) {
+      return url.split("?")[0];
+    }
+  }
+
+  function recordDebug(event) {
+    if (!window[DEBUG_FLAG]) return;
+    window[LAST_PATCH_KEY] = Object.assign(
+      {
+        at: new Date().toISOString(),
+      },
+      event || {}
+    );
+    console.log("Yanji context cache debug:", window[LAST_PATCH_KEY]);
   }
 
   function readState() {
@@ -129,14 +152,29 @@
   }
 
   function patchJsonBody(input, init, body) {
-    if (!shouldParseBody(input, body)) return body;
+    if (!shouldParseBody(input, body)) {
+      recordDebug({
+        patched: false,
+        reason: "skipped-request",
+        url: getSafeRequestPath(input),
+      });
+      return body;
+    }
 
     try {
       const payload = JSON.parse(body);
 
       if (Array.isArray(payload.messages) && isLikelyOpenAIStylePayload(input, payload)) {
         const patchedMessages = addSummaryToMessages(payload.messages);
-        if (patchedMessages === payload.messages) return body;
+        const patched = patchedMessages !== payload.messages;
+        recordDebug({
+          patched,
+          kind: "openai-compatible",
+          url: getSafeRequestPath(input),
+          messageCount: patchedMessages.length,
+          hasSummary: hasSummaryMessage(patchedMessages),
+        });
+        if (!patched) return body;
 
         payload.messages = patchedMessages;
         return JSON.stringify(payload);
@@ -144,13 +182,32 @@
 
       if (Array.isArray(payload.contents) && isLikelyGeminiPayload(input, payload)) {
         const patchedPayload = addSummaryToGeminiPayload(payload);
-        if (patchedPayload === payload) return body;
+        const parts = patchedPayload.systemInstruction && patchedPayload.systemInstruction.parts;
+        const patched = patchedPayload !== payload;
+        recordDebug({
+          patched,
+          kind: "gemini-native",
+          url: getSafeRequestPath(input),
+          contentCount: payload.contents.length,
+          hasSummary: hasSummaryPart(parts),
+        });
+        if (!patched) return body;
 
         return JSON.stringify(patchedPayload);
       }
 
+      recordDebug({
+        patched: false,
+        reason: "not-model-payload",
+        url: getSafeRequestPath(input),
+      });
       return body;
     } catch (e) {
+      recordDebug({
+        patched: false,
+        reason: "json-parse-failed",
+        url: getSafeRequestPath(input),
+      });
       return body;
     }
   }
@@ -179,6 +236,13 @@
     addSummaryToGeminiPayload,
     getActiveSummary,
     installFetchPatch,
+    getLastPatchDebug: function () {
+      return window[LAST_PATCH_KEY] || null;
+    },
+    setDebug: function (enabled) {
+      window[DEBUG_FLAG] = !!enabled;
+      return window[DEBUG_FLAG];
+    },
   };
 
   installFetchPatch();
