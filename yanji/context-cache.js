@@ -31,11 +31,28 @@
     return "";
   }
 
+  function buildSummaryText(summary) {
+    return (
+      SUMMARY_SENTINEL +
+      "\n以下是较早对话的摘要，仅用于保持长期上下文；最近原文消息优先级更高。\n" +
+      summary
+    );
+  }
+
+  function hasSummaryText(text) {
+    return typeof text === "string" && text.includes(SUMMARY_SENTINEL);
+  }
+
   function hasSummaryMessage(messages) {
     return messages.some((message) => {
       if (!message || typeof message.content !== "string") return false;
-      return message.content.includes(SUMMARY_SENTINEL);
+      return hasSummaryText(message.content);
     });
+  }
+
+  function hasSummaryPart(parts) {
+    if (!Array.isArray(parts)) return false;
+    return parts.some((part) => part && hasSummaryText(part.text));
   }
 
   function isAnthropicRequest(input) {
@@ -46,10 +63,17 @@
     return /memory\.ravenlove\.cc|nominatim\.openstreetmap\.org/i.test(getRequestUrl(input));
   }
 
-  function isLikelyModelPayload(input, payload) {
+  function isLikelyOpenAIStylePayload(input, payload) {
     const url = getRequestUrl(input);
     if (/\/chat\/completions|\/responses|openai|deepseek/i.test(url)) return true;
     if (payload && typeof payload.model === "string" && Array.isArray(payload.messages)) return true;
+    return false;
+  }
+
+  function isLikelyGeminiPayload(input, payload) {
+    const url = getRequestUrl(input);
+    if (/generativelanguage|googleapis|gemini/i.test(url)) return true;
+    if (payload && Array.isArray(payload.contents)) return true;
     return false;
   }
 
@@ -72,15 +96,29 @@
 
     const summaryMessage = {
       role: "system",
-      content:
-        SUMMARY_SENTINEL +
-        "\n以下是较早对话的摘要，仅用于保持长期上下文；最近原文消息优先级更高。\n" +
-        summary,
+      content: buildSummaryText(summary),
     };
 
     const nextMessages = messages.slice();
     nextMessages.splice(findSummaryInsertIndex(nextMessages), 0, summaryMessage);
     return nextMessages;
+  }
+
+  function addSummaryToGeminiPayload(payload) {
+    if (!payload || !Array.isArray(payload.contents)) return payload;
+
+    const summary = getActiveSummary();
+    if (!summary) return payload;
+
+    const systemInstruction = payload.systemInstruction || {};
+    const parts = Array.isArray(systemInstruction.parts) ? systemInstruction.parts : [];
+    if (hasSummaryPart(parts)) return payload;
+
+    return Object.assign({}, payload, {
+      systemInstruction: Object.assign({}, systemInstruction, {
+        parts: parts.concat([{ text: buildSummaryText(summary) }]),
+      }),
+    });
   }
 
   function shouldParseBody(input, body) {
@@ -95,14 +133,23 @@
 
     try {
       const payload = JSON.parse(body);
-      if (!Array.isArray(payload.messages)) return body;
-      if (!isLikelyModelPayload(input, payload)) return body;
 
-      const patchedMessages = addSummaryToMessages(payload.messages);
-      if (patchedMessages === payload.messages) return body;
+      if (Array.isArray(payload.messages) && isLikelyOpenAIStylePayload(input, payload)) {
+        const patchedMessages = addSummaryToMessages(payload.messages);
+        if (patchedMessages === payload.messages) return body;
 
-      payload.messages = patchedMessages;
-      return JSON.stringify(payload);
+        payload.messages = patchedMessages;
+        return JSON.stringify(payload);
+      }
+
+      if (Array.isArray(payload.contents) && isLikelyGeminiPayload(input, payload)) {
+        const patchedPayload = addSummaryToGeminiPayload(payload);
+        if (patchedPayload === payload) return body;
+
+        return JSON.stringify(patchedPayload);
+      }
+
+      return body;
     } catch (e) {
       return body;
     }
@@ -129,6 +176,7 @@
 
   window.YanjiContextCache = {
     addSummaryToMessages,
+    addSummaryToGeminiPayload,
     getActiveSummary,
     installFetchPatch,
   };
