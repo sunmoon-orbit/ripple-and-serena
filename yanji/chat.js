@@ -1015,8 +1015,9 @@
       content += searchContext;
     }
 
-    if (els.moonMemoryAutoToggle && els.moonMemoryAutoToggle.checked && !getMoonMemoryContext()) {
+    if (getMoonMemoryToken() && !getMoonMemoryContext()) {
       try {
+        setStatus("检索相关记忆…");
         await autoFetchMoonMemoryForContent(visibleContent);
       } catch (e) {
         console.warn("Moon Memory 自动检索失败:", e);
@@ -2645,6 +2646,12 @@
     const token = getMoonMemoryToken();
     if (!token) throw new Error("请先填写 Moon Memory API Token。");
 
+    const cacheKey = `mm:${query}:${limit}`;
+    if (window.YanjiContextCache) {
+      const cached = window.YanjiContextCache.cacheGet(cacheKey);
+      if (cached) return cached;
+    }
+
     const params = new URLSearchParams();
     if (query && query.trim()) params.set("q", query.trim());
     params.set("limit", String(limit));
@@ -2662,7 +2669,9 @@
       throw new Error(`Moon Memory 读取失败：${resp.status} ${text}`);
     }
 
-    return await resp.json();
+    const rows = await resp.json();
+    if (window.YanjiContextCache) window.YanjiContextCache.cacheSet(cacheKey, rows);
+    return rows;
   }
 
   async function searchMoonMemoryFromPanel() {
@@ -2679,14 +2688,13 @@
   }
 
   async function autoFetchMoonMemoryForContent(content) {
-    if (!content || !els.moonMemoryAutoToggle || !els.moonMemoryAutoToggle.checked) return;
+    if (!content) return;
     const token = getMoonMemoryToken();
     if (!token) return;
-    const query = content.slice(0, 80);
+    const query = content.slice(0, 120);
     const rows = await fetchMoonMemories(query, 5);
     if (rows && rows.length) {
       pendingMoonMemoryContext = formatMoonMemoryContext(rows);
-      if (els.moonMemoryPreviewArea) els.moonMemoryPreviewArea.style.display = "block";
       if (els.moonMemoryContent) renderMoonMemoryResults(rows, query, true);
     }
   }

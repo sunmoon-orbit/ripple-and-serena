@@ -231,11 +231,36 @@
     window.__YANJI_CONTEXT_CACHE_FETCH_PATCHED__ = true;
   }
 
+  // ========== 通用 TTL 缓存（供 fetchMoonMemories 等共用）==========
+  const _cache = new Map();
+  const _CACHE_TTL = 5 * 60 * 1000; // 5 分钟
+
+  function cacheGet(key) {
+    const entry = _cache.get(key);
+    if (!entry) return null;
+    if (Date.now() - entry.ts > _CACHE_TTL) { _cache.delete(key); return null; }
+    return entry.data;
+  }
+
+  function cacheSet(key, data) {
+    _cache.set(key, { data, ts: Date.now() });
+  }
+
+  function cacheClear(prefix) {
+    if (!prefix) { _cache.clear(); return; }
+    for (const k of _cache.keys()) {
+      if (k.startsWith(prefix)) _cache.delete(k);
+    }
+  }
+
   window.YanjiContextCache = {
     addSummaryToMessages,
     addSummaryToGeminiPayload,
     getActiveSummary,
     installFetchPatch,
+    cacheGet,
+    cacheSet,
+    cacheClear,
     getLastPatchDebug: function () {
       return window[LAST_PATCH_KEY] || null;
     },

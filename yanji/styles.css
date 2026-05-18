@@ -2467,3 +2467,128 @@ select:focus,
     overflow: hidden;
   }
 }
+
+/* ================================================================
+   Redesign v2 · Line & Minimal
+   覆写 Yanji Clean UI Refresh 中气泡、间距、输入栏的设定
+   ================================================================ */
+
+/* 消息间距收紧 */
+.message {
+  margin-bottom: 10px;
+}
+
+/* 气泡基础：更小的 radius，更紧的 padding */
+.message-bubble {
+  border-radius: 10px;
+  padding: 9px 13px;
+  font-size: 14px;
+  line-height: 1.68;
+}
+
+/* 用户气泡：扁平配色，右下角单独收 */
+.message.user .message-bubble {
+  background: #637a67;
+  background: linear-gradient(135deg, #687f6c, #5b7060);
+  border-radius: 10px 10px 2px 10px;
+  box-shadow: none;
+  border: none;
+  max-width: min(70%, 560px);
+  padding: 8px 12px;
+}
+
+/* AI 回复：左侧细线 + 极浅背景，无 box */
+.message.assistant .message-bubble {
+  background: rgba(249, 245, 239, 0.4);
+  border: none;
+  border-left: 2px solid rgba(125, 107, 93, 0.26);
+  border-radius: 0 8px 8px 0;
+  box-shadow: none;
+  padding: 8px 13px 8px 14px;
+}
+
+/* 元信息更紧 */
+.message-meta {
+  margin-top: 3px;
+  font-size: 10px;
+}
+
+/* 消息区域 padding 收紧 */
+.messages-container {
+  padding: 14px 20px 10px;
+}
+
+/* 输入栏收紧 */
+.input-area {
+  padding: 8px 18px calc(12px + env(safe-area-inset-bottom, 0px));
+}
+
+.input-wrapper {
+  padding: 4px 6px 4px 8px;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(80, 58, 35, 0.06);
+  border-color: rgba(104, 84, 65, 0.16);
+}
+
+.input-wrapper:focus-within {
+  border-color: rgba(155, 122, 85, 0.45);
+  box-shadow: 0 3px 12px rgba(80, 58, 35, 0.09), 0 0 0 3px rgba(155, 122, 85, 0.08);
+}
+
+#userInput {
+  padding: 7px 6px;
+  font-size: 14px;
+}
+
+.send-btn {
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+}
+
+.input-action-btn {
+  font-size: 18px;
+  padding: 4px 7px;
+}
+
+/* status bar */
+.status-bar {
+  margin-top: 4px;
+  font-size: 11px;
+}
+
+/* 记忆面板：更紧凑 */
+.moon-memory-preview-area {
+  margin: 0 0 8px;
+  padding: 10px 12px;
+  border-radius: 12px;
+}
+
+.moon-memory-header {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: var(--yj-muted);
+  margin-bottom: 8px;
+}
+
+/* 移动端覆写 */
+@media (max-width: 768px) {
+  .message-bubble {
+    border-radius: 9px;
+    padding: 7px 11px;
+  }
+  .message.user .message-bubble {
+    border-radius: 9px 9px 2px 9px;
+    max-width: 84%;
+  }
+  .message.assistant .message-bubble {
+    border-radius: 0 7px 7px 0;
+  }
+  .messages-container {
+    padding: 10px 12px 8px;
+  }
+  .input-area {
+    padding: 6px 10px calc(10px + env(safe-area-inset-bottom, 0px));
+  }
+}
