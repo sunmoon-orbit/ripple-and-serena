@@ -2572,6 +2572,25 @@ select:focus,
   margin-bottom: 8px;
 }
 
+/* 记忆复选框 */
+.moon-memory-selectable {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  cursor: pointer;
+  width: 100%;
+  user-select: none;
+}
+
+.moon-memory-checkbox {
+  width: 15px;
+  height: 15px;
+  margin-top: 3px;
+  flex-shrink: 0;
+  accent-color: #9b7a55;
+  cursor: pointer;
+}
+
 /* 移动端覆写 */
 @media (max-width: 768px) {
   .message-bubble {

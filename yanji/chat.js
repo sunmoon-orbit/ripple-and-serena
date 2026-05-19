@@ -1198,9 +1198,12 @@
       
       // 自动记忆提取（本地版）
       maybeExtractMemory(chat.id, conn);
-      
+
       // RAG 记忆形成（向量版）
       maybeFormRAGMemory(chat.id, conn);
+
+      // 自动写入 Moon Memory
+      maybeWriteToMoonMemory(chat.id, conn);
     } catch (e) {
       console.error(e);
       const assistantMsg = {
@@ -2703,23 +2706,52 @@
     if (!els.moonMemoryContent) return;
     if (!Array.isArray(rows) || rows.length === 0) {
       els.moonMemoryContent.innerHTML = `<div class="moon-memory-empty">没有找到相关记忆${query ? "：" + escapeHtml(query) : ""}。</div>`;
+      if (!auto) pendingMoonMemoryContext = "";
       return;
     }
 
-    const context = formatMoonMemoryContext(rows);
-    pendingMoonMemoryContext = context;
+    if (auto) {
+      // 自动模式：静默注入全部，纯展示
+      pendingMoonMemoryContext = formatMoonMemoryContext(rows);
+      const items = rows.map(m => `
+        <div class="moon-memory-item">
+          <div class="moon-memory-meta">#${escapeHtml(m.id)} · ${escapeHtml(m.type || "memory")} · ${escapeHtml(m.agent || "")}</div>
+          <div class="moon-memory-text">${escapeHtml(m.content || "").slice(0, 260)}</div>
+        </div>
+      `).join("");
+      els.moonMemoryContent.innerHTML = `
+        <div class="moon-memory-tip">已自动找到 ${rows.length} 条相关记忆，将加入本轮上下文。</div>
+        ${items}
+      `;
+      return;
+    }
 
-    const items = rows.map((m, idx) => `
-      <div class="moon-memory-item">
-        <div class="moon-memory-meta">#${escapeHtml(m.id)} · ${escapeHtml(m.type || "memory")} · ${escapeHtml(m.agent || "")} · ${escapeHtml(m.scope || "")}</div>
-        <div class="moon-memory-text">${escapeHtml(m.content || "").slice(0, 260)}</div>
-      </div>
+    // 手动模式：复选框，只注入选中的
+    const itemsHtml = rows.map((m, i) => `
+      <label class="moon-memory-item moon-memory-selectable">
+        <input type="checkbox" class="moon-memory-checkbox" data-idx="${i}" checked>
+        <div>
+          <div class="moon-memory-meta">#${escapeHtml(m.id)} · ${escapeHtml(m.type || "memory")} · ${escapeHtml(m.agent || "")}</div>
+          <div class="moon-memory-text">${escapeHtml(m.content || "").slice(0, 260)}</div>
+        </div>
+      </label>
     `).join("");
 
     els.moonMemoryContent.innerHTML = `
-      <div class="moon-memory-tip">${auto ? "已自动" : "已"}找到 ${rows.length} 条相关记忆，并会加入下一条消息上下文。</div>
-      ${items}
+      <div class="moon-memory-tip">找到 ${rows.length} 条相关记忆，勾选后点击使用。</div>
+      ${itemsHtml}
+      <div class="moon-memory-actions">
+        <button id="moonMemoryUseSelectedBtn" class="moon-memory-use-btn" type="button">使用选中记忆</button>
+      </div>
     `;
+
+    document.getElementById("moonMemoryUseSelectedBtn").addEventListener("click", () => {
+      const checked = [...els.moonMemoryContent.querySelectorAll(".moon-memory-checkbox:checked")]
+        .map(cb => rows[Number(cb.dataset.idx)]).filter(Boolean);
+      pendingMoonMemoryContext = checked.length ? formatMoonMemoryContext(checked) : "";
+      if (els.moonMemoryPreviewArea) els.moonMemoryPreviewArea.style.display = "none";
+      if (els.userInput) setTimeout(() => els.userInput.focus(), 60);
+    });
   }
 
   function formatMoonMemoryContext(rows) {
@@ -2866,6 +2898,69 @@ ${conversationText}
     } catch (e) {
       console.error("解析记忆提取结果失败:", e);
     }
+  }
+
+  // ========== 自动写入 Moon Memory ==========
+  async function maybeWriteToMoonMemory(chatId, conn) {
+    const token = getMoonMemoryToken();
+    if (!token) return;
+
+    const messages = state.messagesByChatId[chatId] || [];
+    if (messages.length < 2) return;
+
+    const lastUser = [...messages].reverse().find(m => m.role === "user");
+    const lastAssistant = [...messages].reverse().find(m => m.role === "assistant");
+    if (!lastUser || !lastAssistant) return;
+
+    const turnText = `用户：${lastUser.content.slice(0, 600)}\n\nAI：${lastAssistant.content.slice(0, 800)}`;
+
+    const extractPrompt = `分析以下一轮对话，提取值得长期保存到记忆库的信息。
+
+【对话】
+${turnText}
+
+【要求】
+- 只提取关于用户的事实性信息（身份、偏好、重要决定、重要经历等）
+- 每条一句话，简洁
+- 临时性任务、代码片段、闲聊不要提取
+- 没有值得记忆的内容就返回空数组
+
+只输出 JSON 数组，例如：["用户喜欢简洁的 UI", "用户决定改用 Claude API"]
+没有则输出：[]`;
+
+    setTimeout(async () => {
+      try {
+        const result = await callLLM(conn, [{ role: "user", content: extractPrompt }], "", conn.defaultModel);
+        const match = result.text.match(/\[[\s\S]*\]/);
+        if (!match) return;
+        const items = JSON.parse(match[0]);
+        if (!Array.isArray(items) || items.length === 0) return;
+
+        for (const content of items) {
+          if (typeof content !== "string" || !content.trim()) continue;
+          await fetch(`${MOON_MEMORY_BASE_URL}/memories`, {
+            method: "POST",
+            headers: {
+              "Authorization": `Bearer ${token}`,
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              content: content.trim(),
+              tags: "yanji-auto",
+              owner: "lianyan",
+              agent: "lianyan",
+              type: "memory",
+              scope: "shared",
+            }),
+          });
+        }
+
+        if (window.YanjiContextCache) window.YanjiContextCache.cacheClear("mm:");
+        console.log(`Moon Memory 自动写入 ${items.length} 条`);
+      } catch (e) {
+        console.warn("Moon Memory 自动写入失败:", e);
+      }
+    }, 800);
   }
 
   // ========== RAG 向量记忆形成 ==========
