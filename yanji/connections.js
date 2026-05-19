@@ -428,9 +428,9 @@
       typeof gen.presencePenalty === "number" ? gen.presencePenalty : 0;
 
     if (provider === "openai") {
-      const url =
-        (baseUrl || "https://api.openai.com/v1").replace(/\/$/, "") +
-        "/chat/completions";
+      let _base = (baseUrl || "https://api.openai.com/v1").replace(/\/$/, "");
+      if (!_base.includes("/chat/completions") && !_base.includes("/v1")) _base += "/v1";
+      const url = _base.includes("/chat/completions") ? _base : _base + "/chat/completions";
       const bodyMessages = [];
       if (globalInstruction && globalInstruction.trim()) {
         bodyMessages.push({ role: "system", content: globalInstruction });
