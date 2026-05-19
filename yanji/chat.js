@@ -2146,52 +2146,29 @@
         }
       });
       
-      const reqBody = {
-        model,
-        messages: bodyMessages,
-        temperature,
-        max_tokens: maxTokens,
-        stream: true,
-      };
-      const reqHeaders = {
-        "Content-Type": "application/json",
-        Authorization: "Bearer " + apiKey,
-      };
-
       const resp = await fetch(url, {
         method: "POST",
-        headers: reqHeaders,
-        body: JSON.stringify(reqBody),
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: "Bearer " + apiKey,
+        },
+        body: JSON.stringify({
+          model,
+          messages: bodyMessages,
+          temperature,
+          max_tokens: maxTokens,
+          stream: true,
+        }),
       });
 
-      // 405 通常表示该端点不支持流式输出，降级为普通请求
-      if (resp.status === 405) {
-        const nonStreamResp = await fetch(url, {
-          method: "POST",
-          headers: reqHeaders,
-          body: JSON.stringify({ ...reqBody, stream: false }),
-        });
-        if (!nonStreamResp.ok) {
-          const errText = await nonStreamResp.text();
-          throw new Error("OpenAI 接口错误：" + nonStreamResp.status + " " + errText.slice(0, 300));
-        }
-        const data = await nonStreamResp.json();
-        const text = data.choices?.[0]?.message?.content || "";
-        if (text) onChunk(text);
-        const u = data.usage || {};
-        return {
-          text,
-          usage: {
-            promptTokens: u.prompt_tokens || 0,
-            completionTokens: u.completion_tokens || 0,
-            totalTokens: u.total_tokens || 0,
-          },
-        };
-      }
-
       if (!resp.ok) {
-        const text = await resp.text();
-        throw new Error("OpenAI 接口错误：" + resp.status + " " + text.slice(0, 300));
+        const errText = await resp.text();
+        const hint = resp.status === 405
+          ? "（405：该端点不支持此请求方式，请检查 Base URL 是否含 /v1）"
+          : resp.status === 403
+          ? "（403：API Key 无效或账号受限）"
+          : "";
+        throw new Error("OpenAI 接口错误：" + resp.status + hint + " " + errText.slice(0, 200));
       }
 
       return await processOpenAIStream(resp, onChunk);
