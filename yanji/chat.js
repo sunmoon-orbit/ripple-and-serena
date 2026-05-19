@@ -1551,9 +1551,10 @@
     const model = overrideModel || connection.defaultModel;
     
     const config = state.generationConfig || {};
-    const temperature = config.temperature ?? 0.7;
+    const rawTemp = config.temperature ?? 0.7;
+    const temperature = provider === "anthropic" ? Math.min(rawTemp, 1.0) : Math.min(rawTemp, 2.0);
     const maxTokens = config.maxTokens || 4096;
-    
+
     const tools = getToolDefinitions();
     const formattedTools = formatToolsForProvider(tools, provider);
     
@@ -1919,7 +1920,8 @@
     }
     
     const config = state.generationConfig || {};
-    const temperature = config.temperature ?? 0.7;
+    const rawTemp = config.temperature ?? 0.7;
+    const temperature = provider === "anthropic" ? Math.min(rawTemp, 1.0) : Math.min(rawTemp, 2.0);
     const maxTokens = config.maxTokens || 4096;
 
     // OpenAI 及兼容格式
@@ -2116,7 +2118,9 @@
     }
     
     const config = state.generationConfig || {};
-    const temperature = config.temperature ?? 0.7;
+    const rawTemp = config.temperature ?? 0.7;
+    // Anthropic 温度上限 1.0，OpenAI/Gemini 允许到 2.0
+    const temperature = provider === "anthropic" ? Math.min(rawTemp, 1.0) : Math.min(rawTemp, 2.0);
     const maxTokens = config.maxTokens || 4096;
 
     // OpenAI 流式
