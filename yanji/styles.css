@@ -2486,10 +2486,10 @@ select:focus,
   line-height: 1.68;
 }
 
-/* 用户气泡：扁平配色，右下角单独收 */
+/* 用户气泡：沙色系，右下角单独收 */
 .message.user .message-bubble {
-  background: #637a67;
-  background: linear-gradient(135deg, #687f6c, #5b7060);
+  background: #CFCEB6;
+  color: #3D3B30;
   border-radius: 10px 10px 2px 10px;
   box-shadow: none;
   border: none;
@@ -2499,12 +2499,50 @@ select:focus,
 
 /* AI 回复：左侧细线 + 极浅背景，无 box */
 .message.assistant .message-bubble {
-  background: rgba(249, 245, 239, 0.4);
+  background: rgba(249, 245, 239, 0.3);
   border: none;
-  border-left: 2px solid rgba(125, 107, 93, 0.26);
+  border-left: 2px solid rgba(207, 206, 182, 0.7);
   border-radius: 0 8px 8px 0;
   box-shadow: none;
   padding: 8px 13px 8px 14px;
+}
+
+/* Thinking block 折叠显示 */
+.thinking-block {
+  margin-bottom: 8px;
+  border-left: 2px solid rgba(207, 206, 182, 0.5);
+  padding-left: 10px;
+}
+
+.thinking-block summary {
+  font-size: 11px;
+  color: #8a8275;
+  cursor: pointer;
+  user-select: none;
+  list-style: none;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 0;
+}
+
+.thinking-block summary::before {
+  content: "▶";
+  font-size: 8px;
+  transition: transform 0.15s;
+}
+
+.thinking-block[open] summary::before {
+  transform: rotate(90deg);
+}
+
+.thinking-block .thinking-content {
+  font-size: 12px;
+  color: #9a9181;
+  line-height: 1.6;
+  padding: 6px 0 2px;
+  white-space: pre-wrap;
+  word-break: break-word;
 }
 
 /* 元信息更紧 */
