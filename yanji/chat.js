@@ -498,7 +498,7 @@
       const formatted = formatMessageContent(msg.content);
       const time = msg.createdAt ? new Date(msg.createdAt).toLocaleTimeString() : "";
       const tokens = msg.tokenUsage ? `📊 ${msg.tokenUsage.totalTokens || 0} tokens` : "";
-      
+
       // 图片显示
       let imagesHtml = "";
       if (msg.images && msg.images.length > 0) {
@@ -508,9 +508,17 @@
         });
         imagesHtml += '</div>';
       }
-      
+
+      // 思考块显示
+      let thinkingHtml = "";
+      if (msg.thinking && window._appSettings?.showThinkingSummaries !== false) {
+        const escaped = escapeHtml(msg.thinking);
+        thinkingHtml = `<details class="thinking-block"><summary>思考过程</summary><div class="thinking-content">${escaped}</div></details>`;
+      }
+
       div.innerHTML = `
         <div class="message-bubble">
+          ${thinkingHtml}
           ${imagesHtml}
           <div class="message-content">${formatted}</div>
         </div>
@@ -1185,6 +1193,9 @@
       if (msgIdx !== -1) {
         state.messagesByChatId[chat.id][msgIdx].content = result.text;
         state.messagesByChatId[chat.id][msgIdx].tokenUsage = result.usage || null;
+        if (result.thinking) {
+          state.messagesByChatId[chat.id][msgIdx].thinking = result.thinking;
+        }
       }
       
       chat.updatedAt = Date.now();
@@ -2400,24 +2411,29 @@
     const reader = resp.body.getReader();
     const decoder = new TextDecoder();
     let fullText = "";
+    let thinkingText = "";
     let usage = null;
-    
+
     while (true) {
       const { done, value } = await reader.read();
       if (done) break;
-      
+
       const chunk = decoder.decode(value, { stream: true });
       const lines = chunk.split("\n");
-      
+
       for (const line of lines) {
         if (!line.startsWith("data: ")) continue;
         const data = line.slice(6);
-        
+
         try {
           const json = JSON.parse(data);
-          if (json.type === "content_block_delta" && json.delta?.text) {
-            fullText += json.delta.text;
-            onChunk(json.delta.text);
+          if (json.type === "content_block_delta") {
+            if (json.delta?.type === "thinking_delta" && json.delta?.thinking) {
+              thinkingText += json.delta.thinking;
+            } else if (json.delta?.text) {
+              fullText += json.delta.text;
+              onChunk(json.delta.text);
+            }
           }
           if (json.type === "message_delta" && json.usage) {
             usage = {
@@ -2436,8 +2452,8 @@
         } catch (e) {}
       }
     }
-    
-    return { text: fullText, usage };
+
+    return { text: fullText, thinking: thinkingText || null, usage };
   }
 
   // ========== 输入框自适应 ==========
@@ -3007,6 +3023,9 @@ ${turnText}
   }
 
   // ========== 初始化 ==========
+  // 加载 settings.json
+  fetch("settings.json").then(r => r.json()).then(s => { window._appSettings = s; }).catch(() => {});
+
   function init() {
     initDomRefs();
     initEventListeners();
