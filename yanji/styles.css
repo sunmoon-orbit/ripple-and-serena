@@ -2649,3 +2649,167 @@ select:focus,
     padding: 6px 10px calc(10px + env(safe-area-inset-bottom, 0px));
   }
 }
+
+/* ========== 月亮记忆库管理 ========== */
+
+/* 热力图容器 */
+.mm-heatmap-wrap {
+  width: 100%;
+  overflow-x: auto;
+  padding: 6px 0 10px;
+}
+
+.mm-heatmap-empty {
+  font-size: 13px;
+  color: var(--yj-muted);
+  padding: 10px 0;
+}
+
+.mm-heatmap-months {
+  display: flex;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+
+.mm-heatmap-month {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.mm-heatmap-month-label {
+  font-size: 10px;
+  color: var(--yj-muted);
+  letter-spacing: 0.04em;
+}
+
+.mm-heatmap-cells {
+  display: grid;
+  grid-template-columns: repeat(7, 12px);
+  gap: 3px;
+}
+
+.mm-heatmap-cell {
+  width: 12px;
+  height: 12px;
+  border-radius: 3px;
+  cursor: pointer;
+  transition: transform 0.1s, box-shadow 0.1s;
+}
+
+.mm-heatmap-cell:hover {
+  transform: scale(1.3);
+  box-shadow: 0 0 0 1px rgba(155, 122, 85, 0.4);
+}
+
+.mm-heatmap-cell.active {
+  box-shadow: 0 0 0 2px var(--yj-accent);
+  transform: scale(1.2);
+}
+
+/* 分层 tabs */
+.mm-layer-tabs {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.mm-tab {
+  padding: 4px 10px;
+  border: 1px solid var(--yj-line);
+  border-radius: 999px;
+  background: transparent;
+  font-size: 12px;
+  color: var(--yj-muted);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.mm-tab:hover {
+  background: var(--yj-accent-soft);
+  color: var(--yj-accent);
+  border-color: rgba(155, 122, 85, 0.3);
+}
+
+.mm-tab.active {
+  background: var(--yj-accent-soft);
+  color: var(--yj-accent);
+  border-color: rgba(155, 122, 85, 0.4);
+  font-weight: 600;
+}
+
+/* 记忆列表 */
+.mm-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.mm-list-empty {
+  font-size: 13px;
+  color: var(--yj-muted);
+  padding: 10px 0;
+}
+
+.mm-card {
+  background: var(--yj-surface);
+  border: 1px solid var(--yj-line);
+  border-radius: 12px;
+  padding: 10px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.mm-card-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.mm-layer-badge {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.mm-card-date {
+  font-size: 11px;
+  color: var(--yj-muted);
+  margin-left: auto;
+}
+
+.mm-card-expires {
+  font-size: 11px;
+  color: #c0392b;
+  opacity: 0.8;
+}
+
+/* 强度条（long 记忆） */
+.mm-strength-bar {
+  height: 3px;
+  background: var(--yj-line);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.mm-strength-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #e67e22, #f39c12);
+  border-radius: 2px;
+  transition: width 0.3s;
+}
+
+.mm-card-content {
+  font-size: 13px;
+  line-height: 1.65;
+  color: var(--yj-text);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.mm-card-tags {
+  font-size: 11px;
+  color: var(--yj-muted);
+}

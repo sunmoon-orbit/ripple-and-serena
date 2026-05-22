@@ -203,6 +203,47 @@
     </section>
   </div>
 
+  <!-- ===== 月亮记忆库管理 ===== -->
+  <div class="settings-page" style="padding-top: 0;">
+    <section class="settings-body narrow" style="gap: 16px;">
+
+      <div class="field">
+        <span>🌙 月亮记忆库</span>
+        <p class="field-hint">连接 memory.ravenlove.cc，管理分层记忆。</p>
+      </div>
+
+      <label class="field">
+        <span>API Token</span>
+        <input type="password" id="mmTokenInput" placeholder="Bearer token" style="font-family: monospace; font-size: 13px;">
+      </label>
+
+      <!-- 热力图 -->
+      <div class="field">
+        <span>记忆热力图</span>
+        <p class="field-hint">颜色越深代表那天记忆越多，点击跳转当天详情。</p>
+      </div>
+      <div id="mmHeatmap" class="mm-heatmap-wrap">
+        <div class="mm-heatmap-empty">输入 token 后点击"加载"</div>
+      </div>
+
+      <!-- 加载按钮 + 分层 tabs -->
+      <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
+        <button id="mmLoadBtn" class="secondary-button" style="flex-shrink:0;">加载记忆库</button>
+        <div class="mm-layer-tabs" id="mmLayerTabs">
+          <button class="mm-tab active" data-layer="">全部</button>
+          <button class="mm-tab" data-layer="core">🔴 核心</button>
+          <button class="mm-tab" data-layer="long">🟠 长期</button>
+          <button class="mm-tab" data-layer="short">🟡 短期</button>
+          <button class="mm-tab" data-layer="consciousness">🟣 意识</button>
+        </div>
+      </div>
+
+      <!-- 记忆列表 -->
+      <div id="mmMemoryList" class="mm-list"></div>
+
+    </section>
+  </div>
+
   <!-- 编辑记忆条目弹窗 -->
   <div id="memoryItemModal" class="modal-overlay hidden">
     <div class="modal-panel" style="max-width: 500px;">
@@ -229,6 +270,170 @@
   <script src="memory.js"></script>
   <script src="version.js"></script>
   <script src="sw-register.js"></script>
+
+  <script>
+  (function() {
+    const BASE = "https://memory.ravenlove.cc";
+    const TOKEN_KEY = "yanji_moon_memory_token";
+    const tokenInput = document.getElementById("mmTokenInput");
+    const heatmapEl  = document.getElementById("mmHeatmap");
+    const listEl     = document.getElementById("mmMemoryList");
+    const loadBtn    = document.getElementById("mmLoadBtn");
+    const tabs       = document.querySelectorAll(".mm-tab");
+
+    let currentLayer = "";
+    let currentDay   = "";
+
+    tokenInput.value = localStorage.getItem(TOKEN_KEY) || "";
+
+    function getToken() {
+      const t = tokenInput.value.trim();
+      if (t) localStorage.setItem(TOKEN_KEY, t);
+      return t;
+    }
+
+    async function mmFetch(path) {
+      const r = await fetch(BASE + path, { headers: { Authorization: "Bearer " + getToken() } });
+      if (!r.ok) throw new Error(r.status);
+      return r.json();
+    }
+
+    // ── 热力图 ──────────────────────────────────────────────
+    const LAYER_EMOJI = { core:"🔴", long:"🟠", short:"🟡", consciousness:"🟣" };
+    const LAYER_COLORS = {
+      core: "#c0392b", long: "#e67e22", short: "#f1c40f", consciousness: "#8e44ad"
+    };
+
+    async function loadHeatmap() {
+      heatmapEl.innerHTML = '<div class="mm-heatmap-empty">加载中…</div>';
+      try {
+        const data = await mmFetch("/memories/heatmap");
+        renderHeatmap(data);
+      } catch(e) {
+        heatmapEl.innerHTML = '<div class="mm-heatmap-empty">加载失败：' + e.message + '</div>';
+      }
+    }
+
+    function renderHeatmap(data) {
+      if (!Object.keys(data).length) {
+        heatmapEl.innerHTML = '<div class="mm-heatmap-empty">还没有记忆</div>';
+        return;
+      }
+      const max = Math.max(...Object.values(data));
+      const days = Object.keys(data).sort();
+      const firstDay = days[0];
+      const lastDay  = days[days.length - 1];
+
+      // 补全日期范围
+      const allDays = [];
+      const d = new Date(firstDay);
+      const end = new Date(lastDay);
+      while (d <= end) {
+        allDays.push(d.toISOString().slice(0, 10));
+        d.setDate(d.getDate() + 1);
+      }
+
+      // 按月分组渲染
+      const months = {};
+      allDays.forEach(day => {
+        const m = day.slice(0, 7);
+        if (!months[m]) months[m] = [];
+        months[m].push(day);
+      });
+
+      let html = '<div class="mm-heatmap-months">';
+      Object.entries(months).forEach(([month, mDays]) => {
+        html += `<div class="mm-heatmap-month"><div class="mm-heatmap-month-label">${month}</div><div class="mm-heatmap-cells">`;
+        mDays.forEach(day => {
+          const cnt = data[day] || 0;
+          const opacity = cnt ? (0.15 + 0.85 * (cnt / max)).toFixed(2) : 0;
+          const bg = cnt ? `rgba(155, 122, 85, ${opacity})` : "rgba(104, 84, 65, 0.06)";
+          html += `<div class="mm-heatmap-cell" style="background:${bg}" title="${day}: ${cnt} 条记忆" data-day="${day}" data-cnt="${cnt}"></div>`;
+        });
+        html += '</div></div>';
+      });
+      html += '</div>';
+      heatmapEl.innerHTML = html;
+
+      heatmapEl.querySelectorAll(".mm-heatmap-cell[data-cnt]").forEach(el => {
+        el.addEventListener("click", () => {
+          if (!Number(el.dataset.cnt)) return;
+          currentDay = el.dataset.day;
+          heatmapEl.querySelectorAll(".mm-heatmap-cell").forEach(c => c.classList.remove("active"));
+          el.classList.add("active");
+          loadMemories();
+        });
+      });
+    }
+
+    // ── 记忆列表 ───────────────────────────────────────────
+    async function loadMemories() {
+      listEl.innerHTML = '<div class="mm-list-empty">加载中…</div>';
+      try {
+        let path = `/memories/filter?limit=100`;
+        if (currentLayer) path += `&layer=${encodeURIComponent(currentLayer)}`;
+        if (currentDay) path += `&q=${encodeURIComponent(currentDay)}`;
+        const rows = await mmFetch(path);
+        renderMemories(currentDay ? rows.filter(r => (r.created_at || "").startsWith(currentDay)) : rows);
+      } catch(e) {
+        listEl.innerHTML = '<div class="mm-list-empty">加载失败：' + e.message + '</div>';
+      }
+    }
+
+    function layerBadge(layer) {
+      if (!layer) return "";
+      const e = LAYER_EMOJI[layer] || "⚪";
+      const names = { core:"核心", long:"长期", short:"短期", consciousness:"意识" };
+      return `<span class="mm-layer-badge" style="color:${LAYER_COLORS[layer]||'#888'}">${e} ${names[layer]||layer}</span>`;
+    }
+
+    function strengthBar(layer, strength) {
+      if (layer !== "long" || strength == null) return "";
+      const pct = Math.max(0, Math.min(100, Math.round(strength * 100)));
+      return `<div class="mm-strength-bar" title="记忆强度 ${pct}%"><div class="mm-strength-fill" style="width:${pct}%"></div></div>`;
+    }
+
+    function renderMemories(rows) {
+      if (!rows.length) {
+        listEl.innerHTML = '<div class="mm-list-empty">没有找到记忆</div>';
+        return;
+      }
+      listEl.innerHTML = rows.map(m => `
+        <div class="mm-card">
+          <div class="mm-card-head">
+            ${layerBadge(m.layer)}
+            <span class="mm-card-date">${(m.created_at||"").slice(0,10)}</span>
+            ${m.expires_at ? `<span class="mm-card-expires">过期：${m.expires_at.slice(0,10)}</span>` : ""}
+          </div>
+          ${strengthBar(m.layer, m.strength)}
+          <div class="mm-card-content">${escHtml(m.content)}</div>
+          ${m.tags ? `<div class="mm-card-tags">${escHtml(m.tags)}</div>` : ""}
+        </div>
+      `).join("");
+    }
+
+    function escHtml(s) {
+      return String(s||"").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[c]));
+    }
+
+    // ── 事件绑定 ───────────────────────────────────────────
+    loadBtn.addEventListener("click", () => {
+      currentDay = "";
+      heatmapEl.querySelectorAll && heatmapEl.querySelectorAll(".mm-heatmap-cell").forEach(c => c.classList.remove("active"));
+      loadHeatmap();
+      loadMemories();
+    });
+
+    tabs.forEach(tab => {
+      tab.addEventListener("click", () => {
+        tabs.forEach(t => t.classList.remove("active"));
+        tab.classList.add("active");
+        currentLayer = tab.dataset.layer;
+        loadMemories();
+      });
+    });
+  })();
+  </script>
 
 </body>
 </html>
