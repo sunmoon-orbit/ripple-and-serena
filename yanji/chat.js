@@ -2939,7 +2939,7 @@ ${conversationText}
 
     const turnText = `用户：${lastUser.content.slice(0, 600)}\n\nAI：${lastAssistant.content.slice(0, 800)}`;
 
-    const extractPrompt = `分析以下一轮对话，提取值得长期保存到记忆库的信息。
+    const extractPrompt = `分析以下一轮对话，提取值得保存到记忆库的信息。
 
 【对话】
 ${turnText}
@@ -2949,8 +2949,14 @@ ${turnText}
 - 每条一句话，简洁
 - 临时性任务、代码片段、闲聊不要提取
 - 没有值得记忆的内容就返回空数组
+- 每条记忆必须带 layer 字段，按重要性判断：
+  * core：关系基石、身份信息、永久偏好（用户最重要的特质/信念/关系）
+  * long：重要事实、决定、项目进展（重要但可随时间淡化）
+  * short：临时状态、当前任务、近期计划（7天内可能过期）
+  * consciousness：AI 自己的行动备忘、当前任务状态
 
-只输出 JSON 数组，例如：["用户喜欢简洁的 UI", "用户决定改用 Claude API"]
+只输出 JSON 数组，例如：
+[{"content":"用户喜欢简洁的 UI","layer":"long"},{"content":"用户今天在调试 treegpt 连接问题","layer":"short"}]
 没有则输出：[]`;
 
     setTimeout(async () => {
@@ -2961,8 +2967,10 @@ ${turnText}
         const items = JSON.parse(match[0]);
         if (!Array.isArray(items) || items.length === 0) return;
 
-        for (const content of items) {
-          if (typeof content !== "string" || !content.trim()) continue;
+        for (const item of items) {
+          const content = typeof item === "string" ? item : item?.content;
+          const layer = typeof item === "object" ? (item?.layer || null) : null;
+          if (!content || !content.trim()) continue;
           await fetch(`${MOON_MEMORY_BASE_URL}/memories`, {
             method: "POST",
             headers: {
@@ -2976,6 +2984,7 @@ ${turnText}
               agent: "lianyan",
               type: "memory",
               scope: "shared",
+              ...(layer ? { layer } : {}),
             }),
           });
         }
