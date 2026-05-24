@@ -9,8 +9,8 @@ html, body {
   height: 100dvh;
   width: 100%;
   font-family: system-ui, -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", sans-serif;
-  background: #fdf7f6;
-  color: #2d2020;
+  background: #faf8fc;
+  color: #28203a;
   overflow: hidden;
 }
 
@@ -26,8 +26,8 @@ body.app-layout {
   min-width: 280px;
   height: 100vh;
   height: 100dvh;
-  background: #f5eeec;
-  border-right: 1px solid rgba(160,100,105,0.10);
+  background: #f2f0f8;
+  border-right: 1px solid rgba(150,140,180,0.10);
   display: flex;
   flex-direction: column;
   transition: transform 0.25s ease, opacity 0.25s ease;
@@ -45,13 +45,13 @@ body.app-layout {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  border-bottom: 1px solid rgba(160,100,105,0.08);
+  border-bottom: 1px solid rgba(150,140,180,0.08);
 }
 
 .app-logo {
   font-size: 18px;
   font-weight: 600;
-  color: #2d2020;
+  color: #28203a;
 }
 
 .icon-btn {
@@ -59,7 +59,7 @@ body.app-layout {
   height: 32px;
   border: none;
   background: transparent;
-  color: #9a8484;
+  color: #9a8aaa;
   font-size: 16px;
   cursor: pointer;
   border-radius: 6px;
@@ -70,14 +70,14 @@ body.app-layout {
 }
 
 .icon-btn:hover {
-  background: rgba(160,100,105,0.10);
-  color: #2d2020;
+  background: rgba(150,140,180,0.10);
+  color: #28203a;
 }
 
 .new-chat-btn {
   margin: 12px 16px;
   padding: 10px 16px;
-  background: #c4848a;
+  background: #bfb5d8;
   color: #fff;
   border: none;
   border-radius: 8px;
@@ -89,7 +89,7 @@ body.app-layout {
 
 .new-chat-btn:hover {
   transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(196, 132, 138, 0.4);
+  box-shadow: 0 4px 12px rgba(191, 181, 216, 0.4);
 }
 
 .sidebar-search {
@@ -99,20 +99,20 @@ body.app-layout {
 .sidebar-search input {
   width: 100%;
   padding: 8px 12px;
-  background: rgba(160,100,105,0.05);
-  border: 1px solid rgba(160,100,105,0.10);
+  background: rgba(150,140,180,0.05);
+  border: 1px solid rgba(150,140,180,0.10);
   border-radius: 6px;
-  color: #2d2020;
+  color: #28203a;
   font-size: 13px;
 }
 
 .sidebar-search input::placeholder {
-  color: #c0a8a8;
+  color: #c0b0cc;
 }
 
 .sidebar-search input:focus {
   outline: none;
-  border-color: #c4848a;
+  border-color: #bfb5d8;
 }
 
 /* 聊天列表 */
@@ -134,11 +134,11 @@ body.app-layout {
 }
 
 .chat-item:hover {
-  background: rgba(160,100,105,0.08);
+  background: rgba(150,140,180,0.08);
 }
 
 .chat-item.active {
-  background: rgba(196, 132, 138, 0.15);
+  background: rgba(191, 181, 216, 0.15);
 }
 
 .chat-item-content {
@@ -148,7 +148,7 @@ body.app-layout {
 
 .chat-item-title {
   font-size: 14px;
-  color: #2d2020;
+  color: #28203a;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -156,7 +156,7 @@ body.app-layout {
 
 .chat-item-meta {
   font-size: 11px;
-  color: #c0a8a8;
+  color: #c0b0cc;
   margin-top: 2px;
 }
 
@@ -174,7 +174,7 @@ body.app-layout {
   height: 24px;
   border: none;
   background: transparent;
-  color: #9a8484;
+  color: #9a8aaa;
   font-size: 12px;
   cursor: pointer;
   border-radius: 4px;
@@ -184,8 +184,8 @@ body.app-layout {
 }
 
 .chat-item-btn:hover {
-  background: rgba(160,100,105,0.12);
-  color: #2d2020;
+  background: rgba(150,140,180,0.12);
+  color: #28203a;
 }
 
 .chat-item-btn.delete:hover {
@@ -196,7 +196,7 @@ body.app-layout {
 /* 侧边栏底部导航 */
 .sidebar-footer {
   padding: 12px;
-  border-top: 1px solid rgba(160,100,105,0.08);
+  border-top: 1px solid rgba(150,140,180,0.08);
   display: flex;
   justify-content: space-around;
 }
@@ -209,14 +209,14 @@ body.app-layout {
   padding: 8px 12px;
   border-radius: 8px;
   text-decoration: none;
-  color: #9a8484;
+  color: #9a8aaa;
   font-size: 12px;
   transition: all 0.15s;
 }
 
 .sidebar-nav-item:hover {
-  background: rgba(160,100,105,0.08);
-  color: #2d2020;
+  background: rgba(150,140,180,0.08);
+  color: #28203a;
 }
 
 .sidebar-nav-item .nav-icon {
@@ -234,7 +234,7 @@ body.app-layout {
   height: 100vh;
   height: 100dvh;
   min-width: 0;
-  background: #fdf7f6;
+  background: #faf8fc;
 }
 
 /* 聊天头部 */
@@ -244,8 +244,8 @@ body.app-layout {
   display: flex;
   align-items: center;
   gap: 12px;
-  border-bottom: 1px solid rgba(160,100,105,0.08);
-  background: rgba(253, 247, 246, 0.92);
+  border-bottom: 1px solid rgba(150,140,180,0.08);
+  background: rgba(250, 248, 252, 0.92);
   backdrop-filter: blur(8px);
 }
 
@@ -264,7 +264,7 @@ body.app-layout {
 .chat-title {
   font-size: 15px;
   font-weight: 500;
-  color: #2d2020;
+  color: #28203a;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -273,8 +273,8 @@ body.app-layout {
 .connection-badge {
   font-size: 11px;
   padding: 3px 8px;
-  background: rgba(196, 132, 138, 0.15);
-  color: #c4848a;
+  background: rgba(191, 181, 216, 0.15);
+  color: #bfb5d8;
   border-radius: 4px;
   white-space: nowrap;
 }
@@ -290,8 +290,8 @@ body.app-layout {
   top: 56px;
   right: 16px;
   width: 280px;
-  background: #fff7f7;
-  border: 1px solid rgba(160,100,105,0.12);
+  background: #fefcff;
+  border: 1px solid rgba(150,140,180,0.12);
   border-radius: 12px;
   box-shadow: 0 8px 32px rgba(0,0,0,0.25);
   z-index: 100;
@@ -305,7 +305,7 @@ body.app-layout {
 .model-switch-content label {
   display: block;
   font-size: 12px;
-  color: #9a8484;
+  color: #9a8aaa;
   margin-bottom: 6px;
   margin-top: 12px;
 }
@@ -318,17 +318,17 @@ body.app-layout {
 .model-switch-content input {
   width: 100%;
   padding: 8px 10px;
-  background: rgba(160,100,105,0.05);
-  border: 1px solid rgba(160,100,105,0.12);
+  background: rgba(150,140,180,0.05);
+  border: 1px solid rgba(150,140,180,0.12);
   border-radius: 6px;
-  color: #2d2020;
+  color: #28203a;
   font-size: 13px;
 }
 
 .model-switch-content select:focus,
 .model-switch-content input:focus {
   outline: none;
-  border-color: #c4848a;
+  border-color: #bfb5d8;
 }
 
 .model-switch-actions {
@@ -352,7 +352,7 @@ body.app-layout {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  color: #c0a8a8;
+  color: #c0b0cc;
   text-align: center;
 }
 
@@ -364,7 +364,7 @@ body.app-layout {
 .empty-state h2 {
   font-size: 20px;
   font-weight: 500;
-  color: #2d2020;
+  color: #28203a;
   margin: 0 0 8px;
 }
 
@@ -389,7 +389,7 @@ body.app-layout {
 }
 
 .message.user .message-bubble {
-  background: #c4848a;
+  background: #bfb5d8;
   color: #fff;
   margin-left: auto;
   max-width: 80%;
@@ -398,10 +398,10 @@ body.app-layout {
 
 .message.assistant .message-bubble {
   background: #fff;
-  color: #2d2020;
-  border: 1px solid #e8d0ce;
+  color: #28203a;
+  border: 1px solid #dedad0;
   border-bottom-left-radius: 4px;
-  box-shadow: 0 1px 3px rgba(160,100,105,0.06);
+  box-shadow: 0 1px 3px rgba(150,140,180,0.06);
 }
 
 .message-meta {
@@ -410,7 +410,7 @@ body.app-layout {
   gap: 8px;
   margin-top: 6px;
   font-size: 11px;
-  color: #c0a8a8;
+  color: #c0b0cc;
 }
 
 .message.user .message-meta {
@@ -428,17 +428,17 @@ body.app-layout {
 
 .message-action-btn {
   padding: 2px 6px;
-  background: rgba(160,100,105,0.05);
+  background: rgba(150,140,180,0.05);
   border: none;
   border-radius: 4px;
-  color: #9a8484;
+  color: #9a8aaa;
   font-size: 11px;
   cursor: pointer;
 }
 
 .message-action-btn:hover {
-  background: rgba(160,100,105,0.12);
-  color: #2d2020;
+  background: rgba(150,140,180,0.12);
+  color: #28203a;
 }
 
 /* 消息内容格式化 */
@@ -451,12 +451,12 @@ body.app-layout {
 }
 
 .message-bubble pre {
-  background: #f9f0ef;
+  background: #f5f3f8;
   padding: 12px;
   border-radius: 8px;
   overflow-x: auto;
   margin: 12px 0;
-  border: 1px solid #e8d0ce;
+  border: 1px solid #dedad0;
 }
 
 .message-bubble code {
@@ -474,10 +474,10 @@ body.app-layout {
   width: 100%;
   min-height: 80px;
   padding: 10px;
-  background: #f9f0ef;
-  border: 1px solid #c4848a;
+  background: #f5f3f8;
+  border: 1px solid #bfb5d8;
   border-radius: 8px;
-  color: #2d2020;
+  color: #28203a;
   font-size: 14px;
   font-family: inherit;
   resize: vertical;
@@ -494,7 +494,7 @@ body.app-layout {
 .input-area {
   padding: 16px 20px 20px;
   padding-bottom: calc(20px + env(safe-area-inset-bottom, 0px));
-  background: linear-gradient(to top, #fdf7f6 0%, transparent 100%);
+  background: linear-gradient(to top, #faf8fc 0%, transparent 100%);
   flex-shrink: 0;
 }
 
@@ -504,22 +504,22 @@ body.app-layout {
   display: flex;
   align-items: flex-end;
   gap: 10px;
-  background: rgba(160,100,105,0.05);
-  border: 1px solid rgba(160,100,105,0.12);
+  background: rgba(150,140,180,0.05);
+  border: 1px solid rgba(150,140,180,0.12);
   border-radius: 16px;
   padding: 8px 12px;
   transition: border-color 0.2s;
 }
 
 .input-wrapper:focus-within {
-  border-color: #c4848a;
+  border-color: #bfb5d8;
 }
 
 .input-wrapper textarea {
   flex: 1;
   background: transparent;
   border: none;
-  color: #2d2020;
+  color: #28203a;
   font-size: 14px;
   font-family: inherit;
   resize: none;
@@ -528,7 +528,7 @@ body.app-layout {
 }
 
 .input-wrapper textarea::placeholder {
-  color: #c0a8a8;
+  color: #c0b0cc;
 }
 
 .input-wrapper textarea:focus {
@@ -539,7 +539,7 @@ body.app-layout {
   width: 36px;
   height: 36px;
   border: none;
-  background: #c4848a;
+  background: #bfb5d8;
   color: #fff;
   border-radius: 10px;
   font-size: 16px;
@@ -564,7 +564,7 @@ body.app-layout {
   max-width: 720px;
   margin: 8px auto 0;
   font-size: 12px;
-  color: #c0a8a8;
+  color: #c0b0cc;
   text-align: center;
   min-height: 18px;
 }
@@ -586,8 +586,8 @@ body.app-layout {
 }
 
 .modal-panel {
-  background: #fff7f7;
-  border: 1px solid rgba(160,100,105,0.12);
+  background: #fefcff;
+  border: 1px solid rgba(150,140,180,0.12);
   border-radius: 16px;
   width: 90%;
   max-width: 480px;
@@ -603,7 +603,7 @@ body.app-layout {
 
 .modal-header {
   padding: 16px 20px;
-  border-bottom: 1px solid rgba(160,100,105,0.08);
+  border-bottom: 1px solid rgba(150,140,180,0.08);
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -618,21 +618,21 @@ body.app-layout {
 .modal-body input {
   width: 100%;
   padding: 10px 12px;
-  background: rgba(160,100,105,0.05);
-  border: 1px solid rgba(160,100,105,0.12);
+  background: rgba(150,140,180,0.05);
+  border: 1px solid rgba(150,140,180,0.12);
   border-radius: 8px;
-  color: #2d2020;
+  color: #28203a;
   font-size: 14px;
 }
 
 .modal-body input:focus {
   outline: none;
-  border-color: #c4848a;
+  border-color: #bfb5d8;
 }
 
 .modal-footer {
   padding: 16px 20px;
-  border-top: 1px solid rgba(160,100,105,0.08);
+  border-top: 1px solid rgba(150,140,180,0.08);
   display: flex;
   justify-content: flex-end;
   gap: 10px;
@@ -641,7 +641,7 @@ body.app-layout {
 /* ========== 按钮 ========== */
 .primary-button {
   padding: 8px 16px;
-  background: #c4848a;
+  background: #bfb5d8;
   color: #fff;
   border: none;
   border-radius: 8px;
@@ -653,7 +653,7 @@ body.app-layout {
 
 .primary-button:hover {
   transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(196, 132, 138, 0.4);
+  box-shadow: 0 4px 12px rgba(191, 181, 216, 0.4);
 }
 
 .primary-button:disabled {
@@ -664,9 +664,9 @@ body.app-layout {
 
 .secondary-button {
   padding: 8px 16px;
-  background: rgba(160,100,105,0.10);
-  color: #2d2020;
-  border: 1px solid rgba(160,100,105,0.12);
+  background: rgba(150,140,180,0.10);
+  color: #28203a;
+  border: 1px solid rgba(150,140,180,0.12);
   border-radius: 8px;
   font-size: 14px;
   cursor: pointer;
@@ -680,7 +680,7 @@ body.app-layout {
 .ghost-button {
   padding: 8px 16px;
   background: transparent;
-  color: #9a8484;
+  color: #9a8aaa;
   border: none;
   border-radius: 8px;
   font-size: 14px;
@@ -689,8 +689,8 @@ body.app-layout {
 }
 
 .ghost-button:hover {
-  background: rgba(160,100,105,0.08);
-  color: #2d2020;
+  background: rgba(150,140,180,0.08);
+  color: #28203a;
 }
 
 .danger-button {
@@ -714,8 +714,8 @@ body.app-layout {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  border-bottom: 1px solid rgba(160,100,105,0.08);
-  background: #f5eeec;
+  border-bottom: 1px solid rgba(150,140,180,0.08);
+  background: #f2f0f8;
 }
 
 .top-nav-left {
@@ -726,7 +726,7 @@ body.app-layout {
 
 .top-nav-page {
   font-size: 14px;
-  color: #9a8484;
+  color: #9a8aaa;
 }
 
 .top-nav-links {
@@ -736,7 +736,7 @@ body.app-layout {
 
 .top-nav-links a {
   padding: 6px 12px;
-  color: #9a8484;
+  color: #9a8aaa;
   text-decoration: none;
   font-size: 14px;
   border-radius: 6px;
@@ -744,13 +744,13 @@ body.app-layout {
 }
 
 .top-nav-links a:hover {
-  background: rgba(160,100,105,0.08);
-  color: #2d2020;
+  background: rgba(150,140,180,0.08);
+  color: #28203a;
 }
 
 .top-nav-links a.active {
-  background: rgba(196, 132, 138, 0.15);
-  color: #c4848a;
+  background: rgba(191, 181, 216, 0.15);
+  color: #bfb5d8;
 }
 
 .settings-page {
@@ -775,7 +775,7 @@ body.app-layout {
 }
 
 .settings-header p {
-  color: #9a8484;
+  color: #9a8aaa;
   margin: 0;
   font-size: 14px;
 }
@@ -803,7 +803,7 @@ body.app-layout {
 
 .field-hint {
   font-size: 12px;
-  color: #c0a8a8;
+  color: #c0b0cc;
   margin: 0;
 }
 
@@ -813,10 +813,10 @@ body.app-layout {
 .field textarea,
 .field select {
   padding: 10px 12px;
-  background: rgba(160,100,105,0.05);
-  border: 1px solid rgba(160,100,105,0.12);
+  background: rgba(150,140,180,0.05);
+  border: 1px solid rgba(150,140,180,0.12);
   border-radius: 8px;
-  color: #2d2020;
+  color: #28203a;
   font-size: 14px;
   font-family: inherit;
 }
@@ -825,17 +825,17 @@ body.app-layout {
 .field textarea:focus,
 .field select:focus {
   outline: none;
-  border-color: #c4848a;
+  border-color: #bfb5d8;
 }
 
 .field input::placeholder,
 .field textarea::placeholder {
-  color: #c0a8a8;
+  color: #c0b0cc;
 }
 
 .settings-separator {
   border: none;
-  border-top: 1px solid rgba(160,100,105,0.08);
+  border-top: 1px solid rgba(150,140,180,0.08);
   margin: 8px 0;
 }
 
@@ -847,8 +847,8 @@ body.app-layout {
 }
 
 .connection-card {
-  background: rgba(160,100,105,0.03);
-  border: 1px solid rgba(160,100,105,0.10);
+  background: rgba(150,140,180,0.03);
+  border: 1px solid rgba(150,140,180,0.10);
   border-radius: 12px;
   padding: 16px;
   cursor: pointer;
@@ -856,13 +856,13 @@ body.app-layout {
 }
 
 .connection-card:hover {
-  background: rgba(160,100,105,0.05);
+  background: rgba(150,140,180,0.05);
   border-color: rgba(255,255,255,0.12);
 }
 
 .connection-card.active {
-  border-color: #c4848a;
-  background: rgba(196, 132, 138, 0.08);
+  border-color: #bfb5d8;
+  background: rgba(191, 181, 216, 0.08);
 }
 
 .connection-card-header {
@@ -880,14 +880,14 @@ body.app-layout {
 .connection-card-badge {
   font-size: 11px;
   padding: 2px 6px;
-  background: rgba(196, 132, 138, 0.15);
-  color: #c4848a;
+  background: rgba(191, 181, 216, 0.15);
+  color: #bfb5d8;
   border-radius: 4px;
 }
 
 .connection-card-model {
   font-size: 13px;
-  color: #9a8484;
+  color: #9a8aaa;
   margin-bottom: 12px;
 }
 
@@ -908,8 +908,8 @@ body.app-layout {
   align-items: flex-start;
   gap: 10px;
   padding: 12px;
-  background: rgba(160,100,105,0.03);
-  border: 1px solid rgba(160,100,105,0.10);
+  background: rgba(150,140,180,0.03);
+  border: 1px solid rgba(150,140,180,0.10);
   border-radius: 8px;
 }
 
@@ -918,7 +918,7 @@ body.app-layout {
   height: 20px;
   border: none;
   background: transparent;
-  color: #c4848a;
+  color: #bfb5d8;
   font-size: 14px;
   cursor: pointer;
   flex-shrink: 0;
@@ -926,14 +926,14 @@ body.app-layout {
 }
 
 .memory-item-toggle.disabled {
-  color: #c0a8a8;
+  color: #c0b0cc;
 }
 
 .memory-item-content {
   flex: 1;
   font-size: 14px;
   line-height: 1.5;
-  color: #2d2020;
+  color: #28203a;
   min-width: 0;
   word-break: break-word;
 }
@@ -956,7 +956,7 @@ body.app-layout {
   padding: 8px 16px;
   background: transparent;
   border: none;
-  color: #9a8484;
+  color: #9a8aaa;
   cursor: pointer;
   font-size: 14px;
   border-bottom: 2px solid transparent;
@@ -964,12 +964,12 @@ body.app-layout {
 }
 
 .auth-tab.active {
-  color: #2d2020;
-  border-bottom-color: #c4848a;
+  color: #28203a;
+  border-bottom-color: #bfb5d8;
 }
 
 .auth-tab:hover {
-  color: #2d2020;
+  color: #28203a;
 }
 
 .auth-form {
@@ -1007,12 +1007,12 @@ body.app-layout {
 
 .sync-user {
   font-size: 14px;
-  color: #2d2020;
+  color: #28203a;
 }
 
 .sync-indicator {
   font-size: 12px;
-  color: #c0a8a8;
+  color: #c0b0cc;
 }
 
 .sync-indicator.syncing {
@@ -1021,7 +1021,7 @@ body.app-layout {
 }
 
 .sync-indicator.success {
-  color: #c4848a;
+  color: #bfb5d8;
 }
 
 .sync-indicator.error {
@@ -1055,7 +1055,7 @@ body.app-layout {
   min-width: 60px;
   text-align: right;
   font-size: 14px;
-  color: #c4848a;
+  color: #bfb5d8;
 }
 
 /* ========== 模型选择器 ========== */
@@ -1067,28 +1067,28 @@ body.app-layout {
 
 .model-chip {
   padding: 6px 12px;
-  background: rgba(160,100,105,0.05);
-  border: 1px solid rgba(160,100,105,0.12);
+  background: rgba(150,140,180,0.05);
+  border: 1px solid rgba(150,140,180,0.12);
   border-radius: 6px;
-  color: #2d2020;
+  color: #28203a;
   font-size: 13px;
   cursor: pointer;
   transition: all 0.15s;
 }
 
 .model-chip:hover {
-  background: rgba(196, 132, 138, 0.15);
-  border-color: #c4848a;
+  background: rgba(191, 181, 216, 0.15);
+  border-color: #bfb5d8;
 }
 
 .model-chip.selected {
-  background: rgba(196, 132, 138, 0.2);
-  border-color: #c4848a;
-  color: #c4848a;
+  background: rgba(191, 181, 216, 0.2);
+  border-color: #bfb5d8;
+  color: #bfb5d8;
 }
 
 .empty-text {
-  color: #c0a8a8;
+  color: #c0b0cc;
   font-size: 14px;
 }
 
@@ -1193,7 +1193,7 @@ body.app-layout {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: rgba(160,100,105,0.15);
+  background: rgba(150,140,180,0.15);
   border-radius: 3px;
 }
 
@@ -1213,27 +1213,27 @@ body.app-layout {
 .toggle-row input[type="checkbox"] {
   width: 18px;
   height: 18px;
-  accent-color: #c4848a;
+  accent-color: #bfb5d8;
   cursor: pointer;
 }
 
 /* 自动提取的记忆标记 */
 .memory-item.auto-extracted {
-  border-left: 3px solid #c4848a;
+  border-left: 3px solid #bfb5d8;
 }
 
 .memory-auto-badge {
   font-size: 10px;
   padding: 1px 5px;
-  background: rgba(196, 132, 138, 0.2);
-  color: #c4848a;
+  background: rgba(191, 181, 216, 0.2);
+  color: #bfb5d8;
   border-radius: 3px;
   margin-left: 6px;
 }
 
 /* ========== RAG 自然记忆样式 ========== */
 .rag-memory {
-  border-left: 3px solid #c4848a;
+  border-left: 3px solid #bfb5d8;
   display: grid;
   grid-template-columns: auto 1fr auto auto;
   gap: 8px;
@@ -1242,14 +1242,14 @@ body.app-layout {
 
 .memory-strength {
   font-size: 10px;
-  color: #c4848a;
+  color: #bfb5d8;
   letter-spacing: -1px;
   cursor: help;
 }
 
 .memory-time {
   font-size: 11px;
-  color: #9a8484;
+  color: #9a8aaa;
   white-space: nowrap;
 }
 
@@ -1261,7 +1261,7 @@ body.app-layout {
   height: 32px;
   cursor: pointer;
   padding: 0;
-  color: #9a8484;
+  color: #9a8aaa;
   opacity: 0.65;
   border-radius: 6px;
   display: flex;
@@ -1273,7 +1273,7 @@ body.app-layout {
 
 .input-action-btn:hover {
   opacity: 1;
-  background: rgba(160,100,105,0.08);
+  background: rgba(150,140,180,0.08);
 }
 
 .input-action-btn svg,
@@ -1283,7 +1283,7 @@ body.app-layout {
 
 .image-preview-area {
   padding: 8px 12px;
-  border-bottom: 1px solid #e5d0ce;
+  border-bottom: 1px solid #dedad0;
 }
 
 .image-preview-list {
@@ -1339,7 +1339,7 @@ body.app-layout {
 }
 
 .message-content pre {
-  background: #fdf7f6;
+  background: #faf8fc;
   border-radius: 8px;
   padding: 12px;
   overflow-x: auto;
@@ -1367,10 +1367,10 @@ body.app-layout {
 }
 
 .message-content blockquote {
-  border-left: 3px solid #c4848a;
+  border-left: 3px solid #bfb5d8;
   margin: 0.8em 0;
   padding-left: 12px;
-  color: #9a8484;
+  color: #9a8aaa;
 }
 
 .message-content table {
@@ -1432,7 +1432,7 @@ body.app-layout {
   display: inline-block;
   width: 8px;
   height: 16px;
-  background: #c4848a;
+  background: #bfb5d8;
   margin-left: 2px;
   animation: blink 0.8s infinite;
   vertical-align: text-bottom;
@@ -1457,7 +1457,7 @@ body.app-layout {
 .msg-action-btn {
   background: rgba(255, 255, 255, 0.1);
   border: none;
-  color: #9a8484;
+  color: #9a8aaa;
   font-size: 12px;
   padding: 4px 8px;
   border-radius: 4px;
@@ -1467,7 +1467,7 @@ body.app-layout {
 
 .msg-action-btn:hover {
   background: rgba(255, 255, 255, 0.2);
-  color: #2d2020;
+  color: #28203a;
 }
 
 /* ========== 模型切换面板优化 ========== */
@@ -1477,8 +1477,8 @@ body.app-layout {
   right: 10px;
   width: 320px;
   max-height: 70vh;
-  background: #fff7f7;
-  border: 1px solid #e5d0ce;
+  background: #fefcff;
+  border: 1px solid #dedad0;
   border-radius: 12px;
   box-shadow: 0 10px 40px rgba(60, 50, 40, 0.15);
   z-index: 100;
@@ -1496,7 +1496,7 @@ body.app-layout {
   justify-content: space-between;
   align-items: center;
   padding: 12px 16px;
-  border-bottom: 1px solid #e5d0ce;
+  border-bottom: 1px solid #dedad0;
   font-weight: 500;
 }
 
@@ -1512,7 +1512,7 @@ body.app-layout {
 .model-switch-section label {
   display: block;
   font-size: 12px;
-  color: #9a8484;
+  color: #9a8aaa;
   margin-bottom: 8px;
 }
 
@@ -1529,7 +1529,7 @@ body.app-layout {
   align-items: center;
   gap: 8px;
   padding: 8px 12px;
-  background: #fdf7f6;
+  background: #faf8fc;
   border: 1px solid transparent;
   border-radius: 6px;
   cursor: pointer;
@@ -1537,13 +1537,13 @@ body.app-layout {
 }
 
 .model-item:hover {
-  background: #f5eeec;
-  border-color: #e5d0ce;
+  background: #f2f0f8;
+  border-color: #dedad0;
 }
 
 .model-item.active {
-  background: rgba(196, 132, 138, 0.2);
-  border-color: #c4848a;
+  background: rgba(191, 181, 216, 0.2);
+  border-color: #bfb5d8;
 }
 
 .model-item-name {
@@ -1556,9 +1556,9 @@ body.app-layout {
 
 .model-item-provider {
   font-size: 11px;
-  color: #9a8484;
+  color: #9a8aaa;
   padding: 2px 6px;
-  background: #e5d0ce;
+  background: #dedad0;
   border-radius: 4px;
 }
 
@@ -1579,22 +1579,22 @@ body.app-layout {
 .connection-badge {
   font-size: 12px;
   padding: 2px 8px;
-  background: rgba(196, 132, 138, 0.2);
-  color: #c4848a;
+  background: rgba(191, 181, 216, 0.2);
+  color: #bfb5d8;
   border-radius: 4px;
   cursor: pointer;
   transition: background 0.2s;
 }
 
 .connection-badge:hover {
-  background: rgba(196, 132, 138, 0.3);
+  background: rgba(191, 181, 216, 0.3);
 }
 
 /* ========== 搜索预览区域 ========== */
 .search-preview-area {
   padding: 8px 12px;
-  border-bottom: 1px solid #e5d0ce;
-  background: #fff7f7;
+  border-bottom: 1px solid #dedad0;
+  background: #fefcff;
 }
 
 .search-preview-header {
@@ -1603,20 +1603,20 @@ body.app-layout {
   align-items: center;
   margin-bottom: 8px;
   font-size: 12px;
-  color: #9a8484;
+  color: #9a8aaa;
 }
 
 .icon-btn-small {
   background: transparent;
   border: none;
-  color: #9a8484;
+  color: #9a8aaa;
   cursor: pointer;
   padding: 2px 6px;
   font-size: 12px;
 }
 
 .icon-btn-small:hover {
-  color: #2d2020;
+  color: #28203a;
 }
 
 .search-preview-content {
@@ -1642,7 +1642,7 @@ body.app-layout {
 }
 
 .search-result-snippet {
-  color: #9a8484;
+  color: #9a8aaa;
   font-size: 12px;
   margin-top: 2px;
 }
@@ -1664,8 +1664,8 @@ body.app-layout {
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  background: rgba(196, 132, 138, 0.2);
-  color: #c4848a;
+  background: rgba(191, 181, 216, 0.2);
+  color: #bfb5d8;
   padding: 2px 8px;
   border-radius: 4px;
   font-size: 12px;
@@ -1673,7 +1673,7 @@ body.app-layout {
 
 /* 输入按钮激活状态 */
 .input-action-btn.active {
-  color: #c4848a;
+  color: #bfb5d8;
   opacity: 1;
 }
 
@@ -2532,7 +2532,7 @@ select:focus,
 
 .thinking-block summary {
   font-size: 11px;
-  color: #9a8484;
+  color: #9a8aaa;
   cursor: pointer;
   user-select: none;
   list-style: none;
@@ -2828,4 +2828,50 @@ select:focus,
 .mm-card-tags {
   font-size: 11px;
   color: var(--yj-muted);
+}
+
+/* ========== 紫灰主题精调 ========== */
+/* 卡片软阴影 */
+.memory-card,
+.connection-card,
+.model-switch-panel,
+.modal-panel {
+  box-shadow: 0 1px 3px rgba(150,140,180,0.07), 0 4px 16px rgba(150,140,180,0.06);
+}
+
+/* 用户气泡 + 发送按钮用渐变紫 */
+.message.user .message-bubble,
+.send-btn,
+.new-chat-btn {
+  background: linear-gradient(135deg, #bfb5d8 0%, #c8bedd 100%);
+}
+
+/* 软 accent (#ddc4e0) 用于 badge、active 状态高亮 */
+.connection-badge {
+  background: rgba(221,196,224,0.25);
+  color: #a090c0;
+}
+.chat-item.active {
+  background: rgba(221,196,224,0.20);
+}
+.tab.active::after,
+.tab.active {
+  color: #bfb5d8;
+}
+.sidebar-nav-item:hover,
+.chat-item:hover {
+  background: rgba(221,196,224,0.15);
+}
+
+/* 输入框聚焦线 */
+.sidebar-search input:focus,
+.input-wrapper:focus-within {
+  border-color: #bfb5d8;
+  box-shadow: 0 0 0 3px rgba(191,181,216,0.12);
+}
+
+/* 导航栏 active 链接 */
+.top-nav-links a.active {
+  background: rgba(191,181,216,0.18);
+  color: #bfb5d8;
 }
