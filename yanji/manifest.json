@@ -4,8 +4,8 @@
   "description": "言叽 · 你的聊天伙伴",
   "start_url": "./index.html",
   "display": "standalone",
-  "background_color": "#f5f0e8",
-  "theme_color": "#f5f0e8",
+  "background_color": "#faf8fc",
+  "theme_color": "#faf8fc",
   "icons": [
     {
       "src": "icon-192.png",
