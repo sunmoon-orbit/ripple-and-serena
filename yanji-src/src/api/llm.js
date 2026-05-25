@@ -192,7 +192,9 @@ async function callWithTools({
       const msg = data.choices[0].message
       if (msg.tool_calls?.length) {
         onToolCall?.(msg.tool_calls.map((t) => t.function.name))
-        convo.push({ role: 'assistant', content: msg.content || '', tool_calls: msg.tool_calls })
+        const aMsg = { role: 'assistant', content: msg.content || '', tool_calls: msg.tool_calls }
+        if (msg.reasoning_content) aMsg.reasoning_content = msg.reasoning_content
+        convo.push(aMsg)
         for (const tc of msg.tool_calls) {
           const args = JSON.parse(tc.function.arguments || '{}')
           const result = await executeTool(tc.function.name, args, { searchConfig, moonMemoryConfig, onStatus })
