@@ -137,6 +137,7 @@ export async function sendMessage({
   moonMemoryConfig,
   autoTools,
   onChunk,
+  onThinking,
   onStatus,
   onToolCall,
 }) {
@@ -151,11 +152,11 @@ export async function sendMessage({
   if (hasTools) {
     return await callWithTools({
       connection, messages, systemPrompt, model: usedModel, generationConfig,
-      tools, provider, searchConfig, moonMemoryConfig, onChunk, onStatus, onToolCall,
+      tools, provider, searchConfig, moonMemoryConfig, onChunk, onThinking, onStatus, onToolCall,
     })
   }
   return await callStream({
-    connection, messages, systemPrompt, model: usedModel, generationConfig, provider, onChunk,
+    connection, messages, systemPrompt, model: usedModel, generationConfig, provider, onChunk, onThinking,
   })
 }
 
@@ -163,7 +164,7 @@ export async function sendMessage({
 
 async function callWithTools({
   connection, messages, systemPrompt, model, generationConfig,
-  tools, provider, searchConfig, moonMemoryConfig, onChunk, onStatus, onToolCall,
+  tools, provider, searchConfig, moonMemoryConfig, onChunk, onThinking, onStatus, onToolCall,
 }) {
   const { temperature = 0.7, maxTokens = 4096 } = generationConfig || {}
   const safeTemp = provider === 'anthropic' ? Math.min(temperature, 1) : Math.min(temperature, 2)
@@ -274,7 +275,7 @@ async function callWithTools({
 
 // ─── Streaming (no tools) ───────────────────────────────────────────────────
 
-async function callStream({ connection, messages, systemPrompt, model, generationConfig, provider, onChunk }) {
+async function callStream({ connection, messages, systemPrompt, model, generationConfig, provider, onChunk, onThinking }) {
   const { temperature = 0.7, maxTokens = 4096 } = generationConfig || {}
   const safeTemp = provider === 'anthropic' ? Math.min(temperature, 1) : Math.min(temperature, 2)
 
@@ -293,6 +294,9 @@ async function callStream({ connection, messages, systemPrompt, model, generatio
     }
     return streamSSE(resp, (line) => {
       const json = JSON.parse(line)
+      // DeepSeek reasoning_content
+      const thinking = json.choices?.[0]?.delta?.reasoning_content
+      if (thinking) { onThinking?.(thinking); return null }
       return json.choices?.[0]?.delta?.content || null
     }, onChunk)
   }
@@ -300,8 +304,13 @@ async function callStream({ connection, messages, systemPrompt, model, generatio
   if (provider === 'anthropic') {
     const url = buildApiUrl(connection.baseUrl, 'anthropic')
     const bodyMsgs = buildAnthropicMessages(messages)
+    const isThinkingModel = (model || '').includes('3-7') || (model || '').includes('4')
     const body = { model, max_tokens: maxTokens, messages: bodyMsgs, stream: true }
     if (systemPrompt?.trim()) body.system = systemPrompt
+    if (isThinkingModel && onThinking) {
+      body.thinking = { type: 'enabled', budget_tokens: Math.min(maxTokens, 8000) }
+      body.temperature = 1  // Anthropic extended thinking requires temp=1
+    }
     const resp = await fetch(url, {
       method: 'POST',
       headers: {
@@ -315,7 +324,10 @@ async function callStream({ connection, messages, systemPrompt, model, generatio
     if (!resp.ok) throw new Error('Anthropic ' + resp.status + ': ' + (await resp.text()).slice(0, 200))
     return streamSSE(resp, (line) => {
       const json = JSON.parse(line)
-      if (json.type === 'content_block_delta' && json.delta?.type === 'text_delta') return json.delta.text
+      if (json.type === 'content_block_delta') {
+        if (json.delta?.type === 'thinking_delta') { onThinking?.(json.delta.thinking); return null }
+        if (json.delta?.type === 'text_delta') return json.delta.text
+      }
       return null
     }, onChunk)
   }

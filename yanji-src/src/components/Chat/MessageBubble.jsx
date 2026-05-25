@@ -47,6 +47,17 @@ export default function MessageBubble({ msg }) {
             {msg.toolCalls.map((n, i) => <span key={i} className="tool-chip">{n}</span>)}
           </div>
         )}
+        {msg.thinking && (
+          <details className="thinking-block" open={isStreaming}>
+            <summary>
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/>
+              </svg>
+              思考过程{isStreaming ? '…' : ''}
+            </summary>
+            <div className="thinking-content">{msg.thinking}</div>
+          </details>
+        )}
         <div className={`message-bubble ${isUser ? 'bubble-user' : 'bubble-assistant'}${isStreaming ? ' streaming' : ''}`}>
           {isUser ? (
             <>

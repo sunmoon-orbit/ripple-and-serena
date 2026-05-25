@@ -71,6 +71,7 @@ export default function Chat() {
 
       const systemPrompt = buildSystemPrompt(globalInstruction, memoryItems, '')
       let fullText = ''
+      let fullThinking = ''
 
       const result = await sendMessage({
         connection: conn,
@@ -85,6 +86,10 @@ export default function Chat() {
           fullText += chunk
           updateMessage(chat.id, assistantId, { content: fullText, streaming: true })
         },
+        onThinking: (chunk) => {
+          fullThinking += chunk
+          updateMessage(chat.id, assistantId, { thinking: fullThinking, streaming: true })
+        },
         onStatus: setStatus,
         onToolCall: (toolNames) => {
           updateMessage(chat.id, assistantId, { toolCalls: toolNames })
@@ -94,6 +99,7 @@ export default function Chat() {
 
       updateMessage(chat.id, assistantId, {
         content: result.text || fullText,
+        thinking: fullThinking || undefined,
         streaming: false,
         tokenUsage: result.usage || null,
         toolCalls: undefined,
