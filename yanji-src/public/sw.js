@@ -1,3 +1,8 @@
+self.addEventListener('fetch', (event) => {
+  // pass-through: no offline caching, just satisfy PWA install criteria
+  event.respondWith(fetch(event.request))
+})
+
 self.addEventListener('push', (event) => {
   if (!event.data) return
   let payload
