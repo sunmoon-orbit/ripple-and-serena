@@ -67,7 +67,7 @@ export default function Chat() {
 
     try {
       const allMsgs = getMessages(chat.id).filter((m) => !m.streaming)
-      const limited = applyContextLimit(allMsgs.map((m) => ({ role: m.role, content: m.content, images: m.images })))
+      const limited = applyContextLimit(allMsgs.map((m) => ({ role: m.role, content: m.content, images: m.images, thinking: m.thinking || undefined, tool_calls: m.tool_calls || undefined })))
 
       const systemPrompt = buildSystemPrompt(globalInstruction, memoryItems, '')
       let fullText = ''
