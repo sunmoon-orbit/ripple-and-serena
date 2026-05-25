@@ -1368,3 +1368,39 @@ a { text-decoration: none; color: inherit; }
   max-height: 320px; overflow-y: auto;
   background: rgba(150,140,180,0.03);
 }
+
+/* ===== 消息编辑 ===== */
+.msg-edit-icon-btn {
+  background: none; border: none; cursor: pointer;
+  color: var(--text-faint); padding: 2px 3px; border-radius: 3px;
+  display: inline-flex; align-items: center; opacity: 0;
+  transition: opacity 0.15s, color 0.15s;
+}
+.message-meta:hover .msg-edit-icon-btn { opacity: 1; }
+.msg-edit-icon-btn:hover { color: var(--accent); }
+.msg-edit-wrap {
+  display: flex; flex-direction: column; gap: 6px;
+  min-width: 200px; max-width: min(78%, 600px);
+}
+.msg-edit-textarea {
+  width: 100%; padding: 8px 12px;
+  background: rgba(255,255,255,0.25);
+  border: 1px solid rgba(255,255,255,0.5);
+  border-radius: var(--r-sm);
+  color: #fff; font-size: 14px; font-family: inherit;
+  line-height: 1.5; resize: vertical; outline: none;
+  min-height: 60px;
+}
+.msg-edit-textarea::placeholder { color: rgba(255,255,255,0.5); }
+.msg-edit-actions { display: flex; gap: 6px; justify-content: flex-end; }
+.msg-edit-btn {
+  padding: 4px 12px; font-size: 12px; border: none;
+  border-radius: var(--r-sm); cursor: pointer; transition: all 0.15s;
+  background: rgba(255,255,255,0.18); color: rgba(255,255,255,0.9);
+}
+.msg-edit-btn:hover { background: rgba(255,255,255,0.3); }
+.msg-edit-btn.primary {
+  background: rgba(255,255,255,0.9); color: var(--accent);
+  font-weight: 500;
+}
+.msg-edit-btn.primary:hover { background: #fff; }
