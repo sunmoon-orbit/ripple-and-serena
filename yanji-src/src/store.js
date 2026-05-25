@@ -200,6 +200,16 @@ export const useStore = create((set, get) => ({
       return { messagesByChatId }
     })
   },
+  truncateMessagesFrom: (chatId, msgId) => {
+    set((s) => {
+      const msgs = s.messagesByChatId[chatId] || []
+      const idx = msgs.findIndex((m) => m.id === msgId)
+      const truncated = idx >= 0 ? msgs.slice(0, idx) : msgs
+      const messagesByChatId = { ...s.messagesByChatId, [chatId]: truncated }
+      savePersistedState({ ...s, messagesByChatId })
+      return { messagesByChatId }
+    })
+  },
   removeLastEmptyAssistant: (chatId) => {
     set((s) => {
       const msgs = (s.messagesByChatId[chatId] || []).filter((m) => m.content !== '')

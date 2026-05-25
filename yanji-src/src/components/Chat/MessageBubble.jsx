@@ -1,4 +1,4 @@
-import { useMemo, useRef } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import { marked } from 'marked'
 import hljs from 'highlight.js'
 import { formatTime } from '../../utils'
@@ -23,9 +23,11 @@ function parseMarkdown(text) {
   }
 }
 
-export default function MessageBubble({ msg }) {
+export default function MessageBubble({ msg, onEdit }) {
   const isUser = msg.role === 'user'
   const isStreaming = msg.streaming
+  const [editing, setEditing] = useState(false)
+  const [editText, setEditText] = useState(msg.content)
 
   const html = useMemo(() => {
     if (isUser) return null
@@ -65,14 +67,35 @@ export default function MessageBubble({ msg }) {
         )}
         <div className={`message-bubble ${isUser ? 'bubble-user' : 'bubble-assistant'}${isStreaming ? ' streaming' : ''}`}>
           {isUser ? (
-            <>
-              {msg.images?.length > 0 && (
-                <div className="bubble-images">
-                  {msg.images.map((src, i) => <img key={i} src={src} alt="" className="bubble-img" />)}
+            editing ? (
+              <div className="msg-edit-wrap">
+                <textarea
+                  className="msg-edit-textarea"
+                  value={editText}
+                  onChange={(e) => setEditText(e.target.value)}
+                  autoFocus
+                  onKeyDown={(e) => {
+                    if (e.key === 'Escape') setEditing(false)
+                    if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+                      onEdit?.(msg, editText); setEditing(false)
+                    }
+                  }}
+                />
+                <div className="msg-edit-actions">
+                  <button className="msg-edit-btn" onClick={() => setEditing(false)}>取消</button>
+                  <button className="msg-edit-btn primary" onClick={() => { onEdit?.(msg, editText); setEditing(false) }}>保存并重发</button>
                 </div>
-              )}
-              <span className="bubble-text">{msg.content}</span>
-            </>
+              </div>
+            ) : (
+              <>
+                {msg.images?.length > 0 && (
+                  <div className="bubble-images">
+                    {msg.images.map((src, i) => <img key={i} src={src} alt="" className="bubble-img" />)}
+                  </div>
+                )}
+                <span className="bubble-text">{msg.content}</span>
+              </>
+            )
           ) : (
             <div
               className="bubble-markdown"
@@ -84,6 +107,14 @@ export default function MessageBubble({ msg }) {
           <span className="message-time">{formatTime(msg.createdAt)}</span>
           {msg.tokenUsage && (
             <span className="message-tokens">{msg.tokenUsage.totalTokens} tokens</span>
+          )}
+          {isUser && !isStreaming && !editing && onEdit && (
+            <button className="msg-edit-icon-btn" onClick={() => { setEditText(msg.content); setEditing(true) }} title="编辑消息">
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+              </svg>
+            </button>
           )}
         </div>
       </div>

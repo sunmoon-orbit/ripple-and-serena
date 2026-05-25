@@ -400,6 +400,8 @@ function buildOpenAIMessages(messages, systemPrompt) {
       const parts = [{ type: 'text', text: m.content || '' }]
       for (const img of m.images) parts.push({ type: 'image_url', image_url: { url: img } })
       out.push({ role: m.role, content: parts })
+    } else if (m.role === 'assistant' && m.thinking) {
+      out.push({ role: 'assistant', content: m.content, reasoning_content: m.thinking })
     } else {
       out.push({ role: m.role, content: m.content })
     }

@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react'
 import MessageBubble from './MessageBubble'
 
-export default function MessageList({ messages, status }) {
+export default function MessageList({ messages, status, onEdit }) {
   const bottomRef = useRef(null)
 
   useEffect(() => {
@@ -24,7 +24,7 @@ export default function MessageList({ messages, status }) {
   return (
     <div className="messages-list">
       {messages.map((msg) => (
-        <MessageBubble key={msg.id} msg={msg} />
+        <MessageBubble key={msg.id} msg={msg} onEdit={onEdit} />
       ))}
       {status && (
         <div className="message-status">{status}</div>

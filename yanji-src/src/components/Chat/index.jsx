@@ -14,7 +14,7 @@ export default function Chat() {
     globalInstruction, memoryItems, generationConfig,
     searchConfig, moonMemory, autoTools,
     createChat, setActiveChat, getActiveConnection, getActiveChat, getMessages,
-    addMessage, updateMessage, removeLastEmptyAssistant, touchChat,
+    addMessage, updateMessage, removeLastEmptyAssistant, truncateMessagesFrom, touchChat,
     recordTokenUsage, updateChatModel, applyContextLimit,
   } = store
 
@@ -122,6 +122,12 @@ export default function Chat() {
     }
   }, [isSending, activeChat, activeConn, connections, globalInstruction, memoryItems,
       generationConfig, searchConfig, moonMemory, autoTools])
+
+  const handleEditMessage = useCallback((msg, newText) => {
+    if (!newText.trim() || !activeChatId) return
+    truncateMessagesFrom(activeChatId, msg.id)
+    setTimeout(() => handleSend(newText, []), 0)
+  }, [activeChatId, truncateMessagesFrom, handleSend])
 
   // ── Render ────────────────────────────────────────────────────────────────
   return (
@@ -234,7 +240,7 @@ export default function Chat() {
               </p>
             </div>
           ) : (
-            <MessageList messages={messages} status={status} />
+            <MessageList messages={messages} status={status} onEdit={handleEditMessage} />
           )}
         </div>
 
