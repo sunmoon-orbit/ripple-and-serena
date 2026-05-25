@@ -57,6 +57,7 @@ export default function IconNav() {
             title={item.label}
           >
             {item.icon}
+            <span className="icon-nav-label">{item.label}</span>
           </button>
         ))}
       </div>
