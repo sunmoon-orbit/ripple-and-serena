@@ -44,7 +44,10 @@ export async function subscribePush(moonMemoryConfig) {
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiToken}` },
     body: JSON.stringify(sub.toJSON()),
   })
-  if (!resp.ok) throw new Error('订阅保存失败')
+  if (!resp.ok) {
+    const detail = await resp.text().catch(() => '')
+    throw new Error(`订阅保存失败 (${resp.status}): ${detail.slice(0, 100)}`)
+  }
   return sub
 }
 
