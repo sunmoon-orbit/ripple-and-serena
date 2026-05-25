@@ -209,13 +209,16 @@ async function callWithTools({
       const url = buildApiUrl(connection.baseUrl, 'anthropic')
       const bodyMsgs = buildAnthropicMessages(convo)
       const body = { model, max_tokens: maxTokens, messages: bodyMsgs, tools: formattedTools }
-      if (systemPrompt?.trim()) body.system = systemPrompt
+      if (systemPrompt?.trim()) {
+        body.system = [{ type: 'text', text: systemPrompt, cache_control: { type: 'ephemeral' } }]
+      }
       const resp = await fetch(url, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'x-api-key': connection.apiKey,
           'anthropic-version': '2023-06-01',
+          'anthropic-beta': 'prompt-caching-2024-07-31',
           'anthropic-dangerous-direct-browser-access': 'true',
         },
         body: JSON.stringify(body),
@@ -306,7 +309,9 @@ async function callStream({ connection, messages, systemPrompt, model, generatio
     const bodyMsgs = buildAnthropicMessages(messages)
     const isThinkingModel = (model || '').includes('3-7') || (model || '').includes('4')
     const body = { model, max_tokens: maxTokens, messages: bodyMsgs, stream: true }
-    if (systemPrompt?.trim()) body.system = systemPrompt
+    if (systemPrompt?.trim()) {
+      body.system = [{ type: 'text', text: systemPrompt, cache_control: { type: 'ephemeral' } }]
+    }
     if (isThinkingModel && onThinking) {
       body.thinking = { type: 'enabled', budget_tokens: Math.min(maxTokens, 8000) }
       body.temperature = 1  // Anthropic extended thinking requires temp=1
@@ -317,6 +322,7 @@ async function callStream({ connection, messages, systemPrompt, model, generatio
         'Content-Type': 'application/json',
         'x-api-key': connection.apiKey,
         'anthropic-version': '2023-06-01',
+        'anthropic-beta': 'prompt-caching-2024-07-31',
         'anthropic-dangerous-direct-browser-access': 'true',
       },
       body: JSON.stringify(body),
