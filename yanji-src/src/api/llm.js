@@ -34,7 +34,7 @@ function geminiApiVersion(model) {
 
 export function checkToolSupport(provider, model) {
   const m = (model || '').toLowerCase()
-  if (m.includes('deepseek')) return false
+  if (m.includes('deepseek-reasoner')) return false
   if (provider === 'openai') return true
   if (provider === 'gemini') return m.includes('1.5') || m.includes('2.0') || m.includes('2.5') || m.includes('flash') || m.includes('pro')
   if (provider === 'anthropic') return m.includes('claude-3') || m.includes('claude-sonnet') || m.includes('claude-opus')
