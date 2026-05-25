@@ -1,9 +1,10 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useStore } from '../../store'
 import { normalizeProvider, BUILTIN_MODELS } from '../../api/llm'
 import { checkHealth } from '../../api/moonMemory'
 import { showToast } from '../Toast'
 import { uuid } from '../../utils'
+import { subscribePush, unsubscribePush, getSubscription } from '../../api/push'
 
 function Section({ title, children }) {
   return (
@@ -110,6 +111,35 @@ export default function Settings() {
   const [moonHealthStatus, setMoonHealthStatus] = useState('')
   const [newMemContent, setNewMemContent] = useState('')
   const [tab, setTab] = useState('connections')
+  const [pushEnabled, setPushEnabled] = useState(false)
+  const [pushLoading, setPushLoading] = useState(false)
+
+  useEffect(() => {
+    getSubscription().then((sub) => setPushEnabled(!!sub)).catch(() => {})
+  }, [])
+
+  async function togglePush() {
+    if (!moonMemory?.enabled || !moonMemory?.baseUrl || !moonMemory?.apiToken) {
+      showToast('请先配置并启用拾羽记忆库', 'error'); return
+    }
+    setPushLoading(true)
+    try {
+      const moonConfig = { apiUrl: (moonMemory.baseUrl || '').replace(/\/$/, ''), apiToken: moonMemory.apiToken }
+      if (pushEnabled) {
+        await unsubscribePush(moonConfig)
+        setPushEnabled(false)
+        showToast('已关闭推送通知')
+      } else {
+        await subscribePush(moonConfig)
+        setPushEnabled(true)
+        showToast('推送通知已开启！')
+      }
+    } catch (e) {
+      showToast(e.message, 'error')
+    } finally {
+      setPushLoading(false)
+    }
+  }
 
   const TABS = [
     { id: 'connections', label: '连接' },
@@ -311,6 +341,24 @@ export default function Settings() {
                 <span className="card-row-label">AI 可删除记忆</span>
                 <span className="perm-badge perm-deny">禁止</span>
               </div>
+            </div>
+            <div className="settings-card">
+              <div className="settings-card-title">推送通知</div>
+              <div className="card-row">
+                <div style={{ flex: 1 }}>
+                  <div className="card-row-label">每日问候推送</div>
+                  <div style={{ fontSize: 11, color: 'var(--text-faint)', marginTop: 2 }}>9:00 / 12:00 / 18:00 / 22:00</div>
+                </div>
+                <label className="toggle">
+                  <input type="checkbox" checked={pushEnabled} disabled={pushLoading} onChange={togglePush} />
+                  <span className="toggle-track" />
+                </label>
+              </div>
+              {!('PushManager' in window) && (
+                <div className="card-row" style={{ fontSize: 12, color: 'var(--text-muted)' }}>
+                  此浏览器不支持推送通知
+                </div>
+              )}
             </div>
           </Section>
         )}
