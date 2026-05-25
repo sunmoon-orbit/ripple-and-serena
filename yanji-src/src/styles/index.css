@@ -633,7 +633,7 @@ a { text-decoration: none; color: inherit; }
 .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
 
 /* ===== 移动端 ===== */
-@media (max-width: 768px) {
+@media (max-width: 900px) {
   .sidebar {
     position: fixed; left: 0; top: 0; z-index: 200;
     transform: translateX(-100%);
@@ -644,12 +644,11 @@ a { text-decoration: none; color: inherit; }
     position: fixed; inset: 0; z-index: 199;
     background: rgba(40,32,58,0.25);
   }
-  .icon-nav { display: none; }
   .top-bar-hamburger { display: flex !important; }
   .messages-area { padding: 12px; }
   .input-area { padding: 8px 12px 12px; padding-bottom: calc(12px + env(safe-area-inset-bottom,0px)); }
 }
-@media (min-width: 769px) {
+@media (min-width: 901px) {
   .top-bar-hamburger { display: none; }
 }
 
@@ -1246,9 +1245,10 @@ a { text-decoration: none; color: inherit; }
 @keyframes toastIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
 
 /* ===== Mobile responsive ===== */
-@media (max-width: 768px) {
+@media (max-width: 900px) {
   /* 底部 Tab 栏 */
   .icon-nav {
+    display: flex;
     position: fixed; bottom: 0; left: 0; right: 0;
     width: 100%;
     height: calc(52px + env(safe-area-inset-bottom, 0px));
@@ -1303,7 +1303,7 @@ a { text-decoration: none; color: inherit; }
   .settings-content { padding: 16px 12px 40px; }
   .toast-container { bottom: calc(60px + env(safe-area-inset-bottom, 0px)); }
 }
-@media (min-width: 769px) {
+@media (min-width: 901px) {
   .icon-nav-items { display: flex; flex-direction: column; gap: 4px; }
   .icon-nav-btn { display: flex; align-items: center; justify-content: center; }
 }
