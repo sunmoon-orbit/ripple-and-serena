@@ -36,8 +36,13 @@ export default function MessageBubble({ msg }) {
     <div className={`message-row ${isUser ? 'message-row-user' : 'message-row-assistant'}`}>
       {!isUser && (
         <div className="message-avatar">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M12 2a5 5 0 0 1 5 5c0 1.7-.85 3.2-2.14 4.1A6 6 0 0 1 18 17v1H6v-1a6 6 0 0 1 3.14-5.9A5 5 0 0 1 7 7a5 5 0 0 1 5-5z" />
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M4 8 C4 8 7 4 12 5 C16 6 18 9 17 13 C16 17 12 19 8 17" />
+            <path d="M17 13 L21 11 L18 15" />
+            <path d="M8 17 L6 21" />
+            <path d="M10 17 L10 21" />
+            <circle cx="13" cy="8" r="1" fill="currentColor" stroke="none" />
+            <path d="M4 8 L1 7" />
           </svg>
         </div>
       )}
