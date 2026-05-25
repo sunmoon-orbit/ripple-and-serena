@@ -397,13 +397,16 @@ function buildOpenAIMessages(messages, systemPrompt) {
     if (m.role === 'tool') {
       out.push({ role: 'tool', tool_call_id: m.tool_call_id, content: m.content })
     } else if (m.role === 'assistant' && m.tool_calls) {
-      out.push({ role: 'assistant', content: m.content || null, tool_calls: m.tool_calls })
+      const am = { role: 'assistant', content: m.content || null, tool_calls: m.tool_calls }
+      const rc = m.thinking || m.reasoning_content
+      if (rc) am.reasoning_content = rc
+      out.push(am)
     } else if (m.images?.length) {
       const parts = [{ type: 'text', text: m.content || '' }]
       for (const img of m.images) parts.push({ type: 'image_url', image_url: { url: img } })
       out.push({ role: m.role, content: parts })
-    } else if (m.role === 'assistant' && m.thinking) {
-      out.push({ role: 'assistant', content: m.content, reasoning_content: m.thinking })
+    } else if (m.role === 'assistant' && (m.thinking || m.reasoning_content)) {
+      out.push({ role: 'assistant', content: m.content, reasoning_content: m.thinking || m.reasoning_content })
     } else {
       out.push({ role: m.role, content: m.content })
     }
