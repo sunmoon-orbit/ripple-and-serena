@@ -23,6 +23,7 @@ const DEFAULT_STATE = {
     apiToken: '',
     limit: 5,
   },
+  theme: 'default',
   // UI-only (not persisted)
   activePanel: 'chat',
 }
@@ -49,7 +50,7 @@ const persistedKeys = [
   'connections', 'activeConnectionId', 'chats', 'activeChatId',
   'messagesByChatId', 'globalInstruction', 'summariesByChatId',
   'generationConfig', 'memoryItems', 'tokenStats', 'contextLimit',
-  'searchConfig', 'autoTools', 'moonMemory',
+  'searchConfig', 'autoTools', 'moonMemory', 'theme',
 ]
 
 function mergeWithDefaults(persisted) {
@@ -77,6 +78,7 @@ export const useStore = create((set, get) => ({
 
   // ─── panel navigation ─────────────────────────────────────────────
   setActivePanel: (panel) => set({ activePanel: panel }),
+  setTheme: (theme) => set((s) => { savePersistedState({ ...s, theme }); return { theme } }),
 
   // ─── connections ──────────────────────────────────────────────────
   addConnection: (conn) => {

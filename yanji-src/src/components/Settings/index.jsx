@@ -99,11 +99,11 @@ function ConnectionCard({ conn, onSave, onDelete, onActivate, isActive }) {
 export default function Settings() {
   const store = useStore()
   const {
-    connections, activeConnectionId, tokenStats, moonMemory,
+    connections, activeConnectionId, tokenStats, moonMemory, theme,
     globalInstruction, generationConfig, contextLimit, searchConfig, autoTools,
     addConnection, updateConnection, deleteConnection, setActiveConnection,
     setGlobalInstruction, setGenerationConfig, setContextLimit, setSearchConfig,
-    setAutoTools, setMoonMemory, memoryItems, addMemoryItem, toggleMemoryItem, deleteMemoryItem,
+    setAutoTools, setMoonMemory, setTheme, memoryItems, addMemoryItem, toggleMemoryItem, deleteMemoryItem,
   } = store
 
   const [addingConn, setAddingConn] = useState(false)
@@ -146,7 +146,14 @@ export default function Settings() {
     { id: 'memory', label: '记忆注入' },
     { id: 'moon', label: '拾羽记忆库' },
     { id: 'general', label: '通用' },
+    { id: 'appearance', label: '外观' },
     { id: 'monitor', label: 'API 监控' },
+  ]
+
+  const THEMES = [
+    { id: 'default', name: '暮山紫', color: '#bfb5d8' },
+    { id: 'xilan', name: '夕岚', color: '#deb7b8' },
+    { id: 'claude', name: 'Claude', color: '#c8745a' },
   ]
 
   async function checkMoonHealth() {
@@ -428,6 +435,26 @@ export default function Settings() {
               </div>
             </Section>
           </>
+        )}
+
+        {/* ── Appearance ───────────────────────────────────────── */}
+        {tab === 'appearance' && (
+          <Section title="主题">
+            <div className="settings-card">
+              <div className="theme-picker">
+                {THEMES.map((t) => (
+                  <button
+                    key={t.id}
+                    className={'theme-option' + (( theme || 'default') === t.id ? ' active' : '')}
+                    onClick={() => setTheme(t.id)}
+                  >
+                    <span className="theme-dot" style={{ background: t.color }} />
+                    {t.name}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </Section>
         )}
 
         {/* ── API Monitor ──────────────────────────────────────── */}

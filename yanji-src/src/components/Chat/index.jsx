@@ -69,7 +69,9 @@ export default function Chat() {
       const allMsgs = getMessages(chat.id).filter((m) => !m.streaming)
       const limited = applyContextLimit(allMsgs.map((m) => ({ role: m.role, content: m.content, images: m.images, thinking: m.thinking || undefined, tool_calls: m.tool_calls || undefined })))
 
-      const systemPrompt = buildSystemPrompt(globalInstruction, memoryItems, '')
+      const now = new Date()
+      const timeCtx = `当前时间：${now.toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai', hour12: false })}`
+      const systemPrompt = buildSystemPrompt(globalInstruction, memoryItems, timeCtx)
       let fullText = ''
       let fullThinking = ''
 
