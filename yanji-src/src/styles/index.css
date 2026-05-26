@@ -1224,6 +1224,7 @@ a { text-decoration: none; color: inherit; }
 .layer-core { color: #9a5a5a !important; background: rgba(180,100,100,0.10) !important; }
 .layer-long { color: #8a7040 !important; background: rgba(180,150,80,0.10) !important; }
 .layer-short { color: #7a7840 !important; background: rgba(160,160,80,0.10) !important; }
+.layer-consciousness { color: #6860a0 !important; background: rgba(120,100,180,0.10) !important; }
 .scope-badge { font-size: 11px; padding: 1px 7px; border-radius: 100px; background: rgba(191,181,216,0.12); color: var(--text-muted); }
 .agent-badge { font-size: 11px; padding: 1px 7px; border-radius: 100px; background: rgba(150,140,180,0.08); color: var(--text-faint); }
 .memory-card-meta { display: flex; align-items: center; gap: 6px; }
