@@ -99,13 +99,19 @@ export default function Chat() {
         },
       })
 
+      const finalText = result.text || fullText
+      const parts = finalText.split(/\[MSG\]/).map((p) => p.trim()).filter(Boolean)
       updateMessage(chat.id, assistantId, {
-        content: result.text || fullText,
+        content: parts[0] || finalText,
         thinking: fullThinking || undefined,
         streaming: false,
         tokenUsage: result.usage || null,
         toolCalls: undefined,
       })
+      for (let i = 1; i < parts.length; i++) {
+        await new Promise((r) => setTimeout(r, 700))
+        addMessage(chat.id, { role: 'assistant', content: parts[i] })
+      }
       touchChat(chat.id)
       if (result.usage) recordTokenUsage(conn.id, result.usage)
 
