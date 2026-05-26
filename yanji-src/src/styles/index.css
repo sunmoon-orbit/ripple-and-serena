@@ -6,6 +6,7 @@
   --accent: #bfb5d8;
   --accent-soft: #ddc4e0;
   --accent-dim: rgba(191,181,216,0.15);
+  --accent-grad: #c8bedd;
   --text: #28203a;
   --text-mid: #6a5a7a;
   --text-muted: #9a8aaa;
@@ -19,6 +20,44 @@
   --r-lg: 16px;
   --nav-w: 56px;
   --sidebar-w: 260px;
+}
+
+/* ===== 夕岚主题 ===== */
+[data-theme="xilan"] {
+  --bg: #fdf5f5;
+  --bg-sidebar: #f5e8e8;
+  --card: #ffffff;
+  --accent: #deb7b8;
+  --accent-soft: #f0cdd0;
+  --accent-dim: rgba(222,183,184,0.15);
+  --accent-grad: #f2d5d7;
+  --text: #3a2020;
+  --text-mid: #7a5050;
+  --text-muted: #aa8080;
+  --text-faint: #ccb0b0;
+  --border: rgba(180,140,140,0.12);
+  --border-md: rgba(180,140,140,0.22);
+  --shadow-sm: 0 1px 3px rgba(180,140,140,0.07), 0 2px 8px rgba(180,140,140,0.05);
+  --shadow-md: 0 2px 12px rgba(180,140,140,0.10), 0 8px 24px rgba(180,140,140,0.08);
+}
+
+/* ===== Claude 主题 ===== */
+[data-theme="claude"] {
+  --bg: #f7f4ef;
+  --bg-sidebar: #eeeae2;
+  --card: #ffffff;
+  --accent: #c8745a;
+  --accent-soft: #e8b89a;
+  --accent-dim: rgba(200,116,90,0.12);
+  --accent-grad: #d4906e;
+  --text: #1a1611;
+  --text-mid: #6b5c4a;
+  --text-muted: #9b8c7a;
+  --text-faint: #c0b0a0;
+  --border: rgba(160,140,110,0.12);
+  --border-md: rgba(160,140,110,0.22);
+  --shadow-sm: 0 1px 3px rgba(160,140,110,0.07), 0 2px 8px rgba(160,140,110,0.05);
+  --shadow-md: 0 2px 12px rgba(160,140,110,0.10), 0 8px 24px rgba(160,140,110,0.08);
 }
 
 /* ===== 重置 ===== */
@@ -163,7 +202,7 @@ a { text-decoration: none; color: inherit; }
 .new-chat-btn {
   margin: 0 12px 10px;
   padding: 9px 14px;
-  background: linear-gradient(135deg, var(--accent) 0%, #c8bedd 100%);
+  background: linear-gradient(135deg, var(--accent) 0%, var(--accent-grad) 100%);
   color: #fff;
   border: none; border-radius: var(--r-sm);
   font-size: 13px; font-weight: 500;
@@ -233,7 +272,7 @@ a { text-decoration: none; color: inherit; }
   position: relative;
 }
 .message.user .message-bubble {
-  background: linear-gradient(135deg, var(--accent) 0%, #c8bedd 100%);
+  background: linear-gradient(135deg, var(--accent) 0%, var(--accent-grad) 100%);
   color: #fff;
   margin-left: auto; max-width: 78%;
   border-bottom-right-radius: 3px;
@@ -359,7 +398,7 @@ a { text-decoration: none; color: inherit; }
 .send-btn {
   width: 34px; height: 34px; flex-shrink: 0;
   border: none;
-  background: linear-gradient(135deg, var(--accent) 0%, #c8bedd 100%);
+  background: linear-gradient(135deg, var(--accent) 0%, var(--accent-grad) 100%);
   color: #fff; border-radius: var(--r-sm);
   display: flex; align-items: center; justify-content: center;
   transition: all 0.18s;
@@ -424,7 +463,7 @@ a { text-decoration: none; color: inherit; }
 /* ===== 通用按钮 ===== */
 .btn-primary {
   padding: 8px 16px;
-  background: linear-gradient(135deg, var(--accent) 0%, #c8bedd 100%);
+  background: linear-gradient(135deg, var(--accent) 0%, var(--accent-grad) 100%);
   color: #fff; border: none; border-radius: var(--r-sm);
   font-size: 13px; font-weight: 500; transition: all 0.18s;
 }
@@ -686,7 +725,7 @@ a { text-decoration: none; color: inherit; }
   border: none; cursor: pointer; transition: all 0.15s;
 }
 .btn-sm.btn-primary {
-  background: linear-gradient(135deg, var(--accent) 0%, #c8bedd 100%);
+  background: linear-gradient(135deg, var(--accent) 0%, var(--accent-grad) 100%);
   color: #fff;
 }
 .btn-sm.btn-primary:hover { opacity: 0.85; }
@@ -847,7 +886,7 @@ a { text-decoration: none; color: inherit; }
 /* Bubbles */
 .message-bubble { padding: 10px 14px; border-radius: var(--r); font-size: 14px; line-height: 1.65; position: relative; }
 .bubble-user {
-  background: linear-gradient(135deg, var(--accent) 0%, #c8bedd 100%);
+  background: linear-gradient(135deg, var(--accent) 0%, var(--accent-grad) 100%);
   color: #fff; border-bottom-right-radius: 3px;
   box-shadow: var(--shadow-sm);
 }
@@ -937,7 +976,7 @@ a { text-decoration: none; color: inherit; }
 .chat-input-textarea:disabled { opacity: 0.6; }
 .chat-send-btn {
   width: 34px; height: 34px; flex-shrink: 0;
-  background: linear-gradient(135deg, var(--accent) 0%, #c8bedd 100%);
+  background: linear-gradient(135deg, var(--accent) 0%, var(--accent-grad) 100%);
   color: #fff; border: none; border-radius: var(--r-sm);
   display: flex; align-items: center; justify-content: center;
   transition: all 0.18s; cursor: pointer;
@@ -1008,7 +1047,7 @@ a { text-decoration: none; color: inherit; }
 .conv-search-input::placeholder { color: var(--text-faint); }
 .btn-new-chat {
   width: 30px; height: 30px; border: none; border-radius: var(--r-sm);
-  background: linear-gradient(135deg, var(--accent) 0%, #c8bedd 100%);
+  background: linear-gradient(135deg, var(--accent) 0%, var(--accent-grad) 100%);
   color: #fff; display: flex; align-items: center; justify-content: center;
   flex-shrink: 0; cursor: pointer; transition: all 0.15s;
 }
@@ -1206,7 +1245,7 @@ a { text-decoration: none; color: inherit; }
   display: flex; align-items: center; justify-content: center; gap: 8px;
   margin: 16px 20px; padding: 10px 20px;
   font-size: 14px; font-weight: 500;
-  background: linear-gradient(135deg, var(--accent) 0%, #c8bedd 100%);
+  background: linear-gradient(135deg, var(--accent) 0%, var(--accent-grad) 100%);
   color: #fff; border: none; border-radius: var(--r-sm);
   cursor: pointer; transition: all 0.18s;
 }
@@ -1404,3 +1443,16 @@ a { text-decoration: none; color: inherit; }
   font-weight: 500;
 }
 .msg-edit-btn.primary:hover { background: #fff; }
+
+/* ===== 主题选择器 ===== */
+.theme-picker { display: flex; gap: 8px; flex-wrap: wrap; }
+.theme-option {
+  display: flex; align-items: center; gap: 8px;
+  padding: 8px 14px; border-radius: var(--r);
+  border: 1px solid var(--border-md);
+  background: var(--bg); color: var(--text);
+  font-size: 13px; cursor: pointer; transition: all 0.15s;
+}
+.theme-option:hover { border-color: var(--accent); }
+.theme-option.active { border-color: var(--accent); background: var(--accent-dim); font-weight: 500; }
+.theme-dot { width: 12px; height: 12px; border-radius: 50%; flex-shrink: 0; }

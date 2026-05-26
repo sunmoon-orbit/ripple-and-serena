@@ -28,6 +28,7 @@ export default function MessageBubble({ msg, onEdit }) {
   const isStreaming = msg.streaming
   const [editing, setEditing] = useState(false)
   const [editText, setEditText] = useState(msg.content)
+  const [thinkOpen, setThinkOpen] = useState(true)
 
   const html = useMemo(() => {
     if (isUser) return null
@@ -55,7 +56,7 @@ export default function MessageBubble({ msg, onEdit }) {
           </div>
         )}
         {msg.thinking && (
-          <details className="thinking-block" open={isStreaming}>
+          <details className="thinking-block" open={thinkOpen} onToggle={(e) => setThinkOpen(e.currentTarget.open)}>
             <summary>
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/>

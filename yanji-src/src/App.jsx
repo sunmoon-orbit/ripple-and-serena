@@ -31,7 +31,13 @@ function Splash({ onDone }) {
 
 export default function App() {
   const activePanel = useStore((s) => s.activePanel)
+  const theme = useStore((s) => s.theme)
   const [showSplash, setShowSplash] = useState(true)
+
+  useEffect(() => {
+    const t = theme && theme !== 'default' ? theme : ''
+    document.documentElement.setAttribute('data-theme', t)
+  }, [theme])
 
   return (
     <>
