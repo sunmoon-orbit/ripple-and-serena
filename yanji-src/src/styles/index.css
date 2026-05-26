@@ -1418,6 +1418,7 @@ a { text-decoration: none; color: inherit; }
 }
 .message-meta:hover .msg-edit-icon-btn { opacity: 1; }
 .msg-edit-icon-btn:hover { color: var(--accent); }
+@media (hover: none) { .msg-edit-icon-btn { opacity: 0.5; } }
 .msg-edit-wrap {
   display: flex; flex-direction: column; gap: 6px;
   min-width: 200px; max-width: min(78%, 600px);
