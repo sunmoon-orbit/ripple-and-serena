@@ -5,8 +5,14 @@ import { showToast } from '../Toast'
 import { formatTime } from '../../utils'
 
 const SCOPE_LABELS = { shared: '共享', private_qing: '私密', private_crow: '乌鸦' }
-const LAYER_LABELS = { core: '核心', long: '长期', short: '短期' }
-const LAYER_COLORS = { core: 'layer-core', long: 'layer-long', short: 'layer-short' }
+const LAYER_LABELS = { core: '核心', long: '长期', short: '短期', consciousness: '意识' }
+const LAYER_COLORS = { core: 'layer-core', long: 'layer-long', short: 'layer-short', consciousness: 'layer-consciousness' }
+
+const KNOWN_META_TAGS = new Set([
+  'core', 'long', 'short', 'consciousness', '核心', '长期', '短期', '意识',
+  'shared', 'private_qing', 'private_crow', '共享', '私密', '乌鸦',
+  'crow', 'qing',
+])
 
 function HeatmapCell({ count, date }) {
   const intensity = count ? Math.min(0.2 + (count / 5) * 0.8, 1) : 0
@@ -202,7 +208,7 @@ export default function Memory() {
               <>
                 <div className="memory-card-body">
                   <p className="memory-content">{m.content}</p>
-                  {m.tags && <div className="memory-tags">{m.tags.split(',').filter(Boolean).map((t, i) => <span key={i} className="memory-tag">{t.trim()}</span>)}</div>}
+                  {(() => { const tags = m.tags ? m.tags.split(',').map(t => t.trim()).filter(t => t && !KNOWN_META_TAGS.has(t)) : []; return tags.length > 0 && <div className="memory-tags">{tags.map((t, i) => <span key={i} className="memory-tag">{t}</span>)}</div> })()}
                 </div>
                 <div className="memory-card-footer">
                   <div className="memory-badges">
