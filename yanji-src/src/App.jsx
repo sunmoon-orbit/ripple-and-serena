@@ -5,6 +5,7 @@ import Chat from './components/Chat'
 import Memory from './components/Memory'
 import Dream from './components/Dream'
 import Settings from './components/Settings'
+import Home from './components/Home'
 import Toast from './components/Toast'
 
 function Splash({ onDone }) {
@@ -33,6 +34,7 @@ export default function App() {
   const activePanel = useStore((s) => s.activePanel)
   const theme = useStore((s) => s.theme)
   const [showSplash, setShowSplash] = useState(true)
+  const [showHome, setShowHome] = useState(false)
 
   useEffect(() => {
     const t = theme && theme !== 'default' ? theme : ''
@@ -41,7 +43,8 @@ export default function App() {
 
   return (
     <>
-      {showSplash && <Splash onDone={() => setShowSplash(false)} />}
+      {showSplash && <Splash onDone={() => { setShowSplash(false); setShowHome(true) }} />}
+      {showHome && <Home onEnter={() => setShowHome(false)} />}
       <div className="app-shell">
         <IconNav />
         <div className="main-area">
