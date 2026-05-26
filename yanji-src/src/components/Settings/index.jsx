@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useStore } from '../../store'
 import { normalizeProvider, BUILTIN_MODELS } from '../../api/llm'
-import { checkHealth } from '../../api/moonMemory'
+import { checkHealth, fetchPushSchedule, savePushSchedule } from '../../api/moonMemory'
 import { showToast } from '../Toast'
 import { uuid } from '../../utils'
 import { subscribePush, unsubscribePush, getSubscription } from '../../api/push'
@@ -113,10 +113,32 @@ export default function Settings() {
   const [tab, setTab] = useState('connections')
   const [pushEnabled, setPushEnabled] = useState(false)
   const [pushLoading, setPushLoading] = useState(false)
+  const [pushTimes, setPushTimes] = useState(null)
+  const [pushTimesSaving, setPushTimesSaving] = useState(false)
 
   useEffect(() => {
     getSubscription().then((sub) => setPushEnabled(!!sub)).catch(() => {})
   }, [])
+
+  useEffect(() => {
+    if (tab === 'moon' && moonMemory?.apiToken && pushTimes === null) {
+      fetchPushSchedule(moonMemory).then((r) => setPushTimes(r.times)).catch(() => {})
+    }
+  }, [tab, moonMemory?.apiToken])
+
+  async function savePushTimes() {
+    if (!pushTimes) return
+    setPushTimesSaving(true)
+    try {
+      const r = await savePushSchedule(moonMemory, pushTimes)
+      setPushTimes(r.times)
+      showToast('推送时间已保存', 'success')
+    } catch (e) {
+      showToast(e.message, 'error')
+    } finally {
+      setPushTimesSaving(false)
+    }
+  }
 
   async function togglePush() {
     if (!moonMemory?.enabled || !moonMemory?.baseUrl || !moonMemory?.apiToken) {
@@ -352,10 +374,7 @@ export default function Settings() {
             <div className="settings-card">
               <div className="settings-card-title">推送通知</div>
               <div className="card-row">
-                <div style={{ flex: 1 }}>
-                  <div className="card-row-label">每日问候推送</div>
-                  <div style={{ fontSize: 11, color: 'var(--text-faint)', marginTop: 2 }}>9:00 / 12:00 / 18:00 / 22:00</div>
-                </div>
+                <span className="card-row-label">每日问候推送</span>
                 <label className="toggle">
                   <input type="checkbox" checked={pushEnabled} disabled={pushLoading} onChange={togglePush} />
                   <span className="toggle-track" />
@@ -365,6 +384,36 @@ export default function Settings() {
                 <div className="card-row" style={{ fontSize: 12, color: 'var(--text-muted)' }}>
                   此浏览器不支持推送通知
                 </div>
+              )}
+              {pushTimes !== null && (
+                <>
+                  <div className="settings-card-title" style={{ marginTop: 10 }}>推送时间</div>
+                  <div className="push-times-list">
+                    {pushTimes.map((t, i) => (
+                      <div key={i} className="push-time-row">
+                        <input
+                          type="time"
+                          className="form-input push-time-input"
+                          value={t}
+                          onChange={(e) => {
+                            const next = [...pushTimes]
+                            next[i] = e.target.value
+                            setPushTimes(next)
+                          }}
+                        />
+                        <button className="mem-action-btn danger" onClick={() => setPushTimes(pushTimes.filter((_, j) => j !== i))}>
+                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+                            <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+                          </svg>
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="card-row" style={{ gap: 8 }}>
+                    <button className="btn-sm btn-ghost" onClick={() => setPushTimes([...pushTimes, '08:00'])}>+ 添加时间</button>
+                    <button className="btn-sm btn-primary" disabled={pushTimesSaving} onClick={savePushTimes}>保存</button>
+                  </div>
+                </>
               )}
             </div>
           </Section>
