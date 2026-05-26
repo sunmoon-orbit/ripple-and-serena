@@ -68,6 +68,20 @@ export async function checkHealth(config) {
   return request(baseUrl, '/health')
 }
 
+export async function fetchPushSchedule(config) {
+  const { baseUrl, apiToken } = config
+  return request(baseUrl, '/push/schedule', { headers: headers(apiToken) })
+}
+
+export async function savePushSchedule(config, times) {
+  const { baseUrl, apiToken } = config
+  return request(baseUrl, '/push/schedule', {
+    method: 'PATCH',
+    headers: headers(apiToken),
+    body: JSON.stringify({ times }),
+  })
+}
+
 // Tool definitions for AI (read + write only, no delete)
 export function getMemoryToolDefinitions() {
   return [

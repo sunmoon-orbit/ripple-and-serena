@@ -1480,6 +1480,11 @@ a { text-decoration: none; color: inherit; }
 }
 .msg-edit-btn.primary:hover { background: #fff; }
 
+/* ===== 推送时间 ===== */
+.push-times-list { display: flex; flex-direction: column; gap: 6px; margin: 4px 0 8px; }
+.push-time-row { display: flex; align-items: center; gap: 8px; }
+.push-time-input { width: 110px !important; flex-shrink: 0; }
+
 /* ===== 主题选择器 ===== */
 .theme-picker { display: flex; gap: 8px; flex-wrap: wrap; }
 .theme-option {
