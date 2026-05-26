@@ -23,7 +23,7 @@ const DEFAULT_STATE = {
     apiToken: '',
     limit: 5,
   },
-  theme: 'default',
+  theme: 'claude',
   // UI-only (not persisted)
   activePanel: 'chat',
 }
