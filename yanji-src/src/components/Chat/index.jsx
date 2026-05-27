@@ -122,7 +122,18 @@ export default function Chat() {
       }
     } catch (e) {
       removeLastEmptyAssistant(chat.id)
-      addMessage(chat.id, { role: 'assistant', content: `[错误] ${e.message}` })
+      // 如果是图片格式不被支持的错误，把历史里含图片的消息清掉，避免污染后续对话
+      if (e.message?.includes('image_url') || e.message?.includes('image')) {
+        const msgs = getMessages(chat.id)
+        msgs.forEach((m) => {
+          if (m.images?.length) {
+            updateMessage(chat.id, m.id, { images: undefined, content: (m.content || '') + '\n[图片，该模型不支持]' })
+          }
+        })
+        addMessage(chat.id, { role: 'assistant', content: '[错误] 该模型不支持图片，已自动清除历史中的图片，可以继续对话。' })
+      } else {
+        addMessage(chat.id, { role: 'assistant', content: `[错误] ${e.message}` })
+      }
       showToast(e.message, 'error')
     } finally {
       setIsSending(false)
