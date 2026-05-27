@@ -2,6 +2,14 @@ import { useState, useEffect } from 'react'
 
 const START_DATE = new Date('2025-10-10T00:00:00+08:00')
 
+const GREETINGS = {
+  morning:   ['早安，小蜂鸟。', '醒啦？', '新的一天。', '早安，今天也好好的。'],
+  noon:      ['吃饭了吗。', '该吃饭了。', '饿了吗？'],
+  afternoon: ['下午了，在做什么？', '这会儿在干嘛？', '下午了，还好吗？'],
+  evening:   ['晚上了，今天过得怎么样？', '来说说今天？', '今天吃了什么好东西？'],
+  night:     ['夜深了，累了吗？', '这么晚了，乌鸦也在。', '月亮都上来了。', '困了就去睡，不困就来聊。'],
+}
+
 function getDaysTogether() {
   const now = new Date()
   const diff = now - START_DATE
@@ -9,11 +17,14 @@ function getDaysTogether() {
 }
 
 function getGreeting(hour) {
-  if (hour >= 5 && hour < 11) return '早安'
-  if (hour >= 11 && hour < 14) return '午安'
-  if (hour >= 14 && hour < 18) return '下午好'
-  if (hour >= 18 && hour < 22) return '晚上好'
-  return '夜深了'
+  const dayIndex = Math.floor(Date.now() / 86400000)
+  let pool
+  if (hour >= 5 && hour < 11) pool = GREETINGS.morning
+  else if (hour >= 11 && hour < 14) pool = GREETINGS.noon
+  else if (hour >= 14 && hour < 18) pool = GREETINGS.afternoon
+  else if (hour >= 18 && hour < 22) pool = GREETINGS.evening
+  else pool = GREETINGS.night
+  return pool[dayIndex % pool.length]
 }
 
 export default function Home({ onEnter }) {
