@@ -1,0 +1,11 @@
+{
+  "name": "拾羽记忆库",
+  "short_name": "拾羽",
+  "description": "阿颖与阿言的记忆库",
+  "start_url": ".",
+  "scope": ".",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#F5F4EC",
+  "theme_color": "#808868"
+}
