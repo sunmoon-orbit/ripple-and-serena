@@ -1,11 +1,20 @@
 import { useState, useEffect, useCallback } from 'react'
 import { api } from '../api'
 import { showToast } from './Toast'
-import { Plus, RefreshCw, Search, Clock, Pencil, Trash2 } from 'lucide-react'
+import { Plus, RefreshCw, Search, Clock, Pencil, Trash2, Pin, Star } from 'lucide-react'
 
 export const SCOPES = { shared: '共享', private_阿颖: '阿颖私密', private_阿言: '阿言私密' }
 export const LAYERS = { core: '核心', long: '长期', short: '短期', consciousness: '意识' }
 const META = new Set(['core', 'long', 'short', 'consciousness', 'shared', 'private_阿颖', 'private_阿言', '阿言', '阿颖'])
+
+// 重要程度档位
+const IMP_OPTS = [{ v: 10, l: '珍藏' }, { v: 7, l: '重要' }, { v: 5, l: '普通' }, { v: 3, l: '琐碎' }]
+function impBadge(n) {
+  if (n == null) return null
+  if (n >= 9) return { l: '珍藏', c: 'badge-imp-t' }
+  if (n >= 7) return { l: '重要', c: 'badge-imp-h' }
+  return null // 普通/琐碎不显示标签，避免每条都占位
+}
 
 function fmtDate(s) {
   if (!s) return ''
@@ -54,14 +63,17 @@ function Editor({ initial, onClose, onSaved }) {
   const [tags, setTags] = useState(initial?.tags || '')
   const [scope, setScope] = useState(initial?.scope || 'shared')
   const [layer, setLayer] = useState(initial?.layer || '')
+  const [importance, setImportance] = useState(initial?.importance || 5)
+  const [memorable, setMemorable] = useState((initial?.arousal || 0) > 0.6)
   const [saving, setSaving] = useState(false)
 
   async function save() {
     if (!content.trim()) return showToast('内容不能为空', 'error')
     setSaving(true)
+    const fields = { content: content.trim(), tags, scope, layer: layer || null, importance, arousal: memorable ? 0.85 : 0.3 }
     try {
-      if (isEdit) await api.update(initial.id, { content: content.trim(), tags, scope, layer: layer || null })
-      else await api.create({ content: content.trim(), tags, scope, layer: layer || null, owner: '阿颖', agent: '阿言' })
+      if (isEdit) await api.update(initial.id, fields)
+      else await api.create({ ...fields, owner: '阿颖', agent: '阿言' })
       showToast(isEdit ? '已更新' : '已记下', 'success')
       onSaved()
     } catch (e) { showToast(e.message, 'error') } finally { setSaving(false) }
@@ -84,6 +96,15 @@ function Editor({ initial, onClose, onSaved }) {
             {Object.entries(LAYERS).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
           </select>
         </div>
+        <div style={{ display: 'flex', gap: 10, marginTop: 12, alignItems: 'center' }}>
+          <select className="select" style={{ flex: 1 }} value={importance} onChange={(e) => setImportance(Number(e.target.value))}>
+            {IMP_OPTS.map((o) => <option key={o.v} value={o.v}>重要程度：{o.l}</option>)}
+          </select>
+          <label className="memorable-toggle" onClick={() => setMemorable(!memorable)}>
+            <span className={'toggle' + (memorable ? ' on' : '')} />
+            <span>难忘</span>
+          </label>
+        </div>
         <div className="modal-actions">
           <button className="btn btn-ghost" onClick={onClose}>取消</button>
           <button className="btn btn-primary" onClick={save} disabled={saving}>{saving ? '保存中…' : '保存'}</button>
@@ -97,6 +118,7 @@ function Card({ m, onEdit, onTrash }) {
   const [exp, setExp] = useState(false)
   const tags = (m.tags || '').split(',').map((t) => t.trim()).filter((t) => t && !META.has(t))
   const long = (m.content || '').length > 300
+  const imp = impBadge(m.importance)
   return (
     <div className="card">
       <div className={'card-content' + (exp ? ' expanded' : '')}>
@@ -107,6 +129,8 @@ function Card({ m, onEdit, onTrash }) {
       {tags.length > 0 && <div className="tags">{tags.map((t, i) => <span key={i} className="tag">{t}</span>)}</div>}
       <div className="card-footer">
         <div className="badges">
+          {m.pinned ? <span className="badge badge-imp-t"><Pin size={11} style={{ verticalAlign: -1 }} /></span> : null}
+          {imp && <span className={'badge ' + imp.c}>{imp.l === '珍藏' ? <Star size={11} style={{ verticalAlign: -1, marginRight: 2 }} /> : null}{imp.l}</span>}
           {m.layer && <span className="badge badge-layer">{LAYERS[m.layer] || m.layer}</span>}
           <span className="badge badge-scope">{SCOPES[m.scope] || m.scope}</span>
           {m.agent && <span className="badge badge-agent">{m.agent}</span>}
