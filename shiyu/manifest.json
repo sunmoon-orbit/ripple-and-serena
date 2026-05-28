@@ -7,5 +7,8 @@
   "display": "standalone",
   "orientation": "portrait",
   "background_color": "#F5F4EC",
-  "theme_color": "#808868"
+  "theme_color": "#808868",
+  "icons": [
+    { "src": "feather.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
 }
