@@ -219,6 +219,10 @@ input, textarea, select { font-family: inherit; font-size: 15px; color: var(--in
 .badge-layer { background: rgba(168,176,136,0.22); color: var(--olive-deep); }
 .badge-scope { background: rgba(224,147,90,0.16); color: var(--accent); }
 .badge-agent { background: var(--bg-soft); color: var(--ink-soft); }
+.badge-imp-t { background: rgba(224, 147, 90, 0.18); color: #C57A3D; }
+.badge-imp-h { background: rgba(128, 136, 104, 0.24); color: var(--olive-deep); }
+.memorable-toggle { display: flex; align-items: center; gap: 7px; font-size: 14px; color: var(--ink-soft); cursor: pointer; white-space: nowrap; user-select: none; }
+.memorable-toggle .toggle { flex-shrink: 0; }
 .card-meta { display: flex; align-items: center; gap: 10px; }
 .card-date { font-size: 12px; color: var(--ink-faint); }
 .card-acts { display: flex; gap: 4px; }
