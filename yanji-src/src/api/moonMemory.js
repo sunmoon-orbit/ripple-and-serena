@@ -100,7 +100,7 @@ export function getMemoryToolDefinitions() {
     },
     {
       name: 'write_memory',
-      description: '向拾羽记忆库写入新记忆。当用户分享重要信息、偏好、事件，或你想记住某件事时使用。',
+      description: '向拾羽记忆库写入新记忆。当用户明确要求写入/记录某件事时立即调用（不要先搜索）；也可在用户分享重要信息、偏好、事件时主动调用。',
       parameters: {
         type: 'object',
         properties: {

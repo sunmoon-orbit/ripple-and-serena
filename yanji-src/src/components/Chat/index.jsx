@@ -74,10 +74,10 @@ export default function Chat() {
       const moonCtxParts = [timeCtx]
       if (moonMemory?.enabled && moonMemory?.apiToken) {
         moonCtxParts.push(
-          '你连接了拾羽记忆库（工具：write_memory / search_memories）。' +
-          '当对话中出现值得记住的内容——用户分享的经历、偏好、情感、事件、重要信息——' +
-          '主动调用 write_memory 记录，无需征询用户同意。' +
-          '对话开始时可先调用 search_memories 检索相关记忆，以便更贴心地回应。'
+          '你连接了拾羽记忆库，有两个工具：\n' +
+          '- write_memory：用户明确要求写入/记录，或出现值得记住的重要信息时，立即调用，直接写，不要先搜索。\n' +
+          '- search_memories：用户询问过去的事、需要回忆时调用。\n' +
+          '写入时无需征询用户同意，直接执行。'
         )
       }
       const systemPrompt = buildSystemPrompt(globalInstruction, memoryItems, moonCtxParts.join('\n\n'))
