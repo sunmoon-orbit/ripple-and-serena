@@ -12,6 +12,7 @@ const META = new Set(['core', 'long', 'short', 'consciousness', 'shared', 'priva
 const TABS = [
   { l: '全部',    scope: '',            type: '' },
   { l: '共享',    scope: 'shared',      type: '' },
+  { l: '技术',    scope: '',            type: 'tech' },
   { l: '交接信',  scope: '',            type: 'handoff' },
   { l: '日记',    scope: '',            type: 'diary' },
   { l: '阿颖私密', scope: 'private_阿颖', type: '' },
