@@ -34,7 +34,7 @@ export default function Chat() {
   const currentModel = activeChat?.model || activeConn?.defaultModel || ''
 
   function handleSelectModel(model) {
-    if (activeChat) updateChatModel(activeChat.id, model)
+    if (activeChat) updateChatModel(activeChat.id, (model || '').trim())
     setModelPanelOpen(false)
   }
 
