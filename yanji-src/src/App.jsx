@@ -6,6 +6,7 @@ import Memory from './components/Memory'
 import Dream from './components/Dream'
 import Settings from './components/Settings'
 import Home from './components/Home'
+import Roost from './components/Roost'
 import Toast from './components/Toast'
 
 function Splash({ onDone }) {
@@ -48,6 +49,7 @@ export default function App() {
       <div className="app-shell">
         <IconNav />
         <div className="main-area">
+          {activePanel === 'roost' && <Roost />}
           {activePanel === 'chat' && <Chat />}
           {activePanel === 'memory' && <Memory />}
           {activePanel === 'dream' && <Dream />}
