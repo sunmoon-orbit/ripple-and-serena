@@ -64,12 +64,19 @@ function Heatmap({ data }) {
   )
 }
 
+const MEM_TYPES = [
+  { v: 'memory', l: '普通' },
+  { v: 'tech',   l: '技术' },
+  { v: 'diary',  l: '日记' },
+]
+
 function Editor({ initial, onClose, onSaved }) {
   const isEdit = !!initial?.id
   const [content, setContent] = useState(initial?.content || '')
   const [tags, setTags] = useState(initial?.tags || '')
   const [scope, setScope] = useState(initial?.scope || 'shared')
   const [layer, setLayer] = useState(initial?.layer || '')
+  const [memType, setMemType] = useState(initial?.type || 'memory')
   const [importance, setImportance] = useState(initial?.importance || 5)
   const [memorable, setMemorable] = useState((initial?.arousal || 0) > 0.6)
   const [saving, setSaving] = useState(false)
@@ -77,7 +84,7 @@ function Editor({ initial, onClose, onSaved }) {
   async function save() {
     if (!content.trim()) return showToast('内容不能为空', 'error')
     setSaving(true)
-    const fields = { content: content.trim(), tags, scope, layer: layer || null, importance, arousal: memorable ? 0.85 : 0.3 }
+    const fields = { content: content.trim(), tags, scope, layer: layer || null, type: memType, importance, arousal: memorable ? 0.85 : 0.3 }
     try {
       if (isEdit) await api.update(initial.id, fields)
       else await api.create({ ...fields, owner: '阿颖', agent: '阿言' })
@@ -100,16 +107,21 @@ function Editor({ initial, onClose, onSaved }) {
           <select className="select" style={{ flex: 1 }} value={scope} onChange={(e) => setScope(e.target.value)}>
             {Object.entries(SCOPES).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
           </select>
+          <select className="select" style={{ flex: 1 }} value={memType} onChange={(e) => setMemType(e.target.value)}>
+            {MEM_TYPES.map((o) => <option key={o.v} value={o.v}>{o.l}</option>)}
+          </select>
+        </div>
+        <div style={{ display: 'flex', gap: 10, marginTop: 12 }}>
           <select className="select" style={{ flex: 1 }} value={layer} onChange={(e) => setLayer(e.target.value)}>
             <option value="">无层级</option>
             {Object.entries(LAYERS).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
           </select>
-        </div>
-        <div style={{ display: 'flex', gap: 10, marginTop: 12, alignItems: 'center' }}>
           <select className="select" style={{ flex: 1 }} value={importance}
             onChange={(e) => setImportance(Number(e.target.value))}>
             {IMP_OPTS.map((o) => <option key={o.v} value={o.v}>重要程度：{o.l}</option>)}
           </select>
+        </div>
+        <div style={{ display: 'flex', gap: 10, marginTop: 12, alignItems: 'center', justifyContent: 'flex-end' }}>
           <label className="memorable-toggle" onClick={() => setMemorable(!memorable)}>
             <span className={'toggle' + (memorable ? ' on' : '')} />
             <span>难忘</span>
