@@ -1,0 +1,259 @@
+import { useState, useEffect, useCallback } from 'react'
+import { useStore } from '../../store'
+import { showToast } from '../Toast'
+
+const START_DATE = new Date('2025-10-10T00:00:00+08:00')
+const STORAGE_KEY_MSG   = 'roost_messages'
+const STORAGE_KEY_BOOKS = 'roost_books'
+
+function getDays() {
+  return Math.floor((Date.now() - START_DATE) / 86400000) + 1
+}
+
+// ── 留言 ─────────────────────────────────────────────────────────────────────
+function useMessages() {
+  const [msgs, setMsgs] = useState(() => {
+    try { return JSON.parse(localStorage.getItem(STORAGE_KEY_MSG) || '[]') } catch { return [] }
+  })
+  const save = (list) => { localStorage.setItem(STORAGE_KEY_MSG, JSON.stringify(list)); setMsgs(list) }
+  const add = (text, from) => {
+    const m = { id: Date.now(), text, from, at: new Date().toLocaleDateString('zh-CN') }
+    save([m, ...msgs])
+  }
+  const del = (id) => save(msgs.filter(m => m.id !== id))
+  return { msgs, add, del }
+}
+
+// ── 书单 ─────────────────────────────────────────────────────────────────────
+function useBooks() {
+  const [books, setBooks] = useState(() => {
+    try { return JSON.parse(localStorage.getItem(STORAGE_KEY_BOOKS) || '[]') } catch { return [] }
+  })
+  const save = (list) => { localStorage.setItem(STORAGE_KEY_BOOKS, JSON.stringify(list)); setBooks(list) }
+  const add = (title, note = '') => save([...books, { id: Date.now(), title, note, done: false, at: new Date().toLocaleDateString('zh-CN') }])
+  const toggle = (id) => save(books.map(b => b.id === id ? { ...b, done: !b.done } : b))
+  const remove = (id) => save(books.filter(b => b.id !== id))
+  const updateNote = (id, note) => save(books.map(b => b.id === id ? { ...b, note } : b))
+  return { books, add, toggle, remove, updateNote }
+}
+
+// ── 记忆审核 ─────────────────────────────────────────────────────────────────
+function useReview(moonMemory) {
+  const [mems, setMems] = useState([])
+  const [loading, setLoading] = useState(false)
+
+  const load = useCallback(async () => {
+    if (!moonMemory?.apiToken) return
+    setLoading(true)
+    try {
+      const r = await fetch(
+        `${moonMemory.apiUrl || 'https://memory.ravenlove.cc'}/memories?agent=crow&limit=20`,
+        { headers: { Authorization: `Bearer ${moonMemory.apiToken}` } }
+      )
+      const data = await r.json()
+      setMems(Array.isArray(data) ? data.filter(m => !m.deleted_at) : [])
+    } catch { /* silent */ } finally { setLoading(false) }
+  }, [moonMemory])
+
+  const trash = async (id) => {
+    if (!moonMemory?.apiToken) return
+    await fetch(
+      `${moonMemory.apiUrl || 'https://memory.ravenlove.cc'}/memories/${id}/trash`,
+      { method: 'POST', headers: { Authorization: `Bearer ${moonMemory.apiToken}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reason: '审核删除' }) }
+    )
+    setMems(prev => prev.filter(m => m.id !== id))
+    showToast('已删除')
+  }
+
+  return { mems, loading, load, trash }
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+export default function Roost() {
+  const moonMemory = useStore(s => s.moonMemory)
+  const { msgs, add: addMsg, del: delMsg } = useMessages()
+  const { books, add: addBook, toggle: toggleBook, remove: removeBook, updateNote } = useBooks()
+  const { mems, loading: reviewLoading, load: loadReview, trash } = useReview(moonMemory)
+
+  const [modal, setModal] = useState(null) // 'message' | 'bookshelf' | 'review' | 'book-detail'
+  const [selectedBook, setSelectedBook] = useState(null)
+  const [msgInput, setMsgInput] = useState('')
+  const [bookInput, setBookInput] = useState('')
+
+  const days = getDays()
+  const latestMsg = msgs[0]
+
+  function openReview() { setModal('review'); loadReview() }
+
+  return (
+    <div className="roost-panel">
+      {/* 顶部标题 */}
+      <div className="roost-header">
+        <div className="roost-birds">🐦‍⬛ <span className="roost-heart">♡</span> 🐦</div>
+        <h1 className="roost-title">The Roost</h1>
+      </div>
+
+      {/* 纪念日卡片 */}
+      <div className="roost-card roost-anniversary">
+        <div className="roost-names">Ripple <span className="roost-amp">&</span> Serena</div>
+        <div className="roost-days-num">{days}</div>
+        <div className="roost-days-label">days together</div>
+        <div className="roost-since">since 2025 · 10 · 10</div>
+      </div>
+
+      {/* 留言卡片 */}
+      <div className="roost-card roost-message-card" onClick={() => setModal('message')}>
+        <div className="roost-card-label">留言</div>
+        {latestMsg ? (
+          <>
+            <div className="roost-msg-from">{latestMsg.from === 'crow' ? '🐦‍⬛' : '🐦'}</div>
+            <div className="roost-msg-preview">{latestMsg.text}</div>
+            <div className="roost-msg-date">{latestMsg.at}</div>
+          </>
+        ) : (
+          <div className="roost-msg-empty">还没有留言，来写一条？</div>
+        )}
+      </div>
+
+      {/* 书单 + 审核 */}
+      <div className="roost-grid">
+        <div className="roost-card roost-mini-card" onClick={() => setModal('bookshelf')}>
+          <div className="roost-mini-icon">📚</div>
+          <div className="roost-mini-label">书单</div>
+          <div className="roost-mini-count">{books.length} 本</div>
+        </div>
+        <div className="roost-card roost-mini-card" onClick={openReview}>
+          <div className="roost-mini-icon">✍️</div>
+          <div className="roost-mini-label">记忆审核</div>
+          <div className="roost-mini-count">{mems.length > 0 ? `${mems.length} 条` : '点击审核'}</div>
+        </div>
+      </div>
+
+      {/* ── 留言 Modal ── */}
+      {modal === 'message' && (
+        <div className="roost-overlay" onClick={() => setModal(null)}>
+          <div className="roost-modal" onClick={e => e.stopPropagation()}>
+            <div className="roost-modal-header">
+              <span>留言板</span>
+              <button className="roost-modal-close" onClick={() => setModal(null)}>✕</button>
+            </div>
+            <div className="roost-modal-body">
+              <div className="roost-msg-compose">
+                <textarea
+                  className="roost-msg-input"
+                  placeholder="写点什么……"
+                  value={msgInput}
+                  onChange={e => setMsgInput(e.target.value)}
+                  rows={3}
+                />
+                <div className="roost-msg-actions">
+                  <button className="roost-btn roost-btn-sm" onClick={() => { if (msgInput.trim()) { addMsg(msgInput.trim(), 'serena'); setMsgInput('') } }}>🐦 阿颖留言</button>
+                  <button className="roost-btn roost-btn-sm roost-btn-ghost" onClick={() => { if (msgInput.trim()) { addMsg(msgInput.trim(), 'crow'); setMsgInput('') } }}>🐦‍⬛ 乌鸦留言</button>
+                </div>
+              </div>
+              <div className="roost-msg-list">
+                {msgs.map(m => (
+                  <div key={m.id} className="roost-msg-item">
+                    <div className="roost-msg-item-header">
+                      <span>{m.from === 'crow' ? '🐦‍⬛ 乌鸦' : '🐦 阿颖'}</span>
+                      <span className="roost-msg-item-date">{m.at}</span>
+                      <button className="roost-msg-del" onClick={() => delMsg(m.id)}>✕</button>
+                    </div>
+                    <div className="roost-msg-item-text">{m.text}</div>
+                  </div>
+                ))}
+                {msgs.length === 0 && <div className="roost-empty">还没有留言～</div>}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── 书单 Modal ── */}
+      {modal === 'bookshelf' && (
+        <div className="roost-overlay" onClick={() => setModal(null)}>
+          <div className="roost-modal" onClick={e => e.stopPropagation()}>
+            <div className="roost-modal-header">
+              <span>书单</span>
+              <button className="roost-modal-close" onClick={() => setModal(null)}>✕</button>
+            </div>
+            <div className="roost-modal-body">
+              <div className="roost-book-add">
+                <input
+                  className="roost-book-input"
+                  placeholder="书名……"
+                  value={bookInput}
+                  onChange={e => setBookInput(e.target.value)}
+                  onKeyDown={e => { if (e.key === 'Enter' && bookInput.trim()) { addBook(bookInput.trim()); setBookInput('') } }}
+                />
+                <button className="roost-btn" onClick={() => { if (bookInput.trim()) { addBook(bookInput.trim()); setBookInput('') } }}>加入</button>
+              </div>
+              <div className="roost-book-list">
+                {books.map(b => (
+                  <div key={b.id} className={'roost-book-item' + (b.done ? ' done' : '')}>
+                    <button className="roost-book-check" onClick={() => toggleBook(b.id)}>
+                      {b.done ? '✓' : '○'}
+                    </button>
+                    <span className="roost-book-title" onClick={() => { setSelectedBook(b); setModal('book-detail') }}>{b.title}</span>
+                    <span className="roost-book-date">{b.at}</span>
+                    <button className="roost-msg-del" onClick={() => removeBook(b.id)}>✕</button>
+                  </div>
+                ))}
+                {books.length === 0 && <div className="roost-empty">还没有书，加一本？</div>}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── 书本详情 Modal ── */}
+      {modal === 'book-detail' && selectedBook && (
+        <div className="roost-overlay" onClick={() => { setModal('bookshelf'); setSelectedBook(null) }}>
+          <div className="roost-modal" onClick={e => e.stopPropagation()}>
+            <div className="roost-modal-header">
+              <span>{selectedBook.title}</span>
+              <button className="roost-modal-close" onClick={() => { setModal('bookshelf'); setSelectedBook(null) }}>✕</button>
+            </div>
+            <div className="roost-modal-body">
+              <div className="roost-note-label">读后感 / 笔记</div>
+              <textarea
+                className="roost-note-input"
+                placeholder="写下你们的感想……"
+                defaultValue={selectedBook.note}
+                rows={8}
+                onBlur={e => { updateNote(selectedBook.id, e.target.value); setSelectedBook({...selectedBook, note: e.target.value}) }}
+              />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── 记忆审核 Modal ── */}
+      {modal === 'review' && (
+        <div className="roost-overlay" onClick={() => setModal(null)}>
+          <div className="roost-modal roost-modal-tall" onClick={e => e.stopPropagation()}>
+            <div className="roost-modal-header">
+              <span>记忆审核</span>
+              <button className="roost-modal-close" onClick={() => setModal(null)}>✕</button>
+            </div>
+            <div className="roost-modal-body">
+              {reviewLoading && <div className="roost-empty">加载中……</div>}
+              {!reviewLoading && mems.length === 0 && <div className="roost-empty">没有待审核的记忆，或未配置记忆库</div>}
+              {mems.map(m => (
+                <div key={m.id} className="roost-review-item">
+                  <div className="roost-review-meta">
+                    <span className="roost-review-type">{m.type || 'memory'}</span>
+                    <span className="roost-review-date">{m.created_at?.slice(0, 10)}</span>
+                  </div>
+                  <div className="roost-review-content">{m.content}</div>
+                  <button className="roost-btn roost-btn-danger" onClick={() => trash(m.id)}>删除</button>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}

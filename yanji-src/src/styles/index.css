@@ -1497,3 +1497,265 @@ a { text-decoration: none; color: inherit; }
 .theme-option:hover { border-color: var(--accent); }
 .theme-option.active { border-color: var(--accent); background: var(--accent-dim); font-weight: 500; }
 .theme-dot { width: 12px; height: 12px; border-radius: 50%; flex-shrink: 0; }
+
+/* ===== The Roost 主页 ===== */
+@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;1,300;1,400&display=swap');
+
+.roost-panel {
+  padding: 24px 18px 40px;
+  max-width: 480px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  overflow-y: auto;
+  height: 100%;
+  box-sizing: border-box;
+}
+
+/* 顶部 */
+.roost-header {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 12px 0 4px;
+}
+.roost-birds { font-size: 20px; letter-spacing: 6px; }
+.roost-heart { color: var(--accent); }
+.roost-title {
+  font-family: 'Cormorant Garamond', Georgia, serif;
+  font-size: 28px;
+  font-weight: 300;
+  font-style: italic;
+  letter-spacing: 0.12em;
+  color: var(--text);
+  margin: 0;
+}
+
+/* 卡片基础 */
+.roost-card {
+  background: var(--surface);
+  border-radius: 16px;
+  padding: 20px;
+  border: 1px solid var(--border);
+}
+
+/* 纪念日 */
+.roost-anniversary {
+  text-align: center;
+  padding: 28px 20px;
+  background: linear-gradient(135deg, var(--surface) 0%, color-mix(in srgb, var(--accent) 6%, var(--surface)) 100%);
+}
+.roost-names {
+  font-family: 'Cormorant Garamond', Georgia, serif;
+  font-size: 17px;
+  font-style: italic;
+  color: var(--text-muted);
+  letter-spacing: 0.1em;
+  margin-bottom: 12px;
+}
+.roost-amp {
+  font-style: normal;
+  margin: 0 6px;
+  color: var(--accent);
+  opacity: 0.7;
+}
+.roost-days-num {
+  font-family: 'Cormorant Garamond', Georgia, serif;
+  font-size: 72px;
+  font-weight: 300;
+  line-height: 1;
+  color: var(--text);
+  letter-spacing: -0.02em;
+}
+.roost-days-label {
+  font-size: 12px;
+  color: var(--text-muted);
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  margin-top: 4px;
+}
+.roost-since {
+  font-family: 'Cormorant Garamond', Georgia, serif;
+  font-size: 13px;
+  color: var(--accent);
+  letter-spacing: 0.15em;
+  margin-top: 8px;
+  opacity: 0.8;
+}
+
+/* 留言卡片 */
+.roost-message-card {
+  cursor: pointer;
+  transition: opacity 0.15s;
+  min-height: 90px;
+}
+.roost-message-card:hover { opacity: 0.85; }
+.roost-card-label {
+  font-size: 11px;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+  margin-bottom: 10px;
+}
+.roost-msg-from { font-size: 18px; margin-bottom: 6px; }
+.roost-msg-preview {
+  font-size: 14px;
+  color: var(--text);
+  line-height: 1.6;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.roost-msg-date { font-size: 11px; color: var(--text-faint); margin-top: 8px; }
+.roost-msg-empty { font-size: 13px; color: var(--text-faint); text-align: center; padding: 12px 0; }
+
+/* 迷你卡片网格 */
+.roost-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+.roost-mini-card {
+  cursor: pointer;
+  text-align: center;
+  padding: 22px 12px;
+  transition: opacity 0.15s;
+}
+.roost-mini-card:hover { opacity: 0.8; }
+.roost-mini-icon { font-size: 24px; margin-bottom: 8px; }
+.roost-mini-label { font-size: 13px; color: var(--text); font-weight: 500; }
+.roost-mini-count { font-size: 12px; color: var(--text-faint); margin-top: 4px; }
+
+/* Modal */
+.roost-overlay {
+  position: fixed; inset: 0; z-index: 3000;
+  background: rgba(0,0,0,0.35);
+  display: flex; align-items: flex-end; justify-content: center;
+  backdrop-filter: blur(2px);
+}
+.roost-modal {
+  background: var(--bg);
+  border-radius: 20px 20px 0 0;
+  width: 100%; max-width: 480px;
+  max-height: 75vh;
+  display: flex; flex-direction: column;
+  overflow: hidden;
+  animation: roostSlideUp 0.25s ease;
+}
+.roost-modal-tall { max-height: 85vh; }
+@keyframes roostSlideUp {
+  from { transform: translateY(40px); opacity: 0; }
+  to   { transform: translateY(0);    opacity: 1; }
+}
+.roost-modal-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--border);
+  font-size: 15px; font-weight: 500; color: var(--text);
+  flex-shrink: 0;
+}
+.roost-modal-close {
+  background: none; border: none;
+  font-size: 16px; color: var(--text-faint); cursor: pointer;
+  padding: 4px 8px;
+}
+.roost-modal-body {
+  flex: 1; overflow-y: auto; padding: 16px 20px;
+  display: flex; flex-direction: column; gap: 12px;
+}
+
+/* 留言输入 */
+.roost-msg-compose { display: flex; flex-direction: column; gap: 8px; }
+.roost-msg-input {
+  width: 100%; box-sizing: border-box;
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 10px; padding: 10px 12px;
+  font-size: 14px; color: var(--text); resize: none;
+  font-family: inherit;
+}
+.roost-msg-actions { display: flex; gap: 8px; }
+.roost-btn {
+  padding: 7px 14px; border-radius: 8px; border: none; cursor: pointer;
+  font-size: 13px; font-family: inherit;
+  background: var(--accent); color: #fff; font-weight: 500;
+  transition: opacity 0.15s;
+}
+.roost-btn:hover { opacity: 0.85; }
+.roost-btn-sm { padding: 6px 12px; font-size: 12px; }
+.roost-btn-ghost {
+  background: var(--surface); color: var(--text);
+  border: 1px solid var(--border);
+}
+.roost-btn-danger { background: #c0392b; }
+
+/* 留言列表 */
+.roost-msg-list { display: flex; flex-direction: column; gap: 10px; }
+.roost-msg-item {
+  background: var(--surface); border-radius: 10px;
+  padding: 12px; border: 1px solid var(--border);
+}
+.roost-msg-item-header {
+  display: flex; align-items: center; gap: 8px; margin-bottom: 6px;
+  font-size: 12px; color: var(--text-muted);
+}
+.roost-msg-item-date { flex: 1; }
+.roost-msg-del {
+  background: none; border: none; cursor: pointer;
+  font-size: 12px; color: var(--text-faint); padding: 2px 4px;
+}
+.roost-msg-item-text { font-size: 14px; color: var(--text); line-height: 1.6; }
+
+/* 书单 */
+.roost-book-add { display: flex; gap: 8px; }
+.roost-book-input {
+  flex: 1; background: var(--surface); border: 1px solid var(--border);
+  border-radius: 8px; padding: 8px 12px; font-size: 14px; color: var(--text);
+  font-family: inherit;
+}
+.roost-book-list { display: flex; flex-direction: column; gap: 8px; }
+.roost-book-item {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 12px; background: var(--surface);
+  border-radius: 10px; border: 1px solid var(--border);
+}
+.roost-book-item.done .roost-book-title { opacity: 0.4; text-decoration: line-through; }
+.roost-book-check {
+  background: none; border: none; cursor: pointer;
+  font-size: 16px; color: var(--accent); width: 24px; flex-shrink: 0;
+}
+.roost-book-title {
+  flex: 1; font-size: 14px; color: var(--text); cursor: pointer;
+}
+.roost-book-date { font-size: 11px; color: var(--text-faint); }
+
+/* 书本笔记 */
+.roost-note-label { font-size: 12px; color: var(--text-faint); margin-bottom: 4px; }
+.roost-note-input {
+  width: 100%; box-sizing: border-box;
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 10px; padding: 12px; font-size: 14px;
+  color: var(--text); line-height: 1.6; resize: none; font-family: inherit;
+}
+
+/* 审核 */
+.roost-review-item {
+  background: var(--surface); border-radius: 10px;
+  padding: 14px; border: 1px solid var(--border);
+  display: flex; flex-direction: column; gap: 8px;
+}
+.roost-review-meta { display: flex; gap: 10px; align-items: center; }
+.roost-review-type {
+  font-size: 11px; padding: 2px 8px; border-radius: 4px;
+  background: color-mix(in srgb, var(--accent) 15%, transparent);
+  color: var(--accent);
+}
+.roost-review-date { font-size: 11px; color: var(--text-faint); }
+.roost-review-content {
+  font-size: 13px; color: var(--text); line-height: 1.6;
+  display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden;
+}
+
+.roost-empty { font-size: 13px; color: var(--text-faint); text-align: center; padding: 20px 0; }
