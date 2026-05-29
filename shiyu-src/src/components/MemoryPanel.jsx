@@ -8,6 +8,16 @@ export const LAYERS = { core: '核心', long: '长期', short: '短期', conscio
 const LAYER_COLORS = { core: '#D94040', long: '#D87830', short: '#C0A020', consciousness: '#8848C0' }
 const META = new Set(['core', 'long', 'short', 'consciousness', 'shared', 'private_阿颖', 'private_阿言', '阿言', '阿颖'])
 
+// 横向 tab：label → { scope?, type? }
+const TABS = [
+  { l: '全部',    scope: '',            type: '' },
+  { l: '共享',    scope: 'shared',      type: '' },
+  { l: '交接信',  scope: '',            type: 'handoff' },
+  { l: '日记',    scope: '',            type: 'diary' },
+  { l: '阿颖私密', scope: 'private_阿颖', type: '' },
+  { l: '阿言私密', scope: 'private_阿言', type: '' },
+]
+
 const IMP_OPTS = [{ v: 10, l: '珍藏' }, { v: 7, l: '重要' }, { v: 5, l: '普通' }, { v: 3, l: '琐碎' }]
 
 function fmtDate(s) {
@@ -179,9 +189,11 @@ export default function MemoryPanel() {
   const [error, setError] = useState('')
   const [q, setQ] = useState('')
   const [scope, setScope] = useState('')
+  const [memType, setMemType] = useState('')
   const [layer, setLayer] = useState('')
   const [editor, setEditor] = useState(null)
   const [days, setDays] = useState(null)
+  const [tabIdx, setTabIdx] = useState(0)
 
   // 在一起多少天
   useEffect(() => {
@@ -197,10 +209,14 @@ export default function MemoryPanel() {
   const load = useCallback(async () => {
     setLoading(true); setError('')
     try {
-      const [m, h] = await Promise.all([api.list({ q, scope, layer, limit: 200 }), api.heatmap()])
+      const params = { q, limit: 200 }
+      if (scope) params.scope = scope
+      if (memType) params.type = memType
+      if (layer) params.layer = layer
+      const [m, h] = await Promise.all([api.list(params), api.heatmap()])
       setMems(m); setHeat(h)
     } catch (e) { setError(e.message) } finally { setLoading(false) }
-  }, [q, scope, layer])
+  }, [q, scope, memType, layer])
 
   useEffect(() => { load() }, [load])
 
@@ -243,11 +259,14 @@ export default function MemoryPanel() {
         </div>
       </div>
 
-      {/* Scope 横向 tab */}
+      {/* 横向 tab：scope + type 组合筛选 */}
       <div className="scope-tabs">
-        <button className={'scope-tab' + (scope === '' ? ' active' : '')} onClick={() => setScope('')}>全部</button>
-        {Object.entries(SCOPES).map(([v, l]) => (
-          <button key={v} className={'scope-tab' + (scope === v ? ' active' : '')} onClick={() => setScope(v)}>{l}</button>
+        {TABS.map((t, i) => (
+          <button key={i}
+            className={'scope-tab' + (tabIdx === i ? ' active' : '')}
+            onClick={() => { setTabIdx(i); setScope(t.scope); setMemType(t.type) }}>
+            {t.l}
+          </button>
         ))}
       </div>
 
