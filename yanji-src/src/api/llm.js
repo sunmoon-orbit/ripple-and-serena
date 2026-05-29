@@ -144,7 +144,7 @@ export async function sendMessage({
 }) {
   if (!connection) throw new Error('未选择连接')
   const provider = normalizeProvider(connection.provider)
-  const usedModel = model || connection.defaultModel
+  const usedModel = (model || connection.defaultModel || '').trim()
   if (!usedModel) throw new Error('未设置模型')
 
   const tools = autoTools !== false ? getAllTools(searchConfig, moonMemoryConfig) : []
