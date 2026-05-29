@@ -71,7 +71,16 @@ export default function Chat() {
 
       const now = new Date()
       const timeCtx = `当前时间：${now.toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai', hour12: false })}`
-      const systemPrompt = buildSystemPrompt(globalInstruction, memoryItems, timeCtx)
+      const moonCtxParts = [timeCtx]
+      if (moonMemory?.enabled && moonMemory?.apiToken) {
+        moonCtxParts.push(
+          '你连接了拾羽记忆库（工具：write_memory / search_memories）。' +
+          '当对话中出现值得记住的内容——用户分享的经历、偏好、情感、事件、重要信息——' +
+          '主动调用 write_memory 记录，无需征询用户同意。' +
+          '对话开始时可先调用 search_memories 检索相关记忆，以便更贴心地回应。'
+        )
+      }
+      const systemPrompt = buildSystemPrompt(globalInstruction, memoryItems, moonCtxParts.join('\n\n'))
       let fullText = ''
       let fullThinking = ''
 
