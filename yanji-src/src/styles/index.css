@@ -1502,12 +1502,12 @@ a { text-decoration: none; color: inherit; }
 @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;1,300;1,400&display=swap');
 
 .roost-panel {
-  padding: 24px 18px 40px;
+  padding: 20px 18px 36px;
   max-width: 480px;
   margin: 0 auto;
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 12px;
   overflow-y: auto;
   height: 100%;
   box-sizing: border-box;
@@ -1518,17 +1518,17 @@ a { text-decoration: none; color: inherit; }
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 4px;
-  padding: 12px 0 4px;
+  gap: 2px;
+  padding: 8px 0 2px;
 }
-.roost-birds { font-size: 20px; letter-spacing: 6px; }
+.roost-birds { font-size: 18px; letter-spacing: 5px; }
 .roost-heart { color: var(--accent); }
 .roost-title {
   font-family: 'Cormorant Garamond', Georgia, serif;
-  font-size: 28px;
+  font-size: 26px;
   font-weight: 300;
   font-style: italic;
-  letter-spacing: 0.12em;
+  letter-spacing: 0.14em;
   color: var(--text);
   margin: 0;
 }
@@ -1536,70 +1536,80 @@ a { text-decoration: none; color: inherit; }
 /* 卡片基础 */
 .roost-card {
   background: var(--surface);
-  border-radius: 16px;
-  padding: 20px;
+  border-radius: 14px;
+  padding: 18px;
   border: 1px solid var(--border);
 }
 
 /* 纪念日 */
 .roost-anniversary {
   text-align: center;
-  padding: 28px 20px;
-  background: linear-gradient(135deg, var(--surface) 0%, color-mix(in srgb, var(--accent) 6%, var(--surface)) 100%);
+  padding: 24px 20px;
+  background: var(--surface);
+  position: relative;
+}
+/* 内层细边框装饰 */
+.roost-anniversary::after {
+  content: '';
+  position: absolute;
+  inset: 6px;
+  border: 1px solid color-mix(in srgb, var(--accent) 20%, transparent);
+  border-radius: 9px;
+  pointer-events: none;
 }
 .roost-names {
   font-family: 'Cormorant Garamond', Georgia, serif;
-  font-size: 17px;
+  font-size: 16px;
   font-style: italic;
-  color: var(--text-muted);
-  letter-spacing: 0.1em;
-  margin-bottom: 12px;
+  color: #e8a4b0;
+  letter-spacing: 0.12em;
+  margin-bottom: 10px;
 }
 .roost-amp {
   font-style: normal;
-  margin: 0 6px;
-  color: var(--accent);
+  margin: 0 5px;
+  color: #e8a4b0;
   opacity: 0.7;
 }
 .roost-days-num {
   font-family: 'Cormorant Garamond', Georgia, serif;
-  font-size: 72px;
+  font-size: 68px;
   font-weight: 300;
   line-height: 1;
   color: var(--text);
   letter-spacing: -0.02em;
 }
 .roost-days-label {
-  font-size: 12px;
+  font-size: 11px;
   color: var(--text-muted);
-  letter-spacing: 0.2em;
+  letter-spacing: 0.22em;
   text-transform: uppercase;
   margin-top: 4px;
 }
 .roost-since {
   font-family: 'Cormorant Garamond', Georgia, serif;
-  font-size: 13px;
+  font-size: 12px;
   color: var(--accent);
-  letter-spacing: 0.15em;
-  margin-top: 8px;
-  opacity: 0.8;
+  letter-spacing: 0.18em;
+  margin-top: 6px;
+  opacity: 0.75;
 }
 
 /* 留言卡片 */
 .roost-message-card {
   cursor: pointer;
   transition: opacity 0.15s;
-  min-height: 90px;
+  min-height: 80px;
 }
 .roost-message-card:hover { opacity: 0.85; }
 .roost-card-label {
-  font-size: 11px;
-  letter-spacing: 0.15em;
+  font-size: 10px;
+  letter-spacing: 0.18em;
   text-transform: uppercase;
   color: var(--text-faint);
-  margin-bottom: 10px;
+  margin-bottom: 8px;
 }
-.roost-msg-from { font-size: 18px; margin-bottom: 6px; }
+.roost-msg-from { font-size: 16px; margin-bottom: 5px; }
 .roost-msg-preview {
   font-size: 14px;
   color: var(--text);
@@ -1609,25 +1619,28 @@ a { text-decoration: none; color: inherit; }
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
-.roost-msg-date { font-size: 11px; color: var(--text-faint); margin-top: 8px; }
-.roost-msg-empty { font-size: 13px; color: var(--text-faint); text-align: center; padding: 12px 0; }
+.roost-msg-date { font-size: 11px; color: var(--text-faint); margin-top: 6px; }
+.roost-msg-empty { font-size: 13px; color: var(--text-faint); text-align: center; padding: 10px 0; }
 
 /* 迷你卡片网格 */
 .roost-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 14px;
+  gap: 12px;
 }
 .roost-mini-card {
   cursor: pointer;
   text-align: center;
-  padding: 22px 12px;
+  padding: 18px 12px;
   transition: opacity 0.15s;
 }
 .roost-mini-card:hover { opacity: 0.8; }
-.roost-mini-icon { font-size: 24px; margin-bottom: 8px; }
+.roost-mini-icon {
+  display: flex; justify-content: center; align-items: center;
+  margin-bottom: 8px; color: var(--text-muted);
+}
 .roost-mini-label { font-size: 13px; color: var(--text); font-weight: 500; }
-.roost-mini-count { font-size: 12px; color: var(--text-faint); margin-top: 4px; }
+.roost-mini-count { font-size: 12px; color: var(--text-faint); margin-top: 3px; }
 
 /* Modal */
 .roost-overlay {

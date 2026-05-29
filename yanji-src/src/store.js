@@ -25,7 +25,7 @@ const DEFAULT_STATE = {
   },
   theme: 'claude',
   // UI-only (not persisted)
-  activePanel: 'chat',
+  activePanel: 'roost',
 }
 
 function loadPersistedState() {
