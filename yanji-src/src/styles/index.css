@@ -1561,15 +1561,16 @@ a { text-decoration: none; color: inherit; }
   font-family: 'Cormorant Garamond', Georgia, serif;
   font-size: 16px;
   font-style: italic;
-  color: #e8a4b0;
+  color: var(--accent);
+  opacity: 0.85;
   letter-spacing: 0.12em;
   margin-bottom: 10px;
 }
 .roost-amp {
   font-style: normal;
   margin: 0 5px;
-  color: #e8a4b0;
-  opacity: 0.7;
+  color: var(--accent);
+  opacity: 0.6;
 }
 .roost-days-num {
   font-family: 'Cormorant Garamond', Georgia, serif;
@@ -1637,7 +1638,9 @@ a { text-decoration: none; color: inherit; }
 .roost-mini-card:hover { opacity: 0.8; }
 .roost-mini-icon {
   display: flex; justify-content: center; align-items: center;
-  margin-bottom: 8px; color: var(--text-muted);
+  margin-bottom: 8px;
+  color: var(--accent);
+  opacity: 0.75;
 }
 .roost-mini-label { font-size: 13px; color: var(--text); font-weight: 500; }
 .roost-mini-count { font-size: 12px; color: var(--text-faint); margin-top: 3px; }
