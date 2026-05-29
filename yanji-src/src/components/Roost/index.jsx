@@ -232,6 +232,31 @@ export default function Roost() {
                 rows={8}
                 onBlur={e => { updateNote(selectedBook.id, e.target.value); setSelectedBook({...selectedBook, note: e.target.value}) }}
               />
+              <button
+                className="roost-btn"
+                style={{ marginTop: 4 }}
+                onClick={async () => {
+                  if (!selectedBook.note?.trim()) { showToast('还没有笔记内容', 'error'); return }
+                  if (!moonMemory?.apiToken) { showToast('未配置记忆库 Token', 'error'); return }
+                  try {
+                    const r = await fetch(
+                      `${moonMemory.apiUrl || 'https://memory.ravenlove.cc'}/memories`,
+                      { method: 'POST',
+                        headers: { Authorization: `Bearer ${moonMemory.apiToken}`, 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                          content: `【读书笔记】《${selectedBook.title}》\n\n${selectedBook.note.trim()}`,
+                          type: 'book', layer: 'long', importance: 6,
+                          agent: 'qing', scope: 'shared'
+                        })
+                      }
+                    )
+                    if (r.ok) { showToast('已存入记忆库 ✓') }
+                    else { showToast('存入失败', 'error') }
+                  } catch { showToast('网络错误', 'error') }
+                }}
+              >
+                存入记忆库
+              </button>
             </div>
           </div>
         </div>
