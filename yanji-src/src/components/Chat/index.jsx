@@ -157,6 +157,33 @@ export default function Chat() {
     setTimeout(() => handleSend(newText, []), 0)
   }, [activeChatId, truncateMessagesFrom, handleSend])
 
+  // ── Export ───────────────────────────────────────────────────────────────
+  function handleExport() {
+    if (!activeChat || !messages.length) return
+    const title = activeChat.title || '新对话'
+    const model = activeChat.model || activeConn?.name || ''
+    const date = new Date(activeChat.updatedAt || Date.now()).toLocaleDateString('zh-CN')
+
+    const lines = [`# ${title}`, ``, `> 模型：${model}　日期：${date}`, ``]
+    messages.forEach((m) => {
+      if (m.streaming) return
+      const role = m.role === 'user' ? '**阿颖**' : '**涟言**'
+      lines.push(`### ${role}`, ``)
+      if (m.thinking) {
+        lines.push(`<details><summary>思考过程</summary>`, ``, m.thinking.trim(), ``, `</details>`, ``)
+      }
+      lines.push(m.content?.trim() || '', ``, `---`, ``)
+    })
+
+    const blob = new Blob([lines.join('\n')], { type: 'text/markdown;charset=utf-8' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `${title.replace(/[\/\\:*?"<>|]/g, '_')}.md`
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+
   // ── Render ────────────────────────────────────────────────────────────────
   return (
     <div className="chat-panel">
@@ -186,6 +213,15 @@ export default function Chat() {
               </button>
             )}
           </div>
+          {activeChat && messages.length > 0 && (
+            <button className="topbar-btn" onClick={handleExport} title="导出对话">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                <polyline points="7 10 12 15 17 10" />
+                <line x1="12" y1="15" x2="12" y2="3" />
+              </svg>
+            </button>
+          )}
           <button
             className="topbar-btn"
             onClick={() => {
