@@ -46,7 +46,7 @@ export default function App() {
     <>
       {showSplash && <Splash onDone={() => { setShowSplash(false); setShowHome(true) }} />}
       {showHome && <Home onEnter={() => setShowHome(false)} />}
-      <div className="app-shell">
+      <div className="app-shell" style={(showSplash || showHome) ? { visibility: 'hidden', pointerEvents: 'none' } : undefined}>
         <IconNav />
         <div className="main-area">
           {activePanel === 'roost' && <Roost />}

@@ -119,12 +119,20 @@ export default function Roost() {
       {/* 书单 + 审核 */}
       <div className="roost-grid">
         <div className="roost-card roost-mini-card" onClick={() => setModal('bookshelf')}>
-          <div className="roost-mini-icon">📚</div>
+          <div className="roost-mini-icon">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
+            </svg>
+          </div>
           <div className="roost-mini-label">书单</div>
           <div className="roost-mini-count">{books.length} 本</div>
         </div>
         <div className="roost-card roost-mini-card" onClick={openReview}>
-          <div className="roost-mini-icon">✍️</div>
+          <div className="roost-mini-icon">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+            </svg>
+          </div>
           <div className="roost-mini-label">记忆审核</div>
           <div className="roost-mini-count">{mems.length > 0 ? `${mems.length} 条` : '点击审核'}</div>
         </div>
