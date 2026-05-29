@@ -1,20 +1,14 @@
 import { useState, useEffect, useCallback } from 'react'
 import { api } from '../api'
 import { showToast } from './Toast'
-import { Plus, RefreshCw, Search, Clock, Pencil, Trash2, Pin, Star } from 'lucide-react'
+import { Plus, RefreshCw, Search, Clock, Pencil, Trash2 } from 'lucide-react'
 
 export const SCOPES = { shared: '共享', private_阿颖: '阿颖私密', private_阿言: '阿言私密' }
 export const LAYERS = { core: '核心', long: '长期', short: '短期', consciousness: '意识' }
+const LAYER_COLORS = { core: '#D94040', long: '#D87830', short: '#C0A020', consciousness: '#8848C0' }
 const META = new Set(['core', 'long', 'short', 'consciousness', 'shared', 'private_阿颖', 'private_阿言', '阿言', '阿颖'])
 
-// 重要程度档位
 const IMP_OPTS = [{ v: 10, l: '珍藏' }, { v: 7, l: '重要' }, { v: 5, l: '普通' }, { v: 3, l: '琐碎' }]
-function impBadge(n) {
-  if (n == null) return null
-  if (n >= 9) return { l: '珍藏', c: 'badge-imp-t' }
-  if (n >= 7) return { l: '重要', c: 'badge-imp-h' }
-  return null // 普通/琐碎不显示标签，避免每条都占位
-}
 
 function fmtDate(s) {
   if (!s) return ''
@@ -30,7 +24,9 @@ function fmtDate(s) {
 function useClock() {
   const [t, setT] = useState('')
   useEffect(() => {
-    const upd = () => setT(new Intl.DateTimeFormat('zh-CN', { timeZone: 'Asia/Shanghai', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).format(new Date()))
+    const upd = () => setT(new Intl.DateTimeFormat('zh-CN', {
+      timeZone: 'Asia/Shanghai', hour: '2-digit', minute: '2-digit', hourCycle: 'h23'
+    }).format(new Date()))
     upd()
     const i = setInterval(upd, 30000)
     return () => clearInterval(i)
@@ -50,7 +46,7 @@ function Heatmap({ data }) {
         {days.map((d) => {
           const op = d.n ? Math.min(0.25 + (d.n / 6) * 0.75, 1) : 0
           return <div key={d.key} className="heatmap-cell" title={`${d.key}: ${d.n} 条`}
-            style={op ? { background: 'var(--olive)', opacity: op } : undefined} />
+            style={op ? { background: 'var(--olive-active)', opacity: op } : undefined} />
         })}
       </div>
     </div>
@@ -83,9 +79,11 @@ function Editor({ initial, onClose, onSaved }) {
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal" onClick={(e) => e.stopPropagation()}>
         <div className="modal-title">{isEdit ? '编辑记忆' : '新记忆'}</div>
-        <textarea className="textarea" rows={5} value={content} autoFocus placeholder="记忆内容…" onChange={(e) => setContent(e.target.value)} />
+        <textarea className="textarea" rows={5} value={content} autoFocus
+          placeholder="记忆内容…" onChange={(e) => setContent(e.target.value)} />
         <div style={{ marginTop: 12 }}>
-          <input className="input" value={tags} placeholder="标签（逗号分隔）" onChange={(e) => setTags(e.target.value)} />
+          <input className="input" value={tags} placeholder="标签（逗号分隔）"
+            onChange={(e) => setTags(e.target.value)} />
         </div>
         <div style={{ display: 'flex', gap: 10, marginTop: 12 }}>
           <select className="select" style={{ flex: 1 }} value={scope} onChange={(e) => setScope(e.target.value)}>
@@ -97,7 +95,8 @@ function Editor({ initial, onClose, onSaved }) {
           </select>
         </div>
         <div style={{ display: 'flex', gap: 10, marginTop: 12, alignItems: 'center' }}>
-          <select className="select" style={{ flex: 1 }} value={importance} onChange={(e) => setImportance(Number(e.target.value))}>
+          <select className="select" style={{ flex: 1 }} value={importance}
+            onChange={(e) => setImportance(Number(e.target.value))}>
             {IMP_OPTS.map((o) => <option key={o.v} value={o.v}>重要程度：{o.l}</option>)}
           </select>
           <label className="memorable-toggle" onClick={() => setMemorable(!memorable)}>
@@ -107,7 +106,9 @@ function Editor({ initial, onClose, onSaved }) {
         </div>
         <div className="modal-actions">
           <button className="btn btn-ghost" onClick={onClose}>取消</button>
-          <button className="btn btn-primary" onClick={save} disabled={saving}>{saving ? '保存中…' : '保存'}</button>
+          <button className="btn btn-primary" onClick={save} disabled={saving}>
+            {saving ? '保存中…' : '保存'}
+          </button>
         </div>
       </div>
     </div>
@@ -118,29 +119,52 @@ function Card({ m, onEdit, onTrash }) {
   const [exp, setExp] = useState(false)
   const tags = (m.tags || '').split(',').map((t) => t.trim()).filter((t) => t && !META.has(t))
   const long = (m.content || '').length > 300
-  const imp = impBadge(m.importance)
+  // importance：只在珍藏/重要时显示文字，不用彩色圆点
+  const impLabel = m.importance >= 9 ? '珍藏' : m.importance >= 7 ? '重要' : null
+
   return (
     <div className="card">
+      {/* 卡片顶部：层级圆点 + 范围 + 重要度文字 + 日期 */}
+      <div className="card-header">
+        <div className="card-header-left">
+          {m.layer && (
+            <span className="badge-layer-dot">
+              <span className="layer-dot" style={{ background: LAYER_COLORS[m.layer] || '#AAA' }} />
+              {LAYERS[m.layer] || m.layer}
+            </span>
+          )}
+          {m.scope && m.scope !== 'shared' && (
+            <span className="badge badge-scope">{SCOPES[m.scope] || m.scope}</span>
+          )}
+          {impLabel && <span className="imp-text">{impLabel}</span>}
+        </div>
+        <span className="card-date">{fmtDate(m.created_at)}</span>
+      </div>
+
+      {/* 正文 */}
       <div className={'card-content' + (exp ? ' expanded' : '')}>
         {m.content}
         {long && !exp && <div className="card-fade" />}
       </div>
-      {long && <div className="card-more" onClick={() => setExp(!exp)}>{exp ? '收起' : '展开全文'}</div>}
-      {tags.length > 0 && <div className="tags">{tags.map((t, i) => <span key={i} className="tag">{t}</span>)}</div>}
-      <div className="card-footer">
-        <div className="badges">
-          {m.pinned ? <span className="badge badge-imp-t"><Pin size={11} style={{ verticalAlign: -1 }} /></span> : null}
-          {imp && <span className={'badge ' + imp.c}>{imp.l === '珍藏' ? <Star size={11} style={{ verticalAlign: -1, marginRight: 2 }} /> : null}{imp.l}</span>}
-          {m.layer && <span className="badge badge-layer">{LAYERS[m.layer] || m.layer}</span>}
-          <span className="badge badge-scope">{SCOPES[m.scope] || m.scope}</span>
-          {m.agent && <span className="badge badge-agent">{m.agent}</span>}
+      {long && (
+        <div className="card-more" onClick={() => setExp(!exp)}>
+          {exp ? '收起' : '展开全文'}
         </div>
-        <div className="card-meta">
-          <span className="card-date">{fmtDate(m.created_at)}</span>
-          <div className="card-acts">
-            <button className="icon-btn" onClick={() => onEdit(m)}><Pencil size={15} /></button>
-            <button className="icon-btn danger" onClick={() => onTrash(m)}><Trash2 size={15} /></button>
-          </div>
+      )}
+
+      {/* 用户标签 */}
+      {tags.length > 0 && (
+        <div className="tags">
+          {tags.map((t, i) => <span key={i} className="tag">{t}</span>)}
+        </div>
+      )}
+
+      {/* 底部操作 */}
+      <div className="card-footer">
+        <span className="card-agent">{m.agent || ''}</span>
+        <div className="card-acts">
+          <button className="icon-btn" onClick={() => onEdit(m)}><Pencil size={14} /></button>
+          <button className="icon-btn danger" onClick={() => onTrash(m)}><Trash2 size={14} /></button>
         </div>
       </div>
     </div>
@@ -157,6 +181,18 @@ export default function MemoryPanel() {
   const [scope, setScope] = useState('')
   const [layer, setLayer] = useState('')
   const [editor, setEditor] = useState(null)
+  const [days, setDays] = useState(null)
+
+  // 在一起多少天
+  useEffect(() => {
+    api.anniversaries().then((list) => {
+      const a = list.find((x) => x.anniversary_date?.startsWith('2025-10-10'))
+      if (a) {
+        const d = Math.floor((Date.now() - new Date(a.anniversary_date).getTime()) / 86400000) + 1
+        setDays(d)
+      }
+    }).catch(() => {})
+  }, [])
 
   const load = useCallback(async () => {
     setLoading(true); setError('')
@@ -176,31 +212,54 @@ export default function MemoryPanel() {
 
   return (
     <div className="panel">
+      {/* 顶栏 */}
       <div className="topbar">
-        <h1>拾羽记忆库</h1>
+        <div>
+          <h1>拾羽</h1>
+          {days != null && (
+            <div className="together-line">
+              <span>🐦‍⬛</span><span className="together-heart">♡</span><span>🐦</span>
+              <span className="together-text">在一起 <strong>{days}</strong> 天</span>
+            </div>
+          )}
+        </div>
         <div className="topbar-actions">
-          {clock && <span className="clock"><Clock size={13} />{clock}</span>}
-          <button className="btn-icon" onClick={load}><RefreshCw size={17} className={loading ? 'spin' : ''} /></button>
-          <button className="btn-icon" style={{ background: 'var(--olive-deep)', color: '#fff' }} onClick={() => setEditor({ _new: true })}><Plus size={18} /></button>
+          {clock && <span className="clock"><Clock size={12} />{clock}</span>}
+          <button className="btn-icon" onClick={load}>
+            <RefreshCw size={16} className={loading ? 'spin' : ''} />
+          </button>
         </div>
       </div>
 
+      {/* 热力图 */}
       <Heatmap data={heat} />
       <div className="heatmap-legend">过去 12 周 · {mems.length} 条记忆</div>
 
-      <div className="filters" style={{ marginTop: 14 }}>
+      {/* 搜索框 */}
+      <div className="search-wrap">
         <div className="search-box">
-          <Search size={15} />
+          <Search size={14} />
           <input value={q} placeholder="搜索记忆…" onChange={(e) => setQ(e.target.value)} />
         </div>
-        <select className="select" value={scope} onChange={(e) => setScope(e.target.value)}>
-          <option value="">全部范围</option>
-          {Object.entries(SCOPES).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
-        </select>
-        <select className="select" value={layer} onChange={(e) => setLayer(e.target.value)}>
-          <option value="">全部层</option>
-          {Object.entries(LAYERS).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
-        </select>
+      </div>
+
+      {/* Scope 横向 tab */}
+      <div className="scope-tabs">
+        <button className={'scope-tab' + (scope === '' ? ' active' : '')} onClick={() => setScope('')}>全部</button>
+        {Object.entries(SCOPES).map(([v, l]) => (
+          <button key={v} className={'scope-tab' + (scope === v ? ' active' : '')} onClick={() => setScope(v)}>{l}</button>
+        ))}
+      </div>
+
+      {/* Layer 彩色圆点胶囊 */}
+      <div className="layer-pills">
+        <button className={'layer-pill' + (layer === '' ? ' active' : '')} onClick={() => setLayer('')}>全部层</button>
+        {Object.entries(LAYERS).map(([v, l]) => (
+          <button key={v} className={'layer-pill' + (layer === v ? ' active' : '')} onClick={() => setLayer(v)}>
+            <span className="layer-dot" style={{ background: LAYER_COLORS[v] }} />
+            {l}
+          </button>
+        ))}
       </div>
 
       {error && <div className="error-box">{error}</div>}
@@ -210,7 +269,18 @@ export default function MemoryPanel() {
         {mems.map((m) => <Card key={m.id} m={m} onEdit={setEditor} onTrash={trash} />)}
       </div>
 
-      {editor && <Editor initial={editor._new ? null : editor} onClose={() => setEditor(null)} onSaved={() => { setEditor(null); load() }} />}
+      {/* 悬浮新建按钮 */}
+      <button className="fab" onClick={() => setEditor({ _new: true })}>
+        <Plus size={22} />
+      </button>
+
+      {editor && (
+        <Editor
+          initial={editor._new ? null : editor}
+          onClose={() => setEditor(null)}
+          onSaved={() => { setEditor(null); load() }}
+        />
+      )}
     </div>
   )
 }
