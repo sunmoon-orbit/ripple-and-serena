@@ -47,7 +47,7 @@ function useReview(moonMemory) {
     setLoading(true)
     try {
       const r = await fetch(
-        `${moonMemory.apiUrl || 'https://memory.ravenlove.cc'}/memories?agent=crow&limit=20`,
+        `${moonMemory.apiUrl || 'https://memory.ravenlove.cc'}/memories?agent=${encodeURIComponent('阿言')}&limit=20`,
         { headers: { Authorization: `Bearer ${moonMemory.apiToken}` } }
       )
       const data = await r.json()
@@ -246,7 +246,7 @@ export default function Roost() {
                         body: JSON.stringify({
                           content: `【读书笔记】《${selectedBook.title}》\n\n${selectedBook.note.trim()}`,
                           type: 'book', layer: 'long', importance: 6,
-                          agent: 'crow', owner: 'qing', scope: 'shared'
+                          agent: '阿颖', owner: '阿颖', scope: 'shared'
                         })
                       }
                     )
