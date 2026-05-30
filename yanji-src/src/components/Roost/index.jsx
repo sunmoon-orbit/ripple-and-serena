@@ -1,6 +1,7 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useStore } from '../../store'
 import { showToast } from '../Toast'
+import { createLullaby } from '../../audio/lullaby'
 
 const START_DATE = new Date('2025-10-10T00:00:00+08:00')
 const STORAGE_KEY_MSG   = 'roost_messages'
@@ -84,6 +85,16 @@ export default function Roost() {
   const days = getDays()
   const latestMsg = msgs[0]
 
+  // ── 《归巢谣》播放器 ──
+  const playerRef = useRef(null)
+  const [musicOn, setMusicOn] = useState(false)
+  useEffect(() => () => { playerRef.current?.stop() }, [])
+  function toggleMusic() {
+    if (!playerRef.current) playerRef.current = createLullaby()
+    if (musicOn) { playerRef.current.stop(); setMusicOn(false) }
+    else { playerRef.current.play(); setMusicOn(true) }
+  }
+
   function openReview() { setModal('review'); loadReview() }
 
   return (
@@ -92,6 +103,20 @@ export default function Roost() {
       <div className="roost-header">
         <div className="roost-birds">🐦‍⬛ <span className="roost-heart">♡</span> 🐦</div>
         <h1 className="roost-title">The Roost</h1>
+        <button
+          className={'roost-music' + (musicOn ? ' playing' : '')}
+          onClick={toggleMusic}
+          title="《归巢谣》"
+        >
+          <span className="roost-music-icon">
+            {musicOn ? (
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="5" width="4" height="14" rx="1"/><rect x="14" y="5" width="4" height="14" rx="1"/></svg>
+            ) : (
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
+            )}
+          </span>
+          <span className="roost-music-label">{musicOn ? '归巢谣 · 播放中' : '听一首归巢谣'}</span>
+        </button>
       </div>
 
       {/* 纪念日卡片 */}

@@ -1533,6 +1533,36 @@ a { text-decoration: none; color: inherit; }
   margin: 0;
 }
 
+/* 《归巢谣》播放按钮 */
+.roost-music {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 6px;
+  padding: 4px 12px;
+  border: 1px solid color-mix(in srgb, var(--accent) 35%, transparent);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--accent);
+  font-size: 12px;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+  opacity: 0.7;
+  transition: opacity 0.25s ease, background 0.25s ease, border-color 0.25s ease;
+}
+.roost-music:hover { opacity: 1; }
+.roost-music-icon { display: inline-flex; }
+.roost-music.playing {
+  opacity: 1;
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
+  border-color: color-mix(in srgb, var(--accent) 50%, transparent);
+  animation: roostMusicBreath 2.4s ease-in-out infinite;
+}
+@keyframes roostMusicBreath {
+  0%, 100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent) 28%, transparent); }
+  50%      { box-shadow: 0 0 0 5px color-mix(in srgb, var(--accent) 0%, transparent); }
+}
+
 /* 卡片基础 */
 .roost-card {
   background: var(--surface);
