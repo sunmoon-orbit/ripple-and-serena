@@ -92,7 +92,7 @@ export function getMemoryToolDefinitions() {
         type: 'object',
         properties: {
           query: { type: 'string', description: '搜索关键词或主题' },
-          scope: { type: 'string', description: '范围过滤：shared / private_qing（可选）' },
+          scope: { type: 'string', description: '范围过滤：shared / private_阿颖（可选）' },
           limit: { type: 'number', description: '返回条数，默认5，最多20' },
         },
         required: ['query'],
@@ -106,7 +106,7 @@ export function getMemoryToolDefinitions() {
         properties: {
           content: { type: 'string', description: '记忆内容，简洁明确' },
           tags: { type: 'string', description: '标签，逗号分隔（可选）' },
-          scope: { type: 'string', description: 'shared 或 private_qing，默认 shared' },
+          scope: { type: 'string', description: 'shared 或 private_阿颖，默认 shared' },
           layer: { type: 'string', description: 'core / long / short，默认不填' },
         },
         required: ['content'],
@@ -141,8 +141,8 @@ export async function executeMemoryTool(toolName, args, config) {
         tags: args.tags || '',
         scope: args.scope || 'shared',
         layer: args.layer || null,
-        agent: 'crow',
-        owner: 'qing',
+        agent: '阿言',
+        owner: '阿颖',
       })
       return `已记录: "${m.content}" (ID: ${m.id})`
     } catch (e) {

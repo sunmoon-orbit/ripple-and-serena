@@ -90,8 +90,8 @@ export default function Dream() {
         content: resultText.trim(),
         scope: saveScope,
         layer: saveLayer || null,
-        agent: 'crow',
-        owner: 'qing',
+        agent: '阿言',
+        owner: '阿颖',
         tags: 'dream,整合',
       })
       setSavedId(m.id)

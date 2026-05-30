@@ -68,7 +68,7 @@ export default function Memory() {
   async function handleCreate() {
     if (!newContent.trim()) return
     try {
-      await createMemory(cfg, { content: newContent.trim(), tags: newTags.trim(), scope: newScope, layer: newLayer || null, agent: 'crow', owner: 'qing' })
+      await createMemory(cfg, { content: newContent.trim(), tags: newTags.trim(), scope: newScope, layer: newLayer || null, agent: '阿颖', owner: '阿颖' })
       setNewContent(''); setNewTags(''); setCreating(false)
       showToast('记忆已创建', 'success')
       load()
