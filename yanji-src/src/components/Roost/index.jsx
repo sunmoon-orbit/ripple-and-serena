@@ -246,7 +246,7 @@ export default function Roost() {
                         body: JSON.stringify({
                           content: `【读书笔记】《${selectedBook.title}》\n\n${selectedBook.note.trim()}`,
                           type: 'book', layer: 'long', importance: 6,
-                          agent: 'qing', scope: 'shared'
+                          agent: 'crow', owner: 'qing', scope: 'shared'
                         })
                       }
                     )
