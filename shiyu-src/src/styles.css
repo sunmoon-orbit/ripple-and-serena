@@ -1,54 +1,54 @@
 /* ============================================================
-   拾羽记忆库 · 设计系统 v3  「暖羽·原版还原」
+   拾羽记忆库 · 设计系统 v4  「鸦翎」
    ──────────────────────────────────────────────────────────
-   底色  暖奶油   #F5F0E8
-   主色  暖橄榄   #8A7E62  (active tab / button)
-   点缀  沉橙     #C97A48  (阿颖)
-   墨    深暖黑   #1E1B16
+   底色  雾蓝     #ECEEF4
+   主色  鸦翎蓝   #5A7A98  (active tab / button)
+   点缀  铜暖     #A07850  (阿颖)
+   墨    深夜蓝   #1C2130
    层级圆点：核心红 / 长期橙 / 短期黄 / 意识紫
    ============================================================ */
 
 :root {
-  --bg:          #F5F0E8;
-  --bg-soft:     #EDE8DE;
-  --surface:     #FEFCF8;
-  --line:        rgba(30, 27, 22, 0.09);
-  --line-soft:   rgba(30, 27, 22, 0.05);
+  --bg:          #ECEEF4;
+  --bg-soft:     #E2E4EE;
+  --surface:     #F5F6FA;
+  --line:        rgba(28, 33, 48, 0.09);
+  --line-soft:   rgba(28, 33, 48, 0.05);
 
-  --ink:         #1E1B16;
-  --ink-soft:    #6A6456;
-  --ink-faint:   #AAA090;
+  --ink:         #1C2130;
+  --ink-soft:    #5A6070;
+  --ink-faint:   #9AA0B0;
 
-  --olive-active: #8A7E62;   /* active 状态：tab 下划线 / 填充按钮 */
-  --olive-mid:    #A89878;   /* 次要 */
-  --olive-light:  #C8BE9E;   /* 最淡，tag 背景 */
+  --olive-active: #5A7A98;   /* active 状态：tab 下划线 / 填充按钮 */
+  --olive-mid:    #7A9AB8;   /* 次要 */
+  --olive-light:  #C0D0E0;   /* 最淡，tag 背景 */
 
-  --accent:  #C97A48;
-  --raven:   #0E0E0A;
-  --danger:  #B85252;
+  --accent:  #A07850;
+  --raven:   #0A0E18;
+  --danger:  #B05060;
 
-  --shadow:    0 1px 3px rgba(0,0,0,0.03), 0 3px 12px rgba(0,0,0,0.06);
-  --shadow-lg: 0 4px 16px rgba(0,0,0,0.08), 0 12px 36px rgba(0,0,0,0.10);
+  --shadow:    0 1px 3px rgba(0,0,0,0.04), 0 3px 12px rgba(0,0,0,0.08);
+  --shadow-lg: 0 4px 16px rgba(0,0,0,0.10), 0 12px 36px rgba(0,0,0,0.13);
 
   --radius:    16px;
   --radius-sm: 10px;
 }
 
 [data-theme="dark"] {
-  --bg:          #141210;
-  --bg-soft:     #1C1A16;
-  --surface:     #211F1A;
+  --bg:          #111520;
+  --bg-soft:     #181D2C;
+  --surface:     #1E2438;
   --line:        rgba(255,255,255,0.09);
   --line-soft:   rgba(255,255,255,0.05);
-  --ink:         #E8E4DA;
-  --ink-soft:    #7A7060;
-  --ink-faint:   #484030;
-  --olive-active: #A89878;
-  --olive-mid:    #887860;
-  --olive-light:  #3A3428;
-  --accent:   #CC7D4E;
-  --shadow:   0 1px 3px rgba(0,0,0,0.24), 0 3px 12px rgba(0,0,0,0.40);
-  --shadow-lg:0 4px 16px rgba(0,0,0,0.36), 0 12px 36px rgba(0,0,0,0.52);
+  --ink:         #D8DCE8;
+  --ink-soft:    #8088A0;
+  --ink-faint:   #3A4058;
+  --olive-active: #7AAEC8;
+  --olive-mid:    #5A8AAA;
+  --olive-light:  #28384A;
+  --accent:   #C89060;
+  --shadow:   0 1px 3px rgba(0,0,0,0.28), 0 3px 12px rgba(0,0,0,0.44);
+  --shadow-lg:0 4px 16px rgba(0,0,0,0.40), 0 12px 36px rgba(0,0,0,0.56);
 }
 
 /* ── 基础 ── */
@@ -571,3 +571,4 @@ input, textarea, select { font-family: inherit; font-size: 15px; color: var(--in
   cursor: pointer; white-space: nowrap; user-select: none;
 }
 .memorable-toggle .toggle { flex-shrink: 0; }
+
