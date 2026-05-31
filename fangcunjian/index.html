@@ -577,7 +577,7 @@
 
   .msg-meta .name { font-weight: 500; }
 
-  .msg-bookmark-btn {
+  .msg-bookmark-btn, .msg-copy-btn {
     background: none;
     border: none;
     cursor: pointer;
@@ -587,7 +587,8 @@
     transition: opacity 0.15s;
   }
 
-  .msg-bookmark-btn:hover, .msg-bookmark-btn.active {
+  .msg-bookmark-btn:hover, .msg-bookmark-btn.active,
+  .msg-copy-btn:hover, .msg-copy-btn.copied {
     opacity: 1;
   }
 
@@ -1210,6 +1211,7 @@ function renderChat() {
           <span class="name">${escapeHtml(name)}</span>
           <span>${formatTime(m.created_at)}</span>
           <button class="msg-bookmark-btn${bmClass}" data-conv="${conv.uuid}" data-idx="${i}" title="收藏">🔖</button>
+          <button class="msg-copy-btn" data-idx="${i}" title="复制">📋</button>
         </div>
         <div class="msg-bubble">${highlightText(text, searchQuery)}</div>
       </div>
@@ -1223,6 +1225,23 @@ function renderChat() {
       toggleBookmark(btn.dataset.conv, parseInt(btn.dataset.idx));
       btn.classList.toggle("active");
       if (activeTab === "bookmarks") renderBookmarks();
+    });
+  });
+
+  // Bind copy buttons
+  chatMessages.querySelectorAll(".msg-copy-btn").forEach(btn => {
+    btn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      const idx = parseInt(btn.dataset.idx);
+      const text = getMessageText(msgs[idx]);
+      navigator.clipboard.writeText(text).then(() => {
+        btn.textContent = "✓";
+        btn.classList.add("copied");
+        setTimeout(() => {
+          btn.textContent = "📋";
+          btn.classList.remove("copied");
+        }, 1500);
+      });
     });
   });
 
@@ -1599,3 +1618,4 @@ if ('serviceWorker' in navigator) {
 </script>
 </body>
 </html>
+
