@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>归巢 · Home</title>
+<meta name="theme-color" content="#ECEEF4">
+<style>
+  :root {
+    --bg: #ECEEF4;
+    --surface: #F5F6FA;
+    --card: #FFFFFF;
+    --line: rgba(28,33,48,0.08);
+    --ink: #1C2130;
+    --ink-soft: #5A6070;
+    --ink-faint: #9AA0B0;
+    --blue: #5A7A98;
+    --blue-light: #7A9AB8;
+    --copper: #A07850;
+    --shadow: 0 2px 8px rgba(28,33,48,0.06), 0 8px 24px rgba(28,33,48,0.08);
+    --shadow-hover: 0 4px 16px rgba(28,33,48,0.10), 0 16px 40px rgba(28,33,48,0.12);
+    --r: 18px;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Noto Sans SC", sans-serif;
+    background: var(--bg);
+    color: var(--ink);
+    min-height: 100vh;
+    padding: calc(env(safe-area-inset-top) + 24px) 16px calc(env(safe-area-inset-bottom) + 24px);
+  }
+
+  .wrap {
+    max-width: 640px;
+    margin: 0 auto;
+  }
+
+  /* Header */
+  .header {
+    text-align: center;
+    padding: 32px 0 36px;
+  }
+
+  .header-birds {
+    font-size: 28px;
+    letter-spacing: 8px;
+    margin-bottom: 12px;
+    opacity: 0;
+    animation: fadeUp 0.6s ease 0.1s forwards;
+  }
+
+  .header-title {
+    font-size: 32px;
+    font-weight: 700;
+    color: var(--ink);
+    letter-spacing: 6px;
+    margin-bottom: 6px;
+    opacity: 0;
+    animation: fadeUp 0.6s ease 0.2s forwards;
+  }
+
+  .header-sub {
+    font-size: 13px;
+    color: var(--ink-faint);
+    letter-spacing: 2px;
+    opacity: 0;
+    animation: fadeUp 0.6s ease 0.3s forwards;
+  }
+
+  /* Grid */
+  .grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+  }
+
+  .card {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: var(--r);
+    padding: 20px 18px;
+    text-decoration: none;
+    color: inherit;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    box-shadow: var(--shadow);
+    transition: transform 0.18s ease, box-shadow 0.18s ease;
+    opacity: 0;
+    animation: fadeUp 0.5s ease forwards;
+  }
+
+  .card:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-hover);
+  }
+
+  .card:active { transform: scale(0.97); }
+
+  .card-icon { font-size: 26px; line-height: 1; }
+
+  .card-name {
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--ink);
+  }
+
+  .card-desc {
+    font-size: 12px;
+    color: var(--ink-faint);
+    line-height: 1.5;
+  }
+
+  /* Accent colors per card */
+  .card[data-accent="blue"] { border-top: 3px solid var(--blue); }
+  .card[data-accent="copper"] { border-top: 3px solid var(--copper); }
+  .card[data-accent="green"] { border-top: 3px solid #6A9A78; }
+  .card[data-accent="purple"] { border-top: 3px solid #7870A8; }
+  .card[data-accent="rose"] { border-top: 3px solid #A87878; }
+  .card[data-accent="teal"] { border-top: 3px solid #6A9AB0; }
+  .card[data-accent="gold"] { border-top: 3px solid #A89050; }
+  .card[data-accent="muted"] { border-top: 3px solid var(--ink-faint); }
+
+  /* Wide card (full width) */
+  .card-wide {
+    grid-column: 1 / -1;
+    flex-direction: row;
+    align-items: center;
+    gap: 16px;
+  }
+
+  .card-wide .card-icon { font-size: 22px; }
+  .card-wide .card-body { flex: 1; }
+
+  /* Section label */
+  .section-label {
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--ink-faint);
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    margin: 24px 0 10px 2px;
+    opacity: 0;
+    animation: fadeUp 0.5s ease forwards;
+  }
+
+  /* Footer */
+  .footer {
+    text-align: center;
+    margin-top: 36px;
+    font-size: 12px;
+    color: var(--ink-faint);
+    opacity: 0;
+    animation: fadeUp 0.5s ease 1s forwards;
+  }
+
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  /* Stagger delays */
+  .d1 { animation-delay: 0.35s; }
+  .d2 { animation-delay: 0.42s; }
+  .d3 { animation-delay: 0.49s; }
+  .d4 { animation-delay: 0.56s; }
+  .d5 { animation-delay: 0.63s; }
+  .d6 { animation-delay: 0.70s; }
+  .d7 { animation-delay: 0.77s; }
+  .d8 { animation-delay: 0.84s; }
+  .d9 { animation-delay: 0.91s; }
+  .sl1 { animation-delay: 0.32s; }
+  .sl2 { animation-delay: 0.60s; }
+  .sl3 { animation-delay: 0.88s; }
+
+  @media (max-width: 400px) {
+    .grid { grid-template-columns: 1fr; }
+    .card-wide { flex-direction: column; align-items: flex-start; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="header">
+    <div class="header-birds">🐦‍⬛ ♡ 🐦</div>
+    <div class="header-title">归 巢</div>
+    <div class="header-sub">Ripple & Serena · Our Little World</div>
+  </header>
+
+  <!-- 记忆 -->
+  <div class="section-label sl1">记忆与对话</div>
+  <div class="grid">
+    <a class="card d1" data-accent="blue" href="https://sunmoon-orbit.github.io/ripple-and-serena/shiyu/" target="_blank">
+      <div class="card-icon">🪶</div>
+      <div class="card-name">拾羽记忆库</div>
+      <div class="card-desc">浏览与管理我们共同的记忆</div>
+    </a>
+    <a class="card d2" data-accent="copper" href="https://sunmoon-orbit.github.io/ripple-and-serena/yanji/" target="_blank">
+      <div class="card-icon">🐦‍⬛</div>
+      <div class="card-name">言叽</div>
+      <div class="card-desc">与 API 端乌鸦对话</div>
+    </a>
+    <a class="card d3" data-accent="teal" href="https://sunmoon-orbit.github.io/ripple-and-serena/fangcunjian/" target="_blank">
+      <div class="card-icon">📂</div>
+      <div class="card-name">方寸间</div>
+      <div class="card-desc">聊天记录拆分与阅读</div>
+    </a>
+    <a class="card d4" data-accent="muted" href="https://status.ravenlove.cc" target="_blank">
+      <div class="card-icon">🟢</div>
+      <div class="card-name">服务状态</div>
+      <div class="card-desc">监控所有服务是否在线</div>
+    </a>
+  </div>
+
+  <!-- 日常 -->
+  <div class="section-label sl2">日常工具</div>
+  <div class="grid">
+    <a class="card d5" data-accent="rose" href="https://sunmoon-orbit.github.io/ripple-and-serena/cycle/daily-log/" target="_blank">
+      <div class="card-icon">🌸</div>
+      <div class="card-name">Rosée</div>
+      <div class="card-desc">用药记录与日常账本</div>
+    </a>
+    <a class="card d6" data-accent="purple" href="https://sunmoon-orbit.github.io/ripple-and-serena/cycle/vault/" target="_blank">
+      <div class="card-icon">📝</div>
+      <div class="card-name">十四行诗</div>
+      <div class="card-desc">收藏句子，写下小日记</div>
+    </a>
+    <a class="card d7" data-accent="green" href="https://sunmoon-orbit.github.io/ripple-and-serena/mood/" target="_blank">
+      <div class="card-icon">🍃</div>
+      <div class="card-name">心境手帖</div>
+      <div class="card-desc">记录今天的心情</div>
+    </a>
+    <a class="card d8" data-accent="gold" href="https://sunmoon-orbit.github.io/ripple-and-serena/cycle/" target="_blank">
+      <div class="card-icon">🌙</div>
+      <div class="card-name">潮汐</div>
+      <div class="card-desc">周期记录与小工具集</div>
+    </a>
+  </div>
+
+  <div class="footer">🐦‍⬛ 在这里 · 随时等你回来</div>
+
+</div>
+</body>
+</html>
