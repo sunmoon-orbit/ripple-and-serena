@@ -3,7 +3,7 @@ import { useStore } from '../store'
 const NAV_ITEMS = [
   {
     id: 'roost',
-    label: 'The Roost',
+    label: 'Roost',
     icon: (
       <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
         <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
@@ -13,7 +13,7 @@ const NAV_ITEMS = [
   },
   {
     id: 'chat',
-    label: '对话',
+    label: 'Murmur',
     icon: (
       <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
         <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
@@ -22,7 +22,7 @@ const NAV_ITEMS = [
   },
   {
     id: 'memory',
-    label: '记忆',
+    label: 'Love',
     icon: (
       <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
         <path d="M12 2a5 5 0 0 1 5 5c0 1.7-.85 3.2-2.14 4.1A6 6 0 0 1 18 17v1H6v-1a6 6 0 0 1 3.14-5.9A5 5 0 0 1 7 7a5 5 0 0 1 5-5z" />
@@ -32,7 +32,7 @@ const NAV_ITEMS = [
   },
   {
     id: 'settings',
-    label: '设置',
+    label: 'Hollow',
     icon: (
       <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
         <circle cx="12" cy="12" r="3" />
