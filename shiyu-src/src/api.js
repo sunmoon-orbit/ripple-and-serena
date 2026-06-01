@@ -32,6 +32,7 @@ export const api = {
   update: (id, body) => req(`/memories/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
   moveToTrash: (id) => req(`/memories/${id}/trash`, { method: 'POST', body: '{}' }),
   restore: (id) => req(`/memories/${id}/restore`, { method: 'POST', body: '{}' }),
+  related: (id, k = 5) => req(`/memories/${id}/related?k=${k}`),
   anniversaries: () => req('/anniversaries'),
   time: () => req('/context/time'),
   health: () => req('/health'),

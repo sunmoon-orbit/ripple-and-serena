@@ -564,6 +564,44 @@ input, textarea, select { font-family: inherit; font-size: 15px; color: var(--in
 /* ── select 样式补丁 ── */
 .select { width: auto; min-width: 88px; border-radius: var(--radius-sm); font-size: 13px; }
 
+/* ── 相关记忆 ── */
+.related-btn {
+  display: inline-flex; align-items: center; gap: 4px;
+  font-size: 12px; padding: 0 6px; width: auto;
+  color: var(--ink-faint);
+}
+.related-btn span { font-size: 12px; }
+.related-btn.active { color: var(--olive-active); }
+.related-btn:hover { color: var(--olive-active); background: var(--bg-soft); }
+
+.related-section {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px dashed var(--line);
+  display: flex; flex-direction: column; gap: 7px;
+}
+.related-loading, .related-empty {
+  font-size: 12px; color: var(--ink-faint); text-align: center; padding: 6px 0;
+}
+.related-item {
+  background: var(--bg-soft);
+  border-radius: var(--radius-sm);
+  padding: 9px 12px;
+  cursor: default;
+}
+.related-item-content {
+  font-size: 13px; color: var(--ink); line-height: 1.6;
+  word-break: break-word;
+}
+.related-item-meta {
+  display: flex; align-items: center; gap: 6px; margin-top: 5px;
+}
+.related-item-date { font-size: 11px; color: var(--ink-faint); }
+.related-item-score {
+  font-size: 11px; color: var(--olive-mid);
+  margin-left: auto;
+}
+
 /* ── 回收站面板补丁（保留原有结构） ── */
 .memorable-toggle {
   display: flex; align-items: center; gap: 7px;
