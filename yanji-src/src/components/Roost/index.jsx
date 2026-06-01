@@ -102,7 +102,7 @@ export default function Roost() {
       {/* 顶部标题 */}
       <div className="roost-header">
         <div className="roost-birds">🐦‍⬛ <span className="roost-heart">♡</span> 🐦</div>
-        <h1 className="roost-title">The Roost</h1>
+        <h1 className="roost-title">Roost</h1>
         <button
           className={'roost-music' + (musicOn ? ' playing' : '')}
           onClick={toggleMusic}
