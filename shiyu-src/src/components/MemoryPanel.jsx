@@ -47,7 +47,7 @@ function useClock() {
   return t
 }
 
-function Heatmap({ data }) {
+function Heatmap({ data, selectedDate, onSelectDate }) {
   const days = []
   for (let i = 83; i >= 0; i--) {
     const d = new Date(); d.setDate(d.getDate() - i)
@@ -58,8 +58,15 @@ function Heatmap({ data }) {
       <div className="heatmap">
         {days.map((d) => {
           const op = d.n ? Math.min(0.25 + (d.n / 6) * 0.75, 1) : 0
-          return <div key={d.key} className="heatmap-cell" title={`${d.key}: ${d.n} 条`}
-            style={op ? { background: 'var(--olive-active)', opacity: op } : undefined} />
+          const selected = selectedDate === d.key
+          return <div key={d.key} className={'heatmap-cell' + (selected ? ' selected' : '')}
+            title={`${d.key}: ${d.n} 条`}
+            onClick={() => d.n && onSelectDate(selected ? null : d.key)}
+            style={{
+              ...(op ? { background: 'var(--olive-active)', opacity: op } : {}),
+              ...(selected ? { outline: '2px solid var(--olive-active)', opacity: 1, background: 'var(--olive-active)' } : {}),
+              cursor: d.n ? 'pointer' : 'default',
+            }} />
         })}
       </div>
     </div>
@@ -257,6 +264,7 @@ export default function MemoryPanel() {
   const [editor, setEditor] = useState(null)
   const [days, setDays] = useState(null)
   const [tabIdx, setTabIdx] = useState(0)
+  const [selectedDate, setSelectedDate] = useState(null)
 
   // 在一起多少天
   useEffect(() => {
@@ -270,16 +278,18 @@ export default function MemoryPanel() {
   }, [])
 
   const load = useCallback(async () => {
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     setLoading(true); setError('')
     try {
       const params = { q, limit: 200 }
       if (scope) params.scope = scope
       if (memType) params.type = memType
       if (layer) params.layer = layer
+      if (selectedDate) params.date = selectedDate
       const [m, h] = await Promise.all([api.list(params), api.heatmap()])
       setMems(m); setHeat(h)
     } catch (e) { setError(e.message) } finally { setLoading(false) }
-  }, [q, scope, memType, layer])
+  }, [q, scope, memType, layer, selectedDate])
 
   useEffect(() => { load() }, [load])
 
@@ -311,8 +321,13 @@ export default function MemoryPanel() {
       </div>
 
       {/* 热力图 */}
-      <Heatmap data={heat} />
-      <div className="heatmap-legend">过去 12 周 · {mems.length} 条记忆</div>
+      <Heatmap data={heat} selectedDate={selectedDate} onSelectDate={setSelectedDate} />
+      <div className="heatmap-legend">
+        {selectedDate
+          ? <><span style={{ color: 'var(--olive-active)', fontWeight: 600 }}>{selectedDate}</span> · {mems.length} 条 <button className="card-more" style={{ display: 'inline', marginLeft: 6 }} onClick={() => setSelectedDate(null)}>清除</button></>
+          : <>过去 12 周 · {mems.length} 条记忆</>
+        }
+      </div>
 
       {/* 搜索框 */}
       <div className="search-wrap">
