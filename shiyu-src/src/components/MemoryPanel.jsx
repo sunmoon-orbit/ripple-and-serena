@@ -73,6 +73,49 @@ function Heatmap({ data, selectedDate, onSelectDate }) {
   )
 }
 
+function EmotionHeatmap({ data }) {
+  const days = []
+  for (let i = 83; i >= 0; i--) {
+    const d = new Date(); d.setDate(d.getDate() - i)
+    const key = d.toISOString().slice(0, 10)
+    days.push({ key, ...(data[key] || null) })
+  }
+
+  function cellColor(d) {
+    if (!d.valence && d.valence !== 0) return undefined
+    const v = d.valence  // -1 ~ 1
+    const a = d.arousal ?? 0.5  // 0 ~ 1
+    const alpha = 0.2 + a * 0.8
+    if (v > 0.2) {
+      // 暖色：橙红
+      const r = Math.round(200 + v * 55)
+      const g = Math.round(120 - v * 60)
+      return `rgba(${r},${g},60,${alpha.toFixed(2)})`
+    } else if (v < -0.2) {
+      // 冷色：蓝紫
+      const b = Math.round(180 + Math.abs(v) * 60)
+      const r = Math.round(80 - Math.abs(v) * 40)
+      return `rgba(${r},100,${b},${alpha.toFixed(2)})`
+    } else {
+      // 中性：灰
+      return `rgba(150,150,150,${(0.15 + a * 0.3).toFixed(2)})`
+    }
+  }
+
+  return (
+    <div className="heatmap-wrap">
+      <div className="heatmap">
+        {days.map((d) => {
+          const bg = cellColor(d)
+          return <div key={d.key} className="heatmap-cell"
+            title={d.n ? `${d.key}: 情绪${d.valence >= 0 ? '+' : ''}${d.valence?.toFixed(2)} 强度${d.arousal?.toFixed(2)}` : d.key}
+            style={bg ? { background: bg } : undefined} />
+        })}
+      </div>
+    </div>
+  )
+}
+
 const MEM_TYPES = [
   { v: 'memory',  l: '普通' },
   { v: 'tech',    l: '技术' },
@@ -255,6 +298,7 @@ export default function MemoryPanel() {
   const clock = useClock()
   const [mems, setMems] = useState([])
   const [heat, setHeat] = useState({})
+  const [emotionHeat, setEmotionHeat] = useState({})
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [q, setQ] = useState('')
@@ -286,8 +330,8 @@ export default function MemoryPanel() {
       if (memType) params.type = memType
       if (layer) params.layer = layer
       if (selectedDate) params.date = selectedDate
-      const [m, h] = await Promise.all([api.list(params), api.heatmap()])
-      setMems(m); setHeat(h)
+      const [m, h, eh] = await Promise.all([api.list(params), api.heatmap(), api.emotionHeatmap()])
+      setMems(m); setHeat(h); setEmotionHeat(eh)
     } catch (e) { setError(e.message) } finally { setLoading(false) }
   }, [q, scope, memType, layer, selectedDate])
 
@@ -320,7 +364,7 @@ export default function MemoryPanel() {
         </div>
       </div>
 
-      {/* 热力图 */}
+      {/* 条数热力图 */}
       <Heatmap data={heat} selectedDate={selectedDate} onSelectDate={setSelectedDate} />
       <div className="heatmap-legend">
         {selectedDate
@@ -328,6 +372,10 @@ export default function MemoryPanel() {
           : <>过去 12 周 · {mems.length} 条记忆</>
         }
       </div>
+
+      {/* 情绪热力图 */}
+      <EmotionHeatmap data={emotionHeat} />
+      <div className="heatmap-legend">情绪分布 · 暖色积极 冷色消极 深色强烈</div>
 
       {/* 搜索框 */}
       <div className="search-wrap">
