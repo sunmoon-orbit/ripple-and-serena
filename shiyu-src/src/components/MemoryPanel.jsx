@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { api } from '../api'
 import { showToast } from './Toast'
-import { Plus, RefreshCw, Search, Clock, Pencil, Trash2 } from 'lucide-react'
+import { Plus, RefreshCw, Search, Clock, Pencil, Trash2, Share2 } from 'lucide-react'
 
 export const SCOPES = { shared: '共享', private_阿颖: '阿颖私密', private_阿言: '阿言私密' }
 export const LAYERS = { core: '核心', long: '长期', short: '短期', consciousness: '意识' }
@@ -145,10 +145,23 @@ function Editor({ initial, onClose, onSaved }) {
 
 function Card({ m, onEdit, onTrash }) {
   const [exp, setExp] = useState(false)
+  const [relOpen, setRelOpen] = useState(false)
+  const [related, setRelated] = useState(null)
+  const [relLoading, setRelLoading] = useState(false)
   const tags = (m.tags || '').split(',').map((t) => t.trim()).filter((t) => t && !META.has(t))
   const long = (m.content || '').length > 300
-  // importance：只在珍藏/重要时显示文字，不用彩色圆点
   const impLabel = m.importance >= 9 ? '珍藏' : m.importance >= 7 ? '重要' : null
+
+  async function toggleRelated() {
+    if (relOpen) { setRelOpen(false); return }
+    setRelOpen(true)
+    if (related !== null) return
+    setRelLoading(true)
+    try {
+      const list = await api.related(m.id)
+      setRelated(list)
+    } catch { setRelated([]) } finally { setRelLoading(false) }
+  }
 
   return (
     <div className="card">
@@ -191,10 +204,42 @@ function Card({ m, onEdit, onTrash }) {
       <div className="card-footer">
         <span className="card-agent">{m.agent || ''}</span>
         <div className="card-acts">
+          <button
+            className={'icon-btn related-btn' + (relOpen ? ' active' : '')}
+            onClick={toggleRelated}
+            title="关联记忆"
+          >
+            <Share2 size={13} />
+            <span>相关</span>
+          </button>
           <button className="icon-btn" onClick={() => onEdit(m)}><Pencil size={14} /></button>
           <button className="icon-btn danger" onClick={() => onTrash(m)}><Trash2 size={14} /></button>
         </div>
       </div>
+
+      {/* 关联记忆展开区 */}
+      {relOpen && (
+        <div className="related-section">
+          {relLoading && <div className="related-loading">加载中…</div>}
+          {!relLoading && related !== null && related.length === 0 && (
+            <div className="related-empty">暂无关联记忆</div>
+          )}
+          {!relLoading && related && related.map((r) => (
+            <div key={r.id} className="related-item">
+              <div className="related-item-content">
+                {(r.content || '').slice(0, 100)}{(r.content || '').length > 100 ? '…' : ''}
+              </div>
+              <div className="related-item-meta">
+                {r.layer && <span className="layer-dot" style={{ background: LAYER_COLORS[r.layer] || '#AAA', display: 'inline-block' }} />}
+                <span className="related-item-date">{fmtDate(r.created_at)}</span>
+                {r.similarity != null && (
+                  <span className="related-item-score">{Math.round(r.similarity * 100)}%</span>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   )
 }
