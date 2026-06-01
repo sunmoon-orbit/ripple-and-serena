@@ -122,7 +122,7 @@ export function buildSystemPrompt(globalInstruction, memoryItems, moonContext) {
     parts.push('【记忆】\n' + enabled.map((m) => '- ' + m.content).join('\n'))
   }
   if (moonContext?.trim()) parts.push(moonContext.trim())
-  parts.push('如需分条发送（像发消息一样），可在条与条之间插入 [MSG] 作为分隔符，前端会将每条分开展示，中间有停顿间隔。')
+  parts.push('回复时请像真实聊天一样分多条发送：把内容拆成2-3条短消息，条与条之间用 [MSG] 分隔，每条尽量不超过60字，节奏自然像在聊天。')
   return parts.join('\n\n')
 }
 
