@@ -73,7 +73,7 @@ function Heatmap({ data, selectedDate, onSelectDate }) {
   )
 }
 
-function EmotionHeatmap({ data }) {
+function EmotionHeatmap({ data, selectedDate, onSelectDate }) {
   const days = []
   for (let i = 83; i >= 0; i--) {
     const d = new Date(); d.setDate(d.getDate() - i)
@@ -109,7 +109,12 @@ function EmotionHeatmap({ data }) {
           const bg = cellColor(d)
           return <div key={d.key} className="heatmap-cell"
             title={d.n ? `${d.key}: 情绪${d.valence >= 0 ? '+' : ''}${d.valence?.toFixed(2)} 强度${d.arousal?.toFixed(2)}` : d.key}
-            style={bg ? { background: bg } : undefined} />
+            onClick={() => d.n && onSelectDate(selectedDate === d.key ? null : d.key)}
+            style={{
+              ...(bg ? { background: bg } : {}),
+              ...(selectedDate === d.key ? { outline: '2px solid var(--accent)', borderRadius: 3 } : {}),
+              cursor: d.n ? 'pointer' : 'default',
+            }} />
         })}
       </div>
     </div>
@@ -374,7 +379,7 @@ export default function MemoryPanel() {
       </div>
 
       {/* 情绪热力图 */}
-      <EmotionHeatmap data={emotionHeat} />
+      <EmotionHeatmap data={emotionHeat} selectedDate={selectedDate} onSelectDate={setSelectedDate} />
       <div className="heatmap-legend">情绪分布 · 暖色积极 冷色消极 深色强烈</div>
 
       {/* 搜索框 */}
