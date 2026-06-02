@@ -1631,6 +1631,7 @@ a { text-decoration: none; color: inherit; }
   cursor: pointer;
   transition: opacity 0.15s;
   min-height: 80px;
+  overflow: hidden;
 }
 .roost-message-card:hover { opacity: 0.85; }
 .roost-card-label {
