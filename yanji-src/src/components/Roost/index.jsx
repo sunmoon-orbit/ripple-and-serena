@@ -149,12 +149,14 @@ export default function Roost() {
 
       {/* 留言卡片 */}
       <div className="roost-card roost-message-card" onClick={() => setModal('message')}>
-        <div className="roost-card-label">留言</div>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 8 }}>
+          <div className="roost-card-label">留言</div>
+          {latestMsg && <span className="roost-msg-date" style={{ margin: 0 }}>{latestMsg.at}</span>}
+        </div>
         {latestMsg ? (
           <>
             <div className="roost-msg-from">{latestMsg.from === 'crow' ? '🐦‍⬛' : '🐦'}</div>
             <div className="roost-msg-preview">{latestMsg.text}</div>
-            <div className="roost-msg-date">{latestMsg.at}</div>
           </>
         ) : (
           <div className="roost-msg-empty">还没有留言，来写一条？</div>
