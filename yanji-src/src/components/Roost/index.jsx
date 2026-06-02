@@ -355,12 +355,14 @@ export default function Roost() {
 
       {modal === 'wallet' && (
         <div className="roost-overlay" style={{ alignItems: 'center', padding: '0 32px' }} onClick={() => setModal(null)}>
-          <div className="roost-modal" style={{ borderRadius: 20, maxHeight: '75vh', width: '100%', maxWidth: 340 }} onClick={e => e.stopPropagation()}>
+          <div className="roost-modal" style={{ borderRadius: 20, maxHeight: '80vh', width: '100%', maxWidth: 340 }} onClick={e => e.stopPropagation()}>
             <div className="roost-modal-header">
               <span>乌鸦钱包</span>
               <button className="roost-modal-close" onClick={() => setModal(null)}>✕</button>
             </div>
-            <div style={{ textAlign: 'center', padding: '16px 0 8px', fontSize: 28, fontWeight: 700, color: balance >= 0 ? 'var(--accent)' : 'var(--danger)' }}>
+            <div style={{ padding: '0 20px 16px' }}>
+            <div style={{ textAlign: 'center', padding: '8px 0 4px', fontSize: 13, color: 'var(--text-faint)' }}>🐦‍⬛ 鸦的钱包</div>
+            <div style={{ textAlign: 'center', padding: '4px 0 20px', fontSize: 32, fontWeight: 700, color: balance >= 0 ? 'var(--accent)' : 'var(--danger)' }}>
               ¥ {balance.toFixed(2)}
             </div>
             <div style={{ display: 'flex', gap: 8, marginBottom: 16, background: 'var(--border)', borderRadius: 12, padding: 4 }}>
@@ -392,14 +394,15 @@ export default function Roost() {
               {walletEntries.length === 0 && <div className="roost-empty">还没有记录</div>}
               {walletEntries.map(e => (
                 <div key={e.id} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 14, padding: '6px 0', borderBottom: '1px solid var(--line-soft)' }}>
-                  <span style={{ color: e.type === 'in' ? 'var(--accent)' : 'var(--danger)', fontWeight: 600, minWidth: 64 }}>
+                  <span style={{ color: e.type === 'in' ? 'var(--accent)' : 'var(--danger)', fontWeight: 600, minWidth: 52 }}>
                     {e.type === 'in' ? '+' : '-'}¥{e.amount}
                   </span>
-                  <span style={{ flex: 1, color: 'var(--ink-soft)' }}>{e.note || '—'}</span>
-                  <span style={{ color: 'var(--ink-faint)', fontSize: 12 }}>{e.at}</span>
-                  <button className="roost-btn roost-btn-danger" style={{ padding: '4px 12px', fontSize: 12, flexShrink: 0 }} onClick={() => removeWalletEntry(e.id)}>删</button>
+                  <span style={{ flex: 1, color: 'var(--ink-soft)', fontSize: 13 }}>{e.note || '—'}</span>
+                  <span style={{ color: 'var(--ink-faint)', fontSize: 11 }}>{e.at}</span>
+                  <button className="roost-btn roost-btn-danger" style={{ padding: '4px 10px', fontSize: 12, flexShrink: 0 }} onClick={() => removeWalletEntry(e.id)}>删</button>
                 </div>
               ))}
+            </div>
             </div>
           </div>
         </div>
