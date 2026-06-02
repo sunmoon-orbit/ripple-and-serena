@@ -4,6 +4,7 @@ import IconNav from './components/IconNav'
 import Chat from './components/Chat'
 import Memory from './components/Memory'
 import Dream from './components/Dream'
+import Moments from './components/Moments'
 import Settings from './components/Settings'
 import Home from './components/Home'
 import Roost from './components/Roost'
@@ -53,6 +54,7 @@ export default function App() {
           {activePanel === 'chat' && <Chat />}
           {activePanel === 'memory' && <Memory />}
           {activePanel === 'dream' && <Dream />}
+          {activePanel === 'moments' && <Moments />}
           {activePanel === 'settings' && <Settings />}
         </div>
         <Toast />

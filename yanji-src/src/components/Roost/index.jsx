@@ -201,6 +201,15 @@ export default function Roost() {
           <div className="roost-mini-label">乌鸦钱包</div>
           <div className="roost-mini-count">¥ {balance.toFixed(0)}</div>
         </div>
+        <div className="roost-card roost-mini-card" onClick={() => setActivePanel('moments')}>
+          <div className="roost-mini-icon">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/>
+            </svg>
+          </div>
+          <div className="roost-mini-label">朋友圈</div>
+          <div className="roost-mini-count">🐦🐦‍⬛</div>
+        </div>
       </div>
 
       {/* ── 留言 Modal ── */}
