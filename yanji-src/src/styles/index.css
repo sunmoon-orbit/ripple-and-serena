@@ -1574,7 +1574,7 @@ a { text-decoration: none; color: inherit; }
 /* 纪念日 */
 .roost-anniversary {
   text-align: center;
-  padding: 24px 20px;
+  padding: 16px 20px;
   background: var(--surface);
   position: relative;
 }
@@ -1604,7 +1604,7 @@ a { text-decoration: none; color: inherit; }
 }
 .roost-days-num {
   font-family: 'Cormorant Garamond', Georgia, serif;
-  font-size: 68px;
+  font-size: 48px;
   font-weight: 300;
   line-height: 1;
   color: var(--text);

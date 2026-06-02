@@ -201,15 +201,17 @@ export default function Roost() {
           <div className="roost-mini-label">乌鸦钱包</div>
           <div className="roost-mini-count">¥ {balance.toFixed(0)}</div>
         </div>
-        <div className="roost-card roost-mini-card" onClick={() => setActivePanel('moments')}>
-          <div className="roost-mini-icon">
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-              <circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/>
-            </svg>
-          </div>
-          <div className="roost-mini-label">朋友圈</div>
-          <div className="roost-mini-count">🐦🐦‍⬛</div>
+      </div>
+
+      {/* 朋友圈全宽入口 */}
+      <div className="roost-card" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 20px', cursor: 'pointer', marginTop: 0 }} onClick={() => setActivePanel('moments')}>
+        <div>
+          <div style={{ fontWeight: 700, fontSize: 15, color: 'var(--text)' }}>朋友圈</div>
+          <div style={{ fontSize: 12, color: 'var(--text-faint)', marginTop: 2 }}>动态 · 评论 · 互动</div>
         </div>
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" style={{ color: 'var(--text-faint)', flexShrink: 0 }}>
+          <path d="M9 18l6-6-6-6"/>
+        </svg>
       </div>
 
       {/* ── 留言 Modal ── */}
