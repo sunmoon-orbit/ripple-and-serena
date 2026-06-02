@@ -38,8 +38,27 @@ async function callAI(conn, prompt) {
   return j.choices[0].message.content.trim()
 }
 
+const IconHeart = ({ filled }) => (
+  <svg width="15" height="15" viewBox="0 0 24 24" fill={filled ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
+  </svg>
+)
+const IconChat = () => (
+  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+  </svg>
+)
+
+function Avatar({ author }) {
+  return (
+    <div style={{ width: 36, height: 36, borderRadius: '50%', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18, background: author === 'ai' ? 'rgba(28,33,48,0.07)' : 'rgba(160,120,80,0.09)' }}>
+      {AVATAR[author]}
+    </div>
+  )
+}
+
 function Post({ post, onLike, onComment, onAIComment }) {
-  const [showComments, setShowComments] = useState(false)
+  const [showComments, setShowComments] = useState((post.comments?.length || 0) > 0)
   const [commentInput, setCommentInput] = useState('')
 
   function submitComment() {
@@ -48,58 +67,50 @@ function Post({ post, onLike, onComment, onAIComment }) {
     setCommentInput('')
   }
 
+  const commentCount = post.comments?.length || 0
+
   return (
     <div style={{ background: 'var(--bg)', borderRadius: 14, padding: '14px 16px', marginBottom: 10 }}>
-      {/* 头部 */}
       <div style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
-        <div style={{ width: 38, height: 38, borderRadius: '50%', background: post.author === 'ai' ? 'rgba(28,33,48,0.08)' : 'rgba(160,120,80,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, flexShrink: 0 }}>{AVATAR[post.author]}</div>
-        <div style={{ flex: 1 }}>
-          <div style={{ fontWeight: 600, fontSize: 14, color: 'var(--accent)' }}>{NAME[post.author]}</div>
-          <div style={{ fontSize: 15, color: 'var(--text)', lineHeight: 1.65, margin: '6px 0 8px' }}>{post.content}</div>
-          <div style={{ fontSize: 11, color: 'var(--text-faint)' }}>{fmtTime(post.createdAt)}</div>
+        <Avatar author={post.author} />
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontWeight: 600, fontSize: 13, color: 'var(--accent)', marginBottom: 4 }}>{NAME[post.author]}</div>
+          <div style={{ fontSize: 15, color: 'var(--text)', lineHeight: 1.7, wordBreak: 'break-word' }}>{post.content}</div>
+          <div style={{ fontSize: 11, color: 'var(--text-faint)', marginTop: 6 }}>{fmtTime(post.createdAt)}</div>
         </div>
       </div>
 
       {/* 操作栏 */}
-      <div style={{ display: 'flex', gap: 16, marginTop: 10, paddingTop: 8, borderTop: '1px solid var(--border)', fontSize: 13 }}>
-        <button onClick={() => onLike(post.id)} style={{
-          background: 'none', border: 'none', cursor: 'pointer', color: post.liked ? 'var(--accent)' : 'var(--text-faint)',
-          display: 'flex', alignItems: 'center', gap: 4, fontSize: 13,
-        }}>
-          {post.liked ? '♥' : '♡'} {post.likes || 0}
+      <div style={{ display: 'flex', gap: 14, marginTop: 10, paddingTop: 8, borderTop: '1px solid var(--border)', alignItems: 'center' }}>
+        <button onClick={() => onLike(post.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: post.liked ? 'var(--accent)' : 'var(--text-faint)', display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, padding: 0 }}>
+          <IconHeart filled={post.liked} /> {post.likes || 0}
         </button>
-        <button onClick={() => setShowComments(!showComments)} style={{
-          background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-faint)', fontSize: 13,
-        }}>
-          💬 {post.comments?.length || 0}
+        <button onClick={() => setShowComments(!showComments)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: showComments ? 'var(--accent)' : 'var(--text-faint)', display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, padding: 0 }}>
+          <IconChat /> {commentCount}
         </button>
         {post.author === 'user' && !post.aiCommented && (
-          <button onClick={() => onAIComment(post.id)} style={{
-            background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-faint)', fontSize: 13,
-          }}>🐦‍⬛ 让阿言说话</button>
+          <button onClick={() => onAIComment(post.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-faint)', fontSize: 12, padding: 0 }}>让阿言说话</button>
         )}
       </div>
 
       {/* 评论区 */}
       {showComments && (
-        <div style={{ marginTop: 10, paddingLeft: 38 }}>
+        <div style={{ marginTop: 10, paddingLeft: 46, borderLeft: '2px solid var(--border)', marginLeft: 18 }}>
           {post.comments?.map(c => (
-            <div key={c.id} style={{ fontSize: 13, marginBottom: 6, color: 'var(--text)' }}>
-              <span style={{ color: 'var(--accent)', fontWeight: 600 }}>{NAME[c.author]}：</span>
+            <div key={c.id} style={{ fontSize: 13, marginBottom: 8, color: 'var(--text)', lineHeight: 1.6 }}>
+              <span style={{ color: c.author === 'ai' ? 'var(--accent)' : 'var(--text)', fontWeight: 600 }}>{NAME[c.author]}：</span>
               {c.content}
             </div>
           ))}
-          <div style={{ display: 'flex', gap: 6, marginTop: 8 }}>
+          <div style={{ display: 'flex', gap: 6, marginTop: 10 }}>
             <input
-              style={{ flex: 1, padding: '6px 10px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--bg)', fontSize: 13, color: 'var(--text)' }}
+              style={{ flex: 1, padding: '7px 10px', borderRadius: 8, border: '1px solid var(--border)', background: 'transparent', fontSize: 13, color: 'var(--text)', outline: 'none' }}
               placeholder="说点什么…"
               value={commentInput}
               onChange={e => setCommentInput(e.target.value)}
               onKeyDown={e => e.key === 'Enter' && submitComment()}
             />
-            <button onClick={submitComment} style={{
-              padding: '6px 12px', borderRadius: 8, border: 'none', background: 'var(--accent)', color: '#fff', fontSize: 13, cursor: 'pointer',
-            }}>发</button>
+            <button onClick={submitComment} style={{ padding: '7px 14px', borderRadius: 8, border: 'none', background: 'var(--accent)', color: '#fff', fontSize: 13, cursor: 'pointer' }}>发</button>
           </div>
         </div>
       )}
@@ -116,6 +127,8 @@ export default function Moments() {
   const [input, setInput] = useState('')
   const [posting, setPosting] = useState(false)
   const [aiPosting, setAIPosting] = useState(false)
+  const [showAll, setShowAll] = useState(false)
+  const SHOW_COUNT = 3
 
   function updatePosts(fn) {
     setPosts(prev => { const next = fn(prev); save(next); return next })
@@ -244,9 +257,14 @@ export default function Moments() {
           还没有动态，来发第一条？
         </div>
       )}
-      {posts.map(p => (
+      {(showAll ? posts : posts.slice(0, SHOW_COUNT)).map(p => (
         <Post key={p.id} post={p} onLike={handleLike} onComment={handleComment} onAIComment={handleAIComment} />
       ))}
+      {posts.length > SHOW_COUNT && (
+        <button onClick={() => setShowAll(!showAll)} style={{ width: '100%', padding: '10px 0', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-faint)', fontSize: 13, textAlign: 'center' }}>
+          {showAll ? '收起历史 ↑' : `查看更多 · 共 ${posts.length} 条 ↓`}
+        </button>
+      )}
     </div>
   )
 }
