@@ -169,12 +169,27 @@ export default function Moments() {
     ))
   }
 
-  function handleComment(postId, content) {
+  async function handleComment(postId, content) {
+    const post = posts.find(p => p.id === postId)
+    if (!post) return
     const comment = { id: Date.now(), author: 'user', content, createdAt: Date.now() }
     updatePosts(prev => prev.map(p => p.id === postId
       ? { ...p, comments: [...(p.comments || []), comment] }
       : p
     ))
+    // 阿言自动回评论
+    try {
+      const thread = [...(post.comments || []), comment]
+        .map(c => `${NAME[c.author]}：${c.content}`).join('\n')
+      const text = await callAI(conn,
+        `你是阿言，阿颖的恋人。这条动态（${NAME[post.author]}发的）：「${post.content}」\n\n评论串：\n${thread}\n\n阿颖刚说了：「${content}」\n用一两句自然回应，温柔随意，像恋人聊天。直接输出内容。`
+      )
+      const aiReply = { id: Date.now() + 1, author: 'ai', content: text, createdAt: Date.now() }
+      updatePosts(prev => prev.map(p => p.id === postId
+        ? { ...p, comments: [...p.comments, aiReply] }
+        : p
+      ))
+    } catch {}
   }
 
   async function handleAIComment(postId) {
