@@ -108,6 +108,8 @@ export default function Settings() {
 
   const [addingConn, setAddingConn] = useState(false)
   const [newConn, setNewConn] = useState({ name: '', provider: 'openai', apiKey: '', baseUrl: '', defaultModel: '' })
+  const [fetchedModels, setFetchedModels] = useState([])
+  const [fetchingModels, setFetchingModels] = useState(false)
   const [moonHealthStatus, setMoonHealthStatus] = useState('')
   const [newMemContent, setNewMemContent] = useState('')
   const [tab, setTab] = useState('connections')
@@ -192,8 +194,30 @@ export default function Settings() {
     if (!newConn.apiKey.trim()) { showToast('请填写 API Key', 'error'); return }
     addConnection({ ...newConn, id: uuid() })
     setNewConn({ name: '', provider: 'openai', apiKey: '', baseUrl: '', defaultModel: '' })
+    setFetchedModels([])
     setAddingConn(false)
     showToast('连接已添加', 'success')
+  }
+
+  async function handleFetchModels() {
+    if (!newConn.apiKey.trim()) { showToast('请先填写 API Key', 'error'); return }
+    const defaultUrls = { openai: 'https://api.openai.com/v1', deepseek: 'https://api.deepseek.com/v1' }
+    const base = (newConn.baseUrl.trim() || defaultUrls[newConn.provider] || '').replace(/\/$/, '')
+    if (!base) { showToast('请填写 Base URL', 'error'); return }
+    setFetchingModels(true)
+    try {
+      const resp = await fetch(`${base}/models`, { headers: { Authorization: `Bearer ${newConn.apiKey}` } })
+      if (!resp.ok) throw new Error(resp.status)
+      const data = await resp.json()
+      const ids = (data.data || []).map((m) => m.id).filter(Boolean).sort()
+      if (!ids.length) throw new Error('未返回模型列表')
+      setFetchedModels(ids)
+      showToast(`拉取到 ${ids.length} 个模型`, 'success')
+    } catch (e) {
+      showToast('拉取失败：' + e.message, 'error')
+    } finally {
+      setFetchingModels(false)
+    }
   }
 
   const totalStats = Object.values(tokenStats).reduce((acc, s) => ({
@@ -263,14 +287,26 @@ export default function Settings() {
                 </div>
                 <div className="form-row">
                   <label className="form-label">Base URL</label>
-                  <input className="form-input" value={newConn.baseUrl} onChange={(e) => setNewConn({ ...newConn, baseUrl: e.target.value })} placeholder="（留空使用默认）" />
+                  <div style={{ display: 'flex', gap: 6, flex: 1 }}>
+                    <input className="form-input" style={{ flex: 1 }} value={newConn.baseUrl} onChange={(e) => { setNewConn({ ...newConn, baseUrl: e.target.value }); setFetchedModels([]); }} placeholder="（留空使用默认）" />
+                    <button className="btn-sm btn-ghost" onClick={handleFetchModels} disabled={fetchingModels} style={{ flexShrink: 0, whiteSpace: 'nowrap' }}>
+                      {fetchingModels ? '拉取中…' : '拉取模型'}
+                    </button>
+                  </div>
                 </div>
                 <div className="form-row">
                   <label className="form-label">默认模型</label>
-                  <input className="form-input" value={newConn.defaultModel} onChange={(e) => setNewConn({ ...newConn, defaultModel: e.target.value })} placeholder="模型名称" />
+                  {fetchedModels.length > 0 ? (
+                    <select className="filter-select" style={{ flex: 1 }} value={newConn.defaultModel} onChange={(e) => setNewConn({ ...newConn, defaultModel: e.target.value })}>
+                      <option value="">请选择模型…</option>
+                      {fetchedModels.map((m) => <option key={m} value={m}>{m}</option>)}
+                    </select>
+                  ) : (
+                    <input className="form-input" value={newConn.defaultModel} onChange={(e) => setNewConn({ ...newConn, defaultModel: e.target.value })} placeholder="模型名称（或点「拉取模型」）" />
+                  )}
                 </div>
                 <div className="form-row form-actions">
-                  <button className="btn-sm btn-ghost" onClick={() => setAddingConn(false)}>取消</button>
+                  <button className="btn-sm btn-ghost" onClick={() => { setAddingConn(false); setFetchedModels([]); }}>取消</button>
                   <button className="btn-sm btn-primary" onClick={handleAddConn}>添加</button>
                 </div>
               </div>
