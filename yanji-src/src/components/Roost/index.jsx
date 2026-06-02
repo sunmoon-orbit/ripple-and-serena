@@ -361,7 +361,7 @@ export default function Roost() {
               <button className="roost-modal-close" onClick={() => setModal(null)}>✕</button>
             </div>
             <div style={{ padding: '0 20px 16px' }}>
-            <div style={{ textAlign: 'center', padding: '8px 0 4px', fontSize: 13, color: 'var(--text-faint)' }}>🐦‍⬛ 鸦的钱包</div>
+            <div style={{ textAlign: 'center', padding: '8px 0 4px', fontSize: 28 }}>🐦‍⬛</div>
             <div style={{ textAlign: 'center', padding: '4px 0 20px', fontSize: 32, fontWeight: 700, color: balance >= 0 ? 'var(--accent)' : 'var(--danger)' }}>
               ¥ {balance.toFixed(2)}
             </div>
