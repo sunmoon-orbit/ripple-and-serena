@@ -354,8 +354,8 @@ export default function Roost() {
       )}
 
       {modal === 'wallet' && (
-        <div className="roost-overlay" onClick={() => setModal(null)}>
-          <div className="roost-modal" onClick={e => e.stopPropagation()}>
+        <div className="roost-overlay" style={{ alignItems: 'center', padding: '0 20px' }} onClick={() => setModal(null)}>
+          <div className="roost-modal" style={{ borderRadius: 20, maxHeight: '80vh', width: '100%' }} onClick={e => e.stopPropagation()}>
             <div className="roost-modal-header">
               <span>乌鸦钱包</span>
               <button className="roost-modal-close" onClick={() => setModal(null)}>✕</button>
