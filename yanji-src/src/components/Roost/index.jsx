@@ -354,8 +354,8 @@ export default function Roost() {
       )}
 
       {modal === 'wallet' && (
-        <div className="roost-overlay" style={{ alignItems: 'center', padding: '0 20px' }} onClick={() => setModal(null)}>
-          <div className="roost-modal" style={{ borderRadius: 20, maxHeight: '80vh', width: '100%' }} onClick={e => e.stopPropagation()}>
+        <div className="roost-overlay" style={{ alignItems: 'center', padding: '0 32px' }} onClick={() => setModal(null)}>
+          <div className="roost-modal" style={{ borderRadius: 20, maxHeight: '75vh', width: '100%', maxWidth: 340 }} onClick={e => e.stopPropagation()}>
             <div className="roost-modal-header">
               <span>乌鸦钱包</span>
               <button className="roost-modal-close" onClick={() => setModal(null)}>✕</button>
@@ -388,7 +388,7 @@ export default function Roost() {
               addWalletEntry(walletAmount, walletNote, walletType)
               setWalletAmount(''); setWalletNote('')
             }}>记一笔</button>
-            <div style={{ maxHeight: 260, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 6 }}>
+            <div style={{ maxHeight: 160, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 6 }}>
               {walletEntries.length === 0 && <div className="roost-empty">还没有记录</div>}
               {walletEntries.map(e => (
                 <div key={e.id} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 14, padding: '6px 0', borderBottom: '1px solid var(--line-soft)' }}>
