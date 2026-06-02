@@ -363,23 +363,30 @@ export default function Roost() {
             <div style={{ textAlign: 'center', padding: '16px 0 8px', fontSize: 28, fontWeight: 700, color: balance >= 0 ? 'var(--accent)' : 'var(--danger)' }}>
               ¥ {balance.toFixed(2)}
             </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 12 }}>
-              <div style={{ display: 'flex', gap: 8 }}>
-                <select className="filter-select" style={{ flex: 1 }} value={walletType} onChange={e => setWalletType(e.target.value)}>
-                  <option value="in">存入</option>
-                  <option value="out">支出</option>
-                </select>
-                <input className="form-input" style={{ flex: 2 }} type="number" placeholder="金额 ¥" value={walletAmount} onChange={e => setWalletAmount(e.target.value)} />
-              </div>
-              <div style={{ display: 'flex', gap: 8 }}>
-                <input className="form-input" style={{ flex: 1 }} placeholder="备注（选填）" value={walletNote} onChange={e => setWalletNote(e.target.value)} />
-                <button className="btn-sm btn-primary" style={{ flexShrink: 0 }} onClick={() => {
-                  if (!walletAmount || isNaN(walletAmount)) return
-                  addWalletEntry(walletAmount, walletNote, walletType)
-                  setWalletAmount(''); setWalletNote('')
-                }}>记一笔</button>
-              </div>
+            <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
+              {['in','out'].map(t => (
+                <button key={t} onClick={() => setWalletType(t)} style={{
+                  flex: 1, padding: '10px 0', borderRadius: 10, border: 'none', cursor: 'pointer', fontWeight: 600, fontSize: 14,
+                  background: walletType === t ? 'var(--accent)' : 'var(--bg-secondary)',
+                  color: walletType === t ? '#fff' : 'var(--text-faint)',
+                  transition: 'all 0.15s',
+                }}>{t === 'in' ? '存入' : '支出'}</button>
+              ))}
             </div>
+            <input className="form-input" type="number" placeholder="金额 ¥" value={walletAmount}
+              onChange={e => setWalletAmount(e.target.value)}
+              style={{ width: '100%', marginBottom: 8, fontSize: 18, textAlign: 'center' }} />
+            <input className="form-input" placeholder="备注（选填）" value={walletNote}
+              onChange={e => setWalletNote(e.target.value)}
+              style={{ width: '100%', marginBottom: 12 }} />
+            <button style={{
+              width: '100%', padding: '13px 0', borderRadius: 12, border: 'none', cursor: 'pointer',
+              background: 'var(--accent)', color: '#fff', fontWeight: 700, fontSize: 15, marginBottom: 16,
+            }} onClick={() => {
+              if (!walletAmount || isNaN(walletAmount)) return
+              addWalletEntry(walletAmount, walletNote, walletType)
+              setWalletAmount(''); setWalletNote('')
+            }}>记一笔</button>
             <div style={{ maxHeight: 260, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 6 }}>
               {walletEntries.length === 0 && <div className="roost-empty">还没有记录</div>}
               {walletEntries.map(e => (
@@ -389,7 +396,7 @@ export default function Roost() {
                   </span>
                   <span style={{ flex: 1, color: 'var(--ink-soft)' }}>{e.note || '—'}</span>
                   <span style={{ color: 'var(--ink-faint)', fontSize: 12 }}>{e.at}</span>
-                  <button className="roost-btn roost-btn-danger" style={{ padding: '2px 8px', fontSize: 12 }} onClick={() => removeWalletEntry(e.id)}>删</button>
+                  <button className="roost-btn roost-btn-danger" style={{ padding: '4px 12px', fontSize: 12, flexShrink: 0 }} onClick={() => removeWalletEntry(e.id)}>删</button>
                 </div>
               ))}
             </div>
