@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { api } from '../api'
 import { showToast } from './Toast'
-import { Plus, RefreshCw, Search, Clock, Pencil, Trash2, Share2 } from 'lucide-react'
+import { Plus, RefreshCw, Search, Clock, Pencil, Trash2, Share2, Sparkles, ArrowUpDown } from 'lucide-react'
 
 export const SCOPES = { shared: '共享', private_阿颖: '阿颖私密', private_阿言: '阿言私密' }
 export const LAYERS = { core: '核心', long: '长期', short: '短期', consciousness: '意识' }
@@ -198,6 +198,13 @@ function Editor({ initial, onClose, onSaved }) {
   )
 }
 
+function emotionColor(valence) {
+  if (valence == null || valence === 0) return null
+  if (valence > 0.3) return `rgba(220,100,60,${Math.min(0.3 + valence * 0.6, 0.9).toFixed(2)})`
+  if (valence < -0.3) return `rgba(80,120,200,${Math.min(0.3 + Math.abs(valence) * 0.6, 0.9).toFixed(2)})`
+  return null
+}
+
 function Card({ m, onEdit, onTrash }) {
   const [exp, setExp] = useState(false)
   const [relOpen, setRelOpen] = useState(false)
@@ -233,6 +240,9 @@ function Card({ m, onEdit, onTrash }) {
             <span className="badge badge-scope">{SCOPES[m.scope] || m.scope}</span>
           )}
           {impLabel && <span className="imp-text">{impLabel}</span>}
+          {emotionColor(m.valence) && (
+            <span style={{ width: 7, height: 7, borderRadius: '50%', background: emotionColor(m.valence), display: 'inline-block', flexShrink: 0 }} title={`情绪 ${m.valence > 0 ? '+' : ''}${m.valence?.toFixed(2)}`} />
+          )}
         </div>
         <span className="card-date">{fmtDate(m.created_at)}</span>
       </div>
@@ -314,6 +324,8 @@ export default function MemoryPanel() {
   const [days, setDays] = useState(null)
   const [tabIdx, setTabIdx] = useState(0)
   const [selectedDate, setSelectedDate] = useState(null)
+  const [sortBy, setSortBy] = useState('date') // date | importance | arousal
+  const [semanticLoading, setSemanticLoading] = useState(false)
 
   // 在一起多少天
   useEffect(() => {
@@ -341,6 +353,23 @@ export default function MemoryPanel() {
   }, [q, scope, memType, layer, selectedDate])
 
   useEffect(() => { load() }, [load])
+
+  const sortedMems = [...mems].sort((a, b) => {
+    if (sortBy === 'importance') return (b.importance || 5) - (a.importance || 5)
+    if (sortBy === 'arousal') return (b.arousal || 0) - (a.arousal || 0)
+    return 0
+  })
+
+  async function semanticSearch() {
+    if (!q.trim()) return showToast('请先输入搜索词', 'error')
+    setSemanticLoading(true)
+    try {
+      const results = await api.semantic(q.trim())
+      setMems(results)
+      showToast(`语义搜索找到 ${results.length} 条`, 'success')
+    } catch (e) { showToast(e.message, 'error') }
+    finally { setSemanticLoading(false) }
+  }
 
   async function trash(m) {
     if (!confirm('移入回收站？')) return
@@ -386,7 +415,20 @@ export default function MemoryPanel() {
       <div className="search-wrap">
         <div className="search-box">
           <Search size={14} />
-          <input value={q} placeholder="搜索记忆…" onChange={(e) => setQ(e.target.value)} />
+          <input value={q} placeholder="搜索记忆…" onChange={(e) => setQ(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && load()} />
+          <button className="icon-btn" style={{ width: 26, height: 26, flexShrink: 0 }}
+            onClick={semanticSearch} disabled={semanticLoading} title="语义搜索">
+            <Sparkles size={13} className={semanticLoading ? 'spin' : ''} />
+          </button>
+        </div>
+        <div style={{ display: 'flex', gap: 6, marginTop: 8, alignItems: 'center' }}>
+          <ArrowUpDown size={12} style={{ color: 'var(--ink-faint)' }} />
+          {[['date','时间'],['importance','重要性'],['arousal','情绪强度']].map(([v,l]) => (
+            <button key={v} className={'scope-tab' + (sortBy === v ? ' active' : '')}
+              style={{ padding: '4px 10px', fontSize: 12 }}
+              onClick={() => setSortBy(v)}>{l}</button>
+          ))}
         </div>
       </div>
 
@@ -416,7 +458,7 @@ export default function MemoryPanel() {
       {!error && mems.length === 0 && !loading && <div className="empty">暂无记忆</div>}
 
       <div className="mem-list">
-        {mems.map((m) => <Card key={m.id} m={m} onEdit={setEditor} onTrash={trash} />)}
+        {sortedMems.map((m) => <Card key={m.id} m={m} onEdit={setEditor} onTrash={trash} />)}
       </div>
 
       {/* 悬浮新建按钮 */}
