@@ -363,22 +363,23 @@ export default function Roost() {
             <div style={{ textAlign: 'center', padding: '16px 0 8px', fontSize: 28, fontWeight: 700, color: balance >= 0 ? 'var(--accent)' : 'var(--danger)' }}>
               ¥ {balance.toFixed(2)}
             </div>
-            <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
+            <div style={{ display: 'flex', gap: 8, marginBottom: 16, background: 'var(--border)', borderRadius: 12, padding: 4 }}>
               {['in','out'].map(t => (
                 <button key={t} onClick={() => setWalletType(t)} style={{
-                  flex: 1, padding: '10px 0', borderRadius: 10, border: 'none', cursor: 'pointer', fontWeight: 600, fontSize: 14,
-                  background: walletType === t ? 'var(--accent)' : 'var(--bg-secondary)',
+                  flex: 1, padding: '9px 0', borderRadius: 9, border: 'none', cursor: 'pointer',
+                  fontWeight: walletType === t ? 700 : 400, fontSize: 14,
+                  background: walletType === t ? 'var(--accent)' : 'transparent',
                   color: walletType === t ? '#fff' : 'var(--text-faint)',
-                  transition: 'all 0.15s',
+                  transition: 'all 0.18s',
                 }}>{t === 'in' ? '存入' : '支出'}</button>
               ))}
             </div>
-            <input className="form-input" type="number" placeholder="金额 ¥" value={walletAmount}
+            <input className="form-input" type="number" placeholder="金额" value={walletAmount}
               onChange={e => setWalletAmount(e.target.value)}
-              style={{ width: '100%', marginBottom: 8, fontSize: 18, textAlign: 'center' }} />
+              style={{ width: '100%', marginBottom: 10, fontSize: 16, textAlign: 'center', letterSpacing: 1 }} />
             <input className="form-input" placeholder="备注（选填）" value={walletNote}
               onChange={e => setWalletNote(e.target.value)}
-              style={{ width: '100%', marginBottom: 12 }} />
+              style={{ width: '100%', marginBottom: 16 }} />
             <button style={{
               width: '100%', padding: '13px 0', borderRadius: 12, border: 'none', cursor: 'pointer',
               background: 'var(--accent)', color: '#fff', fontWeight: 700, fontSize: 15, marginBottom: 16,
