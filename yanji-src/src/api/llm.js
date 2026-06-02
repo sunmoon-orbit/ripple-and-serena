@@ -381,8 +381,9 @@ async function streamSSE(resp, parseLine, onChunk) {
       try {
         const text = parseLine(data)
         if (text) {
-          fullText += text
-          onChunk?.(text)
+          const cleaned = text.replace(/([一-鿿＀-￯]),/g, '$1，').replace(/,([一-鿿＀-￯])/g, '，$1')
+          fullText += cleaned
+          onChunk?.(cleaned)
         }
       } catch {}
     }
