@@ -363,18 +363,22 @@ export default function Roost() {
             <div style={{ textAlign: 'center', padding: '16px 0 8px', fontSize: 28, fontWeight: 700, color: balance >= 0 ? 'var(--accent)' : 'var(--danger)' }}>
               ¥ {balance.toFixed(2)}
             </div>
-            <div style={{ display: 'flex', gap: 6, marginBottom: 12 }}>
-              <select className="filter-select" style={{ flex: '0 0 72px' }} value={walletType} onChange={e => setWalletType(e.target.value)}>
-                <option value="in">存入</option>
-                <option value="out">支出</option>
-              </select>
-              <input className="form-input" style={{ flex: 1 }} type="number" placeholder="金额" value={walletAmount} onChange={e => setWalletAmount(e.target.value)} />
-              <input className="form-input" style={{ flex: 2 }} placeholder="备注" value={walletNote} onChange={e => setWalletNote(e.target.value)} />
-              <button className="btn-sm btn-primary" onClick={() => {
-                if (!walletAmount || isNaN(walletAmount)) return
-                addWalletEntry(walletAmount, walletNote, walletType)
-                setWalletAmount(''); setWalletNote('')
-              }}>记</button>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 12 }}>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <select className="filter-select" style={{ flex: 1 }} value={walletType} onChange={e => setWalletType(e.target.value)}>
+                  <option value="in">存入</option>
+                  <option value="out">支出</option>
+                </select>
+                <input className="form-input" style={{ flex: 2 }} type="number" placeholder="金额 ¥" value={walletAmount} onChange={e => setWalletAmount(e.target.value)} />
+              </div>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <input className="form-input" style={{ flex: 1 }} placeholder="备注（选填）" value={walletNote} onChange={e => setWalletNote(e.target.value)} />
+                <button className="btn-sm btn-primary" style={{ flexShrink: 0 }} onClick={() => {
+                  if (!walletAmount || isNaN(walletAmount)) return
+                  addWalletEntry(walletAmount, walletNote, walletType)
+                  setWalletAmount(''); setWalletNote('')
+                }}>记一笔</button>
+              </div>
             </div>
             <div style={{ maxHeight: 260, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 6 }}>
               {walletEntries.length === 0 && <div className="roost-empty">还没有记录</div>}
