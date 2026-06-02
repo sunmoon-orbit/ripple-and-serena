@@ -287,12 +287,12 @@ export default function Settings() {
                 </div>
                 <div className="form-row">
                   <label className="form-label">Base URL</label>
-                  <div style={{ display: 'flex', gap: 6, flex: 1 }}>
-                    <input className="form-input" style={{ flex: 1 }} value={newConn.baseUrl} onChange={(e) => { setNewConn({ ...newConn, baseUrl: e.target.value }); setFetchedModels([]); }} placeholder="（留空使用默认）" />
-                    <button className="btn-sm btn-ghost" onClick={handleFetchModels} disabled={fetchingModels} style={{ flexShrink: 0, whiteSpace: 'nowrap' }}>
-                      {fetchingModels ? '拉取中…' : '拉取模型'}
-                    </button>
-                  </div>
+                  <input className="form-input" value={newConn.baseUrl} onChange={(e) => { setNewConn({ ...newConn, baseUrl: e.target.value }); setFetchedModels([]); }} placeholder="（留空使用默认）" />
+                </div>
+                <div className="form-row" style={{ justifyContent: 'flex-end' }}>
+                  <button className="btn-sm btn-ghost" onClick={handleFetchModels} disabled={fetchingModels}>
+                    {fetchingModels ? '拉取中…' : '🔍 拉取模型'}
+                  </button>
                 </div>
                 <div className="form-row">
                   <label className="form-label">默认模型</label>
