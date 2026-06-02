@@ -52,7 +52,7 @@ function Post({ post, onLike, onComment, onAIComment }) {
     <div style={{ background: 'var(--bg)', borderRadius: 14, padding: '14px 16px', marginBottom: 10 }}>
       {/* 头部 */}
       <div style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
-        <div style={{ fontSize: 28, lineHeight: 1 }}>{AVATAR[post.author]}</div>
+        <div style={{ width: 38, height: 38, borderRadius: '50%', background: post.author === 'ai' ? 'rgba(28,33,48,0.08)' : 'rgba(160,120,80,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, flexShrink: 0 }}>{AVATAR[post.author]}</div>
         <div style={{ flex: 1 }}>
           <div style={{ fontWeight: 600, fontSize: 14, color: 'var(--accent)' }}>{NAME[post.author]}</div>
           <div style={{ fontSize: 15, color: 'var(--text)', lineHeight: 1.65, margin: '6px 0 8px' }}>{post.content}</div>
@@ -206,7 +206,7 @@ export default function Moments() {
       {/* 发动态框 */}
       <div style={{ background: 'var(--bg)', borderRadius: 14, padding: 14, marginBottom: 14 }}>
         <div style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
-          <div style={{ fontSize: 28 }}>🐦</div>
+          <div style={{ width: 38, height: 38, borderRadius: '50%', background: 'rgba(160,120,80,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, flexShrink: 0 }}>🐦</div>
           <textarea
             style={{ flex: 1, border: 'none', background: 'transparent', resize: 'none', fontSize: 15, color: 'var(--text)', outline: 'none', minHeight: 60, lineHeight: 1.6 }}
             placeholder="在想什么…"
