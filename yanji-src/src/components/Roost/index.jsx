@@ -73,6 +73,7 @@ function useReview(moonMemory) {
 // ══════════════════════════════════════════════════════════════════════════════
 export default function Roost() {
   const moonMemory = useStore(s => s.moonMemory)
+  const setActivePanel = useStore(s => s.setActivePanel)
   const { msgs, add: addMsg, del: delMsg } = useMessages()
   const { books, add: addBook, toggle: toggleBook, remove: removeBook, updateNote } = useBooks()
   const { mems, loading: reviewLoading, load: loadReview, trash } = useReview(moonMemory)
@@ -160,6 +161,15 @@ export default function Roost() {
           </div>
           <div className="roost-mini-label">记忆审核</div>
           <div className="roost-mini-count">{mems.length > 0 ? `${mems.length} 条` : '点击审核'}</div>
+        </div>
+        <div className="roost-card roost-mini-card" onClick={() => setActivePanel('dream')}>
+          <div className="roost-mini-icon">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+            </svg>
+          </div>
+          <div className="roost-mini-label">记忆整合</div>
+          <div className="roost-mini-count">Dream</div>
         </div>
       </div>
 
