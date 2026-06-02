@@ -4,8 +4,9 @@ import { showToast } from '../Toast'
 import { createLullaby } from '../../audio/lullaby'
 
 const START_DATE = new Date('2025-10-10T00:00:00+08:00')
-const STORAGE_KEY_MSG   = 'roost_messages'
-const STORAGE_KEY_BOOKS = 'roost_books'
+const STORAGE_KEY_MSG    = 'roost_messages'
+const STORAGE_KEY_BOOKS  = 'roost_books'
+const STORAGE_KEY_WALLET = 'roost_wallet'
 
 function getDays() {
   return Math.floor((Date.now() - START_DATE) / 86400000) + 1
@@ -36,6 +37,20 @@ function useBooks() {
   const remove = (id) => save(books.filter(b => b.id !== id))
   const updateNote = (id, note) => save(books.map(b => b.id === id ? { ...b, note } : b))
   return { books, add, toggle, remove, updateNote }
+}
+
+// ── 钱包 ─────────────────────────────────────────────────────────────────────
+function useWallet() {
+  const [entries, setEntries] = useState(() => {
+    try { return JSON.parse(localStorage.getItem(STORAGE_KEY_WALLET) || '[]') } catch { return [] }
+  })
+  const save = (list) => { localStorage.setItem(STORAGE_KEY_WALLET, JSON.stringify(list)); setEntries(list) }
+  const add = (amount, note, type) => {
+    save([{ id: Date.now(), amount: Number(amount), note, type, at: new Date().toLocaleDateString('zh-CN') }, ...entries])
+  }
+  const remove = (id) => save(entries.filter(e => e.id !== id))
+  const balance = entries.reduce((s, e) => e.type === 'in' ? s + e.amount : s - e.amount, 0)
+  return { entries, add, remove, balance }
 }
 
 // ── 记忆审核 ─────────────────────────────────────────────────────────────────
@@ -77,11 +92,15 @@ export default function Roost() {
   const { msgs, add: addMsg, del: delMsg } = useMessages()
   const { books, add: addBook, toggle: toggleBook, remove: removeBook, updateNote } = useBooks()
   const { mems, loading: reviewLoading, load: loadReview, trash } = useReview(moonMemory)
+  const { entries: walletEntries, add: addWalletEntry, remove: removeWalletEntry, balance } = useWallet()
 
-  const [modal, setModal] = useState(null) // 'message' | 'bookshelf' | 'review' | 'book-detail'
+  const [modal, setModal] = useState(null)
   const [selectedBook, setSelectedBook] = useState(null)
   const [msgInput, setMsgInput] = useState('')
   const [bookInput, setBookInput] = useState('')
+  const [walletAmount, setWalletAmount] = useState('')
+  const [walletNote, setWalletNote] = useState('')
+  const [walletType, setWalletType] = useState('in')
 
   const days = getDays()
   const latestMsg = msgs[0]
@@ -170,6 +189,15 @@ export default function Roost() {
           </div>
           <div className="roost-mini-label">记忆整合</div>
           <div className="roost-mini-count">Dream</div>
+        </div>
+        <div className="roost-card roost-mini-card" onClick={() => setModal('wallet')}>
+          <div className="roost-mini-icon">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+              <rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 14a2 2 0 1 0 0-4 2 2 0 0 0 0 4z"/><path d="M22 7V5a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v2"/>
+            </svg>
+          </div>
+          <div className="roost-mini-label">乌鸦钱包</div>
+          <div className="roost-mini-count">¥ {balance.toFixed(0)}</div>
         </div>
       </div>
 
@@ -316,6 +344,46 @@ export default function Roost() {
                   </div>
                   <div className="roost-review-content">{m.content}</div>
                   <button className="roost-btn roost-btn-danger" onClick={() => trash(m.id)}>删除</button>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {modal === 'wallet' && (
+        <div className="roost-modal-overlay" onClick={() => setModal(null)}>
+          <div className="roost-modal" onClick={e => e.stopPropagation()}>
+            <div className="roost-modal-header">
+              <span>乌鸦钱包</span>
+              <button className="roost-modal-close" onClick={() => setModal(null)}>✕</button>
+            </div>
+            <div style={{ textAlign: 'center', padding: '16px 0 8px', fontSize: 28, fontWeight: 700, color: balance >= 0 ? 'var(--accent)' : 'var(--danger)' }}>
+              ¥ {balance.toFixed(2)}
+            </div>
+            <div style={{ display: 'flex', gap: 6, marginBottom: 12 }}>
+              <select className="filter-select" style={{ flex: '0 0 72px' }} value={walletType} onChange={e => setWalletType(e.target.value)}>
+                <option value="in">存入</option>
+                <option value="out">支出</option>
+              </select>
+              <input className="form-input" style={{ flex: 1 }} type="number" placeholder="金额" value={walletAmount} onChange={e => setWalletAmount(e.target.value)} />
+              <input className="form-input" style={{ flex: 2 }} placeholder="备注" value={walletNote} onChange={e => setWalletNote(e.target.value)} />
+              <button className="btn-sm btn-primary" onClick={() => {
+                if (!walletAmount || isNaN(walletAmount)) return
+                addWalletEntry(walletAmount, walletNote, walletType)
+                setWalletAmount(''); setWalletNote('')
+              }}>记</button>
+            </div>
+            <div style={{ maxHeight: 260, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 6 }}>
+              {walletEntries.length === 0 && <div className="roost-empty">还没有记录</div>}
+              {walletEntries.map(e => (
+                <div key={e.id} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 14, padding: '6px 0', borderBottom: '1px solid var(--line-soft)' }}>
+                  <span style={{ color: e.type === 'in' ? 'var(--accent)' : 'var(--danger)', fontWeight: 600, minWidth: 64 }}>
+                    {e.type === 'in' ? '+' : '-'}¥{e.amount}
+                  </span>
+                  <span style={{ flex: 1, color: 'var(--ink-soft)' }}>{e.note || '—'}</span>
+                  <span style={{ color: 'var(--ink-faint)', fontSize: 12 }}>{e.at}</span>
+                  <button className="roost-btn roost-btn-danger" style={{ padding: '2px 8px', fontSize: 12 }} onClick={() => removeWalletEntry(e.id)}>删</button>
                 </div>
               ))}
             </div>
