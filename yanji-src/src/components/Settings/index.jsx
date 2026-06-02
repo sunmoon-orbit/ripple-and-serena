@@ -291,7 +291,7 @@ export default function Settings() {
                 </div>
                 <div className="form-row" style={{ justifyContent: 'flex-end' }}>
                   <button className="btn-sm btn-ghost" onClick={handleFetchModels} disabled={fetchingModels}>
-                    {fetchingModels ? '拉取中…' : '🔍 拉取模型'}
+                    {fetchingModels ? '拉取中…' : '拉取模型'}
                   </button>
                 </div>
                 <div className="form-row">
