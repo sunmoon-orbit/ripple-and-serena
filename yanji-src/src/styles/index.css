@@ -871,6 +871,9 @@ a { text-decoration: none; color: inherit; }
   display: flex; align-items: center; justify-content: center;
   color: var(--accent); flex-shrink: 0; margin-top: 2px;
 }
+.message-avatar-user {
+  background: rgba(191,181,216,0.35);
+}
 .message-content-wrap {
   display: flex; flex-direction: column; gap: 3px;
   max-width: min(78%, 600px);

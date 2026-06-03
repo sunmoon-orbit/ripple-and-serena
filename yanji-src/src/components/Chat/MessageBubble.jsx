@@ -49,6 +49,14 @@ export default function MessageBubble({ msg, onEdit }) {
           </svg>
         </div>
       )}
+      {isUser && (
+        <div className="message-avatar message-avatar-user">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+            <circle cx="12" cy="8" r="4" />
+            <path d="M4 20c0-4 3.6-7 8-7s8 3 8 7" />
+          </svg>
+        </div>
+      )}
       <div className="message-content-wrap">
         {msg.toolCalls?.length > 0 && (
           <div className="message-tool-badge">
