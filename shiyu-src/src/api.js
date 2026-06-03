@@ -26,7 +26,7 @@ function qs(params = {}) {
 
 export const api = {
   list: (params = {}) => req('/memories/filter' + qs(params)),
-  heatmap: () => req('/memories/heatmap'),
+  heatmap: (params = {}) => req('/memories/heatmap' + qs(params)),
   trash: () => req('/memories/trash?limit=300'),
   create: (body) => req('/memories', { method: 'POST', body: JSON.stringify(body) }),
   update: (id, body) => req(`/memories/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
@@ -34,7 +34,7 @@ export const api = {
   restore: (id) => req(`/memories/${id}/restore`, { method: 'POST', body: '{}' }),
   related: (id, k = 5) => req(`/memories/${id}/related?k=${k}`),
   semantic: (q, k = 20) => req(`/memories/semantic?q=${encodeURIComponent(q)}&k=${k}`),
-  emotionHeatmap: () => req('/memories/emotion-heatmap'),
+  emotionHeatmap: (params = {}) => req('/memories/emotion-heatmap' + qs(params)),
   anniversaries: () => req('/anniversaries'),
   time: () => req('/context/time'),
   health: () => req('/health'),

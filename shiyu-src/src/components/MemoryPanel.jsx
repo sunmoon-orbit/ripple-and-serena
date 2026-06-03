@@ -47,9 +47,9 @@ function useClock() {
   return t
 }
 
-function Heatmap({ data, selectedDate, onSelectDate }) {
+function Heatmap({ data, selectedDate, onSelectDate, offset = 0 }) {
   const days = []
-  for (let i = 83; i >= 0; i--) {
+  for (let i = 83 + offset; i >= offset; i--) {
     const d = new Date(); d.setDate(d.getDate() - i)
     days.push({ key: d.toISOString().slice(0, 10), n: data[d.toISOString().slice(0, 10)] || 0 })
   }
@@ -73,9 +73,9 @@ function Heatmap({ data, selectedDate, onSelectDate }) {
   )
 }
 
-function EmotionHeatmap({ data, selectedDate, onSelectDate }) {
+function EmotionHeatmap({ data, selectedDate, onSelectDate, offset = 0 }) {
   const days = []
-  for (let i = 83; i >= 0; i--) {
+  for (let i = 83 + offset; i >= offset; i--) {
     const d = new Date(); d.setDate(d.getDate() - i)
     const key = d.toISOString().slice(0, 10)
     days.push({ key, ...(data[key] || null) })
@@ -327,6 +327,7 @@ export default function MemoryPanel() {
   const [sortBy, setSortBy] = useState('date') // date | importance | arousal
   const [semanticLoading, setSemanticLoading] = useState(false)
   const [heatType, setHeatType] = useState('count') // count | emotion
+  const [heatPage, setHeatPage] = useState(0) // 0=最近12周, 1=再往前12周...
 
   // 在一起多少天
   useEffect(() => {
@@ -340,7 +341,6 @@ export default function MemoryPanel() {
   }, [])
 
   const load = useCallback(async () => {
-    // eslint-disable-next-line react-hooks/exhaustive-deps
     setLoading(true); setError('')
     try {
       const params = { q, limit: 200 }
@@ -348,10 +348,11 @@ export default function MemoryPanel() {
       if (memType) params.type = memType
       if (layer) params.layer = layer
       if (selectedDate) params.date = selectedDate
-      const [m, h, eh] = await Promise.all([api.list(params), api.heatmap(), api.emotionHeatmap()])
+      const heatOffset = heatPage * 84
+      const [m, h, eh] = await Promise.all([api.list(params), api.heatmap({ offset: heatOffset }), api.emotionHeatmap({ offset: heatOffset })])
       setMems(m); setHeat(h); setEmotionHeat(eh)
     } catch (e) { setError(e.message) } finally { setLoading(false) }
-  }, [q, scope, memType, layer, selectedDate])
+  }, [q, scope, memType, layer, selectedDate, heatPage])
 
   useEffect(() => { load() }, [load])
 
@@ -399,14 +400,21 @@ export default function MemoryPanel() {
         </div>
       </div>
 
-      {/* 热力图切换 */}
-      <div className="heatmap-switch">
-        <button className={'heatmap-switch-btn' + (heatType === 'count' ? ' active' : '')} onClick={() => setHeatType('count')}>记忆数</button>
-        <button className={'heatmap-switch-btn' + (heatType === 'emotion' ? ' active' : '')} onClick={() => setHeatType('emotion')}>情绪</button>
+      {/* 热力图切换 + 翻页 */}
+      <div className="heatmap-nav">
+        <div className="heatmap-switch">
+          <button className={'heatmap-switch-btn' + (heatType === 'count' ? ' active' : '')} onClick={() => setHeatType('count')}>记忆数</button>
+          <button className={'heatmap-switch-btn' + (heatType === 'emotion' ? ' active' : '')} onClick={() => setHeatType('emotion')}>情绪</button>
+        </div>
+        <div className="heatmap-pager">
+          <button className="heatmap-pager-btn" onClick={() => setHeatPage(p => p + 1)} title="往前">←</button>
+          <span className="heatmap-pager-label">{heatPage === 0 ? '最近 12 周' : `第 ${heatPage + 1} 期`}</span>
+          <button className="heatmap-pager-btn" onClick={() => setHeatPage(p => Math.max(0, p - 1))} disabled={heatPage === 0} title="往后">→</button>
+        </div>
       </div>
       {heatType === 'count' ? (
         <>
-          <Heatmap data={heat} selectedDate={selectedDate} onSelectDate={setSelectedDate} />
+          <Heatmap data={heat} selectedDate={selectedDate} onSelectDate={setSelectedDate} offset={heatPage * 84} />
           <div className="heatmap-legend">
             {selectedDate
               ? <><span style={{ color: 'var(--olive-active)', fontWeight: 600 }}>{selectedDate}</span> · {mems.length} 条 <button className="card-more" style={{ display: 'inline', marginLeft: 6 }} onClick={() => setSelectedDate(null)}>取消筛选</button></>
@@ -416,7 +424,7 @@ export default function MemoryPanel() {
         </>
       ) : (
         <>
-          <EmotionHeatmap data={emotionHeat} selectedDate={selectedDate} onSelectDate={setSelectedDate} />
+          <EmotionHeatmap data={emotionHeat} selectedDate={selectedDate} onSelectDate={setSelectedDate} offset={heatPage * 84} />
           <div className="heatmap-legend">情绪分布 · 暖色积极 冷色消极 深色强烈</div>
         </>
       )}
