@@ -57,7 +57,7 @@ function Avatar({ author }) {
   )
 }
 
-function Post({ post, onLike, onComment, onAIComment }) {
+function Post({ post, onLike, onComment, onAIComment, onDelete }) {
   const [showComments, setShowComments] = useState(false)
   const [commentInput, setCommentInput] = useState('')
 
@@ -74,7 +74,10 @@ function Post({ post, onLike, onComment, onAIComment }) {
       <div style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
         <Avatar author={post.author} />
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontWeight: 600, fontSize: 13, color: 'var(--accent)', marginBottom: 4 }}>{NAME[post.author]}</div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+            <div style={{ fontWeight: 600, fontSize: 13, color: 'var(--accent)' }}>{NAME[post.author]}</div>
+            <button onClick={() => onDelete(post.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-faint)', fontSize: 16, lineHeight: 1, padding: '0 2px', opacity: 0.5 }}>×</button>
+          </div>
           <div style={{ fontSize: 15, color: 'var(--text)', lineHeight: 1.7, wordBreak: 'break-word' }}>{post.content}</div>
           <div style={{ fontSize: 11, color: 'var(--text-faint)', marginTop: 6 }}>{fmtTime(post.createdAt)}</div>
         </div>
@@ -254,12 +257,17 @@ export default function Moments() {
           还没有动态，来发第一条？
         </div>
       )}
+      {posts.length > SHOW_COUNT && showAll && (
+        <button onClick={() => setShowAll(false)} style={{ width: '100%', padding: '8px 0', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-faint)', fontSize: 13, textAlign: 'center', marginBottom: 4 }}>
+          收起 ↑
+        </button>
+      )}
       {(showAll ? posts : posts.slice(0, SHOW_COUNT)).map(p => (
-        <Post key={p.id} post={p} onLike={handleLike} onComment={handleComment} onAIComment={handleAIComment} />
+        <Post key={p.id} post={p} onLike={handleLike} onComment={handleComment} onAIComment={handleAIComment} onDelete={id => updatePosts(prev => prev.filter(p => p.id !== id))} />
       ))}
-      {posts.length > SHOW_COUNT && (
-        <button onClick={() => setShowAll(!showAll)} style={{ width: '100%', padding: '10px 0', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-faint)', fontSize: 13, textAlign: 'center' }}>
-          {showAll ? '收起历史 ↑' : `查看更多 · 共 ${posts.length} 条 ↓`}
+      {posts.length > SHOW_COUNT && !showAll && (
+        <button onClick={() => setShowAll(true)} style={{ width: '100%', padding: '8px 0', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-faint)', fontSize: 13, textAlign: 'center' }}>
+          查看更多 · 共 {posts.length} 条 ↓
         </button>
       )}
     </div>
