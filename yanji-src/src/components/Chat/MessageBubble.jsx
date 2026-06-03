@@ -2,6 +2,7 @@ import { useMemo, useRef, useState } from 'react'
 import { marked } from 'marked'
 import hljs from 'highlight.js'
 import { formatTime } from '../../utils'
+import { useStore } from '../../store'
 
 marked.setOptions({
   breaks: true,
@@ -23,9 +24,29 @@ function parseMarkdown(text) {
   }
 }
 
+const AssistantIcon = () => (
+  <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M4 8 C4 8 7 4 12 5 C16 6 18 9 17 13 C16 17 12 19 8 17" />
+    <path d="M17 13 L21 11 L18 15" />
+    <path d="M8 17 L6 21" />
+    <path d="M10 17 L10 21" />
+    <circle cx="13" cy="8" r="1" fill="currentColor" stroke="none" />
+    <path d="M4 8 L1 7" />
+  </svg>
+)
+
+const UserIcon = () => (
+  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+    <circle cx="12" cy="8" r="4" />
+    <path d="M4 20c0-4 3.6-7 8-7s8 3 8 7" />
+  </svg>
+)
+
 export default function MessageBubble({ msg, onEdit }) {
   const isUser = msg.role === 'user'
   const isStreaming = msg.streaming
+  const { avatarConfig } = useStore()
+  const useImages = avatarConfig?.mode === 'image'
   const [editing, setEditing] = useState(false)
   const [editText, setEditText] = useState(msg.content)
   const [thinkOpen, setThinkOpen] = useState(true)
@@ -39,22 +60,16 @@ export default function MessageBubble({ msg, onEdit }) {
     <div className={`message-row ${isUser ? 'message-row-user' : 'message-row-assistant'}`}>
       {!isUser && (
         <div className="message-avatar">
-          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M4 8 C4 8 7 4 12 5 C16 6 18 9 17 13 C16 17 12 19 8 17" />
-            <path d="M17 13 L21 11 L18 15" />
-            <path d="M8 17 L6 21" />
-            <path d="M10 17 L10 21" />
-            <circle cx="13" cy="8" r="1" fill="currentColor" stroke="none" />
-            <path d="M4 8 L1 7" />
-          </svg>
+          {useImages && avatarConfig.assistantImage
+            ? <img src={avatarConfig.assistantImage} alt="助手" className="avatar-img" />
+            : <AssistantIcon />}
         </div>
       )}
       {isUser && (
         <div className="message-avatar message-avatar-user">
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-            <circle cx="12" cy="8" r="4" />
-            <path d="M4 20c0-4 3.6-7 8-7s8 3 8 7" />
-          </svg>
+          {useImages && avatarConfig.userImage
+            ? <img src={avatarConfig.userImage} alt="我" className="avatar-img" />
+            : <UserIcon />}
         </div>
       )}
       <div className="message-content-wrap">
