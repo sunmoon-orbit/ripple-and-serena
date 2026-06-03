@@ -15,6 +15,37 @@ function Section({ title, children }) {
   )
 }
 
+function AvatarUpload({ label, value, onChange }) {
+  function handleFile(e) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    const reader = new FileReader()
+    reader.onload = (ev) => onChange(ev.target.result)
+    reader.readAsDataURL(file)
+  }
+  return (
+    <div className="avatar-upload-row">
+      <span className="card-row-label">{label}</span>
+      <div className="avatar-upload-area">
+        {value
+          ? <img src={value} alt={label} className="avatar-preview" />
+          : <div className="avatar-preview avatar-preview-empty">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="8" r="4" /><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7" />
+              </svg>
+            </div>}
+        <label className="btn-sm btn-ghost avatar-upload-btn">
+          {value ? '更换' : '上传'}
+          <input type="file" accept="image/*" style={{ display: 'none' }} onChange={handleFile} />
+        </label>
+        {value && (
+          <button className="btn-sm btn-ghost danger" onClick={() => onChange(null)}>移除</button>
+        )}
+      </div>
+    </div>
+  )
+}
+
 function ConnectionCard({ conn, onSave, onDelete, onActivate, isActive }) {
   const [editing, setEditing] = useState(false)
   const [form, setForm] = useState({ ...conn })
@@ -99,11 +130,12 @@ function ConnectionCard({ conn, onSave, onDelete, onActivate, isActive }) {
 export default function Settings() {
   const store = useStore()
   const {
-    connections, activeConnectionId, tokenStats, moonMemory, theme,
+    connections, activeConnectionId, tokenStats, moonMemory, theme, avatarConfig,
     globalInstruction, generationConfig, contextLimit, searchConfig, autoTools,
     addConnection, updateConnection, deleteConnection, setActiveConnection,
     setGlobalInstruction, setGenerationConfig, setContextLimit, setSearchConfig,
-    setAutoTools, setMoonMemory, setTheme, memoryItems, addMemoryItem, toggleMemoryItem, deleteMemoryItem,
+    setAutoTools, setMoonMemory, setTheme, setAvatarConfig,
+    memoryItems, addMemoryItem, toggleMemoryItem, deleteMemoryItem,
   } = store
 
   const [addingConn, setAddingConn] = useState(false)
@@ -524,22 +556,55 @@ export default function Settings() {
 
         {/* ── Appearance ───────────────────────────────────────── */}
         {tab === 'appearance' && (
-          <Section title="主题">
-            <div className="settings-card">
-              <div className="theme-picker">
-                {THEMES.map((t) => (
-                  <button
-                    key={t.id}
-                    className={'theme-option' + (( theme || 'default') === t.id ? ' active' : '')}
-                    onClick={() => setTheme(t.id)}
-                  >
-                    <span className="theme-dot" style={{ background: t.color }} />
-                    {t.name}
-                  </button>
-                ))}
+          <>
+            <Section title="主题">
+              <div className="settings-card">
+                <div className="theme-picker">
+                  {THEMES.map((t) => (
+                    <button
+                      key={t.id}
+                      className={'theme-option' + ((theme || 'default') === t.id ? ' active' : '')}
+                      onClick={() => setTheme(t.id)}
+                    >
+                      <span className="theme-dot" style={{ background: t.color }} />
+                      {t.name}
+                    </button>
+                  ))}
+                </div>
               </div>
-            </div>
-          </Section>
+            </Section>
+            <Section title="聊天头像">
+              <div className="settings-card">
+                <div className="card-row">
+                  <span className="card-row-label">头像模式</span>
+                  <div className="avatar-mode-toggle">
+                    <button
+                      className={'avatar-mode-btn' + ((avatarConfig?.mode || 'icon') === 'icon' ? ' active' : '')}
+                      onClick={() => setAvatarConfig({ mode: 'icon' })}
+                    >图标</button>
+                    <button
+                      className={'avatar-mode-btn' + (avatarConfig?.mode === 'image' ? ' active' : '')}
+                      onClick={() => setAvatarConfig({ mode: 'image' })}
+                    >图片</button>
+                  </div>
+                </div>
+                {avatarConfig?.mode === 'image' && (
+                  <>
+                    <AvatarUpload
+                      label="我的头像"
+                      value={avatarConfig.userImage}
+                      onChange={(img) => setAvatarConfig({ userImage: img })}
+                    />
+                    <AvatarUpload
+                      label="助手头像"
+                      value={avatarConfig.assistantImage}
+                      onChange={(img) => setAvatarConfig({ assistantImage: img })}
+                    />
+                  </>
+                )}
+              </div>
+            </Section>
+          </>
         )}
 
         {/* ── API Monitor ──────────────────────────────────────── */}

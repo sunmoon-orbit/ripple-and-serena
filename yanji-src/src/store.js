@@ -16,6 +16,7 @@ const DEFAULT_STATE = {
   tokenStats: {},
   contextLimit: { mode: 'none', maxRounds: 50, maxTokens: 30000 },
   searchConfig: { provider: null, apiKey: null },
+  avatarConfig: { mode: 'icon', userImage: null, assistantImage: null },
   autoTools: true,
   moonMemory: {
     enabled: false,
@@ -50,7 +51,7 @@ const persistedKeys = [
   'connections', 'activeConnectionId', 'chats', 'activeChatId',
   'messagesByChatId', 'globalInstruction', 'summariesByChatId',
   'generationConfig', 'memoryItems', 'tokenStats', 'contextLimit',
-  'searchConfig', 'autoTools', 'moonMemory', 'theme',
+  'searchConfig', 'avatarConfig', 'autoTools', 'moonMemory', 'theme',
 ]
 
 function mergeWithDefaults(persisted) {
@@ -79,6 +80,11 @@ export const useStore = create((set, get) => ({
   // ─── panel navigation ─────────────────────────────────────────────
   setActivePanel: (panel) => set({ activePanel: panel }),
   setTheme: (theme) => set((s) => { savePersistedState({ ...s, theme }); return { theme } }),
+  setAvatarConfig: (patch) => set((s) => {
+    const avatarConfig = { ...s.avatarConfig, ...patch }
+    savePersistedState({ ...s, avatarConfig })
+    return { avatarConfig }
+  }),
 
   // ─── connections ──────────────────────────────────────────────────
   addConnection: (conn) => {
