@@ -19,6 +19,7 @@ export const useStore = create(
 
       // ── 主题 ──
       theme: 'light',
+      setTheme: (theme) => set({ theme }),
       toggleTheme: () => set((s) => ({ theme: s.theme === 'light' ? 'dark' : 'light' })),
 
       // ── 前端密码（本地锁）──

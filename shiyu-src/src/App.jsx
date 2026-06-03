@@ -10,10 +10,10 @@ import SettingsPanel from './components/SettingsPanel'
 import { NotebookPen, Trash2, Sparkles, Settings as SettingsIcon } from 'lucide-react'
 
 const NAV = [
-  { id: 'memory', label: '记忆', Icon: NotebookPen },
-  { id: 'stats', label: '纪念', Icon: Sparkles },
-  { id: 'trash', label: '回收站', Icon: Trash2 },
-  { id: 'settings', label: '设置', Icon: SettingsIcon },
+  { id: 'memory', label: 'Rings', Icon: NotebookPen },
+  { id: 'stats', label: 'Marks', Icon: Sparkles },
+  { id: 'trash', label: 'Fossils', Icon: Trash2 },
+  { id: 'settings', label: 'Settings', Icon: SettingsIcon },
 ]
 
 export default function App() {
@@ -41,7 +41,7 @@ export default function App() {
         {NAV.map(({ id, label, Icon }) => (
           <button key={id} className={'nav-item' + (panel === id ? ' active' : '')} onClick={() => setPanel(id)}>
             <Icon size={20} strokeWidth={2} />
-            <span>{label}</span>
+            <span className="nav-label">{label}</span>
             <span className="nav-dot" />
           </button>
         ))}

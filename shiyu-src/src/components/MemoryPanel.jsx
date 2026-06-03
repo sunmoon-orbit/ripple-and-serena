@@ -382,7 +382,7 @@ export default function MemoryPanel() {
       {/* 顶栏 */}
       <div className="topbar">
         <div>
-          <h1>拾羽</h1>
+          <h1 className="plume-title">Plume</h1>
           {days != null && (
             <div className="together-line">
               <span>🐦‍⬛</span><span className="together-heart">♡</span><span>🐦</span>
