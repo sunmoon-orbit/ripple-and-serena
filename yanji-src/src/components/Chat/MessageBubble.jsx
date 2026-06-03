@@ -1,8 +1,9 @@
-import { useMemo, useRef, useState } from 'react'
+import { useMemo, useRef, useState, useCallback } from 'react'
 import { marked } from 'marked'
 import hljs from 'highlight.js'
 import { formatTime } from '../../utils'
 import { useStore } from '../../store'
+import { synthesizeSpeech } from '../../api/moonMemory'
 
 marked.setOptions({
   breaks: true,
@@ -45,9 +46,36 @@ const UserIcon = () => (
 export default function MessageBubble({ msg, onEdit }) {
   const isUser = msg.role === 'user'
   const isStreaming = msg.streaming
-  const { avatarConfig } = useStore()
+  const { avatarConfig, moonMemory } = useStore()
   const useImages = avatarConfig?.mode === 'image'
   const [editing, setEditing] = useState(false)
+  const [ttsState, setTtsState] = useState('idle') // idle | loading | playing
+  const audioRef = useRef(null)
+
+  const playTts = useCallback(async () => {
+    if (!moonMemory?.enabled || !moonMemory?.baseUrl || !moonMemory?.apiToken) return
+    if (ttsState === 'loading') return
+    if (ttsState === 'playing' && audioRef.current) {
+      audioRef.current.pause()
+      audioRef.current = null
+      setTtsState('idle')
+      return
+    }
+    setTtsState('loading')
+    try {
+      const plainText = msg.content.replace(/[#*`>_~\[\]]/g, '').slice(0, 500)
+      const config = { baseUrl: moonMemory.baseUrl, apiToken: moonMemory.apiToken }
+      const { audio } = await synthesizeSpeech(config, plainText)
+      const audioEl = new Audio(audio)
+      audioRef.current = audioEl
+      audioEl.onended = () => setTtsState('idle')
+      audioEl.onerror = () => setTtsState('idle')
+      await audioEl.play()
+      setTtsState('playing')
+    } catch {
+      setTtsState('idle')
+    }
+  }, [msg.content, moonMemory, ttsState])
   const [editText, setEditText] = useState(msg.content)
   const [thinkOpen, setThinkOpen] = useState(true)
 
@@ -138,6 +166,23 @@ export default function MessageBubble({ msg, onEdit }) {
                 <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
                 <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
               </svg>
+            </button>
+          )}
+          {!isUser && !isStreaming && moonMemory?.enabled && (
+            <button className={`msg-tts-btn${ttsState !== 'idle' ? ' active' : ''}`} onClick={playTts} title={ttsState === 'playing' ? '停止' : '朗读'}>
+              {ttsState === 'loading' ? (
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/>
+                </svg>
+              ) : ttsState === 'playing' ? (
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor">
+                  <rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/>
+                </svg>
+              ) : (
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/>
+                </svg>
+              )}
             </button>
           )}
         </div>
