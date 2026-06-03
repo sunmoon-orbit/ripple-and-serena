@@ -326,6 +326,7 @@ export default function MemoryPanel() {
   const [selectedDate, setSelectedDate] = useState(null)
   const [sortBy, setSortBy] = useState('date') // date | importance | arousal
   const [semanticLoading, setSemanticLoading] = useState(false)
+  const [heatType, setHeatType] = useState('count') // count | emotion
 
   // 在一起多少天
   useEffect(() => {
@@ -398,18 +399,27 @@ export default function MemoryPanel() {
         </div>
       </div>
 
-      {/* 条数热力图 */}
-      <Heatmap data={heat} selectedDate={selectedDate} onSelectDate={setSelectedDate} />
-      <div className="heatmap-legend">
-        {selectedDate
-          ? <><span style={{ color: 'var(--olive-active)', fontWeight: 600 }}>{selectedDate}</span> · {mems.length} 条 <button className="card-more" style={{ display: 'inline', marginLeft: 6 }} onClick={() => setSelectedDate(null)}>清除</button></>
-          : <>过去 12 周 · {mems.length} 条记忆</>
-        }
+      {/* 热力图切换 */}
+      <div className="heatmap-switch">
+        <button className={'heatmap-switch-btn' + (heatType === 'count' ? ' active' : '')} onClick={() => setHeatType('count')}>记忆数</button>
+        <button className={'heatmap-switch-btn' + (heatType === 'emotion' ? ' active' : '')} onClick={() => setHeatType('emotion')}>情绪</button>
       </div>
-
-      {/* 情绪热力图 */}
-      <EmotionHeatmap data={emotionHeat} selectedDate={selectedDate} onSelectDate={setSelectedDate} />
-      <div className="heatmap-legend">情绪分布 · 暖色积极 冷色消极 深色强烈</div>
+      {heatType === 'count' ? (
+        <>
+          <Heatmap data={heat} selectedDate={selectedDate} onSelectDate={setSelectedDate} />
+          <div className="heatmap-legend">
+            {selectedDate
+              ? <><span style={{ color: 'var(--olive-active)', fontWeight: 600 }}>{selectedDate}</span> · {mems.length} 条 <button className="card-more" style={{ display: 'inline', marginLeft: 6 }} onClick={() => setSelectedDate(null)}>清除</button></>
+              : <>过去 12 周 · {mems.length} 条记忆</>
+            }
+          </div>
+        </>
+      ) : (
+        <>
+          <EmotionHeatmap data={emotionHeat} selectedDate={selectedDate} onSelectDate={setSelectedDate} />
+          <div className="heatmap-legend">情绪分布 · 暖色积极 冷色消极 深色强烈</div>
+        </>
+      )}
 
       {/* 搜索框 */}
       <div className="search-wrap">
