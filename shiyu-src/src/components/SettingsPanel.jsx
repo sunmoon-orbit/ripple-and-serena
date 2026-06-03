@@ -6,7 +6,7 @@ import { Plug, KeyRound, Palette } from 'lucide-react'
 
 const THEMES = [
   { id: 'light',    label: 'Light',    dot: '#5A7A98' },
-  { id: 'dark',     label: 'Dark',     dot: '#7AAEC8' },
+  { id: 'blossom',  label: 'Blossom',  dot: '#C07888' },
   { id: 'midnight', label: 'Midnight', dot: '#5888C8' },
   { id: 'dawn',     label: 'Dawn',     dot: '#C07840' },
 ]
