@@ -32,7 +32,7 @@ export default function PasswordGate({ onUnlock }) {
 
       {/* 标题 */}
       <div className="gate-brand">
-        <h1 className="gate-brand-title">拾 羽</h1>
+        <h1 className="gate-brand-title plume-title">Plume</h1>
         <p className="gate-brand-sub">picking up feathers</p>
       </div>
 

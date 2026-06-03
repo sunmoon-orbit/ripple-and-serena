@@ -4,8 +4,15 @@ import { useStore, hashPassword } from '../store'
 import { showToast } from './Toast'
 import { Plug, KeyRound, Palette } from 'lucide-react'
 
+const THEMES = [
+  { id: 'light',    label: 'Light',    dot: '#5A7A98' },
+  { id: 'dark',     label: 'Dark',     dot: '#7AAEC8' },
+  { id: 'midnight', label: 'Midnight', dot: '#5888C8' },
+  { id: 'dawn',     label: 'Dawn',     dot: '#C07840' },
+]
+
 export default function SettingsPanel() {
-  const { baseUrl, apiToken, theme, toggleTheme, setConn, passwordHash, setPassword } = useStore()
+  const { baseUrl, apiToken, theme, setTheme, setConn, passwordHash, setPassword } = useStore()
   const [url, setUrl] = useState(baseUrl)
   const [token, setToken] = useState(apiToken)
   const [testing, setTesting] = useState(false)
@@ -61,9 +68,14 @@ export default function SettingsPanel() {
 
       <div className="section-title"><Palette size={15} style={{ verticalAlign: -2, marginRight: 6 }} />外观</div>
       <div className="settings-card">
-        <div className="row">
-          <span className="row-label">深色模式</span>
-          <button className={'toggle' + (theme === 'dark' ? ' on' : '')} onClick={toggleTheme} aria-label="深色模式" />
+        <div className="row"><span className="row-label">主题</span></div>
+        <div className="theme-grid">
+          {THEMES.map((t) => (
+            <button key={t.id} className={'theme-chip' + (theme === t.id ? ' active' : '')} onClick={() => setTheme(t.id)}>
+              <span className="theme-chip-dot" style={{ background: t.dot }} />
+              <span className="theme-chip-label">{t.label}</span>
+            </button>
+          ))}
         </div>
       </div>
     </div>

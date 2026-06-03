@@ -51,6 +51,46 @@
   --shadow-lg:0 4px 16px rgba(0,0,0,0.40), 0 12px 36px rgba(0,0,0,0.56);
 }
 
+/* ── Midnight：深靛夜 ── */
+[data-theme="midnight"] {
+  --bg:          #080C14;
+  --bg-soft:     #0E1420;
+  --surface:     #131A28;
+  --line:        rgba(120,150,200,0.10);
+  --line-soft:   rgba(120,150,200,0.06);
+  --ink:         #C8D4E8;
+  --ink-soft:    #6878A0;
+  --ink-faint:   #2A3050;
+  --olive-active: #5888C8;
+  --olive-mid:    #4068A8;
+  --olive-light:  #182040;
+  --accent:   #9878C0;
+  --raven:    #020408;
+  --danger:   #A04060;
+  --shadow:   0 1px 3px rgba(0,0,0,0.40), 0 3px 12px rgba(0,0,0,0.60);
+  --shadow-lg:0 4px 16px rgba(0,0,0,0.55), 0 12px 36px rgba(0,0,0,0.70);
+}
+
+/* ── Dawn：晨曦暖白 ── */
+[data-theme="dawn"] {
+  --bg:          #F7F2EA;
+  --bg-soft:     #EDE6D8;
+  --surface:     #FDFAF5;
+  --line:        rgba(100,80,50,0.10);
+  --line-soft:   rgba(100,80,50,0.06);
+  --ink:         #2C2018;
+  --ink-soft:    #6C5840;
+  --ink-faint:   #B0987A;
+  --olive-active: #8C6840;
+  --olive-mid:    #A88060;
+  --olive-light:  #E8D8C0;
+  --accent:   #C07840;
+  --raven:    #1A1008;
+  --danger:   #B04040;
+  --shadow:   0 1px 3px rgba(100,80,50,0.06), 0 3px 12px rgba(100,80,50,0.10);
+  --shadow-lg:0 4px 16px rgba(100,80,50,0.12), 0 12px 36px rgba(100,80,50,0.16);
+}
+
 /* ── 基础 ── */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 html, body, #root { height: 100%; }
@@ -354,9 +394,8 @@ input, textarea, select { font-family: inherit; font-size: 15px; color: var(--in
   z-index: 50;
 }
 .nav-item {
-  display: flex; flex-direction: column; align-items: center; gap: 3px;
+  display: flex; flex-direction: column; align-items: center; gap: 2px;
   padding: 6px 20px; color: var(--ink-faint);
-  font-size: 10px; letter-spacing: 0.3px;
   transition: color 0.15s;
 }
 .nav-item.active { color: var(--olive-active); }
@@ -364,6 +403,21 @@ input, textarea, select { font-family: inherit; font-size: 15px; color: var(--in
 .nav-dot {
   width: 3px; height: 3px; border-radius: 50%;
   background: var(--olive-active); opacity: 0;
+}
+.nav-label {
+  font-family: 'Dancing Script', cursive;
+  font-size: 13px; font-weight: 600;
+  letter-spacing: 0.2px; line-height: 1;
+}
+
+/* ── Plume 大标题 ── */
+.plume-title {
+  font-family: 'Dancing Script', cursive;
+  font-size: 32px; font-weight: 600;
+  color: var(--ink); letter-spacing: 1px; line-height: 1.1;
+}
+.gate-brand-title.plume-title {
+  font-size: 48px; letter-spacing: 2px;
 }
 
 /* ── 纪念日卡片 ── */
@@ -524,6 +578,29 @@ input, textarea, select { font-family: inherit; font-size: 15px; color: var(--in
   box-shadow: 0 1px 4px rgba(0,0,0,0.16); transition: transform 0.2s;
 }
 .toggle.on::after { transform: translateX(20px); }
+
+/* ── 主题选择 ── */
+.theme-grid {
+  display: grid; grid-template-columns: repeat(2, 1fr);
+  gap: 8px; padding: 4px 0 14px;
+}
+.theme-chip {
+  display: flex; align-items: center; gap: 8px;
+  padding: 10px 14px; border-radius: var(--radius-sm);
+  border: 1.5px solid var(--line); background: var(--bg-soft);
+  transition: border-color 0.15s, background 0.15s;
+}
+.theme-chip.active {
+  border-color: var(--olive-active);
+  background: var(--surface);
+}
+.theme-chip-dot {
+  width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0;
+}
+.theme-chip-label {
+  font-family: 'Dancing Script', cursive;
+  font-size: 16px; font-weight: 600; color: var(--ink);
+}
 
 /* ── Toast ── */
 .toast {
