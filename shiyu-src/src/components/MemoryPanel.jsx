@@ -409,7 +409,7 @@ export default function MemoryPanel() {
           <Heatmap data={heat} selectedDate={selectedDate} onSelectDate={setSelectedDate} />
           <div className="heatmap-legend">
             {selectedDate
-              ? <><span style={{ color: 'var(--olive-active)', fontWeight: 600 }}>{selectedDate}</span> · {mems.length} 条 <button className="card-more" style={{ display: 'inline', marginLeft: 6 }} onClick={() => setSelectedDate(null)}>清除</button></>
+              ? <><span style={{ color: 'var(--olive-active)', fontWeight: 600 }}>{selectedDate}</span> · {mems.length} 条 <button className="card-more" style={{ display: 'inline', marginLeft: 6 }} onClick={() => setSelectedDate(null)}>取消筛选</button></>
               : <>过去 12 周 · {mems.length} 条记忆</>
             }
           </div>
