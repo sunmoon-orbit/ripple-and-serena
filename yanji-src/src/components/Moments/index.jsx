@@ -58,7 +58,7 @@ function Avatar({ author }) {
 }
 
 function Post({ post, onLike, onComment, onAIComment }) {
-  const [showComments, setShowComments] = useState((post.comments?.length || 0) > 0)
+  const [showComments, setShowComments] = useState(false)
   const [commentInput, setCommentInput] = useState('')
 
   function submitComment() {
@@ -128,7 +128,7 @@ export default function Moments() {
   const [posting, setPosting] = useState(false)
   const [aiPosting, setAIPosting] = useState(false)
   const [showAll, setShowAll] = useState(false)
-  const SHOW_COUNT = 3
+  const SHOW_COUNT = 1
 
   function updatePosts(fn) {
     setPosts(prev => { const next = fn(prev); save(next); return next })
@@ -232,23 +232,20 @@ export default function Moments() {
       </div>
 
       {/* 发动态框 */}
-      <div style={{ background: 'var(--bg)', borderRadius: 14, padding: 14, marginBottom: 14 }}>
-        <div style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
-          <div style={{ width: 38, height: 38, borderRadius: '50%', background: 'rgba(160,120,80,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, flexShrink: 0 }}>🐦</div>
-          <textarea
-            style={{ flex: 1, border: 'none', background: 'transparent', resize: 'none', fontSize: 15, color: 'var(--text)', outline: 'none', minHeight: 60, lineHeight: 1.6 }}
-            placeholder="在想什么…"
-            value={input}
-            onChange={e => setInput(e.target.value)}
-          />
-        </div>
-        <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 8 }}>
-          <button onClick={handlePost} disabled={posting || !input.trim()} style={{
-            padding: '7px 18px', borderRadius: 20, border: 'none', cursor: 'pointer',
-            background: 'var(--accent)', color: '#fff', fontSize: 13, fontWeight: 600,
-            opacity: posting || !input.trim() ? 0.5 : 1,
-          }}>{posting ? '发送中…' : '发动态'}</button>
-        </div>
+      <div style={{ background: 'var(--bg)', borderRadius: 12, padding: '10px 12px', marginBottom: 12, display: 'flex', gap: 8, alignItems: 'center' }}>
+        <div style={{ width: 32, height: 32, borderRadius: '50%', background: 'rgba(160,120,80,0.09)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 17, flexShrink: 0 }}>🐦</div>
+        <input
+          style={{ flex: 1, border: 'none', background: 'transparent', fontSize: 14, color: 'var(--text)', outline: 'none' }}
+          placeholder="在想什么…"
+          value={input}
+          onChange={e => setInput(e.target.value)}
+          onKeyDown={e => e.key === 'Enter' && handlePost()}
+        />
+        <button onClick={handlePost} disabled={posting || !input.trim()} style={{
+          padding: '6px 14px', borderRadius: 16, border: 'none', cursor: 'pointer', flexShrink: 0,
+          background: 'var(--accent)', color: '#fff', fontSize: 13, fontWeight: 600,
+          opacity: posting || !input.trim() ? 0.45 : 1,
+        }}>{posting ? '…' : '发'}</button>
       </div>
 
       {/* 动态列表 */}
