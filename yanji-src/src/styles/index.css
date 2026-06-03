@@ -1484,6 +1484,15 @@ a { text-decoration: none; color: inherit; }
 .message-meta:hover .msg-edit-icon-btn { opacity: 1; }
 .msg-edit-icon-btn:hover { color: var(--accent); }
 @media (hover: none) { .msg-edit-icon-btn { opacity: 0.5; } }
+.msg-tts-btn {
+  background: none; border: none; cursor: pointer;
+  color: var(--text-faint); padding: 2px 3px; border-radius: 3px;
+  display: inline-flex; align-items: center; opacity: 0;
+  transition: opacity 0.15s, color 0.15s;
+}
+.message-meta:hover .msg-tts-btn { opacity: 1; }
+.msg-tts-btn:hover, .msg-tts-btn.active { color: var(--accent); opacity: 1; }
+@media (hover: none) { .msg-tts-btn { opacity: 0.5; } }
 .msg-edit-wrap {
   display: flex; flex-direction: column; gap: 6px;
   min-width: 200px; max-width: min(78%, 600px);
