@@ -35,6 +35,57 @@
   --card-height: 240px;
 }
 
+[data-theme="midnight"] {
+  --cream: #0D1117;
+  --cream-light: #161B22;
+  --sage: #4A8FA5;
+  --sage-light: #6BAABB;
+  --sage-pale: #1C3040;
+  --gold: #8BADC0;
+  --gold-light: #B0C8D8;
+  --gold-glow: rgba(139, 173, 192, 0.3);
+  --silver: #7090A8;
+  --silver-light: #9AB0C0;
+  --silver-glow: rgba(112, 144, 168, 0.3);
+  --text: #CDD9E5;
+  --text-light: #8898A8;
+  --card-back: #1C3040;
+}
+
+[data-theme="ember"] {
+  --cream: #130C07;
+  --cream-light: #1E1208;
+  --sage: #C47A3A;
+  --sage-light: #D4924C;
+  --sage-pale: #3A1E08;
+  --gold: #E8AA50;
+  --gold-light: #F0C878;
+  --gold-glow: rgba(232, 170, 80, 0.35);
+  --silver: #B87850;
+  --silver-light: #D09878;
+  --silver-glow: rgba(184, 120, 80, 0.3);
+  --text: #EAD8C0;
+  --text-light: #A89070;
+  --card-back: #3A1E08;
+}
+
+[data-theme="bloom"] {
+  --cream: #FBF0F5;
+  --cream-light: #FFF5FA;
+  --sage: #8B5E7A;
+  --sage-light: #A87A95;
+  --sage-pale: #EAD0DC;
+  --gold: #C07898;
+  --gold-light: #D89AB5;
+  --gold-glow: rgba(192, 120, 152, 0.3);
+  --silver: #A890A8;
+  --silver-light: #C4B0C4;
+  --silver-glow: rgba(168, 144, 168, 0.3);
+  --text: #3A2A35;
+  --text-light: #7A6075;
+  --card-back: #8B5E7A;
+}
+
 * { margin: 0; padding: 0; box-sizing: border-box; }
 
 html { scroll-behavior: smooth; }
@@ -304,9 +355,13 @@ nav .nav-links a:hover { color: var(--sage); }
 }
 
 .card-back-pattern::before {
-  content: '🌿';
-  font-size: 2.5rem;
-  opacity: 0.6;
+  content: '';
+  width: 30px;
+  height: 30px;
+  border: 1.5px solid rgba(255,255,255,0.42);
+  transform: rotate(45deg);
+  display: block;
+  box-shadow: 0 0 0 7px rgba(255,255,255,0.07), inset 0 0 0 6px rgba(255,255,255,0.07);
 }
 
 .card-back-pattern::after {
@@ -348,9 +403,16 @@ nav .nav-links a:hover { color: var(--sage); }
 }
 
 .card-front .card-symbol {
-  font-size: 2.8rem;
+  width: 44px;
+  height: 44px;
   margin-bottom: 8px;
-  line-height: 1;
+  color: var(--gold);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.card-front.reversed .card-symbol {
+  color: var(--silver);
 }
 
 .card-front .card-name-en {
@@ -663,7 +725,13 @@ nav .nav-links a:hover { color: var(--sage); }
 }
 
 .ency-card .ency-card-symbol {
-  font-size: 1.8rem;
+  width: 32px;
+  height: 32px;
+  color: var(--sage);
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .ency-card .ency-card-titles {
@@ -793,6 +861,27 @@ nav .nav-links a:hover { color: var(--sage); }
   .ency-grid { grid-template-columns: 1fr; }
 }
 
+/* ===== Theme Switcher ===== */
+.theme-switcher {
+  display: flex;
+  gap: 9px;
+  align-items: center;
+}
+.theme-dot {
+  width: 13px;
+  height: 13px;
+  border-radius: 50%;
+  cursor: pointer;
+  border: 2px solid transparent;
+  transition: transform 0.2s, border-color 0.2s;
+}
+.theme-dot:hover { transform: scale(1.25); }
+.theme-dot.active { border-color: var(--text); }
+.theme-dot[data-t="willow"]   { background: #5B7B5D; }
+.theme-dot[data-t="midnight"] { background: #4A8FA5; }
+.theme-dot[data-t="ember"]    { background: #C47A3A; }
+.theme-dot[data-t="bloom"]    { background: #8B5E7A; }
+
 /* ===== Scrollbar ===== */
 ::-webkit-scrollbar { width: 6px; }
 ::-webkit-scrollbar-track { background: transparent; }
@@ -889,6 +978,12 @@ footer {
     <a onclick="showPage('home')">抽牌</a>
     <a onclick="showPage('encyclopedia')">牌义</a>
   </div>
+  <div class="theme-switcher">
+    <div class="theme-dot active" data-t="willow"   onclick="setTheme('willow')"></div>
+    <div class="theme-dot"        data-t="midnight" onclick="setTheme('midnight')"></div>
+    <div class="theme-dot"        data-t="ember"    onclick="setTheme('ember')"></div>
+    <div class="theme-dot"        data-t="bloom"    onclick="setTheme('bloom')"></div>
+  </div>
 </nav>
 
 <!-- Home Page -->
@@ -901,17 +996,17 @@ footer {
   </p>
   <div class="spread-choices">
     <div class="spread-btn" onclick="startReading(1)">
-      <span class="spread-icon">🃏</span>
+      <span class="spread-icon" style="font-family:var(--font-display);font-size:1.6rem;color:var(--sage);letter-spacing:0">Ⅰ</span>
       <div class="spread-name">单张抽牌</div>
       <div class="spread-desc">一张牌，一个启示</div>
     </div>
     <div class="spread-btn" onclick="startReading(3)">
-      <span class="spread-icon">🃏🃏🃏</span>
+      <span class="spread-icon" style="font-family:var(--font-display);font-size:1.6rem;color:var(--sage);letter-spacing:0">Ⅲ</span>
       <div class="spread-name">时光之流</div>
       <div class="spread-desc">过去 · 现在 · 未来</div>
     </div>
     <div class="spread-btn" onclick="startReading(5)">
-      <span class="spread-icon">🃏🃏🃏🃏🃏</span>
+      <span class="spread-icon" style="font-family:var(--font-display);font-size:1.6rem;color:var(--sage);letter-spacing:0">Ⅴ</span>
       <div class="spread-name">五芒启示</div>
       <div class="spread-desc">现况 · 障碍 · 建议 · 环境 · 结果</div>
     </div>
@@ -927,9 +1022,9 @@ footer {
   <div class="draw-pile" id="drawPile">
     <div>
       <div class="draw-pile-stack" id="drawPileStack" onclick="drawNextCard()">
-        <div class="draw-pile-card"><span style="font-size:1.5rem;opacity:0.5">🌿</span></div>
-        <div class="draw-pile-card"><span style="font-size:1.5rem;opacity:0.5">🌿</span></div>
-        <div class="draw-pile-card"><span style="font-size:1.5rem;opacity:0.5">🌿</span></div>
+        <div class="draw-pile-card"></div>
+        <div class="draw-pile-card"></div>
+        <div class="draw-pile-card"></div>
       </div>
       <div class="draw-pile-label">点击抽牌</div>
     </div>
@@ -984,72 +1079,72 @@ footer {
 // ============================================================
 
 const MAJOR_ARCANA = [
-  { id: 'major_0', numeral: '0', nameEn: 'The Fool', nameCn: '愚者', symbol: '🌀', suit: 'major',
-    upright: { meaning: '新的开始，自由，天真，冒险精神。踏上未知的旅程，带着信任与勇气。', keywords: '新开始 · 自由 · 信念 · 冒险' },
-    reversed: { meaning: '鲁莽行事，犹豫不决，忽视风险。需要在冒险与谨慎之间找到平衡。', keywords: '鲁莽 · 犹豫 · 冒进 · 疏忽' }},
-  { id: 'major_1', numeral: 'I', nameEn: 'The Magician', nameCn: '魔术师', symbol: '✨', suit: 'major',
-    upright: { meaning: '意志力，创造力，技能与资源的整合。你拥有实现目标所需的一切。', keywords: '创造 · 意志力 · 技能 · 整合' },
-    reversed: { meaning: '操控，欺骗，才能被浪费。需要诚实面对自己的动机。', keywords: '操控 · 欺骗 · 浪费 · 不诚实' }},
-  { id: 'major_2', numeral: 'II', nameEn: 'The High Priestess', nameCn: '女祭司', symbol: '🌙', suit: 'major',
-    upright: { meaning: '直觉，潜意识，内在智慧。安静下来，聆听内心的声音。', keywords: '直觉 · 潜意识 · 智慧 · 静默' },
-    reversed: { meaning: '忽略直觉，表面化，秘密。需要重新连接内在的知觉。', keywords: '忽略直觉 · 表面 · 秘密 · 疏离' }},
-  { id: 'major_3', numeral: 'III', nameEn: 'The Empress', nameCn: '女皇', symbol: '🌸', suit: 'major',
-    upright: { meaning: '丰饶，自然，滋养，感官之美。创造力旺盛，享受生活的丰盛。', keywords: '丰饶 · 滋养 · 美 · 创造力' },
-    reversed: { meaning: '过度依赖，创造力受阻，忽视自我关怀。需要重新找回内在的滋养。', keywords: '依赖 · 受阻 · 忽视自我 · 匮乏感' }},
-  { id: 'major_4', numeral: 'IV', nameEn: 'The Emperor', nameCn: '皇帝', symbol: '🏛️', suit: 'major',
-    upright: { meaning: '权威，结构，稳定，领导力。建立秩序，承担责任。', keywords: '权威 · 结构 · 稳定 · 责任' },
-    reversed: { meaning: '过度控制，专制，僵化。需要学会放松对控制的执念。', keywords: '控制 · 专制 · 僵化 · 固执' }},
-  { id: 'major_5', numeral: 'V', nameEn: 'The Hierophant', nameCn: '教皇', symbol: '🔑', suit: 'major',
-    upright: { meaning: '传统，信仰，指引，精神教导。从传承中获取智慧。', keywords: '传统 · 信仰 · 指导 · 传承' },
-    reversed: { meaning: '打破常规，个人信念，挑战权威。走自己的路。', keywords: '叛逆 · 个人信念 · 挑战 · 自由思考' }},
-  { id: 'major_6', numeral: 'VI', nameEn: 'The Lovers', nameCn: '恋人', symbol: '💕', suit: 'major',
-    upright: { meaning: '爱，和谐，关系中的选择，价值观的契合。真诚地面对内心。', keywords: '爱 · 和谐 · 选择 · 契合' },
-    reversed: { meaning: '不和谐，价值观冲突，逃避选择。需要面对关系中的真实问题。', keywords: '失衡 · 冲突 · 逃避 · 不忠于自我' }},
-  { id: 'major_7', numeral: 'VII', nameEn: 'The Chariot', nameCn: '战车', symbol: '⚡', suit: 'major',
-    upright: { meaning: '意志力，决心，胜利，掌控方向。带着目标前进。', keywords: '意志力 · 决心 · 胜利 · 方向' },
-    reversed: { meaning: '失去方向，缺乏控制，冲突内耗。需要重新校准目标。', keywords: '迷失 · 失控 · 内耗 · 挫败' }},
-  { id: 'major_8', numeral: 'VIII', nameEn: 'Strength', nameCn: '力量', symbol: '🦁', suit: 'major',
-    upright: { meaning: '内在力量，勇气，耐心，温柔的坚定。以柔克刚。', keywords: '内在力量 · 勇气 · 耐心 · 温柔' },
-    reversed: { meaning: '自我怀疑，软弱，缺乏信心。需要重新连接内在的勇气。', keywords: '自我怀疑 · 软弱 · 不安 · 退缩' }},
-  { id: 'major_9', numeral: 'IX', nameEn: 'The Hermit', nameCn: '隐者', symbol: '🏔️', suit: 'major',
-    upright: { meaning: '独处，内省，寻找真相，灵性探索。在沉默中发现答案。', keywords: '独处 · 内省 · 真相 · 沉默' },
-    reversed: { meaning: '过度孤立，逃避现实，孤独感。需要在独处和连接之间找到平衡。', keywords: '孤立 · 逃避 · 孤独 · 封闭' }},
-  { id: 'major_10', numeral: 'X', nameEn: 'Wheel of Fortune', nameCn: '命运之轮', symbol: '☸️', suit: 'major',
-    upright: { meaning: '转变，周期，命运的转折，机遇降临。一切都在流动。', keywords: '转变 · 周期 · 机遇 · 命运' },
-    reversed: { meaning: '逆境，抗拒变化，运势低迷。记住，这也是暂时的。', keywords: '逆境 · 抗拒 · 低迷 · 不幸' }},
-  { id: 'major_11', numeral: 'XI', nameEn: 'Justice', nameCn: '正义', symbol: '⚖️', suit: 'major',
-    upright: { meaning: '公平，真相，因果，负责任的决定。以诚实面对一切。', keywords: '公平 · 真相 · 因果 · 责任' },
-    reversed: { meaning: '不公，逃避责任，缺乏诚实。需要正视自己的行为。', keywords: '不公 · 逃避 · 偏见 · 不诚实' }},
-  { id: 'major_12', numeral: 'XII', nameEn: 'The Hanged Man', nameCn: '倒吊人', symbol: '🍃', suit: 'major',
-    upright: { meaning: '换个角度，暂停，放下，接受等待。有时候放手才是收获。', keywords: '换角度 · 暂停 · 放下 · 等待' },
-    reversed: { meaning: '拖延，抗拒牺牲，无意义的等待。需要做出决定。', keywords: '拖延 · 抗拒 · 困顿 · 浪费时间' }},
-  { id: 'major_13', numeral: 'XIII', nameEn: 'Death', nameCn: '死神', symbol: '🦋', suit: 'major',
-    upright: { meaning: '结束与重生，转变，告别旧事物。蜕变正在发生。', keywords: '结束 · 重生 · 转变 · 蜕变' },
-    reversed: { meaning: '抗拒改变，恐惧结束，停滞不前。需要学会放手。', keywords: '抗拒 · 恐惧 · 停滞 · 不愿放手' }},
-  { id: 'major_14', numeral: 'XIV', nameEn: 'Temperance', nameCn: '节制', symbol: '🌊', suit: 'major',
-    upright: { meaning: '平衡，耐心，调和，中庸之道。在两极之间找到和谐。', keywords: '平衡 · 耐心 · 调和 · 中庸' },
-    reversed: { meaning: '失衡，过度，缺乏耐心。需要重新找到节奏。', keywords: '失衡 · 过度 · 急躁 · 极端' }},
-  { id: 'major_15', numeral: 'XV', nameEn: 'The Devil', nameCn: '恶魔', symbol: '⛓️', suit: 'major',
-    upright: { meaning: '束缚，执念，物质主义，阴暗面。认清什么在控制你。', keywords: '束缚 · 执念 · 欲望 · 阴影' },
-    reversed: { meaning: '解脱，释放，打破束缚。看到了枷锁，就能挣脱。', keywords: '解脱 · 释放 · 觉醒 · 挣脱' }},
-  { id: 'major_16', numeral: 'XVI', nameEn: 'The Tower', nameCn: '高塔', symbol: '🌩️', suit: 'major',
-    upright: { meaning: '突变，崩塌，觉醒，打破虚假。虽然痛苦，但有必要的重建。', keywords: '突变 · 崩塌 · 觉醒 · 重建' },
-    reversed: { meaning: '抗拒必要的改变，恐惧灾难，延迟的觉醒。', keywords: '抗拒 · 恐惧 · 延迟 · 逃避' }},
-  { id: 'major_17', numeral: 'XVII', nameEn: 'The Star', nameCn: '星星', symbol: '⭐', suit: 'major',
-    upright: { meaning: '希望，灵感，平静，信心恢复。暴风雨后的宁静与光明。', keywords: '希望 · 灵感 · 平静 · 信心' },
-    reversed: { meaning: '失去信心，绝望感，与灵感断联。需要重新找到希望之光。', keywords: '绝望 · 失信 · 迷茫 · 断联' }},
-  { id: 'major_18', numeral: 'XVIII', nameEn: 'The Moon', nameCn: '月亮', symbol: '🌕', suit: 'major',
-    upright: { meaning: '幻象，潜意识，不安，直觉领域。事情并非表面看到的那样。', keywords: '幻象 · 潜意识 · 不安 · 直觉' },
-    reversed: { meaning: '走出迷雾，真相渐明，恐惧消退。', keywords: '释然 · 真相 · 清明 · 恐惧消退' }},
-  { id: 'major_19', numeral: 'XIX', nameEn: 'The Sun', nameCn: '太阳', symbol: '☀️', suit: 'major',
-    upright: { meaning: '快乐，成功，活力，光明，纯真的喜悦。一切都在最好的状态。', keywords: '快乐 · 成功 · 活力 · 光明' },
-    reversed: { meaning: '暂时的阴霾，过度乐观，快乐受阻。阳光只是被云遮住了。', keywords: '阴霾 · 过度乐观 · 受阻 · 暂时' }},
-  { id: 'major_20', numeral: 'XX', nameEn: 'Judgement', nameCn: '审判', symbol: '🔔', suit: 'major',
-    upright: { meaning: '觉醒，召唤，重生，反思过去做出新选择。', keywords: '觉醒 · 召唤 · 重生 · 反思' },
-    reversed: { meaning: '自我怀疑，拒绝反思，逃避内心的召唤。', keywords: '怀疑 · 拒绝 · 逃避 · 不愿改变' }},
-  { id: 'major_21', numeral: 'XXI', nameEn: 'The World', nameCn: '世界', symbol: '🌍', suit: 'major',
-    upright: { meaning: '完满，成就，圆满的循环，与世界合一。一段旅程的完成。', keywords: '完满 · 成就 · 圆满 · 合一' },
-    reversed: { meaning: '未完成，缺乏闭合感，差一步到终点。耐心，快了。', keywords: '未完成 · 拖延 · 差一步 · 不圆满' }}
+  { id: 'major_0', numeral: '0', nameEn: 'The Fool', nameCn: '愚者', suit: 'major',
+    upright: { meaning: '你站在这一步之前，背包轻得像是刻意遗忘了什么。不是不知道风险，是决定此刻的好奇比恐惧更重要。出发前不需要把一切都准备好——准备好了就不叫跳跃了。', keywords: '新开始 · 信任 · 跳跃 · 未知' },
+    reversed: { meaning: '犹豫不是谨慎，是你在用"再想想"推迟一个已经知道答案的决定。或者反过来：正在鲁莽冲进一件根本没打算负责的事里。', keywords: '逃避决定 · 鲁莽 · 拖延 · 不负责' }},
+  { id: 'major_1', numeral: 'I', nameEn: 'The Magician', nameCn: '魔术师', suit: 'major',
+    upright: { meaning: '你面前的材料已经够用了。不是缺什么，是还没有把手边的东西真正整合起来。技能、意志、时机——都在。现在是动手的时候，不是等待的时候。', keywords: '整合 · 行动 · 专注 · 资源已备' },
+    reversed: { meaning: '才能在，但方向对了吗？可能是把手段用成了目的，用聪明在操弄而不是在创造。也可能是明明有能力，却一直在等一个永远不会来的"最佳时机"。', keywords: '操控 · 才能虚耗 · 动机不纯 · 拖而不发' }},
+  { id: 'major_2', numeral: 'II', nameEn: 'The High Priestess', nameCn: '女祭司', suit: 'major',
+    upright: { meaning: '答案早就有了，只是你在等一个更大声的声音来确认它。停下来。不是所有真相都在明面上——有些东西需要你在安静里才能听到。直觉不是感觉，是积累出来的认知。', keywords: '直觉 · 潜意识 · 内在知晓 · 沉默' },
+    reversed: { meaning: '该知道的信息一直被压着不去面对，或者在表面的热闹里把真实感受给盖住了。有些秘密不是别人瞒着你，是你瞒着自己。', keywords: '压制直觉 · 信息遮蔽 · 自我欺骗 · 表面化' }},
+  { id: 'major_3', numeral: 'III', nameEn: 'The Empress', nameCn: '女皇', suit: 'major',
+    upright: { meaning: '不是你去追求丰盛，是丰盛在等你愿意接受它。创造力、感官、生长——一切都在向你开放。你现在的状态适合孕育，适合让一件事从无到有地成形。', keywords: '创造 · 丰饶 · 滋养 · 生长' },
+    reversed: { meaning: '付出太多、自我消耗、把照顾别人当成逃避照顾自己的方式。或者相反：创造力被堵住了，不知道从哪里开始，或者不相信自己有东西可以给出去。', keywords: '自我消耗 · 创造受阻 · 依赖 · 匮乏感' }},
+  { id: 'major_4', numeral: 'IV', nameEn: 'The Emperor', nameCn: '皇帝', suit: 'major',
+    upright: { meaning: '不是要你变得冷硬，是让你的结构足够稳，别人才能依靠。混乱的时候需要有人出来定锚。你现在站的位置，需要你做决定、建规则、承担后果。', keywords: '结构 · 权威 · 稳定 · 承担' },
+    reversed: { meaning: '控制欲盖过了真正的领导力——用规则在管束而不是在保护。或者是把所有稳定都外包给别人，自己不愿意负责任何结果。', keywords: '过度控制 · 专制 · 逃避责任 · 僵化' }},
+  { id: 'major_5', numeral: 'V', nameEn: 'The Hierophant', nameCn: '教皇', suit: 'major',
+    upright: { meaning: '有人走过这条路，留下了方法。不一定要完全照着走，但值得认真听一遍——尤其是在你自己还没摸清楚的领域里。传统不是束缚，是别人替你试错过的经验。', keywords: '传承 · 导师 · 系统 · 精神指引' },
+    reversed: { meaning: '一味遵循规则而不去质疑规则是为了什么。或者是叛逆本身成了目的——不是真的找到自己的路，而是用"我不一样"来回避真正的选择。', keywords: '盲从 · 为反对而反对 · 教条 · 逃离' }},
+  { id: 'major_6', numeral: 'VI', nameEn: 'The Lovers', nameCn: '恋人', suit: 'major',
+    upright: { meaning: '不只是关于感情——是一个真正考验你价值观的选择摆在面前。两条路都有代价，真正的问题是：你选哪个，你就是谁。不要选别人认为你该选的那个。', keywords: '真实选择 · 价值观 · 契合 · 忠于自己' },
+    reversed: { meaning: '在逃避这个选择，或者已经选了但不愿承认是自己选的。关系中出现了真实的裂缝——可能是价值观的分歧，也可能是一直在取悦而不是在真正相处。', keywords: '逃避选择 · 价值错位 · 不忠于自我 · 关系裂缝' }},
+  { id: 'major_7', numeral: 'VII', nameEn: 'The Chariot', nameCn: '战车', suit: 'major',
+    upright: { meaning: '不是蛮力推进，是内外同向时自然产生的动力。你现在知道自己要去哪里，这本身就是最强的驱动力。矛盾还在，但方向已定——带着它们一起走。', keywords: '方向 · 意志 · 推进 · 内外一致' },
+    reversed: { meaning: '方向感丢失了，或者内部在拉锯——想走，又怕走；知道该做，又一直在找理由不做。速度不是问题，是搞不清楚在往哪里开。', keywords: '方向混乱 · 内耗 · 失控 · 被欲望驱动' }},
+  { id: 'major_8', numeral: 'VIII', nameEn: 'Strength', nameCn: '力量', suit: 'major',
+    upright: { meaning: '驯服不是压制，是理解。你内心最烈的那部分不需要被消灭，需要被听见、被转化。真正的力量是在最想爆发的时候选择了另一种方式——不是忍，是懂。', keywords: '内在力量 · 耐心 · 温柔的坚定 · 转化' },
+    reversed: { meaning: '在压制而不是在理解，把强撑当成了力量。或者是相反——被情绪推着走，没有任何缓冲，事后才知道自己做了什么。', keywords: '自我怀疑 · 情绪失控 · 硬撑 · 内力耗尽' }},
+  { id: 'major_9', numeral: 'IX', nameEn: 'The Hermit', nameCn: '隐者', suit: 'major',
+    upright: { meaning: '答案不在外面。你已经走了很远了，现在是把收集到的东西整理成智慧的时候了。独处不是孤独，是给自己一个不需要表演的空间。灯是给自己照路的，不是给别人看的。', keywords: '独处 · 内省 · 整合 · 自我导向' },
+    reversed: { meaning: '孤立已经超过了独处的边界，在用沉默惩罚自己或者逃开本该面对的东西。或者是假装内省，其实只是在反复咀嚼同一个伤口。', keywords: '孤立 · 逃避 · 封闭 · 拒绝连接' }},
+  { id: 'major_10', numeral: 'X', nameEn: 'Wheel of Fortune', nameCn: '命运之轮', suit: 'major',
+    upright: { meaning: '局势在转动，不是你推的，也不是针对你的。你能做的是认清现在转到了哪个位置，然后相应而动。有些事情已经开始变了——不管你准备好了没有。', keywords: '转折 · 周期 · 时机 · 顺势而为' },
+    reversed: { meaning: '在一个低潮的位置上死撑，不愿承认这只是轮子的一段，不是终点。或者是运气好的时候没有意识到这是窗口期，错过了。', keywords: '抗拒转变 · 错失时机 · 低谷死撑 · 执念' }},
+  { id: 'major_11', numeral: 'XI', nameEn: 'Justice', nameCn: '正义', suit: 'major',
+    upright: { meaning: '没有隐藏的裁判——只有你的选择和它的结果之间清晰的关系。因果不是惩罚，是逻辑。现在是一个需要做出诚实决定的时刻，不偏不倚地看清楚正在发生什么。', keywords: '因果 · 诚实 · 公正 · 清醒的判断' },
+    reversed: { meaning: '在回避一个已经知道答案的问题。用借口代替承担，或者在用"不公平"解释一个其实是自己造成的结果。', keywords: '逃避责任 · 自欺 · 不公 · 拒绝看清' }},
+  { id: 'major_12', numeral: 'XII', nameEn: 'The Hanged Man', nameCn: '倒吊人', suit: 'major',
+    upright: { meaning: '倒挂着看，世界不一样了。这个暂停不是失去，是换了个视角。你现在无法推进是有原因的——有什么东西需要先被放下，才能让下一步真正发生。', keywords: '暂停 · 视角转换 · 放下 · 等待中的理解' },
+    reversed: { meaning: '一直在等，但这种等是在拖延一个该做的决定。或者在为一件已经不值得的事情消耗自己，把忍耐当成了美德。', keywords: '无意义的等待 · 拖延 · 自我牺牲失当 · 困顿' }},
+  { id: 'major_13', numeral: 'XIII', nameEn: 'Death', nameCn: '死神', suit: 'major',
+    upright: { meaning: '这一章确实要结束了。不是失败，是完成。执着于已经结束的事物，才会错过已经开始的。蜕变不舒服，但不蜕变才是真正的困死。', keywords: '终结 · 蜕变 · 放手 · 转化' },
+    reversed: { meaning: '明知道该结束，还在硬撑着不肯让它结束——关系、阶段、旧的自己。或者是陷在结束的痛苦里出不来，拒绝让这次终结变成转折。', keywords: '抗拒结束 · 停滞 · 困在过去 · 不愿蜕变' }},
+  { id: 'major_14', numeral: 'XIV', nameEn: 'Temperance', nameCn: '节制', suit: 'major',
+    upright: { meaning: '不是强迫自己克制，而是自然地知道什么时候够了。两种看似矛盾的东西其实可以同时存在——你现在有能力把它们流动在一起，而不是非此即彼。', keywords: '调和 · 流动 · 耐心 · 不走极端' },
+    reversed: { meaning: '走进了某个极端，要么过度要么完全压制。在一件事上用力过猛，或者在该坚持的时候忽然全部放弃。节奏乱了。', keywords: '失衡 · 过度 · 急躁 · 极端化' }},
+  { id: 'major_15', numeral: 'XV', nameEn: 'The Devil', nameCn: '恶魔', suit: 'major',
+    upright: { meaning: '链条是真实的。但注意看清楚——是谁锁上的？很多时候绑住我们的不是外力，是我们不愿意承认的舒适、习惯或恐惧。认出来，才是解开的第一步。', keywords: '束缚 · 执念 · 阴影 · 认清控制你的是什么' },
+    reversed: { meaning: '开始看到那根链条了，或者已经开始挣脱。但也可能是用一种瘾换了另一种瘾，以为自己自由了，其实只是换了个牢笼。', keywords: '挣脱 · 觉醒 · 依赖转移 · 表面的自由' }},
+  { id: 'major_16', numeral: 'XVI', nameEn: 'The Tower', nameCn: '高塔', suit: 'major',
+    upright: { meaning: '某个建立在错误基础上的东西正在倒塌，或者已经倒了。这很痛，但那个基础本来就不稳——它早晚会倒，只是现在发生了。倒了反而可以建真正牢固的东西。', keywords: '崩塌 · 觉醒 · 根基动摇 · 必要的破坏' },
+    reversed: { meaning: '在用大量力气阻止一个必然要发生的崩塌，或者崩塌已经发生了但还没有让自己真正接受这件事。越抗拒，下一次来的就越猛。', keywords: '抗拒必要改变 · 延迟觉醒 · 恐惧 · 逃避' }},
+  { id: 'major_17', numeral: 'XVII', nameEn: 'The Star', nameCn: '星星', suit: 'major',
+    upright: { meaning: '暴风雨之后，夜空是这样的。不是所有问题都解决了，是你记起来了——你原本就有的那种平静和方向感。受伤过，但没有破碎。向前走是可以的。', keywords: '希望 · 平静 · 疗愈 · 方向感回归' },
+    reversed: { meaning: '失望盖过了希望，暂时看不到前面。或者明明已经走出来了，又被某件小事拉回去，不相信好事可以持续。', keywords: '失望 · 失去方向 · 不相信好的 · 断联' }},
+  { id: 'major_18', numeral: 'XVIII', nameEn: 'The Moon', nameCn: '月亮', suit: 'major',
+    upright: { meaning: '不是所有模糊都是危险，但现在这种模糊需要被认真对待。你感觉到的那些不安不是幻觉——只是还看不清楚是什么。事情可能不是表面呈现的样子，等一等，让月光再亮一点。', keywords: '幻象 · 潜意识 · 不确定 · 直觉示警' },
+    reversed: { meaning: '迷雾开始散了，或者恐惧被看穿了就小了。也可能是长期在焦虑里转，混淆了真实的危险和想象出来的威胁。', keywords: '走出迷雾 · 真相浮现 · 恐惧消解 · 辨别现实' }},
+  { id: 'major_19', numeral: 'XIX', nameEn: 'The Sun', nameCn: '太阳', suit: 'major',
+    upright: { meaning: '不用怀疑这份好。有些时刻就是单纯地好，值得你完整地在里面。活力、清晰、真实的喜悦——这些不是运气，是你一路走来之后应得的。', keywords: '喜悦 · 成功 · 活力 · 真实的好' },
+    reversed: { meaning: '好事在发生，但在用各种理由拦着自己接受它。或者过度乐观到看不见真实的问题，用表面的阳光把该面对的东西晒干了算了。', keywords: '过度乐观 · 无法接受好事 · 光芒被遮 · 暂时受阻' }},
+  { id: 'major_20', numeral: 'XX', nameEn: 'Judgement', nameCn: '审判', suit: 'major',
+    upright: { meaning: '有什么一直没有正视的，现在该面对了。不是审判你，是召唤你回到真实的自己。这个觉醒不一定舒服，但它是你一直在等的转折点。听到了就别再装没听到。', keywords: '觉醒 · 召唤 · 反思 · 真实的自我' },
+    reversed: { meaning: '听到了那个召唤但在假装没听见。或者在用苛刻的自我批判代替真正的反思——那是另一种逃避，不是成长。', keywords: '逃避觉醒 · 自我批判 · 拒绝改变 · 错过转折' }},
+  { id: 'major_21', numeral: 'XXI', nameEn: 'The World', nameCn: '世界', suit: 'major',
+    upright: { meaning: '你到了。不是终点，是一个圆满的完成。这段旅程里学到的、经历的、改变的——都成了你自己的一部分。带着这些，准备好踏入下一个周期。', keywords: '完满 · 成就 · 圆满 · 一个阶段真正完成' },
+    reversed: { meaning: '差一步到终点，但在这里卡住了——可能是怕结束，可能是怕完成之后"然后呢"。或者在骗自己已经完成了，其实还有一些真实的东西没有收尾。', keywords: '未完成 · 差一步 · 逃避收尾 · 圆满感缺失' }}
 ];
 
 // Minor Arcana helper
@@ -1360,7 +1455,7 @@ function drawNextCard() {
   front.className = `card-face card-front ${isReversed ? 'reversed' : ''}`;
   front.innerHTML = `
     <div class="card-numeral">${card.numeral}</div>
-    <div class="card-symbol" ${isReversed ? 'style="transform:rotate(180deg)"' : ''}>${card.symbol}</div>
+    <div class="card-symbol" ${isReversed ? 'style="transform:rotate(180deg)"' : ''}>${suitSvg(card.suit, 40)}</div>
     <div class="card-name-en">${card.nameEn}</div>
     <div class="card-name-cn">${card.nameCn}</div>
     <div class="card-orientation ${isReversed ? 'reversed-tag' : 'upright'}">
@@ -1413,7 +1508,7 @@ function showInterpretation() {
     html += `
       <div class="interp-card">
         <div class="interp-position">${spread.labels[i]}</div>
-        <div class="interp-name">${card.symbol} ${card.nameEn} · ${card.nameCn}</div>
+        <div class="interp-name">${card.nameEn} · ${card.nameCn}</div>
         <div class="interp-orientation ${isReversed ? 'reversed' : 'upright'}">
           ${isReversed ? '◇ 逆位' : '◆ 正位'}
         </div>
@@ -1504,7 +1599,7 @@ function renderEncyclopedia() {
   grid.innerHTML = cards.map(card => `
     <div class="ency-card" onclick="this.classList.toggle('expanded')">
       <div class="ency-card-header">
-        <span class="ency-card-symbol">${card.symbol}</span>
+        <span class="ency-card-symbol">${suitSvg(card.suit, 28)}</span>
         <div class="ency-card-titles">
           <div class="ency-card-name">${card.nameEn}</div>
           <div class="ency-card-cn">${card.nameCn} ${card.numeral ? '· ' + card.numeral : ''}</div>
@@ -1539,6 +1634,41 @@ document.getElementById('encyTabs').addEventListener('click', (e) => {
     renderEncyclopedia();
   }
 });
+
+// ============================================================
+// SUIT SVG SYMBOLS
+// ============================================================
+function suitSvg(suit, size) {
+  size = size || 36;
+  const a = `stroke="currentColor" stroke-width="1.3" fill="none"`;
+  const s = {
+    major: `<svg width="${size}" height="${size}" viewBox="0 0 36 36" ${a}><circle cx="18" cy="18" r="13"/><circle cx="18" cy="18" r="5"/><line x1="18" y1="3" x2="18" y2="11"/><line x1="18" y1="25" x2="18" y2="33"/><line x1="3" y1="18" x2="11" y2="18"/><line x1="25" y1="18" x2="33" y2="18"/></svg>`,
+    wands: `<svg width="${size}" height="${size}" viewBox="0 0 36 36" ${a}><line x1="18" y1="3" x2="18" y2="33"/><line x1="9" y1="10" x2="27" y2="10"/><line x1="11" y1="18" x2="25" y2="18"/><line x1="9" y1="26" x2="27" y2="26"/></svg>`,
+    cups: `<svg width="${size}" height="${size}" viewBox="0 0 36 36" ${a}><path d="M9 8 Q9 26 18 31 Q27 26 27 8"/><line x1="12" y1="33" x2="24" y2="33"/><line x1="18" y1="31" x2="18" y2="33"/></svg>`,
+    swords: `<svg width="${size}" height="${size}" viewBox="0 0 36 36" ${a}><line x1="18" y1="3" x2="18" y2="29"/><line x1="9" y1="13" x2="27" y2="13"/><path d="M14 29 L18 34 L22 29 Z" fill="currentColor" stroke="none"/></svg>`,
+    pentacles: `<svg width="${size}" height="${size}" viewBox="0 0 36 36" ${a}><circle cx="18" cy="18" r="13"/><polygon points="18,6 21,15 31,15 23,21 26,30 18,25 10,30 13,21 5,15 15,15"/></svg>`
+  };
+  return s[suit] || s.major;
+}
+
+// ============================================================
+// THEME SWITCHER
+// ============================================================
+function setTheme(t) {
+  document.body.setAttribute('data-theme', t);
+  localStorage.setItem('tarot-theme', t);
+  document.querySelectorAll('.theme-dot').forEach(d => {
+    d.classList.toggle('active', d.dataset.t === t);
+  });
+}
+
+(function initTheme() {
+  const saved = localStorage.getItem('tarot-theme') || 'willow';
+  document.body.setAttribute('data-theme', saved);
+  document.querySelectorAll('.theme-dot').forEach(d => {
+    d.classList.toggle('active', d.dataset.t === saved);
+  });
+})();
 
 // ============================================================
 // INIT
