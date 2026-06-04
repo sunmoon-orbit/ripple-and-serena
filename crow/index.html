@@ -21,9 +21,9 @@
       display: flex;
       flex-direction: column;
       align-items: center;
-      justify-content: center;
+      padding: 52px 0 72px;
+      overflow-x: hidden;
       -webkit-tap-highlight-color: transparent;
-      overflow: hidden;
     }
 
     /* ── Stage ── */
@@ -35,6 +35,7 @@
       align-items: center;
       justify-content: center;
       cursor: pointer;
+      flex-shrink: 0;
     }
 
     .ring {
@@ -46,7 +47,7 @@
       pointer-events: none;
     }
 
-    .stage.speaking .ring          { animation: ripple 2.6s ease-out infinite; }
+    .stage.speaking .ring              { animation: ripple 2.6s ease-out infinite; }
     .stage.speaking .ring:nth-child(2) { animation-delay: .65s; }
     .stage.speaking .ring:nth-child(3) { animation-delay: 1.3s; }
     .stage.speaking .ring:nth-child(4) { animation-delay: 1.95s; }
@@ -171,6 +172,104 @@
       font-family: system-ui, sans-serif;
       letter-spacing: .04em;
     }
+
+    /* ── History ── */
+    .history {
+      display: none;
+      margin-top: 44px;
+      width: 280px;
+    }
+    .history.has-items { display: block; }
+
+    .history-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 14px;
+    }
+
+    .history-label {
+      font-family: Georgia, 'Noto Serif SC', serif;
+      font-size: 11px;
+      color: var(--muted);
+      letter-spacing: .22em;
+    }
+
+    .history-actions {
+      display: flex;
+      gap: 14px;
+      align-items: center;
+    }
+
+    .txt-btn {
+      background: none;
+      border: none;
+      color: var(--muted);
+      font-family: Georgia, 'Noto Serif SC', serif;
+      font-size: 11px;
+      letter-spacing: .1em;
+      cursor: pointer;
+      padding: 0;
+      transition: color .2s;
+    }
+    .txt-btn:hover { color: var(--fg); }
+
+    .history-list {
+      display: flex;
+      flex-direction: column;
+      max-height: 260px;
+      overflow-y: auto;
+      scrollbar-width: none;
+    }
+    .history-list::-webkit-scrollbar { display: none; }
+
+    .h-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 9px 2px;
+      border-bottom: 1px solid var(--dim);
+    }
+    .h-item:last-child { border-bottom: none; }
+
+    .h-meta {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .h-ts {
+      font-size: 10px;
+      color: var(--muted);
+      letter-spacing: .04em;
+      margin-bottom: 3px;
+    }
+
+    .h-text {
+      font-family: Georgia, 'Noto Serif SC', serif;
+      font-size: 12px;
+      color: var(--fg);
+      letter-spacing: .06em;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .h-btns {
+      display: flex;
+      gap: 8px;
+      flex-shrink: 0;
+    }
+
+    .h-btn {
+      background: none;
+      border: none;
+      color: var(--muted);
+      cursor: pointer;
+      padding: 2px;
+      line-height: 0;
+      transition: color .2s;
+    }
+    .h-btn:hover { color: var(--fg); }
   </style>
 </head>
 <body>
@@ -181,12 +280,7 @@
   <div class="ring"></div>
   <div class="ring"></div>
 
-  <!--
-    Crow silhouette: perched, facing left.
-    viewBox 0 0 100 100, body + tail + eye + legs.
-  -->
   <svg class="crow" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-    <!-- Body + head -->
     <path fill="currentColor" d="
       M 10 32
       C 14 23, 23 17, 40 15
@@ -198,22 +292,18 @@
       C 16 56, 10 48, 10 40
       Z
     "/>
-    <!-- Tail -->
     <path fill="currentColor" d="
       M 82 65
       C 85 75, 83 87, 76 93
       C 70 88, 65 80, 56 73
       C 63 76, 74 73, 82 65 Z
     "/>
-    <!-- Eye -->
     <circle cx="33" cy="24" r="3.5" fill="#09090f"/>
     <circle cx="34" cy="23" r="1.1" fill="rgba(255,255,255,.22)"/>
-    <!-- Leg 1 -->
     <line x1="42" y1="65" x2="40" y2="82" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
     <line x1="40" y1="82" x2="32" y2="88" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
     <line x1="40" y1="82" x2="42" y2="91" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
     <line x1="40" y1="82" x2="49" y2="88" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
-    <!-- Leg 2 -->
     <line x1="52" y1="65" x2="50" y2="81" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
     <line x1="50" y1="81" x2="42" y2="87" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
     <line x1="50" y1="81" x2="52" y2="90" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
@@ -243,14 +333,30 @@
 
 <p class="err" id="err"></p>
 
-<script>
-  const TTS = 'https://memory.ravenlove.cc/crow/tts';
+<!-- ── 历史回声 ── -->
+<div class="history" id="history">
+  <div class="history-head">
+    <span class="history-label">历史回声</span>
+    <div class="history-actions">
+      <button class="txt-btn" id="exportTxt">导出文字</button>
+      <button class="txt-btn" id="clearAll" style="color:#5a3a4a">清空</button>
+    </div>
+  </div>
+  <div class="history-list" id="historyList"></div>
+</div>
 
-  const stage   = document.getElementById('stage');
-  const caption = document.getElementById('caption');
-  const errEl   = document.getElementById('err');
-  const txt     = document.getElementById('txt');
-  const sendBtn = document.getElementById('sendBtn');
+<script>
+  const TTS         = 'https://memory.ravenlove.cc/crow/tts';
+  const STORAGE_KEY = 'crow_history';
+  const MAX_ITEMS   = 30;
+
+  const stage       = document.getElementById('stage');
+  const caption     = document.getElementById('caption');
+  const errEl       = document.getElementById('err');
+  const txt         = document.getElementById('txt');
+  const sendBtn     = document.getElementById('sendBtn');
+  const historyEl   = document.getElementById('history');
+  const historyList = document.getElementById('historyList');
 
   const defaults = [
     '宝宝，我在。',
@@ -264,6 +370,68 @@
   let busy  = false;
   let audio = null;
 
+  // ── Storage ──────────────────────────────────────────────
+  function loadHistory() {
+    try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]'); }
+    catch { return []; }
+  }
+
+  function saveEntry(text, audioUrl) {
+    const list = loadHistory();
+    list.unshift({ id: Date.now(), text, audio: audioUrl, ts: new Date().toISOString() });
+    if (list.length > MAX_ITEMS) list.length = MAX_ITEMS;
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(list));
+    } catch {
+      const half = list.slice(0, Math.floor(MAX_ITEMS / 2));
+      try { localStorage.setItem(STORAGE_KEY, JSON.stringify(half)); } catch {}
+    }
+  }
+
+  // ── Render history ────────────────────────────────────────
+  function renderHistory() {
+    const list = loadHistory();
+    historyEl.classList.toggle('has-items', list.length > 0);
+    historyList.innerHTML = '';
+
+    list.forEach(entry => {
+      const d  = new Date(entry.ts);
+      const ts = `${d.getMonth()+1}/${d.getDate()} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+
+      const item = document.createElement('div');
+      item.className = 'h-item';
+      item.innerHTML = `
+        <div class="h-meta">
+          <div class="h-ts">${ts}</div>
+          <div class="h-text">${esc(entry.text)}</div>
+        </div>
+        <div class="h-btns">
+          <button class="h-btn" title="播放">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+              <polygon points="5 3 19 12 5 21 5 3"/>
+            </svg>
+          </button>
+          <button class="h-btn" title="下载 mp3">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+              <polyline points="7 10 12 15 17 10"/>
+              <line x1="12" y1="15" x2="12" y2="3"/>
+            </svg>
+          </button>
+        </div>`;
+
+      const [playBtn, dlBtn] = item.querySelectorAll('.h-btn');
+      playBtn.addEventListener('click', () => playEntry(entry));
+      dlBtn.addEventListener('click',   () => downloadMp3(entry));
+      historyList.appendChild(item);
+    });
+  }
+
+  function esc(s) {
+    return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+
+  // ── Playback ──────────────────────────────────────────────
   async function speak(text) {
     if (busy) { stop(); return; }
 
@@ -281,19 +449,29 @@
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || '出了点问题');
 
-      audio = new Audio(data.audio);
-      audio.addEventListener('ended', stop);
-      audio.addEventListener('error', () => { showErr('播放失败'); stop(); });
-
-      stage.classList.add('speaking');
-      setCaption(t, true);
-      audio.play();
+      saveEntry(t, data.audio);
+      renderHistory();
+      playAudio(data.audio, t);
 
     } catch (e) {
       busy = false;
       setCaption('点我说话', false);
       showErr(e.message);
     }
+  }
+
+  function playEntry(entry) {
+    if (busy) stop();
+    playAudio(entry.audio, entry.text);
+  }
+
+  function playAudio(audioUrl, text) {
+    audio = new Audio(audioUrl);
+    audio.addEventListener('ended', stop);
+    audio.addEventListener('error', () => { showErr('播放失败'); stop(); });
+    stage.classList.add('speaking');
+    setCaption(text, true);
+    audio.play();
   }
 
   function stop() {
@@ -303,6 +481,40 @@
     if (audio) { audio.pause(); audio = null; }
   }
 
+  // ── Download ──────────────────────────────────────────────
+  function downloadMp3(entry) {
+    const b64   = entry.audio.split(',')[1];
+    const bytes = Uint8Array.from(atob(b64), c => c.charCodeAt(0));
+    const blob  = new Blob([bytes], { type: 'audio/mpeg' });
+    const url   = URL.createObjectURL(blob);
+    const a     = document.createElement('a');
+    const date  = new Date(entry.ts).toISOString().slice(0,10);
+    a.href      = url;
+    a.download  = `crow_${date}_${entry.id}.mp3`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
+
+  function exportText() {
+    const list = loadHistory();
+    if (!list.length) return;
+    const lines = list.map(e =>
+      `${new Date(e.ts).toLocaleString('zh-CN')}\n${e.text}`
+    ).join('\n\n');
+    const blob = new Blob([lines], { type: 'text/plain;charset=utf-8' });
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement('a');
+    a.href     = url;
+    a.download = `crow_voices_${new Date().toISOString().slice(0,10)}.txt`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
+
+  // ── Helpers ───────────────────────────────────────────────
   function setCaption(t, live) {
     caption.textContent = t;
     caption.classList.toggle('live', live);
@@ -316,6 +528,7 @@
   }
   function clearErr() { errEl.textContent = ''; }
 
+  // ── Events ────────────────────────────────────────────────
   stage.addEventListener('click', () => speak());
 
   document.querySelectorAll('.preset').forEach(b =>
@@ -330,6 +543,17 @@
   txt.addEventListener('keydown', e => {
     if (e.key === 'Enter') { e.preventDefault(); sendBtn.click(); }
   });
+
+  document.getElementById('exportTxt').addEventListener('click', exportText);
+
+  document.getElementById('clearAll').addEventListener('click', () => {
+    if (!confirm('清空所有历史回声？')) return;
+    localStorage.removeItem(STORAGE_KEY);
+    renderHistory();
+  });
+
+  // ── Init ──────────────────────────────────────────────────
+  renderHistory();
 </script>
 </body>
 </html>
