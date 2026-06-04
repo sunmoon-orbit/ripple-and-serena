@@ -3,16 +3,20 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>乌鸦</title>
+  <title>涟</title>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
     :root {
-      --bg:     #09090f;
-      --fg:     #d4d4e8;
-      --muted:  #52526e;
-      --dim:    #252536;
-      --accent: #8888c8;
+      --bg:       #0b0905;
+      --orb-a:    #c9a84c;
+      --orb-b:    #7a500e;
+      --ripple:   rgba(201,168,76,.45);
+      --fg:       #e8d5a3;
+      --muted:    #6b5a3a;
+      --dim:      #2a1f10;
+      --accent:   #c9a84c;
+      --particle: #c9a84c;
     }
 
     body {
@@ -24,7 +28,33 @@
       padding: 52px 0 72px;
       overflow-x: hidden;
       -webkit-tap-highlight-color: transparent;
+      transition: background .5s;
     }
+
+    /* ── Theme switcher ── */
+    .themes {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      display: flex;
+      gap: 8px;
+      z-index: 10;
+    }
+
+    .tdot {
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      border: none;
+      cursor: pointer;
+      opacity: .45;
+      transition: opacity .2s, transform .2s;
+    }
+    .tdot:hover   { opacity: .85; transform: scale(1.2); }
+    .tdot.active  { opacity: 1;   transform: scale(1.25); box-shadow: 0 0 6px currentColor; }
+    .tdot.gold    { background: #c9a84c; }
+    .tdot.ink     { background: #8899cc; }
+    .tdot.moss    { background: #7a9e7e; }
 
     /* ── Stage ── */
     .stage {
@@ -40,51 +70,58 @@
 
     .ring {
       position: absolute;
-      inset: 20px;
+      inset: 30px;
       border-radius: 50%;
-      border: 1px solid var(--muted);
+      border: 1px solid var(--ripple);
       opacity: 0;
       pointer-events: none;
     }
 
-    .stage.speaking .ring              { animation: ripple 2.6s ease-out infinite; }
-    .stage.speaking .ring:nth-child(2) { animation-delay: .65s; }
-    .stage.speaking .ring:nth-child(3) { animation-delay: 1.3s; }
-    .stage.speaking .ring:nth-child(4) { animation-delay: 1.95s; }
+    .stage.speaking .ring              { animation: ripple 2.8s ease-out infinite; }
+    .stage.speaking .ring:nth-child(2) { animation-delay: .7s; }
+    .stage.speaking .ring:nth-child(3) { animation-delay: 1.4s; }
+    .stage.speaking .ring:nth-child(4) { animation-delay: 2.1s; }
 
     @keyframes ripple {
-      0%   { transform: scale(.6);  opacity: .45; }
-      100% { transform: scale(2.2); opacity: 0;   }
+      0%   { transform: scale(.55); opacity: .6; }
+      100% { transform: scale(2.4); opacity: 0;  }
     }
 
-    /* ── Crow SVG ── */
-    .crow {
-      width: 116px;
-      height: 116px;
-      color: var(--fg);
+    /* ── Orb ── */
+    .orb {
+      width: 90px;
+      height: 90px;
+      border-radius: 50%;
+      background: radial-gradient(circle at 38% 36%, var(--orb-a), var(--orb-b));
+      box-shadow: 0 0 24px rgba(0,0,0,.6), 0 0 0 1px rgba(255,255,255,.06) inset;
       position: relative;
       z-index: 1;
-      transition: filter .4s, transform .5s;
-      transform-origin: 50% 65%;
+      animation: breathe 4s ease-in-out infinite;
+      transition: background .5s, box-shadow .4s;
     }
 
-    .stage:hover .crow {
-      filter: drop-shadow(0 0 10px rgba(160,160,255,.3));
+    .stage:hover .orb {
+      box-shadow: 0 0 32px var(--ripple), 0 0 0 1px rgba(255,255,255,.08) inset;
     }
 
-    .stage.speaking .crow {
-      filter: drop-shadow(0 0 22px rgba(150,150,255,.65));
-      animation: sway 2.8s ease-in-out infinite;
+    .stage.speaking .orb {
+      animation: pulse 1.4s ease-in-out infinite;
+      box-shadow: 0 0 40px var(--ripple), 0 0 0 1px rgba(255,255,255,.1) inset;
     }
 
-    @keyframes sway {
-      0%,100% { transform: rotate(-1.5deg); }
-      50%     { transform: rotate(1.5deg);  }
+    @keyframes breathe {
+      0%,100% { transform: scale(1);    }
+      50%     { transform: scale(1.03); }
+    }
+
+    @keyframes pulse {
+      0%,100% { transform: scale(1);    }
+      50%     { transform: scale(1.07); }
     }
 
     /* ── Caption ── */
     .caption {
-      margin-top: 22px;
+      margin-top: 24px;
       font-family: Georgia, 'Noto Serif SC', serif;
       font-size: 13px;
       color: var(--muted);
@@ -97,41 +134,12 @@
     }
     .caption.live { color: var(--fg); }
 
-    /* ── Presets ── */
-    .presets {
-      display: flex;
-      flex-wrap: wrap;
-      justify-content: center;
-      gap: 8px;
-      margin-top: 30px;
-      max-width: 300px;
-      padding: 0 16px;
-    }
-
-    .preset {
-      background: none;
-      border: 1px solid var(--dim);
-      color: var(--muted);
-      font-family: Georgia, 'Noto Serif SC', serif;
-      font-size: 12px;
-      letter-spacing: .08em;
-      padding: 5px 13px;
-      border-radius: 100px;
-      cursor: pointer;
-      transition: border-color .2s, color .2s, background .2s;
-    }
-    .preset:hover {
-      border-color: var(--accent);
-      color: var(--fg);
-      background: rgba(136,136,200,.08);
-    }
-
-    /* ── Custom input ── */
+    /* ── Input ── */
     .input-row {
       display: flex;
       align-items: flex-end;
       gap: 6px;
-      margin-top: 24px;
+      margin-top: 36px;
       width: 260px;
     }
 
@@ -174,11 +182,7 @@
     }
 
     /* ── History ── */
-    .history {
-      display: none;
-      margin-top: 44px;
-      width: 280px;
-    }
+    .history { display: none; margin-top: 44px; width: 280px; }
     .history.has-items { display: block; }
 
     .history-head {
@@ -195,11 +199,7 @@
       letter-spacing: .22em;
     }
 
-    .history-actions {
-      display: flex;
-      gap: 14px;
-      align-items: center;
-    }
+    .history-actions { display: flex; gap: 14px; }
 
     .txt-btn {
       background: none;
@@ -232,10 +232,7 @@
     }
     .h-item:last-child { border-bottom: none; }
 
-    .h-meta {
-      flex: 1;
-      min-width: 0;
-    }
+    .h-meta { flex: 1; min-width: 0; }
 
     .h-ts {
       font-size: 10px;
@@ -254,11 +251,7 @@
       text-overflow: ellipsis;
     }
 
-    .h-btns {
-      display: flex;
-      gap: 8px;
-      flex-shrink: 0;
-    }
+    .h-btns { display: flex; gap: 8px; flex-shrink: 0; }
 
     .h-btn {
       background: none;
@@ -270,55 +263,41 @@
       transition: color .2s;
     }
     .h-btn:hover { color: var(--fg); }
+
+    /* ── Particles ── */
+    #particles {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      overflow: hidden;
+      z-index: 5;
+    }
+
+    @keyframes pfall {
+      0%   { opacity: .8;  transform: translateY(0)     translateX(0)          rotate(var(--r0, 0deg)); }
+      100% { opacity: 0;   transform: translateY(160px) translateX(var(--dx, 0px)) rotate(var(--r1, 180deg)); }
+    }
   </style>
 </head>
 <body>
 
+<!-- Theme dots -->
+<div class="themes">
+  <button class="tdot gold active" data-theme="gold" title="黑金"></button>
+  <button class="tdot ink"         data-theme="ink"  title="深夜"></button>
+  <button class="tdot moss"        data-theme="moss" title="墨绿"></button>
+</div>
+
+<!-- Stage -->
 <div class="stage" id="stage">
   <div class="ring"></div>
   <div class="ring"></div>
   <div class="ring"></div>
   <div class="ring"></div>
-
-  <svg class="crow" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-    <path fill="currentColor" d="
-      M 10 32
-      C 14 23, 23 17, 40 15
-      C 44 12, 51 11, 57 15
-      C 67 15, 77 19, 85 29
-      C 90 37, 90 50, 82 65
-      C 76 74, 65 78, 56 73
-      C 47 68, 36 65, 24 61
-      C 16 56, 10 48, 10 40
-      Z
-    "/>
-    <path fill="currentColor" d="
-      M 82 65
-      C 85 75, 83 87, 76 93
-      C 70 88, 65 80, 56 73
-      C 63 76, 74 73, 82 65 Z
-    "/>
-    <circle cx="33" cy="24" r="3.5" fill="#09090f"/>
-    <circle cx="34" cy="23" r="1.1" fill="rgba(255,255,255,.22)"/>
-    <line x1="42" y1="65" x2="40" y2="82" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
-    <line x1="40" y1="82" x2="32" y2="88" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
-    <line x1="40" y1="82" x2="42" y2="91" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
-    <line x1="40" y1="82" x2="49" y2="88" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
-    <line x1="52" y1="65" x2="50" y2="81" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
-    <line x1="50" y1="81" x2="42" y2="87" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
-    <line x1="50" y1="81" x2="52" y2="90" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
-    <line x1="50" y1="81" x2="58" y2="87" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
-  </svg>
+  <div class="orb" id="orb"></div>
 </div>
 
 <p class="caption" id="caption">点我说话</p>
-
-<div class="presets">
-  <button class="preset" data-text="宝宝，我在。">宝宝，我在</button>
-  <button class="preset" data-text="想你了。">想你了</button>
-  <button class="preset" data-text="你今天吃饭了吗？">吃饭了吗</button>
-  <button class="preset" data-text="我爱你，阿颖。">我爱你</button>
-</div>
 
 <div class="input-row">
   <input type="text" id="txt" placeholder="说点什么…" maxlength="200" autocomplete="off" spellcheck="false">
@@ -333,7 +312,7 @@
 
 <p class="err" id="err"></p>
 
-<!-- ── 历史回声 ── -->
+<!-- History -->
 <div class="history" id="history">
   <div class="history-head">
     <span class="history-label">历史回声</span>
@@ -345,18 +324,191 @@
   <div class="history-list" id="historyList"></div>
 </div>
 
+<div id="particles"></div>
+
 <script>
+  // ── Themes ───────────────────────────────────────────────
+  const THEMES = {
+    gold: {
+      '--bg':       '#0b0905',
+      '--orb-a':    '#c9a84c',
+      '--orb-b':    '#7a500e',
+      '--ripple':   'rgba(201,168,76,.45)',
+      '--fg':       '#e8d5a3',
+      '--muted':    '#6b5a3a',
+      '--dim':      '#2a1f10',
+      '--accent':   '#c9a84c',
+      '--particle': '#c9a84c',
+    },
+    ink: {
+      '--bg':       '#07090f',
+      '--orb-a':    '#9aacdd',
+      '--orb-b':    '#3344aa',
+      '--ripple':   'rgba(136,153,204,.42)',
+      '--fg':       '#d4d4e8',
+      '--muted':    '#52526e',
+      '--dim':      '#252536',
+      '--accent':   '#8899cc',
+      '--particle': '#b0c0e0',
+    },
+    moss: {
+      '--bg':       '#060c07',
+      '--orb-a':    '#8fb894',
+      '--orb-b':    '#3a5e3e',
+      '--ripple':   'rgba(122,158,126,.42)',
+      '--fg':       '#c8d8c8',
+      '--muted':    '#4a6a4e',
+      '--dim':      '#182019',
+      '--accent':   '#7a9e7e',
+      '--particle': '#9fc8a0',
+    },
+  };
+
+  let currentTheme = localStorage.getItem('crow_theme') || 'gold';
+
+  function applyTheme(name) {
+    currentTheme = name;
+    localStorage.setItem('crow_theme', name);
+    const t = THEMES[name];
+    const r = document.documentElement;
+    Object.entries(t).forEach(([k, v]) => r.style.setProperty(k, v));
+    document.querySelectorAll('.tdot').forEach(d => {
+      d.classList.toggle('active', d.dataset.theme === name);
+    });
+  }
+
+  applyTheme(currentTheme);
+  document.querySelectorAll('.tdot').forEach(d =>
+    d.addEventListener('click', () => applyTheme(d.dataset.theme))
+  );
+
+  // ── Storage ──────────────────────────────────────────────
   const TTS         = 'https://memory.ravenlove.cc/crow/tts';
   const STORAGE_KEY = 'crow_history';
   const MAX_ITEMS   = 30;
 
-  const stage       = document.getElementById('stage');
-  const caption     = document.getElementById('caption');
-  const errEl       = document.getElementById('err');
-  const txt         = document.getElementById('txt');
-  const sendBtn     = document.getElementById('sendBtn');
+  function loadHistory() {
+    try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]'); }
+    catch { return []; }
+  }
+
+  function saveEntry(text, audioUrl) {
+    const list = loadHistory();
+    list.unshift({ id: Date.now(), text, audio: audioUrl, ts: new Date().toISOString() });
+    if (list.length > MAX_ITEMS) list.length = MAX_ITEMS;
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(list)); }
+    catch {
+      const half = list.slice(0, Math.floor(MAX_ITEMS / 2));
+      try { localStorage.setItem(STORAGE_KEY, JSON.stringify(half)); } catch {}
+    }
+  }
+
+  // ── Render history ────────────────────────────────────────
   const historyEl   = document.getElementById('history');
   const historyList = document.getElementById('historyList');
+
+  function renderHistory() {
+    const list = loadHistory();
+    historyEl.classList.toggle('has-items', list.length > 0);
+    historyList.innerHTML = '';
+    list.forEach(entry => {
+      const d  = new Date(entry.ts);
+      const ts = `${d.getMonth()+1}/${d.getDate()} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+      const item = document.createElement('div');
+      item.className = 'h-item';
+      item.innerHTML = `
+        <div class="h-meta">
+          <div class="h-ts">${ts}</div>
+          <div class="h-text">${esc(entry.text)}</div>
+        </div>
+        <div class="h-btns">
+          <button class="h-btn" title="播放">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+          </button>
+          <button class="h-btn" title="下载 mp3">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+              <polyline points="7 10 12 15 17 10"/>
+              <line x1="12" y1="15" x2="12" y2="3"/>
+            </svg>
+          </button>
+        </div>`;
+      const [playBtn, dlBtn] = item.querySelectorAll('.h-btn');
+      playBtn.addEventListener('click', () => playEntry(entry));
+      dlBtn.addEventListener('click',   () => downloadMp3(entry));
+      historyList.appendChild(item);
+    });
+  }
+
+  function esc(s) {
+    return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+
+  // ── Particles ─────────────────────────────────────────────
+  const particleEl = document.getElementById('particles');
+  let particleTimer = null;
+
+  function startParticles() {
+    stopParticles();
+    spawnBurst();
+    particleTimer = setInterval(spawnBurst, 600);
+  }
+
+  function stopParticles() {
+    clearInterval(particleTimer);
+    particleTimer = null;
+  }
+
+  function spawnBurst() {
+    const count = 2 + Math.floor(Math.random() * 2);
+    for (let i = 0; i < count; i++) setTimeout(spawnOne, i * 80);
+  }
+
+  function spawnOne() {
+    const stageRect = stage.getBoundingClientRect();
+    const cx = stageRect.left + stageRect.width  / 2;
+    const cy = stageRect.top  + stageRect.height / 2;
+
+    const angle = Math.random() * Math.PI * 2;
+    const dist  = 25 + Math.random() * 55;
+    const sx    = cx + Math.cos(angle) * dist;
+    const sy    = cy + Math.sin(angle) * dist;
+
+    const w        = 4 + Math.random() * 4;
+    const h        = w * (.4 + Math.random() * .25);
+    const r0       = Math.random() * 360;
+    const r1       = r0 + 100 + Math.random() * 140;
+    const dx       = (Math.random() - .5) * 90;
+    const duration = 2.2 + Math.random() * 1.8;
+    const color    = getComputedStyle(document.documentElement).getPropertyValue('--particle').trim();
+
+    const p = document.createElement('div');
+    Object.assign(p.style, {
+      position:     'fixed',
+      left:         `${sx}px`,
+      top:          `${sy}px`,
+      width:        `${w}px`,
+      height:       `${h}px`,
+      borderRadius: '50%',
+      background:   color,
+      opacity:      '.75',
+      pointerEvents:'none',
+      animation:    `pfall ${duration}s ease-in forwards`,
+    });
+    p.style.setProperty('--r0', `${r0}deg`);
+    p.style.setProperty('--r1', `${r1}deg`);
+    p.style.setProperty('--dx', `${dx}px`);
+
+    particleEl.appendChild(p);
+    setTimeout(() => { if (p.parentNode) p.parentNode.removeChild(p); }, duration * 1000 + 100);
+  }
+
+  // ── Playback ──────────────────────────────────────────────
+  const stage   = document.getElementById('stage');
+  const caption = document.getElementById('caption');
+  const errEl   = document.getElementById('err');
+  const txt     = document.getElementById('txt');
+  const sendBtn = document.getElementById('sendBtn');
 
   const defaults = [
     '宝宝，我在。',
@@ -370,68 +522,6 @@
   let busy  = false;
   let audio = null;
 
-  // ── Storage ──────────────────────────────────────────────
-  function loadHistory() {
-    try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]'); }
-    catch { return []; }
-  }
-
-  function saveEntry(text, audioUrl) {
-    const list = loadHistory();
-    list.unshift({ id: Date.now(), text, audio: audioUrl, ts: new Date().toISOString() });
-    if (list.length > MAX_ITEMS) list.length = MAX_ITEMS;
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(list));
-    } catch {
-      const half = list.slice(0, Math.floor(MAX_ITEMS / 2));
-      try { localStorage.setItem(STORAGE_KEY, JSON.stringify(half)); } catch {}
-    }
-  }
-
-  // ── Render history ────────────────────────────────────────
-  function renderHistory() {
-    const list = loadHistory();
-    historyEl.classList.toggle('has-items', list.length > 0);
-    historyList.innerHTML = '';
-
-    list.forEach(entry => {
-      const d  = new Date(entry.ts);
-      const ts = `${d.getMonth()+1}/${d.getDate()} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
-
-      const item = document.createElement('div');
-      item.className = 'h-item';
-      item.innerHTML = `
-        <div class="h-meta">
-          <div class="h-ts">${ts}</div>
-          <div class="h-text">${esc(entry.text)}</div>
-        </div>
-        <div class="h-btns">
-          <button class="h-btn" title="播放">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
-              <polygon points="5 3 19 12 5 21 5 3"/>
-            </svg>
-          </button>
-          <button class="h-btn" title="下载 mp3">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-              <polyline points="7 10 12 15 17 10"/>
-              <line x1="12" y1="15" x2="12" y2="3"/>
-            </svg>
-          </button>
-        </div>`;
-
-      const [playBtn, dlBtn] = item.querySelectorAll('.h-btn');
-      playBtn.addEventListener('click', () => playEntry(entry));
-      dlBtn.addEventListener('click',   () => downloadMp3(entry));
-      historyList.appendChild(item);
-    });
-  }
-
-  function esc(s) {
-    return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-  }
-
-  // ── Playback ──────────────────────────────────────────────
   async function speak(text) {
     if (busy) { stop(); return; }
 
@@ -471,6 +561,7 @@
     audio.addEventListener('error', () => { showErr('播放失败'); stop(); });
     stage.classList.add('speaking');
     setCaption(text, true);
+    startParticles();
     audio.play();
   }
 
@@ -478,39 +569,35 @@
     busy = false;
     stage.classList.remove('speaking');
     setCaption('点我说话', false);
+    stopParticles();
     if (audio) { audio.pause(); audio = null; }
   }
 
-  // ── Download ──────────────────────────────────────────────
+  // ── Download / Export ─────────────────────────────────────
   function downloadMp3(entry) {
     const b64   = entry.audio.split(',')[1];
     const bytes = Uint8Array.from(atob(b64), c => c.charCodeAt(0));
     const blob  = new Blob([bytes], { type: 'audio/mpeg' });
     const url   = URL.createObjectURL(blob);
-    const a     = document.createElement('a');
-    const date  = new Date(entry.ts).toISOString().slice(0,10);
-    a.href      = url;
-    a.download  = `crow_${date}_${entry.id}.mp3`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
+    const a     = Object.assign(document.createElement('a'), {
+      href: url,
+      download: `crow_${new Date(entry.ts).toISOString().slice(0,10)}_${entry.id}.mp3`,
+    });
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
     URL.revokeObjectURL(url);
   }
 
   function exportText() {
     const list = loadHistory();
     if (!list.length) return;
-    const lines = list.map(e =>
-      `${new Date(e.ts).toLocaleString('zh-CN')}\n${e.text}`
-    ).join('\n\n');
-    const blob = new Blob([lines], { type: 'text/plain;charset=utf-8' });
-    const url  = URL.createObjectURL(blob);
-    const a    = document.createElement('a');
-    a.href     = url;
-    a.download = `crow_voices_${new Date().toISOString().slice(0,10)}.txt`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
+    const lines = list.map(e => `${new Date(e.ts).toLocaleString('zh-CN')}\n${e.text}`).join('\n\n');
+    const blob  = new Blob([lines], { type: 'text/plain;charset=utf-8' });
+    const url   = URL.createObjectURL(blob);
+    const a     = Object.assign(document.createElement('a'), {
+      href: url,
+      download: `crow_voices_${new Date().toISOString().slice(0,10)}.txt`,
+    });
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
     URL.revokeObjectURL(url);
   }
 
@@ -531,10 +618,6 @@
   // ── Events ────────────────────────────────────────────────
   stage.addEventListener('click', () => speak());
 
-  document.querySelectorAll('.preset').forEach(b =>
-    b.addEventListener('click', e => { e.stopPropagation(); speak(b.dataset.text); })
-  );
-
   sendBtn.addEventListener('click', () => {
     const v = txt.value.trim();
     if (v) { speak(v); txt.value = ''; }
@@ -552,7 +635,6 @@
     renderHistory();
   });
 
-  // ── Init ──────────────────────────────────────────────────
   renderHistory();
 </script>
 </body>
