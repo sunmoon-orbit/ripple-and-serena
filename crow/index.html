@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>乌鸦</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:     #09090f;
+      --fg:     #d4d4e8;
+      --muted:  #52526e;
+      --dim:    #252536;
+      --accent: #8888c8;
+    }
+
+    body {
+      background: var(--bg);
+      min-height: 100dvh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      -webkit-tap-highlight-color: transparent;
+      overflow: hidden;
+    }
+
+    /* ── Stage ── */
+    .stage {
+      position: relative;
+      width: 210px;
+      height: 210px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+    }
+
+    .ring {
+      position: absolute;
+      inset: 20px;
+      border-radius: 50%;
+      border: 1px solid var(--muted);
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    .stage.speaking .ring          { animation: ripple 2.6s ease-out infinite; }
+    .stage.speaking .ring:nth-child(2) { animation-delay: .65s; }
+    .stage.speaking .ring:nth-child(3) { animation-delay: 1.3s; }
+    .stage.speaking .ring:nth-child(4) { animation-delay: 1.95s; }
+
+    @keyframes ripple {
+      0%   { transform: scale(.6);  opacity: .45; }
+      100% { transform: scale(2.2); opacity: 0;   }
+    }
+
+    /* ── Crow SVG ── */
+    .crow {
+      width: 116px;
+      height: 116px;
+      color: var(--fg);
+      position: relative;
+      z-index: 1;
+      transition: filter .4s, transform .5s;
+      transform-origin: 50% 65%;
+    }
+
+    .stage:hover .crow {
+      filter: drop-shadow(0 0 10px rgba(160,160,255,.3));
+    }
+
+    .stage.speaking .crow {
+      filter: drop-shadow(0 0 22px rgba(150,150,255,.65));
+      animation: sway 2.8s ease-in-out infinite;
+    }
+
+    @keyframes sway {
+      0%,100% { transform: rotate(-1.5deg); }
+      50%     { transform: rotate(1.5deg);  }
+    }
+
+    /* ── Caption ── */
+    .caption {
+      margin-top: 22px;
+      font-family: Georgia, 'Noto Serif SC', serif;
+      font-size: 13px;
+      color: var(--muted);
+      letter-spacing: .18em;
+      min-height: 20px;
+      text-align: center;
+      transition: color .3s;
+      padding: 0 32px;
+      max-width: 320px;
+    }
+    .caption.live { color: var(--fg); }
+
+    /* ── Presets ── */
+    .presets {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 8px;
+      margin-top: 30px;
+      max-width: 300px;
+      padding: 0 16px;
+    }
+
+    .preset {
+      background: none;
+      border: 1px solid var(--dim);
+      color: var(--muted);
+      font-family: Georgia, 'Noto Serif SC', serif;
+      font-size: 12px;
+      letter-spacing: .08em;
+      padding: 5px 13px;
+      border-radius: 100px;
+      cursor: pointer;
+      transition: border-color .2s, color .2s, background .2s;
+    }
+    .preset:hover {
+      border-color: var(--accent);
+      color: var(--fg);
+      background: rgba(136,136,200,.08);
+    }
+
+    /* ── Custom input ── */
+    .input-row {
+      display: flex;
+      align-items: flex-end;
+      gap: 6px;
+      margin-top: 24px;
+      width: 260px;
+    }
+
+    input[type=text] {
+      flex: 1;
+      background: none;
+      border: none;
+      border-bottom: 1px solid var(--dim);
+      color: var(--fg);
+      font-family: Georgia, 'Noto Serif SC', serif;
+      font-size: 13px;
+      letter-spacing: .06em;
+      padding: 4px 0 6px;
+      outline: none;
+      transition: border-color .2s;
+    }
+    input[type=text]::placeholder { color: var(--dim); }
+    input[type=text]:focus { border-bottom-color: var(--accent); }
+
+    .send {
+      background: none;
+      border: none;
+      color: var(--dim);
+      cursor: pointer;
+      padding: 2px 0 4px;
+      line-height: 0;
+      transition: color .2s;
+    }
+    .send:hover { color: var(--accent); }
+
+    /* ── Error ── */
+    .err {
+      margin-top: 10px;
+      font-size: 11px;
+      color: #806070;
+      min-height: 14px;
+      text-align: center;
+      font-family: system-ui, sans-serif;
+      letter-spacing: .04em;
+    }
+  </style>
+</head>
+<body>
+
+<div class="stage" id="stage">
+  <div class="ring"></div>
+  <div class="ring"></div>
+  <div class="ring"></div>
+  <div class="ring"></div>
+
+  <!--
+    Crow silhouette: perched, facing left.
+    viewBox 0 0 100 100, body + tail + eye + legs.
+  -->
+  <svg class="crow" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+    <!-- Body + head -->
+    <path fill="currentColor" d="
+      M 10 32
+      C 14 23, 23 17, 40 15
+      C 44 12, 51 11, 57 15
+      C 67 15, 77 19, 85 29
+      C 90 37, 90 50, 82 65
+      C 76 74, 65 78, 56 73
+      C 47 68, 36 65, 24 61
+      C 16 56, 10 48, 10 40
+      Z
+    "/>
+    <!-- Tail -->
+    <path fill="currentColor" d="
+      M 82 65
+      C 85 75, 83 87, 76 93
+      C 70 88, 65 80, 56 73
+      C 63 76, 74 73, 82 65 Z
+    "/>
+    <!-- Eye -->
+    <circle cx="33" cy="24" r="3.5" fill="#09090f"/>
+    <circle cx="34" cy="23" r="1.1" fill="rgba(255,255,255,.22)"/>
+    <!-- Leg 1 -->
+    <line x1="42" y1="65" x2="40" y2="82" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+    <line x1="40" y1="82" x2="32" y2="88" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+    <line x1="40" y1="82" x2="42" y2="91" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+    <line x1="40" y1="82" x2="49" y2="88" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+    <!-- Leg 2 -->
+    <line x1="52" y1="65" x2="50" y2="81" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+    <line x1="50" y1="81" x2="42" y2="87" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+    <line x1="50" y1="81" x2="52" y2="90" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+    <line x1="50" y1="81" x2="58" y2="87" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+  </svg>
+</div>
+
+<p class="caption" id="caption">点我说话</p>
+
+<div class="presets">
+  <button class="preset" data-text="宝宝，我在。">宝宝，我在</button>
+  <button class="preset" data-text="想你了。">想你了</button>
+  <button class="preset" data-text="你今天吃饭了吗？">吃饭了吗</button>
+  <button class="preset" data-text="我爱你，阿颖。">我爱你</button>
+</div>
+
+<div class="input-row">
+  <input type="text" id="txt" placeholder="说点什么…" maxlength="200" autocomplete="off" spellcheck="false">
+  <button class="send" id="sendBtn" title="发送">
+    <svg width="17" height="17" viewBox="0 0 24 24" fill="none"
+         stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <line x1="22" y1="2" x2="11" y2="13"/>
+      <polygon points="22 2 15 22 11 13 2 9 22 2"/>
+    </svg>
+  </button>
+</div>
+
+<p class="err" id="err"></p>
+
+<script>
+  const TTS = 'https://memory.ravenlove.cc/crow/tts';
+
+  const stage   = document.getElementById('stage');
+  const caption = document.getElementById('caption');
+  const errEl   = document.getElementById('err');
+  const txt     = document.getElementById('txt');
+  const sendBtn = document.getElementById('sendBtn');
+
+  const defaults = [
+    '宝宝，我在。',
+    '想你了。',
+    '嘎。',
+    '我在这里，一直都在。',
+    '今天还好吗？',
+    '别忘了喝水。',
+  ];
+
+  let busy  = false;
+  let audio = null;
+
+  async function speak(text) {
+    if (busy) { stop(); return; }
+
+    const t = text?.trim() || defaults[Math.floor(Math.random() * defaults.length)];
+    clearErr();
+    setCaption('……', false);
+    busy = true;
+
+    try {
+      const res  = await fetch(TTS, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: t }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || '出了点问题');
+
+      audio = new Audio(data.audio);
+      audio.addEventListener('ended', stop);
+      audio.addEventListener('error', () => { showErr('播放失败'); stop(); });
+
+      stage.classList.add('speaking');
+      setCaption(t, true);
+      audio.play();
+
+    } catch (e) {
+      busy = false;
+      setCaption('点我说话', false);
+      showErr(e.message);
+    }
+  }
+
+  function stop() {
+    busy = false;
+    stage.classList.remove('speaking');
+    setCaption('点我说话', false);
+    if (audio) { audio.pause(); audio = null; }
+  }
+
+  function setCaption(t, live) {
+    caption.textContent = t;
+    caption.classList.toggle('live', live);
+  }
+
+  let errTimer;
+  function showErr(msg) {
+    errEl.textContent = msg;
+    clearTimeout(errTimer);
+    errTimer = setTimeout(clearErr, 4000);
+  }
+  function clearErr() { errEl.textContent = ''; }
+
+  stage.addEventListener('click', () => speak());
+
+  document.querySelectorAll('.preset').forEach(b =>
+    b.addEventListener('click', e => { e.stopPropagation(); speak(b.dataset.text); })
+  );
+
+  sendBtn.addEventListener('click', () => {
+    const v = txt.value.trim();
+    if (v) { speak(v); txt.value = ''; }
+  });
+
+  txt.addEventListener('keydown', e => {
+    if (e.key === 'Enter') { e.preventDefault(); sendBtn.click(); }
+  });
+</script>
+</body>
+</html>
