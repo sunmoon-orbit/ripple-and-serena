@@ -69,55 +69,55 @@
       flex-shrink: 0;
     }
 
+    /* 波纹圈：细线，从光晕中心扩散 */
     .ring {
       position: absolute;
-      inset: 30px;
+      width: 50px;
+      height: 50px;
       border-radius: 50%;
-      border: 1px solid var(--ripple);
+      border: .5px solid var(--ripple);
       opacity: 0;
       pointer-events: none;
     }
 
-    .stage.speaking .ring              { animation: ripple 2.8s ease-out infinite; }
-    .stage.speaking .ring:nth-child(2) { animation-delay: .7s; }
-    .stage.speaking .ring:nth-child(3) { animation-delay: 1.4s; }
-    .stage.speaking .ring:nth-child(4) { animation-delay: 2.1s; }
+    .stage.speaking .ring              { animation: ripple 3s ease-out infinite; }
+    .stage.speaking .ring:nth-child(2) { animation-delay: .75s; }
+    .stage.speaking .ring:nth-child(3) { animation-delay: 1.5s; }
+    .stage.speaking .ring:nth-child(4) { animation-delay: 2.25s; }
 
     @keyframes ripple {
-      0%   { transform: scale(.55); opacity: .6; }
-      100% { transform: scale(2.4); opacity: 0;  }
+      0%   { transform: scale(.4);  opacity: .7; }
+      100% { transform: scale(3.8); opacity: 0;  }
     }
 
-    /* ── Orb ── */
+    /* ── Orb：纯光晕，无实体 ── */
     .orb {
-      width: 90px;
-      height: 90px;
+      width: 8px;
+      height: 8px;
       border-radius: 50%;
-      background: radial-gradient(circle at 38% 36%, var(--orb-a), var(--orb-b));
-      box-shadow: 0 0 24px rgba(0,0,0,.6), 0 0 0 1px rgba(255,255,255,.06) inset;
+      background: var(--orb-a);
+      box-shadow:
+        0 0  6px  3px var(--orb-a),
+        0 0 24px 12px var(--orb-b),
+        0 0 60px 30px var(--ripple),
+        0 0 100px 50px var(--ripple);
       position: relative;
       z-index: 1;
-      animation: breathe 4s ease-in-out infinite;
-      transition: background .5s, box-shadow .4s;
-    }
-
-    .stage:hover .orb {
-      box-shadow: 0 0 32px var(--ripple), 0 0 0 1px rgba(255,255,255,.08) inset;
+      animation: breathe 5s ease-in-out infinite;
     }
 
     .stage.speaking .orb {
-      animation: pulse 1.4s ease-in-out infinite;
-      box-shadow: 0 0 40px var(--ripple), 0 0 0 1px rgba(255,255,255,.1) inset;
+      animation: pulse 1.6s ease-in-out infinite;
     }
 
     @keyframes breathe {
-      0%,100% { transform: scale(1);    }
-      50%     { transform: scale(1.03); }
+      0%,100% { transform: scale(1);   }
+      50%     { transform: scale(1.4); }
     }
 
     @keyframes pulse {
-      0%,100% { transform: scale(1);    }
-      50%     { transform: scale(1.07); }
+      0%,100% { transform: scale(1.2); }
+      50%     { transform: scale(1.9); }
     }
 
     /* ── Caption ── */
