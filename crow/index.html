@@ -275,8 +275,15 @@
     }
 
     @keyframes pfall {
-      0%   { opacity: .8;  transform: translateY(0)     translateX(0)          rotate(var(--r0, 0deg)); }
-      100% { opacity: 0;   transform: translateY(160px) translateX(var(--dx, 0px)) rotate(var(--r1, 180deg)); }
+      0%   { opacity: .8;  transform: translateY(0)      translateX(0)             rotate(var(--r0, 0deg)); }
+      100% { opacity: 0;   transform: translateY(160px)  translateX(var(--dx, 0px)) rotate(var(--r1, 180deg)); }
+    }
+
+    @keyframes sparkle {
+      0%   { opacity: 0;  transform: scale(0)   translateY(0)    rotate(0deg);    }
+      25%  { opacity: 1;  transform: scale(1.3) translateY(-8px) rotate(45deg);   }
+      70%  { opacity: .6; transform: scale(.9)  translateY(-20px) rotate(90deg);  }
+      100% { opacity: 0;  transform: scale(0)   translateY(-36px) rotate(135deg); }
     }
   </style>
 </head>
@@ -340,7 +347,8 @@
       '--muted':    '#6b5a3a',
       '--dim':      '#2a1f10',
       '--accent':   '#c9a84c',
-      '--particle': '#c9a84c',
+      '--particle': '#e8d080',
+      type: 'star',
     },
     ink: {
       '--bg':       '#07090f',
@@ -351,7 +359,8 @@
       '--muted':    '#52526e',
       '--dim':      '#252536',
       '--accent':   '#8899cc',
-      '--particle': '#b0c0e0',
+      '--particle': '#c8d4f0',
+      type: 'star',
     },
     moss: {
       '--bg':       '#060c07',
@@ -363,6 +372,7 @@
       '--dim':      '#182019',
       '--accent':   '#7a9e7e',
       '--particle': '#9fc8a0',
+      type: 'petal',
     },
     rose: {
       '--bg':       '#0d0608',
@@ -374,6 +384,7 @@
       '--dim':      '#2e1420',
       '--accent':   '#e8799a',
       '--particle': '#f4a0bc',
+      type: 'petal',
     },
   };
 
@@ -483,34 +494,43 @@
     const cy = stageRect.top  + stageRect.height / 2;
 
     const angle = Math.random() * Math.PI * 2;
-    const dist  = 25 + Math.random() * 55;
+    const dist  = 20 + Math.random() * 65;
     const sx    = cx + Math.cos(angle) * dist;
     const sy    = cy + Math.sin(angle) * dist;
 
-    const w        = 4 + Math.random() * 4;
-    const h        = w * (.4 + Math.random() * .25);
-    const r0       = Math.random() * 360;
-    const r1       = r0 + 100 + Math.random() * 140;
-    const dx       = (Math.random() - .5) * 90;
-    const duration = 2.2 + Math.random() * 1.8;
     const color    = getComputedStyle(document.documentElement).getPropertyValue('--particle').trim();
+    const type     = THEMES[currentTheme].type || 'petal';
+    const duration = type === 'star' ? 1.2 + Math.random() * 1 : 2.2 + Math.random() * 1.8;
 
     const p = document.createElement('div');
-    Object.assign(p.style, {
-      position:     'fixed',
-      left:         `${sx}px`,
-      top:          `${sy}px`,
-      width:        `${w}px`,
-      height:       `${h}px`,
-      borderRadius: '50%',
-      background:   color,
-      opacity:      '.75',
-      pointerEvents:'none',
-      animation:    `pfall ${duration}s ease-in forwards`,
-    });
-    p.style.setProperty('--r0', `${r0}deg`);
-    p.style.setProperty('--r1', `${r1}deg`);
-    p.style.setProperty('--dx', `${dx}px`);
+    p.style.position      = 'fixed';
+    p.style.left          = `${sx}px`;
+    p.style.top           = `${sy}px`;
+    p.style.pointerEvents = 'none';
+    p.style.lineHeight    = '1';
+
+    if (type === 'star') {
+      const chars   = ['✦','✧','⋆','✩','·'];
+      const size    = 10 + Math.random() * 10;
+      p.textContent = chars[Math.floor(Math.random() * chars.length)];
+      p.style.fontSize  = `${size}px`;
+      p.style.color     = color;
+      p.style.animation = `sparkle ${duration}s ease-out forwards`;
+    } else {
+      const w  = 4 + Math.random() * 4;
+      const h  = w * (.4 + Math.random() * .25);
+      const r0 = Math.random() * 360;
+      const r1 = r0 + 100 + Math.random() * 140;
+      const dx = (Math.random() - .5) * 90;
+      p.style.width        = `${w}px`;
+      p.style.height       = `${h}px`;
+      p.style.borderRadius = '50%';
+      p.style.background   = color;
+      p.style.opacity      = '.75';
+      p.style.animation    = `pfall ${duration}s ease-in forwards`;
+      p.style.setProperty  = p.style.setProperty; // no-op placeholder
+      p.style.cssText     += `; --r0:${r0}deg; --r1:${r1}deg; --dx:${dx}px;`;
+    }
 
     particleEl.appendChild(p);
     setTimeout(() => { if (p.parentNode) p.parentNode.removeChild(p); }, duration * 1000 + 100);
