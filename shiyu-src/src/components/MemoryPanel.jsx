@@ -325,6 +325,7 @@ export default function MemoryPanel() {
   const [tabIdx, setTabIdx] = useState(0)
   const [selectedDate, setSelectedDate] = useState(null)
   const [sortBy, setSortBy] = useState('date') // date | importance | arousal
+  const [sortDir, setSortDir] = useState('desc') // desc | asc
   const [semanticLoading, setSemanticLoading] = useState(false)
   const [heatType, setHeatType] = useState('count') // count | emotion
   const [heatPage, setHeatPage] = useState(0) // 0=最近12周, 1=再往前12周...
@@ -357,9 +358,11 @@ export default function MemoryPanel() {
   useEffect(() => { load() }, [load])
 
   const sortedMems = [...mems].sort((a, b) => {
-    if (sortBy === 'importance') return (b.importance || 5) - (a.importance || 5)
-    if (sortBy === 'arousal') return (b.arousal || 0) - (a.arousal || 0)
-    return 0
+    let diff = 0
+    if (sortBy === 'importance') diff = (b.importance || 5) - (a.importance || 5)
+    else if (sortBy === 'arousal') diff = (b.arousal || 0) - (a.arousal || 0)
+    else diff = new Date(b.created_at) - new Date(a.created_at) // date: 默认新→旧
+    return sortDir === 'desc' ? diff : -diff
   })
 
   async function semanticSearch() {
@@ -441,7 +444,11 @@ export default function MemoryPanel() {
           </button>
         </div>
         <div style={{ display: 'flex', gap: 6, marginTop: 8, alignItems: 'center' }}>
-          <ArrowUpDown size={12} style={{ color: 'var(--ink-faint)' }} />
+          <button onClick={() => setSortDir(d => d === 'desc' ? 'asc' : 'desc')}
+            style={{ background:'none', border:'none', cursor:'pointer', padding:'2px 4px', color:'var(--ink-faint)', display:'flex', alignItems:'center' }}
+            title={sortDir === 'desc' ? '当前：新→旧，点击反转' : '当前：旧→新，点击反转'}>
+            {sortDir === 'desc' ? <ArrowUpDown size={12} /> : <ArrowUpDown size={12} style={{ transform:'scaleY(-1)' }} />}
+          </button>
           {[['date','时间'],['importance','重要性'],['arousal','情绪强度']].map(([v,l]) => (
             <button key={v} className={'scope-tab' + (sortBy === v ? ' active' : '')}
               style={{ padding: '4px 10px', fontSize: 12 }}
