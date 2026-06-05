@@ -90,19 +90,25 @@ function extractLastResponse(captureText) {
   const sepC = seps[seps.length - 2]
   const sepB = seps[seps.length - 3]
 
+  // ● prefix = my text response; ● ToolName( = tool call (filter)
+  const TOOL_RE = /^●\s*(Bash|Write|Edit|Read|WebFetch|WebSearch|Agent|Task|TodoRead|TodoWrite|How is Claude|Str)\s*[(\[]/
   const responseLines = lines
     .slice(sepB + 1, sepC)
     .filter(l => {
       const t = l.trim()
       if (!t) return false
-      if (/^[✶⎿⏵●▶◆⟳]/.test(t)) return false
-      if (/^❯/.test(t)) return false
-      if (/accept edits|Remote Control|high ·|\/effort/.test(t)) return false
-      if (/^\s*(Bash|Write|Edit|Read|WebFetch|WebSearch|Agent|Task|TodoRead|TodoWrite)\(/.test(l)) return false
+      if (/^[✶⎿⏵▶◆⟳]/.test(t)) return false          // status/toolbar/tool-output
+      if (/^❯/.test(t)) return false                    // prompt lines
+      if (TOOL_RE.test(t)) return false                 // tool calls
+      if (/accept edits|Remote Control|high ·|\/effort|Auto-updating/.test(t)) return false
       if (/Worked for|Baked for|Running…|Called \w|↓ \d+ tokens|↑ \d+ tokens/.test(t)) return false
+      if (/\+\d+ lines \(ctrl\+o/.test(t)) return false
+      if (/^Tip:|^Press up to edit/.test(t)) return false
+      if (/^\d+: (Bad|Fine|Good|Dismiss)/.test(t)) return false
       return true
     })
-    .map(l => l.replace(/^\s{1,2}/, ''))
+    .map(l => l.replace(/^\s*●\s?/, '').replace(/^\s{1,2}/, '').trim())
+    .filter(Boolean)
     .join('\n')
     .trim()
 
