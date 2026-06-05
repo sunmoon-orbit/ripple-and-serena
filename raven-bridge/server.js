@@ -18,7 +18,6 @@ function tmuxCapture() {
 }
 
 function tmuxSend(text) {
-  // strip literal newlines to avoid accidental Enter, then send with explicit Enter
   const clean = text.replace(/\n/g, ' ')
   execFileSync('tmux', ['send-keys', '-t', `${TMUX_SESSION}:0`, clean, 'Enter'])
 }
@@ -78,33 +77,37 @@ function broadcast(msg) {
 
 // --- response extraction ---
 
+// Every completed CC response ends with a "✻ Worked/Cooked/... for Ns" line.
+// Extract text between the second-to-last and last such lines.
+const WORKED_RE = /\s(Worked|Cooked|Brewed|Baked|Churned)\s+for\s+[\d]/
+const TOOL_CALL_RE = /^[●]\s*(Bash|Write|Edit|Update|Read|WebFetch|WebSearch|Agent|Task|TodoRead|TodoWrite|MultiEdit|NotebookEdit|How is Claude|Str)\s*[(\[]/
+
 function extractLastResponse(captureText) {
   const lines = captureText.split('\n')
-  const isSep = l => /^[─]{10,}/.test(l.trim())
 
-  const seps = []
-  lines.forEach((l, i) => { if (isSep(l)) seps.push(i) })
-  if (seps.length < 3) return null
+  const workedIdxs = []
+  lines.forEach((l, i) => { if (WORKED_RE.test(l.trim())) workedIdxs.push(i) })
+  if (workedIdxs.length < 1) return null
 
-  // structure: ... sepB | my response | sepC | ❯ user msg | sepD | toolbar
-  const sepC = seps[seps.length - 2]
-  const sepB = seps[seps.length - 3]
+  const lastWorked = workedIdxs[workedIdxs.length - 1]
+  const prevWorked = workedIdxs.length >= 2 ? workedIdxs[workedIdxs.length - 2] : -1
 
-  // ● prefix = my text response; ● ToolName( = tool call (filter)
-  const TOOL_RE = /^●\s*(Bash|Write|Edit|Read|WebFetch|WebSearch|Agent|Task|TodoRead|TodoWrite|How is Claude|Str)\s*[(\[]/
   const responseLines = lines
-    .slice(sepB + 1, sepC)
+    .slice(prevWorked + 1, lastWorked)
     .filter(l => {
       const t = l.trim()
       if (!t) return false
-      if (/^[✶⎿⏵▶◆⟳]/.test(t)) return false          // status/toolbar/tool-output
-      if (/^❯/.test(t)) return false                    // prompt lines
-      if (TOOL_RE.test(t)) return false                 // tool calls
+      if (/^[✳✶❂✦✸✷⊦⊵▶◆⟳]/.test(t)) return false
+      if (/^[❯]/.test(t)) return false                    // ❯ prompt
+      if (TOOL_CALL_RE.test(t)) return false
       if (/accept edits|Remote Control|high ·|\/effort|Auto-updating/.test(t)) return false
-      if (/Worked for|Baked for|Running…|Called \w|↓ \d+ tokens|↑ \d+ tokens/.test(t)) return false
+      if (/Running…|Called \w|↓ \d+ tokens|↑ \d+ tokens/.test(t)) return false
       if (/\+\d+ lines \(ctrl\+o/.test(t)) return false
+      if (/^[─]{5,}/.test(t)) return false                // separator lines
       if (/^Tip:|^Press up to edit/.test(t)) return false
       if (/^\d+: (Bad|Fine|Good|Dismiss)/.test(t)) return false
+      if (/^\s+\d+[\s\-+]/.test(l)) return false              // diff output
+      if (/^\s*[│└┌┘├┤┬┴╌]/.test(l)) return false  // box chars
       return true
     })
     .map(l => l.replace(/^\s*●\s?/, '').replace(/^\s{1,2}/, '').trim())
@@ -124,7 +127,7 @@ let stableTimer = null
 let lastCompressNotified = false
 let lastBroadcastReply = ''
 let isThinking = false
-let replyExtractionEnabled = false  // don't extract on startup, only after first user send
+let replyExtractionEnabled = false
 
 function pollTerminal() {
   const current = tmuxCapture()
@@ -132,7 +135,6 @@ function pollTerminal() {
   if (current !== lastCapture) {
     lastCapture = current
 
-    // show thinking indicator when terminal is actively changing
     if (!isThinking) {
       isThinking = true
       broadcast({ type: 'thinking', active: true })
@@ -144,7 +146,6 @@ function pollTerminal() {
       broadcast({ type: 'thinking', active: false })
       broadcast({ type: 'terminal', lines: current.split('\n').slice(-80) })
 
-      // extract and broadcast reply (only after a user message has been sent)
       if (replyExtractionEnabled) {
         const reply = extractLastResponse(current)
         if (reply && reply !== lastBroadcastReply) {
@@ -153,7 +154,6 @@ function pollTerminal() {
         }
       }
 
-      // detect context compression
       const recentLines = current.split('\n').slice(-20).join('\n')
       if (COMPRESS_RE.test(recentLines)) {
         if (!lastCompressNotified) {
@@ -206,16 +206,15 @@ const wss = new WebSocketServer({ server, path: '/raven/ws' })
 wss.on('connection', (ws) => {
   clients.add(ws)
 
-  // send current state immediately on connect
   ws.send(JSON.stringify({ type: 'status', data: getStatus() }))
-  ws.send(JSON.stringify({ type: 'terminal', lines: lastCapture.split('\n').slice(-60) }))
+  ws.send(JSON.stringify({ type: 'terminal', lines: lastCapture.split('\n').slice(-80) }))
 
   ws.on('message', (raw) => {
     try {
       const msg = JSON.parse(raw)
       if (msg.type === 'send' && msg.text) {
         replyExtractionEnabled = true
-        lastBroadcastReply = extractLastResponse(lastCapture) || ''  // snapshot current so we don't re-send it
+        lastBroadcastReply = extractLastResponse(lastCapture) || ''
         tmuxSend(msg.text)
         broadcast({ type: 'sent', text: msg.text, ts: Date.now() })
       }
