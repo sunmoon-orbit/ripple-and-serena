@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect } from 'react'
 import { useStore } from '../../store'
 import { normalizeProvider, BUILTIN_MODELS } from '../../api/llm'
 import { checkHealth, fetchPushSchedule, savePushSchedule } from '../../api/moonMemory'
@@ -259,20 +259,8 @@ export default function Settings() {
     completionTokens: acc.completionTokens + (s.completionTokens || 0),
   }), { calls: 0, totalTokens: 0, promptTokens: 0, completionTokens: 0 })
 
-  const shellRef = useRef(null)
-  const contentRef = useRef(null)
-  const cardRef = useRef(null)
-  const [dbg, setDbg] = useState('')
-  useEffect(() => {
-    const sh = shellRef.current?.offsetWidth ?? '?'
-    const ct = contentRef.current?.offsetWidth ?? '?'
-    const cd = cardRef.current?.offsetWidth ?? '?'
-    setDbg(`vp:${window.innerWidth} shell:${sh} ct:${ct} card:${cd}`)
-  })
-
   return (
-    <div className="panel-shell settings-panel" ref={shellRef}>
-      <div style={{ position:'fixed', top:4, right:4, background:'rgba(0,0,0,0.75)', color:'#fff', fontSize:11, padding:'3px 7px', borderRadius:6, zIndex:9999, pointerEvents:'none', fontFamily:'monospace' }}>{dbg}</div>
+    <div className="panel-shell settings-panel">
       <div className="panel-topbar">
         <h2 className="panel-title">设置</h2>
       </div>
@@ -286,7 +274,7 @@ export default function Settings() {
         ))}
       </div>
 
-      <div className="settings-content" ref={contentRef}>
+      <div className="settings-content">
 
         {/* ── Connections ──────────────────────────────────────── */}
         {tab === 'connections' && (
@@ -411,7 +399,7 @@ export default function Settings() {
         {/* ── Moon Memory ──────────────────────────────────────── */}
         {tab === 'moon' && (
           <Section title="拾羽记忆库">
-            <div className="settings-card" ref={cardRef}>
+            <div className="settings-card">
               <div className="card-row">
                 <span className="card-row-label">启用拾羽记忆库</span>
                 <label className="toggle">
