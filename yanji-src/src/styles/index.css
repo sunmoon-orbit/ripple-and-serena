@@ -1544,6 +1544,7 @@ a { text-decoration: none; color: inherit; }
 @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;1,300;1,400&display=swap');
 
 .roost-panel {
+  width: 100%;
   padding: 20px 18px 36px;
   max-width: 480px;
   margin: 0 auto;
