@@ -752,7 +752,7 @@ a { text-decoration: none; color: inherit; }
   color: var(--text); font-size: 13px; outline: none;
   transition: border-color 0.18s;
 }
-textarea.form-input { width: 100%; }
+textarea.form-input { display: block; margin: 8px 16px 12px; }
 .form-input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(191,181,216,0.12); }
 .form-input::placeholder { color: var(--text-faint); }
 .form-textarea { resize: vertical; min-height: 80px; }
