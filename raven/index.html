@@ -198,15 +198,36 @@ function setConn(ok) {
   document.getElementById('conn-label').textContent = ok ? '已连接' : '连接断开，重试中…'
 }
 
-// --- chat ---
+// --- chat history (localStorage) ---
 
-function appendMsg(text, role) {
+const STORAGE_KEY = 'raven-chat-v1'
+const MAX_STORED = 200
+
+function loadHistory() {
+  try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]') } catch { return [] }
+}
+
+function saveHistory(items) {
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(items.slice(-MAX_STORED))) } catch {}
+}
+
+let chatHistory = loadHistory()
+
+function appendMsg(text, role, save = true) {
   const el = document.createElement('div')
   el.className = `msg ${role}`
   el.textContent = text
   const box = document.getElementById('chat-messages')
   box.appendChild(el)
   box.scrollTop = box.scrollHeight
+  if (save && role !== 'system') {
+    chatHistory.push({ text, role, ts: Date.now() })
+    saveHistory(chatHistory)
+  }
+}
+
+function restoreHistory() {
+  chatHistory.forEach(m => appendMsg(m.text, m.role, false))
 }
 
 function sendMsg() {
@@ -230,6 +251,8 @@ document.getElementById('chat-input').addEventListener('input', function() {
 })
 
 // --- terminal ---
+
+let lastTerminalText = ''
 
 function renderTerminal(lines) {
   const el = document.getElementById('terminal-out')
@@ -286,9 +309,10 @@ document.querySelectorAll('.tab').forEach(tab => {
 function showCompressBanner() {
   const b = document.getElementById('compress-banner')
   b.classList.add('show')
-  appendMsg('⚡ 对话已压缩', 'system')
+  appendMsg('⚡ 对话已压缩，乌鸦记忆重置了', 'system', false)
 }
 
+restoreHistory()
 connect()
 
 if ('serviceWorker' in navigator) {
