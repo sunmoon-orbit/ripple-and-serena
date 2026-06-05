@@ -264,16 +264,11 @@ export default function Settings() {
   const cardRef = useRef(null)
   const [dbg, setDbg] = useState('')
   useEffect(() => {
-    function measure() {
-      const sh = shellRef.current?.offsetWidth ?? '?'
-      const ct = contentRef.current?.offsetWidth ?? '?'
-      const cd = cardRef.current?.offsetWidth ?? '?'
-      setDbg(`shell:${sh} content:${ct} card:${cd}`)
-    }
-    measure()
-    window.addEventListener('resize', measure)
-    return () => window.removeEventListener('resize', measure)
-  }, [])
+    const sh = shellRef.current?.offsetWidth ?? '?'
+    const ct = contentRef.current?.offsetWidth ?? '?'
+    const cd = cardRef.current?.offsetWidth ?? '?'
+    setDbg(`vp:${window.innerWidth} shell:${sh} ct:${ct} card:${cd}`)
+  })
 
   return (
     <div className="panel-shell settings-panel" ref={shellRef}>
