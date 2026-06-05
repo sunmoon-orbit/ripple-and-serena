@@ -76,25 +76,74 @@ function broadcast(msg) {
   }
 }
 
+// --- response extraction ---
+
+function extractLastResponse(captureText) {
+  const lines = captureText.split('\n')
+  const isSep = l => /^[─]{10,}/.test(l.trim())
+
+  const seps = []
+  lines.forEach((l, i) => { if (isSep(l)) seps.push(i) })
+  if (seps.length < 3) return null
+
+  // structure: ... sepB | my response | sepC | ❯ user msg | sepD | toolbar
+  const sepC = seps[seps.length - 2]
+  const sepB = seps[seps.length - 3]
+
+  const responseLines = lines
+    .slice(sepB + 1, sepC)
+    .filter(l => {
+      const t = l.trim()
+      if (!t) return false
+      if (/^[✶⎿⏵●▶◆⟳]/.test(t)) return false
+      if (/^❯/.test(t)) return false
+      if (/accept edits|Remote Control|high ·|\/effort/.test(t)) return false
+      if (/^\s*(Bash|Write|Edit|Read|WebFetch|WebSearch|Agent|Task|TodoRead|TodoWrite)\(/.test(l)) return false
+      if (/Worked for|Baked for|Running…|Called \w|↓ \d+ tokens|↑ \d+ tokens/.test(t)) return false
+      return true
+    })
+    .map(l => l.replace(/^\s{1,2}/, ''))
+    .join('\n')
+    .trim()
+
+  return responseLines || null
+}
+
 // --- terminal polling ---
 
-const COMPRESS_PATTERNS = [
-  'compressing', 'summarizing conversation', 'context.*compress',
-  '压缩', '对话已压缩', 'conversation.*summar'
-]
-const COMPRESS_RE = new RegExp(COMPRESS_PATTERNS.join('|'), 'i')
+const COMPRESS_RE = /compressing|summarizing conversation|context.*compress|对话已压缩|conversation.*summar/i
 
 let lastCapture = ''
 let stableTimer = null
 let lastCompressNotified = false
+let lastBroadcastReply = ''
+let isThinking = false
 
 function pollTerminal() {
   const current = tmuxCapture()
+
   if (current !== lastCapture) {
     lastCapture = current
+
+    // show thinking indicator when terminal is actively changing
+    if (!isThinking) {
+      isThinking = true
+      broadcast({ type: 'thinking', active: true })
+    }
+
     if (stableTimer) clearTimeout(stableTimer)
     stableTimer = setTimeout(() => {
+      isThinking = false
+      broadcast({ type: 'thinking', active: false })
       broadcast({ type: 'terminal', lines: current.split('\n').slice(-60) })
+
+      // extract and broadcast reply
+      const reply = extractLastResponse(current)
+      if (reply && reply !== lastBroadcastReply) {
+        lastBroadcastReply = reply
+        broadcast({ type: 'reply', text: reply, ts: Date.now() })
+      }
+
       // detect context compression
       const recentLines = current.split('\n').slice(-20).join('\n')
       if (COMPRESS_RE.test(recentLines)) {
@@ -105,7 +154,7 @@ function pollTerminal() {
       } else {
         lastCompressNotified = false
       }
-    }, 1200)
+    }, 1500)
   }
 }
 
