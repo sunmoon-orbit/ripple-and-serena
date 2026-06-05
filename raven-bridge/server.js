@@ -12,7 +12,7 @@ const POLL_INTERVAL_MS = 800
 
 function tmuxCapture() {
   try {
-    const r = spawnSync('tmux', ['capture-pane', '-p', '-t', `${TMUX_SESSION}:0`], { encoding: 'utf8' })
+    const r = spawnSync('tmux', ['capture-pane', '-p', '-S', '-500', '-t', `${TMUX_SESSION}:0`], { encoding: 'utf8' })
     return r.stdout || ''
   } catch { return '' }
 }
@@ -142,7 +142,7 @@ function pollTerminal() {
     stableTimer = setTimeout(() => {
       isThinking = false
       broadcast({ type: 'thinking', active: false })
-      broadcast({ type: 'terminal', lines: current.split('\n').slice(-60) })
+      broadcast({ type: 'terminal', lines: current.split('\n').slice(-80) })
 
       // extract and broadcast reply (only after a user message has been sent)
       if (replyExtractionEnabled) {
