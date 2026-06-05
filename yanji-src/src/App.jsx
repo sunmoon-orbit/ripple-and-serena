@@ -39,10 +39,15 @@ export default function App() {
   const [showHome, setShowHome] = useState(false)
   const [dbgDim, setDbgDim] = useState('')
   useEffect(() => {
-    const update = () => setDbgDim(`vp:${window.innerWidth}×${window.innerHeight} doc:${document.documentElement.clientWidth}`)
+    const update = () => {
+      const ma = document.querySelector('.main-area')
+      const rp = document.querySelector('.roost-panel,.panel-shell')
+      setDbgDim(`vp:${window.innerWidth}×${window.innerHeight} doc:${document.documentElement.clientWidth} ma:${ma?.offsetWidth} rp:${rp?.offsetWidth}`)
+    }
     update()
+    const t = setInterval(update, 1000)
     window.addEventListener('resize', update)
-    return () => window.removeEventListener('resize', update)
+    return () => { clearInterval(t); window.removeEventListener('resize', update) }
   }, [])
 
   useEffect(() => {
