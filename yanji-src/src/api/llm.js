@@ -71,6 +71,13 @@ function formatToolsForProvider(tools, provider) {
   return []
 }
 
+const TOOL_RESULT_MAX_LEN = 3000
+
+function compressToolResult(result) {
+  if (typeof result !== 'string' || result.length <= TOOL_RESULT_MAX_LEN) return result
+  return result.slice(0, TOOL_RESULT_MAX_LEN) + '\n…[内容过长已截断]'
+}
+
 async function executeTool(name, args, { searchConfig, moonMemoryConfig, onStatus }) {
   if (name === 'web_search') {
     onStatus?.('搜索中...')
@@ -198,7 +205,7 @@ async function callWithTools({
         convo.push(aMsg)
         for (const tc of msg.tool_calls) {
           const args = JSON.parse(tc.function.arguments || '{}')
-          const result = await executeTool(tc.function.name, args, { searchConfig, moonMemoryConfig, onStatus })
+          const result = compressToolResult(await executeTool(tc.function.name, args, { searchConfig, moonMemoryConfig, onStatus }))
           convo.push({ role: 'tool', tool_call_id: tc.id, content: result })
         }
         continue
@@ -234,7 +241,7 @@ async function callWithTools({
       if (toolBlock) {
         onToolCall?.([toolBlock.name])
         convo.push({ role: 'assistant', content: data.content })
-        const result = await executeTool(toolBlock.name, toolBlock.input || {}, { searchConfig, moonMemoryConfig, onStatus })
+        const result = compressToolResult(await executeTool(toolBlock.name, toolBlock.input || {}, { searchConfig, moonMemoryConfig, onStatus }))
         convo.push({ role: 'user', tool_use_id: toolBlock.id, content: result })
         continue
       }
@@ -265,7 +272,7 @@ async function callWithTools({
         const fc = fcPart.functionCall
         onToolCall?.([fc.name])
         convo.push({ role: 'assistant', content: '', functionCall: fc })
-        const result = await executeTool(fc.name, fc.args || {}, { searchConfig, moonMemoryConfig, onStatus })
+        const result = compressToolResult(await executeTool(fc.name, fc.args || {}, { searchConfig, moonMemoryConfig, onStatus }))
         convo.push({ role: 'function', content: result, functionResponse: { name: fc.name, response: { result } } })
         continue
       }
