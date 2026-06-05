@@ -37,18 +37,6 @@ export default function App() {
   const theme = useStore((s) => s.theme)
   const [showSplash, setShowSplash] = useState(true)
   const [showHome, setShowHome] = useState(false)
-  const [dbgDim, setDbgDim] = useState('')
-  useEffect(() => {
-    const update = () => {
-      const ma = document.querySelector('.main-area')
-      const rp = document.querySelector('.roost-panel,.panel-shell')
-      setDbgDim(`vp:${window.innerWidth}×${window.innerHeight} doc:${document.documentElement.clientWidth} ma:${ma?.offsetWidth} rp:${rp?.offsetWidth}`)
-    }
-    update()
-    const t = setInterval(update, 1000)
-    window.addEventListener('resize', update)
-    return () => { clearInterval(t); window.removeEventListener('resize', update) }
-  }, [])
 
   useEffect(() => {
     const t = theme && theme !== 'default' ? theme : ''
@@ -70,7 +58,6 @@ export default function App() {
           {activePanel === 'settings' && <Settings />}
         </div>
         <Toast />
-        <div style={{ position:'fixed', top:4, right:4, background:'rgba(0,0,0,0.7)', color:'#fff', fontSize:10, padding:'2px 6px', borderRadius:4, zIndex:99999, pointerEvents:'none', fontFamily:'monospace' }}>{dbgDim}</div>
       </div>
     </>
   )
