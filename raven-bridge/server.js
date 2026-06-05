@@ -79,7 +79,7 @@ function broadcast(msg) {
 
 // Every completed CC response ends with a "✻ Worked/Cooked/... for Ns" line.
 // Extract text between the second-to-last and last such lines.
-const WORKED_RE = /\s(Worked|Cooked|Brewed|Baked|Churned)\s+for\s+[\d]/
+const WORKED_RE = /^[^●\s].*\bfor\s+\d+[ms]/
 const TOOL_CALL_RE = /^[●]\s*(Bash|Write|Edit|Update|Read|WebFetch|WebSearch|Agent|Task|TodoRead|TodoWrite|MultiEdit|NotebookEdit|How is Claude|Str)\s*[(\[]/
 
 function extractLastResponse(captureText) {
