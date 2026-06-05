@@ -745,13 +745,14 @@ a { text-decoration: none; color: inherit; }
 .form-row:last-child { border-bottom: none; }
 .form-label { font-size: 12px; color: var(--text-mid); font-weight: 500; min-width: 72px; flex-shrink: 0; }
 .form-input {
-  flex: 1; padding: 7px 10px;
+  flex: 1; min-width: 0; padding: 7px 10px;
   background: rgba(150,140,180,0.05);
   border: 1px solid var(--border-md);
   border-radius: var(--r-sm);
   color: var(--text); font-size: 13px; outline: none;
   transition: border-color 0.18s;
 }
+textarea.form-input { width: 100%; }
 .form-input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(191,181,216,0.12); }
 .form-input::placeholder { color: var(--text-faint); }
 .form-textarea { resize: vertical; min-height: 80px; }
