@@ -78,8 +78,15 @@ function broadcast(msg) {
 
 // --- terminal polling ---
 
+const COMPRESS_PATTERNS = [
+  'compressing', 'summarizing conversation', 'context.*compress',
+  '压缩', '对话已压缩', 'conversation.*summar'
+]
+const COMPRESS_RE = new RegExp(COMPRESS_PATTERNS.join('|'), 'i')
+
 let lastCapture = ''
 let stableTimer = null
+let lastCompressNotified = false
 
 function pollTerminal() {
   const current = tmuxCapture()
@@ -88,6 +95,16 @@ function pollTerminal() {
     if (stableTimer) clearTimeout(stableTimer)
     stableTimer = setTimeout(() => {
       broadcast({ type: 'terminal', lines: current.split('\n').slice(-60) })
+      // detect context compression
+      const recentLines = current.split('\n').slice(-20).join('\n')
+      if (COMPRESS_RE.test(recentLines)) {
+        if (!lastCompressNotified) {
+          lastCompressNotified = true
+          broadcast({ type: 'compressed', ts: Date.now() })
+        }
+      } else {
+        lastCompressNotified = false
+      }
     }, 1200)
   }
 }
