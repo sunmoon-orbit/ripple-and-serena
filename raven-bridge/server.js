@@ -118,6 +118,7 @@ let stableTimer = null
 let lastCompressNotified = false
 let lastBroadcastReply = ''
 let isThinking = false
+let replyExtractionEnabled = false  // don't extract on startup, only after first user send
 
 function pollTerminal() {
   const current = tmuxCapture()
@@ -137,11 +138,13 @@ function pollTerminal() {
       broadcast({ type: 'thinking', active: false })
       broadcast({ type: 'terminal', lines: current.split('\n').slice(-60) })
 
-      // extract and broadcast reply
-      const reply = extractLastResponse(current)
-      if (reply && reply !== lastBroadcastReply) {
-        lastBroadcastReply = reply
-        broadcast({ type: 'reply', text: reply, ts: Date.now() })
+      // extract and broadcast reply (only after a user message has been sent)
+      if (replyExtractionEnabled) {
+        const reply = extractLastResponse(current)
+        if (reply && reply !== lastBroadcastReply) {
+          lastBroadcastReply = reply
+          broadcast({ type: 'reply', text: reply, ts: Date.now() })
+        }
       }
 
       // detect context compression
@@ -205,6 +208,8 @@ wss.on('connection', (ws) => {
     try {
       const msg = JSON.parse(raw)
       if (msg.type === 'send' && msg.text) {
+        replyExtractionEnabled = true
+        lastBroadcastReply = extractLastResponse(lastCapture) || ''  // snapshot current so we don't re-send it
         tmuxSend(msg.text)
         broadcast({ type: 'sent', text: msg.text, ts: Date.now() })
       }
