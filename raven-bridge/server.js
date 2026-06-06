@@ -6,6 +6,7 @@ const fs = require('fs')
 const path = require('path')
 
 const STATIC_DIR = path.join(__dirname, '..', 'raven')
+const UPLOAD_DIR = '/tmp/raven-uploads'
 const MIME = {
   '.html': 'text/html; charset=utf-8',
   '.js':   'application/javascript',
@@ -13,6 +14,8 @@ const MIME = {
   '.png':  'image/png',
   '.ico':  'image/x-icon',
 }
+
+if (!fs.existsSync(UPLOAD_DIR)) fs.mkdirSync(UPLOAD_DIR, { recursive: true })
 
 const PORT = 3400
 const TMUX_SESSION = 'cc'
@@ -222,6 +225,36 @@ const server = http.createServer((req, res) => {
   if (req.method === 'GET' && url.pathname === '/raven/health') {
     res.writeHead(200, { 'Content-Type': 'application/json' })
     res.end(JSON.stringify({ ok: true }))
+    return
+  }
+
+  // file upload
+  if (req.method === 'POST' && url.pathname === '/raven/upload') {
+    const ct = req.headers['content-type'] || ''
+    const boundary = ct.split('boundary=')[1]
+    if (!boundary) { res.writeHead(400); res.end(); return }
+    const chunks = []
+    req.on('data', d => chunks.push(d))
+    req.on('end', () => {
+      try {
+        const buf = Buffer.concat(chunks)
+        const bnd = Buffer.from('--' + boundary)
+        const start = buf.indexOf(bnd) + bnd.length + 2  // skip \r\n
+        const headerEnd = buf.indexOf('\r\n\r\n', start)
+        const headers = buf.slice(start, headerEnd).toString()
+        const nameMatch = headers.match(/filename="([^"]+)"/)
+        const filename = nameMatch ? nameMatch[1].replace(/[^a-zA-Z0-9._\-一-龥]/g, '_') : `file_${Date.now()}`
+        const dataStart = headerEnd + 4
+        const next = buf.indexOf(bnd, dataStart)
+        const fileData = buf.slice(dataStart, next - 2)  // strip trailing \r\n
+        const dest = path.join(UPLOAD_DIR, `${Date.now()}_${filename}`)
+        fs.writeFileSync(dest, fileData)
+        res.writeHead(200, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' })
+        res.end(JSON.stringify({ path: dest, name: filename }))
+      } catch (e) {
+        res.writeHead(500); res.end(JSON.stringify({ error: e.message }))
+      }
+    })
     return
   }
 
