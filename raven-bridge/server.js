@@ -3,6 +3,16 @@ const { WebSocketServer } = require('ws')
 const { execFileSync, spawnSync } = require('child_process')
 const os = require('os')
 const fs = require('fs')
+const path = require('path')
+
+const STATIC_DIR = path.join(__dirname, '..', 'raven')
+const MIME = {
+  '.html': 'text/html; charset=utf-8',
+  '.js':   'application/javascript',
+  '.json': 'application/json',
+  '.png':  'image/png',
+  '.ico':  'image/x-icon',
+}
 
 const PORT = 3400
 const TMUX_SESSION = 'cc'
@@ -195,6 +205,21 @@ const server = http.createServer((req, res) => {
   if (req.method === 'GET' && url.pathname === '/raven/health') {
     res.writeHead(200, { 'Content-Type': 'application/json' })
     res.end(JSON.stringify({ ok: true }))
+    return
+  }
+
+  // static files under /raven/
+  if (req.method === 'GET' && url.pathname.startsWith('/raven/')) {
+    let filePath = url.pathname.slice('/raven'.length) || '/'
+    if (filePath === '/') filePath = '/index.html'
+    const abs = path.join(STATIC_DIR, filePath)
+    if (!abs.startsWith(STATIC_DIR)) { res.writeHead(403); res.end(); return }
+    fs.readFile(abs, (err, data) => {
+      if (err) { res.writeHead(404); res.end(); return }
+      const ext = path.extname(abs)
+      res.writeHead(200, { 'Content-Type': MIME[ext] || 'application/octet-stream', 'Cache-Control': 'no-cache' })
+      res.end(data)
+    })
     return
   }
 
