@@ -122,6 +122,18 @@
   .msg.assistant.show-meta .copy-btn { opacity: 1; }
   .copy-btn.copied { color: var(--green); border-color: var(--green); }
 
+  /* tts */
+  .tts-btn {
+    font-size: 11px; color: var(--text-dim); opacity: 0; cursor: pointer;
+    padding: 1px 7px; border-radius: 4px; border: 1px solid var(--border);
+    background: none; transition: opacity .2s, color .15s, border-color .15s;
+    flex-shrink: 0;
+  }
+  .msg.assistant.show-meta .tts-btn { opacity: 1; }
+  .tts-btn.loading { color: var(--text-dim); animation: tts-pulse 1s infinite; }
+  .tts-btn.playing { color: var(--accent); border-color: var(--accent); opacity: 1 !important; }
+  @keyframes tts-pulse { 0%,100% { opacity: .4 } 50% { opacity: 1 } }
+
   /* thinking dots */
   #thinking { align-self: flex-start; display: none; padding: 10px 14px; }
   #thinking.show { display: flex; gap: 5px; align-items: center; }
@@ -350,6 +362,8 @@ function appendMsg(text, role, save = true, ts = Date.now()) {
     meta.className = 'msg-meta'
 
     if (role === 'assistant') {
+      meta.appendChild(makeTtsBtn(text))
+
       const copyBtn = document.createElement('button')
       copyBtn.className = 'copy-btn'
       copyBtn.textContent = '复制'
@@ -475,6 +489,63 @@ function setThinking(active) {
 function showCompressBanner() {
   document.getElementById('compress-banner').classList.add('show')
   appendMsg('⚡ 对话已压缩，乌鸦记忆重置了', 'system', false)
+}
+
+// --- tts ---
+const TTS_URL = 'https://memory.ravenlove.cc/crow/tts'
+
+function makeTtsBtn(text) {
+  const btn = document.createElement('button')
+  btn.className = 'tts-btn'
+  btn.textContent = '🔊'
+  btn.title = '朗读'
+
+  let audio = null
+
+  btn.addEventListener('click', async (e) => {
+    e.stopPropagation()
+
+    if (audio && !audio.paused) {
+      audio.pause()
+      audio.currentTime = 0
+      btn.textContent = '🔊'
+      btn.classList.remove('playing')
+      return
+    }
+
+    if (!audio) {
+      btn.textContent = '···'
+      btn.classList.add('loading')
+      btn.disabled = true
+      try {
+        const res = await fetch(TTS_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ text: text.replace(/[#*`_~>]/g, '').slice(0, 500) })
+        })
+        if (!res.ok) throw new Error()
+        const blob = await res.blob()
+        audio = new Audio(URL.createObjectURL(blob))
+        audio.onended = () => {
+          btn.textContent = '🔊'
+          btn.classList.remove('playing')
+        }
+      } catch {
+        btn.textContent = '🔊'
+        btn.classList.remove('loading')
+        btn.disabled = false
+        return
+      }
+      btn.classList.remove('loading')
+      btn.disabled = false
+    }
+
+    audio.play()
+    btn.textContent = '⏸'
+    btn.classList.add('playing')
+  })
+
+  return btn
 }
 
 // --- theme ---
