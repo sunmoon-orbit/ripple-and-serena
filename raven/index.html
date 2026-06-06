@@ -27,6 +27,20 @@
     --terminal-text: #b8c5a0;
   }
 
+  [data-theme="pink"] {
+    --bg: #fdf0f3;
+    --surface: #fae4ea;
+    --border: #e8c4cf;
+    --text: #3d2530;
+    --text-dim: #a07888;
+    --accent: #d4688a;
+    --green: #5aaa7a;
+    --red: #cc5060;
+    --yellow: #c09040;
+    --terminal-bg: #f5e8ec;
+    --terminal-text: #5a3040;
+  }
+
   html, body { height: 100%; background: var(--bg); color: var(--text); font-family: -apple-system, 'PingFang SC', sans-serif; }
 
   #app { display: flex; flex-direction: column; height: 100vh; max-width: 480px; margin: 0 auto; }
@@ -39,7 +53,14 @@
   }
   #header-title { display: flex; align-items: center; gap: 7px; font-size: 16px; font-weight: 600; color: var(--text); }
   #header-title .crow-icon { font-size: 20px; line-height: 1; }
-  #conn-status { display: flex; align-items: center; gap: 5px; }
+  #theme-btn {
+    width: 22px; height: 22px; border-radius: 50%; border: 2px solid var(--border);
+    cursor: pointer; background: none; padding: 0; flex-shrink: 0;
+    transition: border-color .2s; overflow: hidden;
+  }
+  #theme-btn:active { opacity: .7; }
+
+  #conn-status { display: flex; align-items: center; gap: 8px; }
   #conn-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--red); transition: background .3s; flex-shrink: 0; }
   #conn-dot.ok { background: var(--green); box-shadow: 0 0 5px var(--green); }
   #conn-label { font-size: 11px; color: var(--text-dim); }
@@ -116,8 +137,10 @@
   #chat-input {
     flex: 1; min-width: 0; background: var(--bg); border: 1px solid var(--border);
     border-radius: 20px; padding: 9px 14px; color: var(--text); font-size: 14px;
-    outline: none; resize: none; max-height: 120px;
+    outline: none; resize: none; max-height: 120px; overflow-y: auto;
+    scrollbar-width: none;
   }
+  #chat-input::-webkit-scrollbar { display: none; }
   #chat-input:focus { border-color: var(--accent); }
   #send-btn {
     background: var(--accent); border: none; border-radius: 50%;
@@ -186,6 +209,7 @@
       <span>乌鸦</span>
     </div>
     <div id="conn-status">
+      <button id="theme-btn" title="切换主题" aria-label="切换主题"></button>
       <span id="conn-dot"></span>
       <span id="conn-label">连接中…</span>
     </div>
@@ -452,6 +476,30 @@ function showCompressBanner() {
   document.getElementById('compress-banner').classList.add('show')
   appendMsg('⚡ 对话已压缩，乌鸦记忆重置了', 'system', false)
 }
+
+// --- theme ---
+const THEMES = ['dark', 'pink']
+const THEME_COLORS = { dark: '#1a1a1f', pink: '#fdf0f3' }
+const THEME_LABELS = { dark: '🌑', pink: '🌸' }
+
+let currentTheme = localStorage.getItem('raven-theme') || 'dark'
+
+function applyTheme(t) {
+  currentTheme = t
+  document.documentElement.setAttribute('data-theme', t === 'dark' ? '' : t)
+  document.querySelector('meta[name="theme-color"]').setAttribute('content', THEME_COLORS[t])
+  const btn = document.getElementById('theme-btn')
+  btn.style.background = t === 'dark' ? '#fdf0f3' : '#1a1a1f'
+  btn.title = t === 'dark' ? '切换粉色主题' : '切换深色主题'
+  localStorage.setItem('raven-theme', t)
+}
+
+document.getElementById('theme-btn').addEventListener('click', () => {
+  const next = THEMES[(THEMES.indexOf(currentTheme) + 1) % THEMES.length]
+  applyTheme(next)
+})
+
+applyTheme(currentTheme)
 
 restoreHistory()
 connect()
