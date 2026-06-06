@@ -120,7 +120,7 @@ function extractLastResponse(captureText) {
 
 // --- terminal polling ---
 
-const COMPRESS_RE = /compressing|summarizing conversation|context.*compress|对话已压缩|conversation.*summar/i
+const COMPRESS_RE = /compact|compressing|summarizing conversation|context.*compress|对话已压缩|conversation.*summar/i
 
 let lastCapture = ''
 let stableTimer = null
@@ -134,6 +134,16 @@ function pollTerminal() {
 
   if (current !== lastCapture) {
     lastCapture = current
+
+    // check compression against full capture immediately on each change
+    if (COMPRESS_RE.test(current)) {
+      if (!lastCompressNotified) {
+        lastCompressNotified = true
+        broadcast({ type: 'compressed', ts: Date.now() })
+      }
+    } else {
+      lastCompressNotified = false
+    }
 
     if (!isThinking) {
       isThinking = true
@@ -152,16 +162,6 @@ function pollTerminal() {
           lastBroadcastReply = reply
           broadcast({ type: 'reply', text: reply, ts: Date.now() })
         }
-      }
-
-      const recentLines = current.split('\n').slice(-20).join('\n')
-      if (COMPRESS_RE.test(recentLines)) {
-        if (!lastCompressNotified) {
-          lastCompressNotified = true
-          broadcast({ type: 'compressed', ts: Date.now() })
-        }
-      } else {
-        lastCompressNotified = false
       }
     }, 1500)
   }
