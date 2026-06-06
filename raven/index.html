@@ -669,6 +669,18 @@ function makeTtsBtn(text, msgEl, vbar) {
   btn.addEventListener('click', handleClick)
   if (vbPlay) vbPlay.addEventListener('click', (e) => { e.stopPropagation(); handleClick(e) })
 
+  // tap waveform to exit voice mode
+  if (vbar) {
+    const wave = vbar.querySelector('.vb-wave')
+    if (wave) wave.addEventListener('click', (e) => {
+      e.stopPropagation()
+      if (!voiceMode) return
+      if (currentSource) stopCurrent()
+      voiceMode = false
+      msgEl.classList.remove('voice-mode', 'playing')
+    })
+  }
+
   return btn
 }
 
