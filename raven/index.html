@@ -212,6 +212,46 @@
   .dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
   .dot.online { background: var(--green); box-shadow: 0 0 6px var(--green); }
   .dot.offline { background: var(--red); }
+
+  /* ========= NOTES PANEL ========= */
+  #notes-wrap { flex: 1; display: flex; flex-direction: column; padding: 14px; gap: 10px; }
+  #notes-area {
+    flex: 1; background: var(--surface); border: 1px solid var(--border);
+    border-radius: 12px; padding: 14px; color: var(--text); font-size: 14px;
+    font-family: -apple-system, 'PingFang SC', monospace; line-height: 1.6;
+    resize: none; outline: none;
+  }
+  #notes-area:focus { border-color: var(--accent); }
+  #notes-footer { display: flex; justify-content: space-between; align-items: center; }
+  #notes-saved { font-size: 11px; color: var(--text-dim); }
+  #notes-clear { font-size: 12px; color: var(--text-dim); background: none; border: 1px solid var(--border); border-radius: 6px; padding: 4px 10px; cursor: pointer; }
+
+  /* voice bar */
+  .msg.voice-mode .msg-body { display: none; }
+  .voice-bar {
+    display: none; align-items: center; gap: 10px;
+    padding: 2px 0;
+  }
+  .msg.voice-mode .voice-bar { display: flex; }
+  .vb-play {
+    width: 28px; height: 28px; border-radius: 50%; flex-shrink: 0;
+    background: var(--accent); border: none; cursor: pointer;
+    display: flex; align-items: center; justify-content: center; color: var(--bg);
+  }
+  .vb-wave { flex: 1; display: flex; align-items: center; gap: 2px; height: 20px; }
+  .vb-bar {
+    width: 3px; border-radius: 2px; background: var(--accent); opacity: .5;
+    animation: none; transition: height .1s;
+  }
+  .msg.voice-mode.playing .vb-bar { animation: vb-bounce 1s infinite; opacity: .8; }
+  .vb-bar:nth-child(1) { height: 6px; } .vb-bar:nth-child(2) { height: 12px; } .vb-bar:nth-child(3) { height: 16px; }
+  .vb-bar:nth-child(4) { height: 10px; } .vb-bar:nth-child(5) { height: 14px; } .vb-bar:nth-child(6) { height: 8px; }
+  .vb-bar:nth-child(7) { height: 12px; } .vb-bar:nth-child(8) { height: 6px; }
+  .vb-bar:nth-child(2) { animation-delay: .1s; } .vb-bar:nth-child(3) { animation-delay: .2s; }
+  .vb-bar:nth-child(4) { animation-delay: .15s; } .vb-bar:nth-child(5) { animation-delay: .25s; }
+  .vb-bar:nth-child(6) { animation-delay: .05s; } .vb-bar:nth-child(7) { animation-delay: .2s; }
+  @keyframes vb-bounce { 0%,100% { transform: scaleY(.4) } 50% { transform: scaleY(1) } }
+  .vb-time { font-size: 11px; color: var(--text-dim); flex-shrink: 0; min-width: 24px; text-align: right; }
 </style>
 </head>
 <body>
@@ -232,6 +272,7 @@
     <div class="tab active" data-tab="chat">聊天</div>
     <div class="tab" data-tab="terminal">终端</div>
     <div class="tab" data-tab="status">状态</div>
+    <div class="tab" data-tab="notes">备忘</div>
   </div>
 
   <!-- CHAT -->
@@ -266,6 +307,14 @@
           <span id="cc-text">检查中…</span>
         </div>
       </div>
+      <div class="card" id="session-card">
+        <div class="card-title">上下文用量</div>
+        <div class="bar-wrap">
+          <div class="bar-label"><span id="session-label">-</span><span id="session-pct">-</span></div>
+          <div class="bar"><div class="bar-fill" id="session-bar" style="width:0%"></div></div>
+        </div>
+        <div style="font-size:11px;color:var(--text-dim);margin-top:6px;">压缩后归零 · 约估，非精确值</div>
+      </div>
       <div class="card" id="mem-card">
         <div class="card-title">内存</div>
         <div class="bar-wrap">
@@ -283,6 +332,17 @@
       <div class="card" id="svc-card">
         <div class="card-title">服务</div>
         <div id="svc-list"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- NOTES -->
+  <div id="notes" class="panel">
+    <div id="notes-wrap">
+      <textarea id="notes-area" placeholder="端口号、域名、备忘…随手记"></textarea>
+      <div id="notes-footer">
+        <span id="notes-saved"></span>
+        <button id="notes-clear">清空</button>
       </div>
     </div>
   </div>
@@ -363,7 +423,18 @@ function appendMsg(text, role, save = true, ts = Date.now()) {
     meta.className = 'msg-meta'
 
     if (role === 'assistant') {
-      meta.appendChild(makeTtsBtn(text))
+      // voice bar (hidden until voice mode activated)
+      const vbar = document.createElement('div')
+      vbar.className = 'voice-bar'
+      vbar.innerHTML = `
+        <button class="vb-play" aria-label="播放">
+          <svg viewBox="0 0 24 24" width="12" height="12" fill="currentColor"><polygon points="5,3 19,12 5,21"/></svg>
+        </button>
+        <div class="vb-wave">${Array(8).fill('<div class="vb-bar"></div>').join('')}</div>
+        <span class="vb-time">-</span>`
+      el.insertBefore(vbar, body)
+
+      meta.appendChild(makeTtsBtn(text, el, vbar))
 
       const copyBtn = document.createElement('button')
       copyBtn.className = 'copy-btn'
@@ -462,6 +533,15 @@ function renderStatus(data) {
     fill.style.width = pct + '%'
     fill.className = `bar-fill${pct > 85 ? ' danger' : pct > 65 ? ' warn' : ''}`
   }
+  if (data.session) {
+    const pct = data.session.pct
+    const kb = Math.round(data.session.bytes / 1024)
+    document.getElementById('session-label').textContent = `${kb} KB`
+    document.getElementById('session-pct').textContent = `${pct}%`
+    const fill = document.getElementById('session-bar')
+    fill.style.width = pct + '%'
+    fill.className = `bar-fill${pct > 80 ? ' danger' : pct > 55 ? ' warn' : ''}`
+  }
   if (data.services && data.services.length) {
     document.getElementById('svc-list').innerHTML = data.services.map(s => `
       <div class="svc-row">
@@ -498,66 +578,72 @@ const IC_SPEAKER = `<svg viewBox="0 0 24 24" width="12" height="12" fill="curren
 const IC_PAUSE   = `<svg viewBox="0 0 24 24" width="12" height="12" fill="currentColor"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>`
 const IC_DOTS    = `<svg viewBox="0 0 24 24" width="12" height="12" fill="currentColor"><circle cx="4" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="20" cy="12" r="2"/></svg>`
 
-function makeTtsBtn(text) {
+function makeTtsBtn(text, msgEl, vbar) {
   const btn = document.createElement('button')
   btn.className = 'tts-btn'
   btn.innerHTML = IC_SPEAKER
   btn.title = '朗读'
 
   let cachedBuffer = null
+  let cachedDuration = 0
   let currentSource = null
   let audioCtx = null
+  let voiceMode = false
+
+  const vbPlay = vbar ? vbar.querySelector('.vb-play') : null
+  const vbTime = vbar ? vbar.querySelector('.vb-time') : null
+
+  function fmtDur(s) {
+    return `${Math.floor(s / 60)}:${String(Math.round(s % 60)).padStart(2, '0')}`
+  }
+
+  function setPlaying(yes) {
+    btn.innerHTML = yes ? IC_PAUSE : IC_SPEAKER
+    btn.classList.toggle('playing', yes)
+    if (msgEl) msgEl.classList.toggle('playing', yes)
+    if (vbPlay) vbPlay.innerHTML = yes
+      ? `<svg viewBox="0 0 24 24" width="12" height="12" fill="currentColor"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>`
+      : `<svg viewBox="0 0 24 24" width="12" height="12" fill="currentColor"><polygon points="5,3 19,12 5,21"/></svg>`
+  }
 
   function stopCurrent() {
     if (currentSource) { try { currentSource.stop() } catch {} currentSource = null }
-    btn.innerHTML = IC_SPEAKER
-    btn.classList.remove('playing')
+    setPlaying(false)
+    if (vbTime && cachedDuration) vbTime.textContent = fmtDur(cachedDuration)
   }
 
-  btn.addEventListener('click', async (e) => {
-    e.stopPropagation()
-    if (currentSource) { stopCurrent(); return }
-
-    // create AudioContext synchronously within click handler - unlocks audio on iOS Safari
+  async function loadAndPlay() {
     if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)()
     if (audioCtx.state === 'suspended') audioCtx.resume()
 
-    if (cachedBuffer) {
-      const src = audioCtx.createBufferSource()
-      src.buffer = cachedBuffer
-      src.connect(audioCtx.destination)
-      src.onended = stopCurrent
-      src.start(0)
-      currentSource = src
-      btn.innerHTML = IC_PAUSE
-      btn.classList.add('playing')
-      return
-    }
-
-    btn.innerHTML = IC_DOTS
-    btn.classList.add('loading')
-    btn.disabled = true
-    try {
-      const res = await fetch(TTS_URL, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text: text.replace(/[#*`_[\]~>]/g, '').slice(0, 500) })
-      })
-      if (!res.ok) throw new Error()
-      const { audio: dataUri } = await res.json()
-      const b64 = dataUri.split(',')[1]
-      const raw = atob(b64)
-      const bytes = new Uint8Array(raw.length)
-      for (let i = 0; i < raw.length; i++) bytes[i] = raw.charCodeAt(i)
-      cachedBuffer = await audioCtx.decodeAudioData(bytes.buffer)
-    } catch {
-      btn.innerHTML = IC_SPEAKER
+    if (!cachedBuffer) {
+      btn.innerHTML = IC_DOTS
+      btn.classList.add('loading')
+      btn.disabled = true
+      try {
+        const res = await fetch(TTS_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ text: text.replace(/[#*`_[\]~>]/g, '').slice(0, 500) })
+        })
+        if (!res.ok) throw new Error()
+        const { audio: dataUri } = await res.json()
+        const b64 = dataUri.split(',')[1]
+        const raw = atob(b64)
+        const bytes = new Uint8Array(raw.length)
+        for (let i = 0; i < raw.length; i++) bytes[i] = raw.charCodeAt(i)
+        cachedBuffer = await audioCtx.decodeAudioData(bytes.buffer)
+        cachedDuration = cachedBuffer.duration
+        if (vbTime) vbTime.textContent = fmtDur(cachedDuration)
+      } catch {
+        btn.innerHTML = IC_SPEAKER
+        btn.classList.remove('loading')
+        btn.disabled = false
+        return
+      }
       btn.classList.remove('loading')
       btn.disabled = false
-      return
     }
-    btn.classList.remove('loading')
-    btn.disabled = false
 
     const src = audioCtx.createBufferSource()
     src.buffer = cachedBuffer
@@ -565,12 +651,53 @@ function makeTtsBtn(text) {
     src.onended = stopCurrent
     src.start(0)
     currentSource = src
-    btn.innerHTML = IC_PAUSE
-    btn.classList.add('playing')
-  })
+    setPlaying(true)
+  }
+
+  function handleClick(e) {
+    e.stopPropagation()
+    if (currentSource) { stopCurrent(); return }
+    // first click: activate voice mode
+    if (!voiceMode && msgEl && vbar) {
+      voiceMode = true
+      msgEl.classList.add('voice-mode')
+      msgEl.classList.add('show-meta')
+    }
+    loadAndPlay()
+  }
+
+  btn.addEventListener('click', handleClick)
+  if (vbPlay) vbPlay.addEventListener('click', (e) => { e.stopPropagation(); handleClick(e) })
 
   return btn
 }
+
+// --- notes ---
+const NOTES_KEY = 'raven-notes-v1'
+let notesSaveTimer = null
+
+const notesArea = document.getElementById('notes-area')
+const notesSaved = document.getElementById('notes-saved')
+
+notesArea.value = localStorage.getItem(NOTES_KEY) || ''
+
+notesArea.addEventListener('input', () => {
+  if (notesSaveTimer) clearTimeout(notesSaveTimer)
+  notesSaved.textContent = '未保存…'
+  notesSaveTimer = setTimeout(() => {
+    localStorage.setItem(NOTES_KEY, notesArea.value)
+    notesSaved.textContent = '已保存'
+    setTimeout(() => { notesSaved.textContent = '' }, 1500)
+  }, 800)
+})
+
+document.getElementById('notes-clear').addEventListener('click', () => {
+  if (!notesArea.value.trim() || !confirm('清空所有备忘？')) return
+  notesArea.value = ''
+  localStorage.removeItem(NOTES_KEY)
+  notesSaved.textContent = '已清空'
+  setTimeout(() => { notesSaved.textContent = '' }, 1500)
+})
 
 // --- theme ---
 const THEMES = ['dark', 'pink']
