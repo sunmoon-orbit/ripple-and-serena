@@ -2,7 +2,7 @@
   "name": "乌鸦",
   "short_name": "乌鸦",
   "description": "阿言监控台",
-  "start_url": "/ripple-and-serena/raven/",
+  "start_url": "/raven/",
   "display": "standalone",
   "background_color": "#1a1a1f",
   "theme_color": "#1a1a1f",
