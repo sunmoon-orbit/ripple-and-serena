@@ -524,7 +524,13 @@ function restoreHistory() {
 
 function sendMsg() {
   const inp = document.getElementById('chat-input')
-  const text = inp.value.trim()
+  let text = inp.value.trim()
+  if (pendingFiles && pendingFiles.length) {
+    const paths = pendingFiles.map(f => `[附件: ${f.path}]`).join(' ')
+    text = text ? `${text}\n${paths}` : paths
+    pendingFiles = []
+    renderAttachPreview()
+  }
   if (!text || !ws || ws.readyState !== 1) return
   ws.send(JSON.stringify({ type: 'send', text }))
   inp.value = ''
@@ -787,20 +793,6 @@ function renderAttachPreview() {
 function removeAttach(i) {
   pendingFiles.splice(i, 1)
   renderAttachPreview()
-}
-
-const _origSendMsg = sendMsg
-// override sendMsg to prepend file paths
-function sendMsg() {
-  const inp = document.getElementById('chat-input')
-  if (pendingFiles.length) {
-    const paths = pendingFiles.map(f => `[附件: ${f.path}]`).join(' ')
-    const orig = inp.value.trim()
-    inp.value = orig ? `${orig}\n${paths}` : paths
-    pendingFiles = []
-    renderAttachPreview()
-  }
-  _origSendMsg()
 }
 
 // --- notes ---
