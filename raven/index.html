@@ -226,6 +226,27 @@
   #notes-saved { font-size: 11px; color: var(--text-dim); }
   #notes-clear { font-size: 12px; color: var(--text-dim); background: none; border: 1px solid var(--border); border-radius: 6px; padding: 4px 10px; cursor: pointer; }
 
+  /* thinking block */
+  .thinking-block {
+    align-self: flex-start; max-width: 85%;
+    border: 1px solid var(--border); border-radius: 12px 12px 12px 4px;
+    overflow: hidden; font-size: 13px;
+  }
+  .thinking-toggle {
+    width: 100%; display: flex; align-items: center; gap: 6px;
+    padding: 8px 12px; background: none; border: none; cursor: pointer;
+    color: var(--text-dim); font-size: 12px; text-align: left;
+  }
+  .thinking-toggle:hover { background: rgba(128,128,128,.05); }
+  .thinking-chevron { transition: transform .2s; font-style: normal; }
+  .thinking-block.open .thinking-chevron { transform: rotate(90deg); }
+  .thinking-body {
+    display: none; padding: 0 12px 10px;
+    color: var(--text-dim); line-height: 1.55; white-space: pre-wrap;
+    font-size: 12px; border-top: 1px solid var(--border);
+  }
+  .thinking-block.open .thinking-body { display: block; }
+
   /* voice bar */
   .msg.voice-mode .msg-body { display: none; }
   .voice-bar {
@@ -375,6 +396,7 @@ function connect() {
       else if (msg.type === 'sent') appendMsg(msg.text, 'user')
       else if (msg.type === 'reply') appendMsg(msg.text, 'assistant')
       else if (msg.type === 'thinking') setThinking(msg.active)
+      else if (msg.type === 'thinking_block') appendThinkingBlock(msg.text)
       else if (msg.type === 'compressed') showCompressBanner()
     } catch {}
   }
@@ -560,6 +582,21 @@ document.querySelectorAll('.tab').forEach(tab => {
     document.getElementById(tab.dataset.tab).classList.add('active')
   })
 })
+
+function appendThinkingBlock(text) {
+  const el = document.createElement('div')
+  el.className = 'thinking-block'
+  el.innerHTML = `
+    <button class="thinking-toggle">
+      <em class="thinking-chevron">›</em>
+      <span>乌鸦在想什么…</span>
+    </button>
+    <div class="thinking-body">${text.replace(/</g,'&lt;')}</div>`
+  el.querySelector('.thinking-toggle').addEventListener('click', () => el.classList.toggle('open'))
+  const box = document.getElementById('chat-messages')
+  box.insertBefore(el, document.getElementById('thinking'))
+  box.scrollTop = box.scrollHeight
+}
 
 function setThinking(active) {
   const el = document.getElementById('thinking')
