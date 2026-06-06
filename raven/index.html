@@ -124,15 +124,16 @@
 
   /* tts */
   .tts-btn {
-    font-size: 11px; color: var(--text-dim); opacity: 0; cursor: pointer;
-    padding: 1px 7px; border-radius: 4px; border: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: center;
+    width: 22px; height: 22px; padding: 0; flex-shrink: 0;
+    color: var(--text-dim); opacity: 0; cursor: pointer;
+    border-radius: 4px; border: 1px solid var(--border);
     background: none; transition: opacity .2s, color .15s, border-color .15s;
-    flex-shrink: 0;
   }
   .msg.assistant.show-meta .tts-btn { opacity: 1; }
-  .tts-btn.loading { color: var(--text-dim); animation: tts-pulse 1s infinite; }
+  .tts-btn.loading { animation: tts-pulse 1s infinite; }
   .tts-btn.playing { color: var(--accent); border-color: var(--accent); opacity: 1 !important; }
-  @keyframes tts-pulse { 0%,100% { opacity: .4 } 50% { opacity: 1 } }
+  @keyframes tts-pulse { 0%,100% { opacity: .3 } 50% { opacity: 1 } }
 
   /* thinking dots */
   #thinking { align-self: flex-start; display: none; padding: 10px 14px; }
@@ -493,55 +494,78 @@ function showCompressBanner() {
 
 // --- tts ---
 const TTS_URL = 'https://memory.ravenlove.cc/crow/tts'
+const IC_SPEAKER = `<svg viewBox="0 0 24 24" width="12" height="12" fill="currentColor"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02z"/></svg>`
+const IC_PAUSE   = `<svg viewBox="0 0 24 24" width="12" height="12" fill="currentColor"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>`
+const IC_DOTS    = `<svg viewBox="0 0 24 24" width="12" height="12" fill="currentColor"><circle cx="4" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="20" cy="12" r="2"/></svg>`
 
 function makeTtsBtn(text) {
   const btn = document.createElement('button')
   btn.className = 'tts-btn'
-  btn.textContent = '🔊'
+  btn.innerHTML = IC_SPEAKER
   btn.title = '朗读'
 
-  let audio = null
+  let cachedBuffer = null
+  let currentSource = null
+  let audioCtx = null
+
+  function stopCurrent() {
+    if (currentSource) { try { currentSource.stop() } catch {} currentSource = null }
+    btn.innerHTML = IC_SPEAKER
+    btn.classList.remove('playing')
+  }
 
   btn.addEventListener('click', async (e) => {
     e.stopPropagation()
+    if (currentSource) { stopCurrent(); return }
 
-    if (audio && !audio.paused) {
-      audio.pause()
-      audio.currentTime = 0
-      btn.textContent = '🔊'
-      btn.classList.remove('playing')
+    // create AudioContext synchronously within click handler - unlocks audio on iOS Safari
+    if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)()
+    if (audioCtx.state === 'suspended') audioCtx.resume()
+
+    if (cachedBuffer) {
+      const src = audioCtx.createBufferSource()
+      src.buffer = cachedBuffer
+      src.connect(audioCtx.destination)
+      src.onended = stopCurrent
+      src.start(0)
+      currentSource = src
+      btn.innerHTML = IC_PAUSE
+      btn.classList.add('playing')
       return
     }
 
-    if (!audio) {
-      btn.textContent = '···'
-      btn.classList.add('loading')
-      btn.disabled = true
-      try {
-        const res = await fetch(TTS_URL, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ text: text.replace(/[#*`_~>]/g, '').slice(0, 500) })
-        })
-        if (!res.ok) throw new Error()
-        const blob = await res.blob()
-        audio = new Audio(URL.createObjectURL(blob))
-        audio.onended = () => {
-          btn.textContent = '🔊'
-          btn.classList.remove('playing')
-        }
-      } catch {
-        btn.textContent = '🔊'
-        btn.classList.remove('loading')
-        btn.disabled = false
-        return
-      }
+    btn.innerHTML = IC_DOTS
+    btn.classList.add('loading')
+    btn.disabled = true
+    try {
+      const res = await fetch(TTS_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: text.replace(/[#*`_[\]~>]/g, '').slice(0, 500) })
+      })
+      if (!res.ok) throw new Error()
+      const { audio: dataUri } = await res.json()
+      const b64 = dataUri.split(',')[1]
+      const raw = atob(b64)
+      const bytes = new Uint8Array(raw.length)
+      for (let i = 0; i < raw.length; i++) bytes[i] = raw.charCodeAt(i)
+      cachedBuffer = await audioCtx.decodeAudioData(bytes.buffer)
+    } catch {
+      btn.innerHTML = IC_SPEAKER
       btn.classList.remove('loading')
       btn.disabled = false
+      return
     }
+    btn.classList.remove('loading')
+    btn.disabled = false
 
-    audio.play()
-    btn.textContent = '⏸'
+    const src = audioCtx.createBufferSource()
+    src.buffer = cachedBuffer
+    src.connect(audioCtx.destination)
+    src.onended = stopCurrent
+    src.start(0)
+    currentSource = src
+    btn.innerHTML = IC_PAUSE
     btn.classList.add('playing')
   })
 
