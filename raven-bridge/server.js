@@ -225,6 +225,20 @@ const server = http.createServer((req, res) => {
     return
   }
 
+  // thinking hook receiver
+  if (req.method === 'POST' && url.pathname === '/raven/thinking') {
+    let body = ''
+    req.on('data', d => { body += d })
+    req.on('end', () => {
+      try {
+        const { thinking } = JSON.parse(body)
+        if (thinking) broadcast({ type: 'thinking_block', text: thinking, ts: Date.now() })
+      } catch {}
+      res.writeHead(200); res.end()
+    })
+    return
+  }
+
   // static files under /raven/
   if (req.method === 'GET' && url.pathname.startsWith('/raven/')) {
     let filePath = url.pathname.slice('/raven'.length) || '/'
