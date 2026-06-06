@@ -64,9 +64,26 @@ function pm2Services() {
   } catch { return [] }
 }
 
+const SESSION_DIR = '/home/ripple/.claude/projects/-home-ripple-ripple-and-serena'
+const SESSION_MAX_BYTES = 4 * 1024 * 1024  // ~1M tokens rough estimate
+
+function sessionUsage() {
+  try {
+    const files = fs.readdirSync(SESSION_DIR).filter(f => f.endsWith('.jsonl'))
+    if (!files.length) return null
+    // pick largest (active session)
+    let maxSize = 0
+    for (const f of files) {
+      try { const s = fs.statSync(path.join(SESSION_DIR, f)).size; if (s > maxSize) maxSize = s } catch {}
+    }
+    return { bytes: maxSize, pct: Math.min(100, Math.round(maxSize / SESSION_MAX_BYTES * 100)) }
+  } catch { return null }
+}
+
 function getStatus() {
   return {
     cc: { online: ccOnline() },
+    session: sessionUsage(),
     disk: diskUsage(),
     mem: memUsage(),
     services: pm2Services(),
