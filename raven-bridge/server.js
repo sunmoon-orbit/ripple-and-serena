@@ -32,7 +32,8 @@ function tmuxCapture() {
 
 function tmuxSend(text) {
   const clean = text.replace(/\n/g, ' ')
-  execFileSync('tmux', ['send-keys', '-t', `${TMUX_SESSION}:0`, clean, 'Enter'])
+  execFileSync('tmux', ['send-keys', '-t', `${TMUX_SESSION}:0`, '-l', clean])
+  execFileSync('tmux', ['send-keys', '-t', `${TMUX_SESSION}:0`, 'Enter'])
 }
 
 function ccOnline() {
@@ -116,14 +117,28 @@ function extractLastResponse(captureText) {
   const lines = captureText.split('\n')
 
   const workedIdxs = []
-  lines.forEach((l, i) => { if (WORKED_RE.test(l.trim())) workedIdxs.push(i) })
+  lines.forEach((l, i) => { const t = l.trim(); if (WORKED_RE.test(t) && !t.startsWith('Thought for')) workedIdxs.push(i) })
   if (workedIdxs.length < 1) return null
 
   const lastWorked = workedIdxs[workedIdxs.length - 1]
   const prevWorked = workedIdxs.length >= 2 ? workedIdxs[workedIdxs.length - 2] : -1
 
-  const responseLines = lines
-    .slice(prevWorked + 1, lastWorked)
+  let sliceLines = lines.slice(prevWorked + 1, lastWorked)
+
+  // skip user input echo: find last ❯ prompt line, then skip it and all
+  // immediately-following non-empty lines (terminal-wrapped input continuation)
+  const promptIdx = sliceLines.map(l => l.trim()).lastIndexOf(l => /^[❯]/.test(l))
+  let lastPromptIdx = -1
+  for (let i = sliceLines.length - 1; i >= 0; i--) {
+    if (/^[❯]/.test(sliceLines[i].trim())) { lastPromptIdx = i; break }
+  }
+  if (lastPromptIdx !== -1) {
+    let skip = lastPromptIdx + 1
+    while (skip < sliceLines.length && sliceLines[skip].trim() !== '') skip++
+    sliceLines = sliceLines.slice(skip)
+  }
+
+  const responseLines = sliceLines
     .filter(l => {
       const t = l.trim()
       if (!t) return false
@@ -135,9 +150,11 @@ function extractLastResponse(captureText) {
       if (/\+\d+ lines \(ctrl\+o/.test(t)) return false
       if (/^[─]{5,}/.test(t)) return false                // separator lines
       if (/^Tip:|^Press up to edit/.test(t)) return false
+      if (/^Thought for \d+/.test(t)) return false
       if (/^\d+: (Bad|Fine|Good|Dismiss)/.test(t)) return false
       if (/^\s+\d+[\s\-+]/.test(l)) return false              // diff output
       if (/^\s*[│└┌┘├┤┬┴╌]/.test(l)) return false  // box chars
+      if (/^[⎿⎾]/.test(t)) return false              // tool result lines
       return true
     })
     .map(l => l.replace(/^\s*●\s?/, '').replace(/^\s{1,2}/, '').trim())
@@ -158,6 +175,10 @@ let lastCompressNotified = false
 let lastBroadcastReply = ''
 let isThinking = false
 let replyExtractionEnabled = false
+let pendingThinking = ''
+let lastReplyMsg = null  // cached for late-connecting clients
+let lastThinking = ''
+let lastThinkingTs = 0
 
 function pollTerminal() {
   const current = tmuxCapture()
@@ -186,11 +207,14 @@ function pollTerminal() {
       broadcast({ type: 'thinking', active: false })
       broadcast({ type: 'terminal', lines: current.split('\n').slice(-80) })
 
-      if (replyExtractionEnabled) {
+      if (replyExtractionEnabled || pendingThinking) {
         const reply = extractLastResponse(current)
         if (reply && reply !== lastBroadcastReply) {
           lastBroadcastReply = reply
-          broadcast({ type: 'reply', text: reply, ts: Date.now() })
+          const msg = { type: 'reply', text: reply, ts: Date.now() }
+          if (pendingThinking) { msg.thinking = pendingThinking; pendingThinking = '' }
+          lastReplyMsg = msg
+          broadcast(msg)
         }
       }
     }, 1500)
@@ -225,6 +249,10 @@ const server = http.createServer((req, res) => {
   if (req.method === 'GET' && url.pathname === '/raven/health') {
     res.writeHead(200, { 'Content-Type': 'application/json' })
     res.end(JSON.stringify({ ok: true }))
+
+  } else if (req.method === 'GET' && url.pathname === '/raven/last-thinking') {
+    res.writeHead(200, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' })
+    res.end(JSON.stringify({ thinking: lastThinking, ts: lastThinkingTs }))
     return
   }
 
@@ -265,8 +293,35 @@ const server = http.createServer((req, res) => {
     req.on('end', () => {
       try {
         const { thinking } = JSON.parse(body)
-        if (thinking) broadcast({ type: 'thinking_block', text: thinking, ts: Date.now() })
-      } catch {}
+        console.log('[thinking] received len:', thinking?.length)
+        if (!thinking) {
+          lastThinking = ''
+          lastThinkingTs = Date.now()
+        } else if (thinking) {
+          pendingThinking = thinking
+          lastThinking = thinking
+          lastThinkingTs = Date.now()
+          // delay to let tmux render the ✻ Worked line before extracting reply
+          setTimeout(() => {
+            const current = tmuxCapture()
+            const reply = extractLastResponse(current)
+            console.log('[thinking] reply extracted:', JSON.stringify(reply?.slice(0, 80)))
+            console.log('[thinking] clients:', clients.size)
+            if (reply && reply !== lastBroadcastReply) {
+              // terminal poller hasn't sent this reply yet — send reply+thinking together
+              lastBroadcastReply = reply
+              const replyMsg = { type: 'reply', text: reply, thinking: pendingThinking, ts: Date.now() }
+              pendingThinking = ''
+              lastReplyMsg = replyMsg
+              broadcast(replyMsg)
+            } else if (reply && pendingThinking) {
+              // terminal poller already sent reply — only push the thinking block
+              broadcast({ type: 'thinking_block', text: pendingThinking, ts: Date.now() })
+              pendingThinking = ''
+            }
+          }, 2000)
+        }
+      } catch (e) { console.log('[thinking] error:', e.message) }
       res.writeHead(200); res.end()
     })
     return
@@ -294,9 +349,11 @@ const wss = new WebSocketServer({ server, path: '/raven/ws' })
 
 wss.on('connection', (ws) => {
   clients.add(ws)
+  console.log('[ws] client connected, total:', clients.size)
 
   ws.send(JSON.stringify({ type: 'status', data: getStatus() }))
   ws.send(JSON.stringify({ type: 'terminal', lines: lastCapture.split('\n').slice(-80) }))
+  if (lastReplyMsg) ws.send(JSON.stringify({ ...lastReplyMsg, replayed: true }))
 
   ws.on('message', (raw) => {
     try {
@@ -310,8 +367,8 @@ wss.on('connection', (ws) => {
     } catch {}
   })
 
-  ws.on('close', () => clients.delete(ws))
-  ws.on('error', () => clients.delete(ws))
+  ws.on('close', () => { clients.delete(ws); console.log('[ws] client disconnected, total:', clients.size) })
+  ws.on('error', () => { clients.delete(ws); console.log('[ws] client error, total:', clients.size) })
 })
 
 server.listen(PORT, '127.0.0.1', () => {
