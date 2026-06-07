@@ -5,7 +5,7 @@ import { Plus, RefreshCw, Search, Clock, Pencil, Trash2, Share2, Sparkles, Arrow
 
 export const SCOPES = { shared: '共享', private_阿颖: '阿颖私密', private_阿言: '阿言私密' }
 export const LAYERS = { core: '核心', long: '长期', short: '短期', consciousness: '意识' }
-const LAYER_COLORS = { core: '#D94040', long: '#D87830', short: '#C0A020', consciousness: '#8848C0' }
+const LAYER_COLORS = { core: '#D4807A', long: '#D4A070', short: '#C4B070', consciousness: '#A080C0' }
 const META = new Set(['core', 'long', 'short', 'consciousness', 'shared', 'private_阿颖', 'private_阿言', '阿言', '阿颖'])
 
 // 横向 tab：label → { scope?, type? }
