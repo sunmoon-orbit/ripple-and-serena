@@ -130,10 +130,26 @@
   }
   .msg.user .msg-body code { background: rgba(0,0,0,.2); }
   .msg-body pre {
-    background: #111116; border-radius: 8px; padding: 10px 12px;
-    overflow-x: auto; margin: 6px 0;
+    background: #111116; border-radius: 0 0 8px 8px; padding: 10px 12px;
+    overflow-x: auto; margin: 0;
   }
   .msg-body pre code { background: none; padding: 0; font-size: 12px; color: var(--terminal-text); }
+
+  /* code block wrapper */
+  .code-block-wrap { margin: 6px 0; border-radius: 8px; overflow: hidden; border: 1px solid rgba(255,255,255,.08); }
+  .code-block-header {
+    background: #1a1a1f; padding: 5px 12px;
+    display: flex; justify-content: space-between; align-items: center;
+    border-bottom: 1px solid rgba(255,255,255,.08);
+  }
+  .code-lang { font-size: 11px; color: var(--text-dim); font-family: 'Menlo','Monaco',monospace; }
+  .code-copy-btn {
+    font-size: 11px; padding: 2px 8px; border-radius: 4px; cursor: pointer;
+    background: rgba(255,255,255,.07); color: var(--text-dim);
+    border: 1px solid var(--border); transition: background .15s, color .15s;
+  }
+  .code-copy-btn:hover { background: rgba(255,255,255,.14); color: var(--text); }
+  .code-copy-btn.copied { color: var(--accent); border-color: var(--accent); }
   .msg-body ul, .msg-body ol { padding-left: 18px; margin: 4px 0; }
   .msg-body li { margin-bottom: 2px; }
   .msg-body h1, .msg-body h2, .msg-body h3 { font-size: 15px; font-weight: 600; margin: 8px 0 4px; }
@@ -263,10 +279,111 @@
   .dot.offline { background: var(--red); }
 
   /* ========= NOTES PANEL ========= */
-  #notes-wrap { flex: 1; display: flex; flex-direction: column; padding: 14px; gap: 10px; }
+  #notes-wrap { flex: 1; display: flex; flex-direction: column; padding: 14px; gap: 12px; overflow-y: auto; }
+  .notes-section-label { font-size: 11px; color: var(--text-dim); letter-spacing: .05em; margin-bottom: -4px; }
+
+  /* 视图切换 */
+  #notes-view-toggle { display: flex; gap: 6px; }
+  .view-btn {
+    flex: 1; padding: 6px; font-size: 12px; border-radius: 8px; border: 1px solid var(--border);
+    background: none; color: var(--text-dim); cursor: pointer; transition: all .15s;
+  }
+  .view-btn.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+
+  /* 便签墙 */
+  #sticky-view { display: none; flex-direction: column; gap: 10px; }
+  #sticky-view.active { display: flex; }
+  .sticky-board {
+    background: #f5f1eb; border-radius: 16px; padding: 20px 14px 16px;
+    box-shadow: inset 0 1px 4px rgba(0,0,0,.06);
+  }
+  .sticky-grid { display: grid; grid-template-columns: 1fr 1fr; column-gap: 14px; row-gap: 0; align-items: start; }
+  .sticky-card:nth-child(4n+1),
+  .sticky-card:nth-child(4n+2) { position: relative; z-index: 2; margin-bottom: 0; }
+  .sticky-card:nth-child(4n+3),
+  .sticky-card:nth-child(4n+4) { position: relative; z-index: 1; margin-top: -18px; }
+  .sticky-card {
+    border-radius: 10px; padding: 18px 11px 11px; position: relative;
+    min-height: 100px; display: flex; flex-direction: column; gap: 6px;
+    box-shadow: 0 2px 8px rgba(0,0,0,.1), 0 1px 2px rgba(0,0,0,.06);
+    transition: transform .15s, box-shadow .15s;
+  }
+  .sticky-card:nth-child(2), .sticky-card:nth-child(5) { border-radius: 2px; }
+  .sticky-card.clickable { cursor: pointer; }
+  .sticky-card.clickable:active { transform: scale(.96) rotate(0deg) !important; }
+
+  /* 图钉 */
+  .sticky-card.att-pin::before {
+    content: ''; position: absolute; top: -7px; left: 50%; transform: translateX(-50%);
+    width: 14px; height: 14px; border-radius: 50%;
+    background: radial-gradient(circle at 35% 35%, #c97a7a, #7a3030);
+    box-shadow: 0 2px 5px rgba(0,0,0,.35);
+  }
+  /* 纸胶带 */
+  .sticky-card.att-tape::before {
+    content: ''; position: absolute; top: -5px; left: 50%; transform: translateX(-50%);
+    width: 44px; height: 13px; border-radius: 3px;
+    background: rgba(255,220,140,.65); box-shadow: 0 1px 3px rgba(0,0,0,.1);
+  }
+  /* 曲别针 */
+  .sticky-clip-icon {
+    position: absolute; top: 6px; right: 10px; opacity: .45;
+  }
+
+  .sticky-title { font-size: 11px; font-weight: 600; color: rgba(0,0,0,.45); }
+  .sticky-body { font-size: 13px; color: rgba(0,0,0,.75); word-break: break-all; flex: 1; line-height: 1.55; }
+  .sticky-ts { font-size: 10px; color: rgba(0,0,0,.35); margin-top: 4px; }
+  .sticky-del { position: absolute; top: 5px; right: 8px; font-size: 15px; color: rgba(0,0,0,.18); background: none; border: none; cursor: pointer; line-height: 1; }
+  .att-clip .sticky-del { right: 28px; }
+
+  #sticky-add-btn {
+    width: 100%; padding: 12px; font-size: 13px; color: var(--text-dim);
+    background: none; border: 1.5px dashed var(--border); border-radius: 10px;
+    cursor: pointer; margin-top: 2px; transition: border-color .15s, color .15s;
+  }
+  #sticky-add-btn:active { border-color: var(--accent); color: var(--accent); }
+  #sticky-add-area { display: none; flex-direction: column; gap: 7px; margin-top: 4px; }
+  #sticky-add-area.open { display: flex; }
+  #sticky-new-title, #sticky-new-body {
+    background: var(--surface); border: 1px solid var(--border); border-radius: 8px;
+    padding: 7px 11px; color: var(--text); font-size: 13px; outline: none; width: 100%; box-sizing: border-box;
+  }
+  #sticky-new-title:focus, #sticky-new-body:focus { border-color: var(--accent); }
+  #sticky-add-confirm { background: var(--accent); color: #fff; border: none; border-radius: 8px; padding: 7px; font-size: 13px; cursor: pointer; width: 100%; }
+
+  /* 速查卡片 */
+  .quickref-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; }
+  .qr-card {
+    background: var(--surface); border: 1px solid var(--border); border-radius: 10px;
+    padding: 9px 11px; cursor: pointer; transition: border-color .15s;
+  }
+  .qr-card:active { border-color: var(--accent); }
+  .qr-label { font-size: 10px; color: var(--text-dim); margin-bottom: 2px; }
+  .qr-val { font-size: 12px; color: var(--text); font-family: monospace; word-break: break-all; }
+  .qr-copied { font-size: 10px; color: var(--accent); margin-top: 2px; display: none; }
+
+  /* 待办 */
+  #todo-list { display: flex; flex-direction: column; gap: 6px; }
+  .todo-item { display: flex; align-items: center; gap: 9px; }
+  .todo-item input[type=checkbox] { accent-color: var(--accent); width: 16px; height: 16px; flex-shrink: 0; cursor: pointer; }
+  .todo-text { flex: 1; font-size: 14px; color: var(--text); background: none; border: none; outline: none; }
+  .todo-text.done { text-decoration: line-through; color: var(--text-dim); }
+  .todo-del { font-size: 16px; color: var(--text-dim); background: none; border: none; cursor: pointer; padding: 0 2px; line-height: 1; }
+  #todo-add-row { display: flex; gap: 7px; margin-top: 2px; }
+  #todo-input {
+    flex: 1; background: var(--surface); border: 1px solid var(--border); border-radius: 8px;
+    padding: 7px 11px; color: var(--text); font-size: 13px; outline: none;
+  }
+  #todo-input:focus { border-color: var(--accent); }
+  #todo-add-btn {
+    background: var(--accent); color: #fff; border: none; border-radius: 8px;
+    padding: 7px 14px; font-size: 13px; cursor: pointer;
+  }
+
+  /* 自由备忘 */
   #notes-area {
-    flex: 1; background: var(--surface); border: 1px solid var(--border);
-    border-radius: 12px; padding: 14px; color: var(--text); font-size: 14px;
+    height: 130px; background: var(--surface); border: 1px solid var(--border);
+    border-radius: 12px; padding: 12px 14px; color: var(--text); font-size: 14px;
     font-family: -apple-system, 'PingFang SC', monospace; line-height: 1.6;
     resize: none; outline: none;
   }
@@ -297,6 +414,28 @@
     font-size: 12px; border-top: 1px solid var(--border);
     border-radius: 0 0 12px 4px;
   }
+
+  /* permission prompt modal */
+  #perm-modal {
+    display: none; position: fixed; inset: 0; z-index: 200;
+    background: rgba(0,0,0,.45); align-items: flex-end; justify-content: center;
+  }
+  #perm-modal.show { display: flex; }
+  #perm-box {
+    background: var(--bg); border: 1px solid var(--border);
+    border-radius: 18px 18px 0 0; padding: 20px 20px 32px;
+    width: 100%; max-width: 480px; box-shadow: 0 -4px 24px rgba(0,0,0,.18);
+  }
+  #perm-title { font-size: 13px; font-weight: 600; margin-bottom: 8px; color: var(--text); }
+  #perm-desc { font-size: 12px; color: var(--text-dim); line-height: 1.5; margin-bottom: 18px; }
+  .perm-btn {
+    display: block; width: 100%; padding: 13px; margin-bottom: 10px;
+    border-radius: 12px; border: 1px solid var(--border);
+    background: none; color: var(--text); font-size: 14px; cursor: pointer;
+    text-align: center;
+  }
+  .perm-btn:first-of-type { background: var(--accent); color: #fff; border-color: var(--accent); }
+  .perm-btn.deny { color: #e05; border-color: var(--border); }
 
   /* voice bar */
   .msg.voice-mode .msg-body { display: none; }
@@ -447,11 +586,77 @@
   <!-- NOTES -->
   <div id="notes" class="panel">
     <div id="notes-wrap">
-      <textarea id="notes-area" placeholder="端口号、域名、备忘…随手记"></textarea>
+
+      <!-- 视图切换 -->
+      <div id="notes-view-toggle">
+        <button class="view-btn active" onclick="switchNotesView('list')">列表</button>
+        <button class="view-btn" onclick="switchNotesView('wall')">便签墙</button>
+      </div>
+
+      <!-- 便签墙 -->
+      <div id="sticky-view">
+        <div class="sticky-board">
+          <div class="sticky-grid" id="sticky-grid"></div>
+        </div>
+        <button id="sticky-add-btn">＋ 贴一张</button>
+        <div id="sticky-add-area">
+          <input id="sticky-new-title" placeholder="标题（可选）" />
+          <input id="sticky-new-body" placeholder="内容或网址…" />
+          <button id="sticky-add-confirm">贴上去</button>
+        </div>
+      </div>
+
+      <!-- 速查卡片 -->
+      <div class="notes-section-label">速查（点击复制）</div>
+      <div class="quickref-grid">
+        <div class="qr-card" onclick="qrCopy(this,'memory.ravenlove.cc')">
+          <div class="qr-label">主域名</div>
+          <div class="qr-val">memory.ravenlove.cc</div>
+          <div class="qr-copied">已复制</div>
+        </div>
+        <div class="qr-card" onclick="qrCopy(this,'107.174.40.67')">
+          <div class="qr-label">服务器 IP</div>
+          <div class="qr-val">107.174.40.67</div>
+          <div class="qr-copied">已复制</div>
+        </div>
+        <div class="qr-card" onclick="qrCopy(this,'3210')">
+          <div class="qr-label">moon-memory</div>
+          <div class="qr-val">:3210</div>
+          <div class="qr-copied">已复制</div>
+        </div>
+        <div class="qr-card" onclick="qrCopy(this,'3400')">
+          <div class="qr-label">raven-bridge</div>
+          <div class="qr-val">:3400</div>
+          <div class="qr-copied">已复制</div>
+        </div>
+        <div class="qr-card" onclick="qrCopy(this,'ssh root@107.174.40.67')">
+          <div class="qr-label">SSH 命令</div>
+          <div class="qr-val">ssh root@107…</div>
+          <div class="qr-copied">已复制</div>
+        </div>
+        <div class="qr-card" onclick="qrCopy(this,'tmux attach -t cc')">
+          <div class="qr-label">接 CC</div>
+          <div class="qr-val">tmux attach -t cc</div>
+          <div class="qr-copied">已复制</div>
+        </div>
+      </div>
+
+      <!-- 待办清单 -->
+      <div class="notes-section-label">待办</div>
+      <div id="todo-list"></div>
+      <div id="todo-add-row">
+        <input id="todo-input" placeholder="添加待办…" />
+        <button id="todo-add-btn">＋</button>
+      </div>
+
+      <!-- 自由备忘 -->
+      <div class="notes-section-label">备忘</div>
+      <textarea id="notes-area" placeholder="随手记…"></textarea>
       <div id="notes-footer">
         <span id="notes-saved"></span>
-        <button id="notes-clear">清空</button>
+        <button id="notes-clear">清空备忘</button>
       </div>
+
     </div>
   </div>
 </div>
@@ -460,12 +665,42 @@
 <script>
 marked.use({ breaks: true, gfm: true })
 
+function enhanceCodeBlocks(container) {
+  container.querySelectorAll('pre').forEach(pre => {
+    const code = pre.querySelector('code')
+    const lang = code
+      ? ([...code.classList].find(c => c.startsWith('language-')) || '').replace('language-', '')
+      : ''
+    const wrap = document.createElement('div')
+    wrap.className = 'code-block-wrap'
+    const header = document.createElement('div')
+    header.className = 'code-block-header'
+    const langEl = document.createElement('span')
+    langEl.className = 'code-lang'
+    langEl.textContent = lang || 'code'
+    const btn = document.createElement('button')
+    btn.className = 'code-copy-btn'
+    btn.textContent = '复制'
+    btn.addEventListener('click', e => {
+      e.stopPropagation()
+      navigator.clipboard.writeText((code || pre).textContent).then(() => {
+        btn.textContent = '已复制'; btn.classList.add('copied')
+        setTimeout(() => { btn.textContent = '复制'; btn.classList.remove('copied') }, 1500)
+      }).catch(() => {})
+    })
+    header.appendChild(langEl); header.appendChild(btn)
+    pre.parentNode.insertBefore(wrap, pre)
+    wrap.appendChild(header); wrap.appendChild(pre)
+  })
+}
+
 const WS_URL = 'wss://memory.ravenlove.cc/raven/ws'
 let ws = null
 let reconnectTimer = null
 
 function connect() {
   ws = new WebSocket(WS_URL)
+  window._ravenWs = ws
   ws.onopen = () => {
     setConn(true)
     if (reconnectTimer) { clearTimeout(reconnectTimer); reconnectTimer = null }
@@ -496,6 +731,7 @@ function connect() {
       else if (msg.type === 'thinking') setThinking(msg.active)
       else if (msg.type === 'thinking_block') appendThinkingBlock(msg.text)
       else if (msg.type === 'compressed') showCompressBanner()
+      else if (msg.type === 'permission_prompt') showPermPrompt(msg)
     } catch {}
   }
 }
@@ -540,6 +776,7 @@ function appendMsg(text, role, save = true, ts = Date.now()) {
       const withStickers = text.replace(/\[sticker:([^\]]+)\]/g, (_, name) =>
         `<img src="/raven/stickers/${name}" style="max-width:220px;border-radius:8px;display:block;margin:4px 0;" alt="${name}">`)
       body.innerHTML = marked.parse(withStickers)
+      enhanceCodeBlocks(body)
     } else {
       body.textContent = text
     }
@@ -768,19 +1005,23 @@ function fetchAndShowThinking(msgEl, replyTs) {
 }
 
 function appendThinkingBlock(text, beforeEl) {
+  const box = document.getElementById('chat-messages')
+  const targetMsg = beforeEl || (() => {
+    const msgs = box.querySelectorAll('.msg.assistant')
+    return msgs[msgs.length - 1]
+  })()
+  // prevent duplicate thinking blocks on the same message
+  if (targetMsg && targetMsg.dataset.thinkingShown) return
+  if (targetMsg) targetMsg.dataset.thinkingShown = '1'
   const el = document.createElement('details')
   el.className = 'thinking-block'
   el.innerHTML = `
     <summary><span><em class="thinking-chevron">›</em>乌鸦在想什么…</span></summary>
     <div class="thinking-body">${text.replace(/</g,'&lt;')}</div>`
-  const box = document.getElementById('chat-messages')
   if (beforeEl) {
     box.insertBefore(el, beforeEl)
   } else {
-    // insert before the last assistant message so it appears above it
-    const msgs = box.querySelectorAll('.msg.assistant')
-    const lastMsg = msgs[msgs.length - 1]
-    box.insertBefore(el, lastMsg || document.getElementById('thinking'))
+    box.insertBefore(el, targetMsg || document.getElementById('thinking'))
   }
   box.scrollTop = box.scrollHeight
 }
@@ -951,7 +1192,144 @@ function removeAttach(i) {
   renderAttachPreview()
 }
 
-// --- notes ---
+// --- 视图切换 ---
+const NOTES_VIEW_KEY = 'raven-notes-view'
+function switchNotesView(mode) {
+  const listEls = ['#notes-wrap > .notes-section-label', '.quickref-grid', '#todo-list', '#todo-add-row', '#notes-area', '#notes-footer']
+  const isWall = mode === 'wall'
+  document.getElementById('sticky-view').classList.toggle('active', isWall)
+  // 隐藏/显示列表区
+  ;['quickref-grid','todo-list','todo-add-row','notes-area','notes-footer'].forEach(id => {
+    const el = document.getElementById(id); if (el) el.style.display = isWall ? 'none' : ''
+  })
+  document.querySelectorAll('#notes-wrap > .notes-section-label').forEach(el => { el.style.display = isWall ? 'none' : '' })
+  document.querySelectorAll('.view-btn').forEach((btn, i) => btn.classList.toggle('active', (i===0) !== isWall))
+  localStorage.setItem(NOTES_VIEW_KEY, mode)
+}
+
+// --- 便签墙 ---
+const STICKY_KEY = 'raven-sticky-v1'
+const STICKY_COLORS = ['#fef9c3','#fce7f3','#dbeafe','#d1fae5','#ede9fe','#ffedd5']
+const STICKY_ATTS = ['pin','tape','clip']
+const CLIP_SVG = `<svg class="sticky-clip-icon" width="14" height="28" viewBox="0 0 14 28" fill="none" stroke="#888" stroke-width="1.8" stroke-linecap="round"><path d="M7 2C4.2 2 2 4.2 2 7v14a5 5 0 0010 0V6a3 3 0 00-6 0v13a1 1 0 002 0V7"/></svg>`
+const DEFAULT_STICKIES = [
+  { id:1, title:'归巢', body:'/raven/home.html', color:'#fef9c3', url:true, ts:'', att:'pin' },
+  { id:2, title:'拾羽', body:'https://sunmoon-orbit.github.io/ripple-and-serena/shiyu/', color:'#fce7f3', url:true, ts:'', att:'clip' },
+  { id:3, title:'方寸间', body:'https://sunmoon-orbit.github.io/ripple-and-serena/fangcunjian/', color:'#dbeafe', url:true, ts:'', att:'tape' },
+  { id:4, title:'心境', body:'https://sunmoon-orbit.github.io/ripple-and-serena/mood/', color:'#d1fae5', url:true, ts:'', att:'pin' },
+  { id:5, title:'言叽', body:'https://sunmoon-orbit.github.io/ripple-and-serena/yanji/', color:'#ede9fe', url:true, ts:'', att:'clip' },
+  { id:6, title:'苏堤柳塔罗', body:'https://sunmoon-orbit.github.io/ripple-and-serena/tarot/', color:'#ffedd5', url:true, ts:'', att:'tape' },
+]
+let stickies = JSON.parse(localStorage.getItem(STICKY_KEY) || 'null') || DEFAULT_STICKIES
+let stickyIdCtr = Math.max(...stickies.map(s=>s.id), 0) + 1
+
+function saveStickies() { localStorage.setItem(STICKY_KEY, JSON.stringify(stickies)) }
+
+function renderStickies() {
+  const grid = document.getElementById('sticky-grid')
+  grid.innerHTML = ''
+  stickies.forEach(s => {
+    const att = s.att || 'pin'
+    const card = document.createElement('div')
+    card.className = `sticky-card att-${att}` + (s.url ? ' clickable' : '')
+    card.style.background = s.color
+    const rot = (((s.id * 137 + 31) % 9) - 4) * 0.6
+    card.style.transform = `rotate(${rot}deg)`
+    if (s.url) card.onclick = (e) => { if (!e.target.classList.contains('sticky-del')) window.open(s.body, '_blank') }
+    const displayBody = s.url ? s.body.replace(/^https?:\/\//,'').replace(/\/$/,'') : s.body
+    const tsStr = s.ts ? `<div class="sticky-ts">${s.ts}</div>` : ''
+    card.innerHTML = `
+      ${att === 'clip' ? CLIP_SVG : ''}
+      <button class="sticky-del" onclick="event.stopPropagation();deleteSticky(${s.id})">×</button>
+      ${s.title ? `<div class="sticky-title">${s.title}</div>` : ''}
+      <div class="sticky-body">${displayBody}</div>
+      ${tsStr}`
+    grid.appendChild(card)
+  })
+}
+
+function deleteSticky(id) {
+  stickies = stickies.filter(s => s.id !== id)
+  saveStickies(); renderStickies()
+}
+
+function addSticky() {
+  const title = document.getElementById('sticky-new-title').value.trim()
+  const body = document.getElementById('sticky-new-body').value.trim()
+  if (!body) return
+  const isUrl = /^https?:\/\/|^\//.test(body)
+  const color = STICKY_COLORS[stickyIdCtr % STICKY_COLORS.length]
+  const att = STICKY_ATTS[stickyIdCtr % 3]
+  const now = new Date(); const ts = `${now.getHours().toString().padStart(2,'0')}:${now.getMinutes().toString().padStart(2,'0')}`
+  stickies.push({ id: stickyIdCtr++, title, body, color, url: isUrl, ts, att })
+  document.getElementById('sticky-new-title').value = ''
+  document.getElementById('sticky-new-body').value = ''
+  document.getElementById('sticky-add-area').classList.remove('open')
+  saveStickies(); renderStickies()
+}
+
+document.getElementById('sticky-add-btn').addEventListener('click', () => {
+  document.getElementById('sticky-add-area').classList.toggle('open')
+})
+document.getElementById('sticky-add-confirm').addEventListener('click', addSticky)
+document.getElementById('sticky-new-body').addEventListener('keydown', e => { if (e.key === 'Enter') addSticky() })
+renderStickies()
+
+// 恢复上次视图
+if (localStorage.getItem(NOTES_VIEW_KEY) === 'wall') switchNotesView('wall')
+
+// --- 速查卡片 ---
+function qrCopy(el, text) {
+  navigator.clipboard.writeText(text).catch(() => {})
+  const copied = el.querySelector('.qr-copied')
+  copied.style.display = 'block'
+  setTimeout(() => { copied.style.display = 'none' }, 1200)
+}
+
+// --- 待办清单 ---
+const TODO_KEY = 'raven-todo-v1'
+let todos = JSON.parse(localStorage.getItem(TODO_KEY) || '[]')
+
+function saveTodos() { localStorage.setItem(TODO_KEY, JSON.stringify(todos)) }
+
+function renderTodos() {
+  const list = document.getElementById('todo-list')
+  list.innerHTML = ''
+  todos.forEach((t, i) => {
+    const row = document.createElement('div')
+    row.className = 'todo-item'
+    row.innerHTML = `
+      <input type="checkbox" ${t.done ? 'checked' : ''} onchange="toggleTodo(${i})">
+      <span class="todo-text${t.done ? ' done' : ''}">${t.text.replace(/</g,'&lt;')}</span>
+      <button class="todo-del" onclick="deleteTodo(${i})">×</button>`
+    list.appendChild(row)
+  })
+}
+
+function toggleTodo(i) {
+  todos[i].done = !todos[i].done
+  saveTodos(); renderTodos()
+}
+
+function deleteTodo(i) {
+  todos.splice(i, 1)
+  saveTodos(); renderTodos()
+}
+
+function addTodo() {
+  const inp = document.getElementById('todo-input')
+  const text = inp.value.trim()
+  if (!text) return
+  todos.push({ text, done: false })
+  inp.value = ''
+  saveTodos(); renderTodos()
+}
+
+document.getElementById('todo-add-btn').addEventListener('click', addTodo)
+document.getElementById('todo-input').addEventListener('keydown', e => { if (e.key === 'Enter') addTodo() })
+renderTodos()
+
+// --- 自由备忘 ---
 const NOTES_KEY = 'raven-notes-v1'
 let notesSaveTimer = null
 
@@ -971,7 +1349,7 @@ notesArea.addEventListener('input', () => {
 })
 
 document.getElementById('notes-clear').addEventListener('click', () => {
-  if (!notesArea.value.trim() || !confirm('清空所有备忘？')) return
+  if (!notesArea.value.trim() || !confirm('清空备忘内容？')) return
   notesArea.value = ''
   localStorage.removeItem(NOTES_KEY)
   notesSaved.textContent = '已清空'
@@ -1008,6 +1386,45 @@ connect()
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker.register('./sw.js')
 }
+</script>
+
+<!-- permission prompt modal -->
+<div id="perm-modal">
+  <div id="perm-box">
+    <div id="perm-title"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:6px"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>乌鸦需要你的授权</div>
+    <div id="perm-desc"></div>
+    <div id="perm-btns"></div>
+  </div>
+</div>
+<script>
+function showPermPrompt(data) {
+  const modal = document.getElementById('perm-modal')
+  document.getElementById('perm-desc').textContent = data.desc || ''
+  const btnsEl = document.getElementById('perm-btns')
+  btnsEl.innerHTML = ''
+  data.options.forEach((opt, i) => {
+    const btn = document.createElement('button')
+    btn.className = 'perm-btn' + (opt.text.toLowerCase().includes('no') || opt.num === '3' ? ' deny' : '')
+    btn.textContent = opt.text
+    btn.onclick = () => {
+      sendPermChoice(opt.num)
+      modal.classList.remove('show')
+    }
+    btnsEl.appendChild(btn)
+  })
+  modal.classList.add('show')
+}
+function sendPermChoice(choice) {
+  if (window._ravenWs && window._ravenWs.readyState === 1) {
+    window._ravenWs.send(JSON.stringify({ type: 'permission', choice }))
+  }
+}
+// close on backdrop click
+document.getElementById('perm-modal').addEventListener('click', e => {
+  if (e.target === document.getElementById('perm-modal')) {
+    document.getElementById('perm-modal').classList.remove('show')
+  }
+})
 </script>
 </body>
 </html>
