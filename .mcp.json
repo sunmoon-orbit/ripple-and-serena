@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "raven": {
+      "type": "sse",
+      "url": "http://127.0.0.1:3400/raven/mcp/sse"
+    }
+  }
+}

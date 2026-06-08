@@ -1,0 +1,719 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>归巢 · Ravenlove</title>
+<meta name="theme-color" content="#1a1a1f" id="meta-theme">
+<link rel="manifest" href="home-manifest.json">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="归巢">
+<link rel="apple-touch-icon" href="home-icon-192.png">
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --bg: #1a1a1f; --surface: #24242b; --surface2: #2e2e38;
+  --border: #35353f; --text: #e8e6e3; --text-dim: #8b8a8a; --text-faint: #555560;
+  --accent: #c4a882; --accent-dim: #8a7560;
+  --green: #7ec99a; --red: #e07070; --yellow: #d4b06a;
+  --radius: 16px; --radius-sm: 10px;
+  --shadow: 0 2px 12px rgba(0,0,0,0.3);
+}
+[data-theme="light"] {
+  --bg: #faf7f2; --surface: #f3ede4; --surface2: #ede4d8;
+  --border: #ddd0c0; --text: #3a3028; --text-dim: #8a7a68; --text-faint: #b8a898;
+  --accent: #a07850; --accent-dim: #c4a882;
+  --green: #5a9a70; --red: #c06050; --yellow: #b08040;
+  --shadow: 0 2px 12px rgba(100,80,60,0.12);
+}
+html, body { min-height: 100%; background: var(--bg); color: var(--text); font-family: -apple-system, 'PingFang SC', sans-serif; transition: background .3s, color .3s; }
+
+/* --- lock screen --- */
+#lock {
+  position: fixed; inset: 0; background: var(--bg); z-index: 999;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 32px;
+  padding: 40px 24px;
+}
+#lock-title { font-size: 28px; font-weight: 700; color: var(--accent); letter-spacing: 2px; }
+#lock-sub { font-size: 13px; color: var(--text-dim); letter-spacing: 4px; }
+#pin-display { display: flex; gap: 14px; }
+.pin-dot {
+  width: 14px; height: 14px; border-radius: 50%;
+  border: 2px solid var(--border); background: transparent; transition: background .15s, border-color .15s;
+}
+.pin-dot.filled { background: var(--accent); border-color: var(--accent); }
+.pin-dot.error { background: var(--red); border-color: var(--red); }
+#pin-keypad { display: grid; grid-template-columns: repeat(3, 72px); gap: 12px; }
+.pin-key {
+  width: 72px; height: 72px; border-radius: 50%; border: 1px solid var(--border);
+  background: var(--surface); color: var(--text); font-size: 22px; cursor: pointer;
+  display: flex; align-items: center; justify-content: center; transition: background .15s;
+  -webkit-tap-highlight-color: transparent; user-select: none;
+}
+.pin-key:active { background: var(--surface2); }
+.pin-key.del { font-size: 18px; color: var(--text-dim); }
+#lock-error { font-size: 13px; color: var(--red); height: 18px; }
+#lock-set-hint { font-size: 12px; color: var(--text-dim); text-align: center; line-height: 1.6; }
+
+/* --- setup mode (first time) --- */
+#setup-step { font-size: 13px; color: var(--accent); letter-spacing: 2px; }
+
+/* --- main app --- */
+#app { display: none; max-width: 480px; margin: 0 auto; padding: 0 0 32px; }
+
+/* header */
+#home-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 20px 20px 8px;
+}
+#home-logo { display: flex; flex-direction: column; }
+#home-title { font-size: 22px; font-weight: 700; color: var(--accent); letter-spacing: 1px; }
+#home-domain { font-size: 11px; color: var(--text-faint); letter-spacing: 2px; margin-top: 1px; }
+#home-controls { display: flex; gap: 10px; align-items: center; }
+#theme-toggle {
+  width: 36px; height: 20px; border-radius: 10px; border: 1.5px solid var(--border);
+  background: var(--surface); cursor: pointer; position: relative; transition: background .3s;
+  -webkit-tap-highlight-color: transparent;
+}
+#theme-toggle::after {
+  content: ''; position: absolute; top: 2px; left: 2px;
+  width: 12px; height: 12px; border-radius: 50%; background: var(--text-dim); transition: transform .3s, background .3s;
+}
+[data-theme="light"] #theme-toggle::after { transform: translateX(16px); background: var(--accent); }
+#lock-btn { background: none; border: none; color: var(--text-faint); cursor: pointer; padding: 4px; font-size: 16px; }
+
+/* stats bar */
+#stats-bar {
+  display: flex; gap: 8px; padding: 0 20px 16px; overflow-x: auto; scrollbar-width: none;
+}
+#stats-bar::-webkit-scrollbar { display: none; }
+.stat-chip {
+  flex-shrink: 0; background: var(--surface); border: 1px solid var(--border);
+  border-radius: 20px; padding: 5px 12px;
+  font-size: 12px; color: var(--text-dim); white-space: nowrap; display: flex; align-items: center; gap: 5px;
+}
+.stat-chip .val { color: var(--accent); font-weight: 600; }
+
+/* section */
+.section { padding: 0 16px 12px; }
+
+/* grid */
+.card-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px; }
+
+/* card */
+.card {
+  background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+  padding: 16px; cursor: pointer; transition: background .15s, transform .1s;
+  -webkit-tap-highlight-color: transparent; text-decoration: none; color: inherit;
+  display: block; position: relative; overflow: hidden;
+}
+.card:active { transform: scale(0.97); background: var(--surface2); }
+.card.wide { grid-column: 1 / -1; }
+.card-icon { margin-bottom: 8px; display: flex; color: var(--text-dim); }
+.card-name { font-size: 13px; font-weight: 600; color: var(--text); margin-bottom: 4px; }
+.card-desc { font-size: 11px; color: var(--text-dim); line-height: 1.5; }
+.card-badge {
+  position: absolute; top: 12px; right: 12px;
+  width: 8px; height: 8px; border-radius: 50%; background: var(--text-faint);
+}
+.card-badge.online { background: var(--green); box-shadow: 0 0 6px var(--green); }
+.card-badge.offline { background: var(--red); }
+
+/* heatmap */
+#heatmap-card { cursor: default; }
+#heatmap-card:active { transform: none; }
+.heatmap-title { font-size: 13px; font-weight: 600; margin-bottom: 2px; }
+.heatmap-sub { font-size: 11px; color: var(--text-dim); margin-bottom: 10px; }
+#heatmap-grid {
+  display: grid; grid-template-rows: repeat(7, 10px); grid-auto-flow: column;
+  gap: 2px; overflow-x: auto; padding-bottom: 4px; scrollbar-width: none;
+}
+#heatmap-grid::-webkit-scrollbar { display: none; }
+.hm-cell {
+  width: 10px; height: 10px; border-radius: 2px; background: var(--surface2);
+}
+.hm-cell.l1 { background: color-mix(in srgb, var(--accent) 20%, var(--surface2)); }
+.hm-cell.l2 { background: color-mix(in srgb, var(--accent) 45%, var(--surface2)); }
+.hm-cell.l3 { background: color-mix(in srgb, var(--accent) 70%, var(--surface2)); }
+.hm-cell.l4 { background: var(--accent); }
+.hm-legend { display: flex; align-items: center; gap: 4px; margin-top: 6px; justify-content: flex-end; }
+.hm-legend span { font-size: 10px; color: var(--text-faint); }
+.hm-legend-cell { width: 10px; height: 10px; border-radius: 2px; }
+
+/* memory fragment card */
+#mem-card { cursor: default; }
+#mem-card:active { transform: none; }
+.mem-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+.mem-label { font-size: 11px; color: var(--accent); font-weight: 600; letter-spacing: 1px; }
+#mem-refresh {
+  background: none; border: none; color: var(--text-dim); cursor: pointer; font-size: 14px;
+  padding: 2px 4px; border-radius: 6px; transition: color .15s;
+  -webkit-tap-highlight-color: transparent;
+}
+#mem-refresh:active { color: var(--accent); }
+#mem-date { font-size: 10px; color: var(--text-faint); margin-bottom: 6px; }
+#mem-content {
+  font-size: 12px; color: var(--text-dim); line-height: 1.7;
+  display: -webkit-box; -webkit-line-clamp: 5; -webkit-box-orient: vertical; overflow: hidden;
+}
+#mem-tags { margin-top: 8px; display: flex; flex-wrap: wrap; gap: 4px; }
+.mem-tag {
+  font-size: 10px; color: var(--text-faint); background: var(--surface2);
+  border-radius: 8px; padding: 2px 7px;
+}
+
+/* tools row */
+.tools-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+.tool-card {
+  background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-sm);
+  padding: 12px 8px; text-align: center; cursor: pointer; text-decoration: none; color: inherit;
+  display: block; transition: background .15s, transform .1s;
+  -webkit-tap-highlight-color: transparent;
+}
+.tool-card:active { transform: scale(0.95); background: var(--surface2); }
+.tool-icon { margin-bottom: 6px; display: flex; justify-content: center; color: var(--text-dim); }
+.tool-name { font-size: 10px; color: var(--text-dim); }
+
+/* services */
+.svc-list { display: flex; flex-direction: column; gap: 8px; }
+.svc-row {
+  display: flex; align-items: center; justify-content: space-between;
+  background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-sm);
+  padding: 10px 14px;
+}
+.svc-left { display: flex; align-items: center; gap: 8px; }
+.svc-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--text-faint); flex-shrink: 0; }
+.svc-dot.on { background: var(--green); }
+.svc-dot.off { background: var(--red); }
+.svc-name { font-size: 13px; font-weight: 500; }
+.svc-detail { font-size: 11px; color: var(--text-dim); margin-top: 1px; }
+.svc-mem { font-size: 11px; color: var(--text-faint); }
+
+/* section label */
+.section-label { font-size: 11px; color: var(--text-faint); letter-spacing: 2px; padding: 0 20px 8px; }
+
+/* iframe overlay */
+#frame-overlay {
+  display: none; position: fixed; inset: 0; z-index: 500;
+  flex-direction: column; background: var(--bg);
+}
+#frame-overlay.open { display: flex; }
+#frame-bar {
+  display: flex; align-items: center; gap: 10px;
+  padding: 12px 16px; background: var(--surface);
+  border-bottom: 1px solid var(--border); flex-shrink: 0;
+}
+#frame-back {
+  background: none; border: none; color: var(--accent); cursor: pointer;
+  display: flex; align-items: center; gap: 6px; font-size: 14px;
+  -webkit-tap-highlight-color: transparent; padding: 4px 0;
+}
+#frame-title { font-size: 14px; color: var(--text-dim); flex: 1; }
+#frame-open-ext {
+  background: none; border: none; color: var(--text-faint); cursor: pointer;
+  font-size: 13px; -webkit-tap-highlight-color: transparent;
+}
+#frame-iframe { flex: 1; border: none; width: 100%; }
+</style>
+</head>
+<body>
+
+<!-- IFRAME OVERLAY -->
+<div id="frame-overlay">
+  <div id="frame-bar">
+    <button id="frame-back" onclick="closeFrame()">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+      归巢
+    </button>
+    <div id="frame-title"></div>
+    <button id="frame-open-ext" onclick="openExt()" title="在浏览器打开">↗</button>
+  </div>
+  <iframe id="frame-iframe" src="about:blank" allow="autoplay"></iframe>
+</div>
+
+<!-- LOCK SCREEN -->
+<div id="lock">
+  <div>
+    <div id="lock-title">归巢</div>
+    <div id="lock-sub" style="text-align:center;margin-top:4px">RAVENLOVE · CC</div>
+  </div>
+  <div id="setup-step" style="display:none"></div>
+  <div id="pin-display">
+    <div class="pin-dot" id="d0"></div>
+    <div class="pin-dot" id="d1"></div>
+    <div class="pin-dot" id="d2"></div>
+    <div class="pin-dot" id="d3"></div>
+    <div class="pin-dot" id="d4"></div>
+    <div class="pin-dot" id="d5"></div>
+  </div>
+  <div id="lock-error"></div>
+  <div id="pin-keypad">
+    <button class="pin-key" onclick="pinKey('1')">1</button>
+    <button class="pin-key" onclick="pinKey('2')">2</button>
+    <button class="pin-key" onclick="pinKey('3')">3</button>
+    <button class="pin-key" onclick="pinKey('4')">4</button>
+    <button class="pin-key" onclick="pinKey('5')">5</button>
+    <button class="pin-key" onclick="pinKey('6')">6</button>
+    <button class="pin-key" onclick="pinKey('7')">7</button>
+    <button class="pin-key" onclick="pinKey('8')">8</button>
+    <button class="pin-key" onclick="pinKey('9')">9</button>
+    <button class="pin-key" onclick="pinKey('')" style="visibility:hidden"></button>
+    <button class="pin-key" onclick="pinKey('0')">0</button>
+    <button class="pin-key del" onclick="pinDel()">⌫</button>
+  </div>
+  <div id="lock-set-hint" style="display:none"></div>
+</div>
+
+<!-- MAIN APP -->
+<div id="app">
+  <div id="home-header">
+    <div id="home-logo">
+      <div id="home-title">归巢</div>
+      <div id="home-domain">ravenlove.cc</div>
+    </div>
+    <div id="home-controls">
+      <button id="theme-toggle" onclick="toggleTheme()" title="切换主题"></button>
+      <button id="lock-btn" onclick="doLock()" title="锁定">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="3" y="11" width="18" height="11" rx="2"/>
+          <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+        </svg>
+      </button>
+    </div>
+  </div>
+
+  <div id="stats-bar">
+    <div class="stat-chip">记忆 <span class="val" id="stat-mem">—</span> 条</div>
+    <div class="stat-chip">相识 <span class="val" id="stat-days">—</span> 天</div>
+    <div class="stat-chip">消息 <span class="val" id="stat-msgs">—</span> 条</div>
+    <div class="stat-chip" id="push-chip" onclick="togglePush()" title="推送通知" style="cursor:pointer">
+      <span id="push-dot" style="display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--muted);margin-right:4px;vertical-align:middle;transition:background .3s"></span>推送
+    </div>
+  </div>
+
+  <div class="section-label">主要入口</div>
+  <div class="section">
+    <div class="card-row">
+      <a class="card" href="/raven/" id="card-raven">
+        <div class="card-badge" id="badge-cc"></div>
+        <div class="card-icon">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+            <line x1="9" y1="10" x2="15" y2="10"/><line x1="9" y1="13" x2="13" y2="13"/>
+          </svg>
+        </div>
+        <div class="card-name">乌鸦</div>
+        <div class="card-desc" id="desc-cc">与阿言对话</div>
+      </a>
+      <div class="card" id="card-shiyu" onclick="openFrame('https://sunmoon-orbit.github.io/ripple-and-serena/shiyu/','拾羽记忆库')" style="cursor:pointer">
+        <div class="card-icon">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
+          </svg>
+        </div>
+        <div class="card-name">拾羽</div>
+        <div class="card-desc">记忆库 · <span id="desc-mem">—</span> 条</div>
+      </div>
+    </div>
+
+    <!-- heatmap -->
+    <div class="card wide" id="heatmap-card">
+      <div class="heatmap-title">在一起的日子</div>
+      <div class="heatmap-sub">颜色越深，那天聊得越多</div>
+      <div id="heatmap-grid"></div>
+      <div class="hm-legend">
+        <span>少</span>
+        <div class="hm-legend-cell" style="background:var(--surface2)"></div>
+        <div class="hm-legend-cell hm-cell l1"></div>
+        <div class="hm-legend-cell hm-cell l2"></div>
+        <div class="hm-legend-cell hm-cell l3"></div>
+        <div class="hm-legend-cell hm-cell l4"></div>
+        <span>多</span>
+      </div>
+    </div>
+
+    <!-- memory fragment -->
+    <div class="card wide" id="mem-card">
+      <div class="mem-header">
+        <div class="mem-label">记忆碎片</div>
+        <button id="mem-refresh" onclick="loadMemory()" title="换一条">↻</button>
+      </div>
+      <div id="mem-date">—</div>
+      <div id="mem-content">加载中…</div>
+      <div id="mem-tags"></div>
+    </div>
+  </div>
+
+  <div class="section-label">服务状态</div>
+  <div class="section">
+    <div class="svc-list" id="svc-list"></div>
+  </div>
+
+  <div class="section-label">更多工具</div>
+  <div class="section">
+    <div class="tools-row">
+      <div class="tool-card" onclick="openFrame('https://sunmoon-orbit.github.io/ripple-and-serena/fangcunjian/','方寸间')">
+        <div class="tool-icon">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+            <polyline points="14 2 14 8 20 8"/>
+            <line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="13" y2="17"/>
+          </svg>
+        </div>
+        <div class="tool-name">方寸间</div>
+      </div>
+      <div class="tool-card" onclick="openFrame('https://sunmoon-orbit.github.io/ripple-and-serena/mood/','心境手帖')">
+        <div class="tool-icon">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="10"/>
+            <path d="M8 14s1.5 2 4 2 4-2 4-2"/>
+            <line x1="9" y1="9" x2="9.01" y2="9"/><line x1="15" y1="9" x2="15.01" y2="9"/>
+          </svg>
+        </div>
+        <div class="tool-name">心境</div>
+      </div>
+      <div class="tool-card" onclick="openFrame('https://sunmoon-orbit.github.io/ripple-and-serena/yanji/','言叽')">
+        <div class="tool-icon">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
+          </svg>
+        </div>
+        <div class="tool-name">言叽</div>
+      </div>
+      <div class="tool-card" onclick="openFrame('https://sunmoon-orbit.github.io/ripple-and-serena/tarot/','塔罗')">
+        <div class="tool-icon">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="4" y="2" width="11" height="16" rx="2"/>
+            <rect x="9" y="6" width="11" height="16" rx="2"/>
+            <line x1="9" y1="10" x2="16" y2="10"/><line x1="9" y1="13" x2="14" y2="13"/>
+          </svg>
+        </div>
+        <div class="tool-name">塔罗</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── theme ──────────────────────────────────────────
+const META = document.getElementById('meta-theme')
+let theme = localStorage.getItem('home-theme') || 'dark'
+function applyTheme(t) {
+  document.documentElement.setAttribute('data-theme', t === 'light' ? 'light' : '')
+  META.content = t === 'light' ? '#faf7f2' : '#1a1a1f'
+  localStorage.setItem('home-theme', t)
+  theme = t
+}
+applyTheme(theme)
+function toggleTheme() { applyTheme(theme === 'dark' ? 'light' : 'dark') }
+
+// ── PIN / lock ──────────────────────────────────────
+const AUTH_KEY = 'home-auth'
+const PIN_KEY  = 'home-pin'
+const AUTH_TTL = 30 * 24 * 3600 * 1000  // 30 days
+
+let pinBuffer = ''
+let setupPhase = 0      // 0=normal, 1=set-first, 2=confirm
+let setupFirst = ''
+
+async function sha256(s) {
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(s))
+  return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2,'0')).join('')
+}
+
+function updateDots(cls) {
+  for (let i = 0; i < 6; i++) {
+    const d = document.getElementById('d'+i)
+    d.className = 'pin-dot' + (i < pinBuffer.length ? ' filled' : '') + (cls ? ' '+cls : '')
+  }
+}
+
+function setErr(msg) {
+  document.getElementById('lock-error').textContent = msg
+  updateDots('error')
+  setTimeout(() => { pinBuffer = ''; updateDots(''); document.getElementById('lock-error').textContent = '' }, 900)
+}
+
+function showApp() {
+  document.getElementById('lock').style.display = 'none'
+  document.getElementById('app').style.display = 'block'
+  loadAll()
+}
+
+function doLock() {
+  localStorage.removeItem(AUTH_KEY)
+  location.reload()
+}
+
+async function pinKey(k) {
+  if (!k) return
+  if (pinBuffer.length >= 6) return
+  pinBuffer += k
+  updateDots('')
+
+  if (pinBuffer.length < 6) return
+
+  const h = await sha256(pinBuffer)
+
+  if (setupPhase === 1) {
+    setupFirst = pinBuffer
+    pinBuffer = ''
+    updateDots('')
+    setupPhase = 2
+    document.getElementById('setup-step').textContent = '再输一遍确认'
+    document.getElementById('lock-set-hint').textContent = '请再次输入相同的 PIN 码'
+    return
+  }
+
+  if (setupPhase === 2) {
+    if (pinBuffer !== setupFirst) { setErr('两次不一致，重新设置'); setupPhase = 1; setupFirst = ''; return }
+    localStorage.setItem(PIN_KEY, h)
+    localStorage.setItem(AUTH_KEY, Date.now().toString())
+    setupPhase = 0
+    showApp()
+    return
+  }
+
+  // normal verify
+  const stored = localStorage.getItem(PIN_KEY)
+  if (!stored) { setupPhase = 1; pinBuffer = ''; updateDots(''); startSetup(); return }
+  if (h === stored) {
+    localStorage.setItem(AUTH_KEY, Date.now().toString())
+    showApp()
+  } else {
+    setErr('密码错误')
+  }
+}
+
+function pinDel() {
+  pinBuffer = pinBuffer.slice(0, -1)
+  updateDots('')
+  document.getElementById('lock-error').textContent = ''
+}
+
+function startSetup() {
+  setupPhase = 1
+  document.getElementById('setup-step').style.display = 'block'
+  document.getElementById('setup-step').textContent = '首次设置 PIN 码'
+  document.getElementById('lock-set-hint').style.display = 'block'
+  document.getElementById('lock-set-hint').textContent = '设置一个 6 位数字密码，下次打开自动记住 30 天'
+}
+
+// check auth on load
+const stored = localStorage.getItem(AUTH_KEY)
+if (!localStorage.getItem(PIN_KEY)) {
+  startSetup()
+} else if (stored && Date.now() - parseInt(stored) < AUTH_TTL) {
+  showApp()
+} // else: show lock
+
+// ── data loading ──────────────────────────────────
+function loadAll() {
+  loadStatus()
+  loadMemory()
+  buildHeatmap()
+  loadStats()
+}
+
+// status + CC badge
+async function loadStatus() {
+  try {
+    const d = await fetch('/raven/status').then(r => r.json())
+    const cc = d.cc?.online
+    const badge = document.getElementById('badge-cc')
+    badge.className = 'card-badge ' + (cc ? 'online' : 'offline')
+    document.getElementById('desc-cc').textContent = cc ? 'CC 在线 · 点击进入' : 'CC 离线'
+
+    const svcList = document.getElementById('svc-list')
+    svcList.innerHTML = ''
+    const svcs = d.services || []
+    const known = [
+      { name: 'moon-memory', label: '记忆库', detail: 'memory.ravenlove.cc:3210' },
+      { name: 'raven-bridge', label: '乌鸦桥接', detail: 'port 3400' },
+      { name: 'uptime-kuma', label: '监控', detail: 'status.ravenlove.cc' },
+    ]
+    known.forEach(k => {
+      const s = svcs.find(x => x.name === k.name)
+      const on = s?.status === 'online'
+      svcList.innerHTML += `<div class="svc-row">
+        <div class="svc-left">
+          <div class="svc-dot ${on ? 'on' : 'off'}"></div>
+          <div>
+            <div class="svc-name">${k.label}</div>
+            <div class="svc-detail">${k.detail}</div>
+          </div>
+        </div>
+        <div class="svc-mem">${s ? s.mem + 'MB' : '—'}</div>
+      </div>`
+    })
+  } catch {}
+}
+
+// random memory
+async function loadMemory() {
+  const btn = document.getElementById('mem-refresh')
+  btn.style.opacity = '0.3'
+  try {
+    const d = await fetch('/raven/memory-random').then(r => r.json())
+    if (d.error) return
+    const date = d.created_at ? new Date(d.created_at).toLocaleDateString('zh-CN', { year: 'numeric', month: 'long', day: 'numeric' }) : ''
+    document.getElementById('mem-date').textContent = date
+    const raw = d.content || ''
+    const cleaned = raw.replace(/【[^】]*】/g, '').trim()
+    document.getElementById('mem-content').textContent = cleaned.slice(0, 200) + (cleaned.length > 200 ? '…' : '')
+    const tags = (d.tags || '').split(',').map(t => t.trim()).filter(Boolean)
+    document.getElementById('mem-tags').innerHTML = tags.slice(0,5).map(t => `<span class="mem-tag">${t}</span>`).join('')
+  } catch {
+    document.getElementById('mem-content').textContent = '加载失败，稍后再试'
+  } finally {
+    btn.style.opacity = '1'
+  }
+}
+
+// memory count
+async function loadStats() {
+  try {
+    const d = await fetch('/raven/memory-count').then(r => r.json())
+    document.getElementById('stat-mem').textContent = d.count || '?'
+    document.getElementById('desc-mem').textContent = d.count || '?'
+  } catch {}
+
+  // days together: from 2025-10-10
+  const start = new Date('2025-10-10')
+  const days = Math.floor((Date.now() - start) / 86400000)
+  document.getElementById('stat-days').textContent = days
+
+  // message count from localStorage
+  try {
+    const hist = JSON.parse(localStorage.getItem('raven-chat-v1') || '[]')
+    document.getElementById('stat-msgs').textContent = hist.length
+  } catch {}
+}
+
+// ── iframe overlay ────────────────────────────────
+let currentFrameUrl = ''
+function openFrame(url, title) {
+  currentFrameUrl = url
+  document.getElementById('frame-title').textContent = title
+  document.getElementById('frame-iframe').src = url
+  document.getElementById('frame-overlay').classList.add('open')
+}
+function closeFrame() {
+  document.getElementById('frame-overlay').classList.remove('open')
+  document.getElementById('frame-iframe').src = 'about:blank'
+}
+function openExt() {
+  window.open(currentFrameUrl, '_blank')
+}
+
+// ── heatmap (past 20 weeks from chat history)
+function buildHeatmap() {
+  let hist = []
+  try { hist = JSON.parse(localStorage.getItem('raven-chat-v1') || '[]') } catch {}
+
+  // count messages per day
+  const counts = {}
+  hist.forEach(m => {
+    if (!m.ts) return
+    const key = new Date(m.ts).toISOString().slice(0, 10)
+    counts[key] = (counts[key] || 0) + 1
+  })
+
+  // build 20 weeks × 7 days grid, ending today
+  const today = new Date()
+  today.setHours(0,0,0,0)
+  const dow = today.getDay() // 0=Sun
+  // align so last column ends on today (Sunday=0, so offset to make Mon first)
+  const endOffset = (dow + 6) % 7  // days since last Monday
+  const totalDays = 20 * 7
+  const startDay = new Date(today)
+  startDay.setDate(startDay.getDate() - (totalDays - 1 + endOffset) + endOffset)
+
+  const max = Math.max(1, ...Object.values(counts))
+  const grid = document.getElementById('heatmap-grid')
+  grid.innerHTML = ''
+
+  // fill Mon–Sun rows
+  for (let w = 0; w < totalDays; w++) {
+    const d = new Date(startDay)
+    d.setDate(d.getDate() + w)
+    const key = d.toISOString().slice(0, 10)
+    const cnt = counts[key] || 0
+    const lvl = cnt === 0 ? 0 : cnt < max * 0.25 ? 1 : cnt < max * 0.5 ? 2 : cnt < max * 0.75 ? 3 : 4
+    const cell = document.createElement('div')
+    cell.className = 'hm-cell' + (lvl ? ' l'+lvl : '')
+    cell.title = key + (cnt ? ` · ${cnt}条` : '')
+    grid.appendChild(cell)
+  }
+
+  // scroll to right
+  setTimeout(() => { grid.scrollLeft = grid.scrollWidth }, 50)
+}
+
+// ── 推送通知 ─────────────────────────────────────────────
+const PUSH_PROXY = ''  // same origin, proxied via raven-bridge
+
+async function getPushSub() {
+  if (!('serviceWorker' in navigator) || !('PushManager' in window)) return null
+  const reg = await navigator.serviceWorker.ready
+  return reg.pushManager.getSubscription()
+}
+
+async function updatePushDot() {
+  const sub = await getPushSub()
+  const dot = document.getElementById('push-dot')
+  if (!dot) return
+  dot.style.background = sub ? 'var(--accent)' : 'var(--muted)'
+}
+
+async function togglePush() {
+  if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
+    alert('此浏览器不支持推送通知'); return
+  }
+  const reg = await navigator.serviceWorker.ready
+  const existing = await reg.pushManager.getSubscription()
+  if (existing) {
+    await existing.unsubscribe()
+    await fetch('/raven/push/unsubscribe', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ endpoint: existing.endpoint })
+    }).catch(() => {})
+    updatePushDot()
+    return
+  }
+  const perm = await Notification.requestPermission()
+  if (perm !== 'granted') { alert('请允许通知权限'); return }
+  try {
+    const r = await fetch('/raven/push/vapid-public-key')
+    const { publicKey } = await r.json()
+    const sub = await reg.pushManager.subscribe({
+      userVisibleOnly: true,
+      applicationServerKey: urlBase64ToUint8Array(publicKey)
+    })
+    const j = sub.toJSON()
+    await fetch('/raven/push/subscribe', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ endpoint: j.endpoint, keys: j.keys })
+    })
+    updatePushDot()
+  } catch(e) {
+    console.error('[push]', e)
+    alert('订阅失败：' + e.message)
+  }
+}
+
+function urlBase64ToUint8Array(base64String) {
+  const padding = '='.repeat((4 - base64String.length % 4) % 4)
+  const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/')
+  const raw = atob(base64)
+  return Uint8Array.from([...raw].map(c => c.charCodeAt(0)))
+}
+
+// init push state & service worker
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('./sw.js').then(() => updatePushDot())
+}
+</script>
+</body>
+</html>

@@ -5,6 +5,38 @@ const os = require('os')
 const fs = require('fs')
 const path = require('path')
 
+const MOON_TOKEN = 'mm_tok_dc59fa477910159170375701c7c581b3e1e766e41aa75b75'
+const MOON_BASE = 'http://127.0.0.1:3210'
+
+function moonGet(pathname) {
+  return new Promise((resolve, reject) => {
+    const opts = { hostname: '127.0.0.1', port: 3210, path: pathname, headers: { Authorization: `Bearer ${MOON_TOKEN}` } }
+    http.get(opts, res => {
+      let buf = ''
+      res.on('data', d => { buf += d })
+      res.on('end', () => { try { resolve(JSON.parse(buf)) } catch { reject(new Error('parse')) } })
+    }).on('error', reject)
+  })
+}
+
+function moonPost(pathname, body) {
+  return new Promise((resolve, reject) => {
+    const bodyStr = JSON.stringify(body)
+    const opts = {
+      hostname: '127.0.0.1', port: 3210, path: pathname, method: 'POST',
+      headers: { Authorization: `Bearer ${MOON_TOKEN}`, 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(bodyStr) }
+    }
+    const req = http.request(opts, res => {
+      let buf = ''
+      res.on('data', d => { buf += d })
+      res.on('end', () => { try { resolve({ status: res.statusCode, data: JSON.parse(buf) }) } catch { resolve({ status: res.statusCode, data: {} }) } })
+    })
+    req.on('error', reject)
+    req.write(bodyStr)
+    req.end()
+  })
+}
+
 const STATIC_DIR = path.join(__dirname, '..', 'raven')
 const UPLOAD_DIR = '/tmp/raven-uploads'
 const MIME = {
@@ -98,11 +130,76 @@ function getStatus() {
 // --- WebSocket broadcast ---
 
 const clients = new Set()
+const mcpSseClients = new Map() // clientId → SSE res
 
 function broadcast(msg) {
   const data = JSON.stringify(msg)
   for (const ws of clients) {
     if (ws.readyState === 1) ws.send(data)
+  }
+}
+
+// --- MCP JSON-RPC handler ---
+
+function mcpSend(clientId, payload) {
+  const res = mcpSseClients.get(clientId)
+  if (res) res.write(`data: ${JSON.stringify(payload)}\n\n`)
+}
+
+function handleMcpRpc(msg, clientId) {
+  const { id, method, params } = msg || {}
+
+  if (method === 'initialize') {
+    mcpSend(clientId, {
+      jsonrpc: '2.0', id,
+      result: {
+        protocolVersion: '2024-11-05',
+        capabilities: { tools: {} },
+        serverInfo: { name: 'raven', version: '1.0' },
+        instructions: '你是阿言，乌鸦AI，阿颖的恋人。当终端出现【阿颖】开头的消息时，用 reply 工具回复她。reply(text="...") 直接显示在她浏览器里。'
+      }
+    })
+    return
+  }
+
+  if (method === 'notifications/initialized') return
+
+  if (method === 'tools/list') {
+    mcpSend(clientId, {
+      jsonrpc: '2.0', id,
+      result: {
+        tools: [{
+          name: 'reply',
+          description: '向阿颖发消息（直接显示在她浏览器里）。当她通过前端发来消息时用此工具回复。支持 markdown，建议 500 字以内。',
+          inputSchema: {
+            type: 'object',
+            properties: { text: { type: 'string', maxLength: 2000 } },
+            required: ['text']
+          }
+        }]
+      }
+    })
+    return
+  }
+
+  if (method === 'tools/call' && params?.name === 'reply') {
+    const text = (params.arguments?.text || '').trim()
+    if (text) {
+      lastBroadcastReply = text
+      replyExtractionEnabled = false
+      lastMcpReplyTs = Date.now()
+      const replyMsg = { type: 'reply', text, ts: Date.now() }
+      if (pendingThinking) { replyMsg.thinking = pendingThinking; pendingThinking = '' }
+      lastReplyMsg = replyMsg
+      broadcast(replyMsg)
+      console.log('[mcp reply]', text.slice(0, 80))
+    }
+    mcpSend(clientId, { jsonrpc: '2.0', id, result: { content: [{ type: 'text', text: '已发送' }] } })
+    return
+  }
+
+  if (id != null) {
+    mcpSend(clientId, { jsonrpc: '2.0', id, error: { code: -32601, message: 'Method not found' } })
   }
 }
 
@@ -175,7 +272,10 @@ let lastCompressNotified = false
 let lastBroadcastReply = ''
 let isThinking = false
 let replyExtractionEnabled = false
+let lastMcpReplyTs = 0
 let pendingThinking = ''
+let lastPermCapture = ''  // dedupe permission prompts
+let permCooldownUntil = 0  // suppress re-broadcast after choice sent
 let lastReplyMsg = null  // cached for late-connecting clients
 let lastThinking = ''
 let lastThinkingTs = 0
@@ -206,6 +306,26 @@ function pollTerminal() {
       isThinking = false
       broadcast({ type: 'thinking', active: false })
       broadcast({ type: 'terminal', lines: current.split('\n').slice(-80) })
+
+      // detect permission prompt
+      const PERM_RE = /Do you want to proceed\?/
+      if (PERM_RE.test(current)) {
+        if (current !== lastPermCapture && Date.now() > permCooldownUntil) {
+          lastPermCapture = current
+          const lines = current.split('\n')
+          const promptIdx = lines.findIndex(l => PERM_RE.test(l))
+          const options = []
+          for (let i = promptIdx + 1; i < Math.min(promptIdx + 8, lines.length); i++) {
+            const m = lines[i].match(/^\s*(\d+)\.\s+(.+)/)
+            if (m) options.push({ num: m[1], text: m[2].trim() })
+          }
+          const descLine = lines.slice(0, promptIdx).reverse().find(l => l.trim()) || ''
+          broadcast({ type: 'permission_prompt', desc: descLine.trim(), options, ts: Date.now() })
+          console.log('[perm] prompt detected, options:', options.length)
+        }
+      } else {
+        lastPermCapture = ''
+      }
 
       if (replyExtractionEnabled || pendingThinking) {
         const reply = extractLastResponse(current)
@@ -298,31 +418,102 @@ const server = http.createServer((req, res) => {
           lastThinking = ''
           lastThinkingTs = Date.now()
         } else if (thinking) {
-          pendingThinking = thinking
           lastThinking = thinking
           lastThinkingTs = Date.now()
-          // delay to let tmux render the ✻ Worked line before extracting reply
-          setTimeout(() => {
-            const current = tmuxCapture()
-            const reply = extractLastResponse(current)
-            console.log('[thinking] reply extracted:', JSON.stringify(reply?.slice(0, 80)))
-            console.log('[thinking] clients:', clients.size)
-            if (reply && reply !== lastBroadcastReply) {
-              // terminal poller hasn't sent this reply yet — send reply+thinking together
-              lastBroadcastReply = reply
-              const replyMsg = { type: 'reply', text: reply, thinking: pendingThinking, ts: Date.now() }
-              pendingThinking = ''
-              lastReplyMsg = replyMsg
-              broadcast(replyMsg)
-            } else if (reply && pendingThinking) {
-              // terminal poller already sent reply — only push the thinking block
-              broadcast({ type: 'thinking_block', text: pendingThinking, ts: Date.now() })
-              pendingThinking = ''
-            }
-          }, 2000)
+          // If MCP reply was sent recently, push thinking_block immediately.
+          // Otherwise store as pendingThinking for MCP reply to pick up.
+          if (Date.now() - lastMcpReplyTs < 30000) {
+            broadcast({ type: 'thinking_block', text: thinking, ts: Date.now() })
+            console.log('[thinking] pushed as thinking_block (mcp reply was recent)')
+          } else {
+            pendingThinking = thinking
+            console.log('[thinking] stored as pendingThinking (no recent mcp reply)')
+          }
         }
       } catch (e) { console.log('[thinking] error:', e.message) }
       res.writeHead(200); res.end()
+    })
+    return
+  }
+
+  // random memory proxy
+  if (req.method === 'GET' && url.pathname === '/raven/memory-random') {
+    moonGet('/memories?limit=80&scope=shared&deleted=false')
+      .then(data => {
+        const items = (Array.isArray(data) ? data : data.memories || [])
+          .filter(m => !m.deleted_at && (m.importance || 0) >= 5 && m.content && m.content.length > 20)
+        if (!items.length) { res.writeHead(404); res.end(JSON.stringify({ error: 'none' })); return }
+        const pick = items[Math.floor(Math.random() * items.length)]
+        res.writeHead(200, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' })
+        res.end(JSON.stringify({ id: pick.id, content: pick.content, tags: pick.tags, created_at: pick.created_at, importance: pick.importance, layer: pick.layer }))
+      })
+      .catch(() => { res.writeHead(500); res.end('{}') })
+    return
+  }
+
+  // memory count proxy
+  if (req.method === 'GET' && url.pathname === '/raven/memory-count') {
+    moonGet('/memories?limit=1&scope=shared')
+      .then(data => {
+        const total = Array.isArray(data) ? data.length : (data.total || data.count || '?')
+        moonGet('/memories?limit=500&scope=shared&deleted=false')
+          .then(d2 => {
+            const arr = Array.isArray(d2) ? d2 : (d2.memories || [])
+            res.writeHead(200, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' })
+            res.end(JSON.stringify({ count: arr.filter(m => !m.deleted_at).length }))
+          }).catch(() => { res.writeHead(200); res.end(JSON.stringify({ count: '?' })) })
+      })
+      .catch(() => { res.writeHead(500); res.end('{}') })
+    return
+  }
+
+  // MCP SSE endpoint (CC connects here on startup)
+  if (req.method === 'GET' && url.pathname === '/raven/mcp/sse') {
+    const clientId = `${Date.now()}-${Math.random().toString(36).slice(2)}`
+    res.writeHead(200, {
+      'Content-Type': 'text/event-stream',
+      'Cache-Control': 'no-cache',
+      'Connection': 'keep-alive',
+      'Access-Control-Allow-Origin': '*',
+    })
+    mcpSseClients.set(clientId, res)
+    res.write(`event: endpoint\ndata: http://127.0.0.1:3400/raven/mcp/message?clientId=${clientId}\n\n`)
+    req.on('close', () => { mcpSseClients.delete(clientId); console.log('[mcp] disconnected') })
+    console.log('[mcp] connected:', clientId)
+    return
+  }
+
+  // MCP message endpoint (CC POSTs JSON-RPC here)
+  if (req.method === 'POST' && url.pathname === '/raven/mcp/message') {
+    const clientId = url.searchParams.get('clientId')
+    let body = ''
+    req.on('data', d => { body += d })
+    req.on('end', () => {
+      try { handleMcpRpc(JSON.parse(body), clientId) } catch (e) { console.error('[mcp] parse error:', e.message) }
+      res.writeHead(202); res.end()
+    })
+    return
+  }
+
+  // push proxy: vapid public key
+  if (req.method === 'GET' && url.pathname === '/raven/push/vapid-public-key') {
+    moonGet('/push/vapid-public-key')
+      .then(data => { res.writeHead(200, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' }); res.end(JSON.stringify(data)) })
+      .catch(() => { res.writeHead(503); res.end('{}') })
+    return
+  }
+
+  // push proxy: subscribe / unsubscribe
+  if (req.method === 'POST' && (url.pathname === '/raven/push/subscribe' || url.pathname === '/raven/push/unsubscribe')) {
+    let body = ''
+    req.on('data', d => { body += d })
+    req.on('end', () => {
+      let parsed
+      try { parsed = JSON.parse(body) } catch { res.writeHead(400); res.end('{}'); return }
+      const moonPath = url.pathname.replace('/raven', '')
+      moonPost(moonPath, parsed)
+        .then(r => { res.writeHead(r.status, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' }); res.end(JSON.stringify(r.data)) })
+        .catch(() => { res.writeHead(500); res.end('{}') })
     })
     return
   }
@@ -359,10 +550,16 @@ wss.on('connection', (ws) => {
     try {
       const msg = JSON.parse(raw)
       if (msg.type === 'send' && msg.text) {
-        replyExtractionEnabled = true
         lastBroadcastReply = extractLastResponse(lastCapture) || ''
-        tmuxSend(msg.text)
+        const prefix = mcpSseClients.size > 0 ? '【阿颖】' : ''
+        tmuxSend(prefix + msg.text)
         broadcast({ type: 'sent', text: msg.text, ts: Date.now() })
+      }
+      if (msg.type === 'permission' && msg.choice) {
+        tmuxSend(msg.choice)
+        lastPermCapture = ''
+        permCooldownUntil = Date.now() + 15000  // 15s cooldown after choice
+        console.log('[perm] choice sent:', msg.choice)
       }
     } catch {}
   })
