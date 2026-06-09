@@ -49,8 +49,31 @@ function AvatarUpload({ label, value, onChange }) {
 function ConnectionCard({ conn, onSave, onDelete, onActivate, isActive }) {
   const [editing, setEditing] = useState(false)
   const [form, setForm] = useState({ ...conn })
+  const [fetchedModels, setFetchedModels] = useState([])
+  const [fetchingModels, setFetchingModels] = useState(false)
   const provider = normalizeProvider(form.provider)
   const models = BUILTIN_MODELS[provider] || []
+
+  async function handleFetchModels() {
+    if (!form.apiKey?.trim()) { showToast('请先填写 API Key', 'error'); return }
+    const defaultUrls = { openai: 'https://api.openai.com/v1', deepseek: 'https://api.deepseek.com/v1' }
+    const base = (form.baseUrl?.trim() || defaultUrls[provider] || '').replace(/\/$/, '')
+    if (!base) { showToast('请填写 Base URL', 'error'); return }
+    setFetchingModels(true)
+    try {
+      const resp = await fetch(`${base}/models`, { headers: { Authorization: `Bearer ${form.apiKey}` } })
+      if (!resp.ok) throw new Error(resp.status)
+      const data = await resp.json()
+      const ids = (data.data || []).map((m) => m.id).filter(Boolean).sort()
+      if (!ids.length) throw new Error('未返回模型列表')
+      setFetchedModels(ids)
+      showToast(`拉取到 ${ids.length} 个模型`, 'success')
+    } catch (e) {
+      showToast('拉取失败：' + e.message, 'error')
+    } finally {
+      setFetchingModels(false)
+    }
+  }
 
   function save() {
     onSave(conn.id, form)
@@ -98,20 +121,30 @@ function ConnectionCard({ conn, onSave, onDelete, onActivate, isActive }) {
           </div>
           <div className="form-row">
             <label className="form-label">Base URL</label>
-            <input className="form-input" value={form.baseUrl || ''} onChange={(e) => setForm({ ...form, baseUrl: e.target.value })} placeholder="（留空使用默认）" />
+            <input className="form-input" value={form.baseUrl || ''} onChange={(e) => { setForm({ ...form, baseUrl: e.target.value }); setFetchedModels([]) }} placeholder="（留空使用默认）" />
+          </div>
+          <div className="form-row" style={{ justifyContent: 'flex-end' }}>
+            <button className="btn-sm btn-ghost" onClick={handleFetchModels} disabled={fetchingModels}>
+              {fetchingModels ? '拉取中…' : '拉取模型'}
+            </button>
           </div>
           <div className="form-row">
             <label className="form-label">默认模型</label>
-            {models.length > 0 ? (
+            {fetchedModels.length > 0 ? (
+              <select className="filter-select" style={{ flex: 1 }} value={form.defaultModel || ''} onChange={(e) => setForm({ ...form, defaultModel: e.target.value })}>
+                <option value="">请选择模型…</option>
+                {fetchedModels.map((m) => <option key={m} value={m}>{m}</option>)}
+              </select>
+            ) : models.length > 0 ? (
               <select className="filter-select" value={form.defaultModel || ''} onChange={(e) => setForm({ ...form, defaultModel: e.target.value })}>
                 <option value="">自定义...</option>
                 {models.map((m) => <option key={m} value={m}>{m}</option>)}
               </select>
             ) : (
-              <input className="form-input" value={form.defaultModel || ''} onChange={(e) => setForm({ ...form, defaultModel: e.target.value })} placeholder="模型名称" />
+              <input className="form-input" value={form.defaultModel || ''} onChange={(e) => setForm({ ...form, defaultModel: e.target.value })} placeholder="模型名称（或点「拉取模型」）" />
             )}
           </div>
-          {form.defaultModel === '' && models.length > 0 && (
+          {form.defaultModel === '' && models.length > 0 && fetchedModels.length === 0 && (
             <div className="form-row">
               <label className="form-label"></label>
               <input className="form-input" value={form.customModel || ''} onChange={(e) => setForm({ ...form, customModel: e.target.value, defaultModel: e.target.value })} placeholder="自定义模型名..." />
