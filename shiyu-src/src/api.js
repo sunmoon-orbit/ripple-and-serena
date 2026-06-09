@@ -38,4 +38,5 @@ export const api = {
   anniversaries: () => req('/anniversaries'),
   time: () => req('/context/time'),
   health: () => req('/health'),
+  maintainHealth: () => req('/maintain/health'),
 }
