@@ -177,6 +177,16 @@ export const useStore = create((set, get) => ({
       return { chats }
     })
   },
+  updateChatConnection: (chatId, connectionId) => {
+    set((s) => {
+      const conn = s.connections.find((c) => c.id === connectionId)
+      const chats = s.chats.map((c) => c.id === chatId
+        ? { ...c, connectionId, model: conn?.defaultModel || c.model }
+        : c)
+      savePersistedState({ ...s, chats })
+      return { chats }
+    })
+  },
   getActiveChat: () => {
     const s = get()
     return s.chats.find((c) => c.id === s.activeChatId) || null
