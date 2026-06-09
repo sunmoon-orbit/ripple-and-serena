@@ -26,6 +26,9 @@
   --accent:  #A07850;
   --raven:   #0A0E18;
   --danger:  #B05060;
+  --ok:      #4a9a6a;
+  --warn:    #b08030;
+  --err:     #b05060;
 
   --shadow:    0 1px 3px rgba(0,0,0,0.04), 0 3px 12px rgba(0,0,0,0.08);
   --shadow-lg: 0 4px 16px rgba(0,0,0,0.10), 0 12px 36px rgba(0,0,0,0.13);
