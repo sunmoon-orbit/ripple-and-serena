@@ -15,7 +15,7 @@ export default function Chat() {
     searchConfig, moonMemory, autoTools,
     createChat, setActiveChat, getActiveConnection, getActiveChat, getMessages,
     addMessage, updateMessage, removeLastEmptyAssistant, truncateMessagesFrom, touchChat,
-    recordTokenUsage, updateChatModel, applyContextLimit,
+    recordTokenUsage, updateChatModel, updateChatConnection, applyContextLimit,
   } = store
 
   const [sidebarOpen, setSidebarOpen] = useState(false)
@@ -25,13 +25,17 @@ export default function Chat() {
   const [pendingImages, setPendingImages] = useState([])
 
   const activeChat = getActiveChat()
-  const activeConn = getActiveConnection()
+  // prefer the chat's own connectionId, fall back to global active connection
+  const activeConn = activeChat
+    ? (connections.find((c) => c.id === activeChat.connectionId) || getActiveConnection())
+    : getActiveConnection()
   const messages = activeChatId ? getMessages(activeChatId) : []
 
   // ── Model panel ──────────────────────────────────────────────────────────
   const provider = activeConn ? normalizeProvider(activeConn.provider) : 'openai'
   const builtinModels = BUILTIN_MODELS[provider] || []
   const currentModel = activeChat?.model || activeConn?.defaultModel || ''
+  const currentConnId = activeChat?.connectionId || activeConnectionId || ''
 
   function handleSelectModel(model) {
     if (activeChat) updateChatModel(activeChat.id, (model || '').trim())
@@ -252,8 +256,11 @@ export default function Chat() {
                 <div className="model-panel-label">连接</div>
                 <select
                   className="model-conn-select"
-                  value={activeConnectionId || ''}
-                  onChange={(e) => store.setActiveConnection(e.target.value)}
+                  value={currentConnId}
+                  onChange={(e) => {
+                    if (activeChat) updateChatConnection(activeChat.id, e.target.value)
+                    else store.setActiveConnection(e.target.value)
+                  }}
                 >
                   {connections.map((c) => (
                     <option key={c.id} value={c.id}>{c.name}</option>
