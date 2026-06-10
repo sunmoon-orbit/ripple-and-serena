@@ -139,6 +139,7 @@ function Editor({ initial, onClose, onSaved }) {
   const [memType, setMemType] = useState(initial?.type || 'memory')
   const [importance, setImportance] = useState(initial?.importance || 5)
   const [memorable, setMemorable] = useState((initial?.arousal || 0) > 0.6)
+  const [agent, setAgent] = useState(initial?.agent || (initial?.type === 'diary' ? '阿颖' : '阿言'))
   const [saving, setSaving] = useState(false)
 
   async function save() {
@@ -146,8 +147,8 @@ function Editor({ initial, onClose, onSaved }) {
     setSaving(true)
     const fields = { content: content.trim(), tags, scope, layer: layer || null, type: memType, importance, arousal: memorable ? 0.85 : 0.3 }
     try {
-      if (isEdit) await api.update(initial.id, fields)
-      else await api.create({ ...fields, owner: '阿颖', agent: '阿言' })
+      if (isEdit) await api.update(initial.id, { ...fields, agent })
+      else await api.create({ ...fields, owner: '阿颖', agent })
       showToast(isEdit ? '已更新' : '已记下', 'success')
       onSaved()
     } catch (e) { showToast(e.message, 'error') } finally { setSaving(false) }
@@ -167,7 +168,11 @@ function Editor({ initial, onClose, onSaved }) {
           <select className="select" style={{ flex: 1 }} value={scope} onChange={(e) => setScope(e.target.value)}>
             {Object.entries(SCOPES).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
           </select>
-          <select className="select" style={{ flex: 1 }} value={memType} onChange={(e) => setMemType(e.target.value)}>
+          <select className="select" style={{ flex: 1 }} value={memType} onChange={(e) => {
+            const t = e.target.value
+            setMemType(t)
+            if (!initial?.id) setAgent(t === 'diary' ? '阿颖' : '阿言')
+          }}>
             {MEM_TYPES.map((o) => <option key={o.v} value={o.v}>{o.l}</option>)}
           </select>
         </div>
@@ -181,7 +186,11 @@ function Editor({ initial, onClose, onSaved }) {
             {IMP_OPTS.map((o) => <option key={o.v} value={o.v}>重要程度：{o.l}</option>)}
           </select>
         </div>
-        <div style={{ display: 'flex', gap: 10, marginTop: 12, alignItems: 'center', justifyContent: 'flex-end' }}>
+        <div style={{ display: 'flex', gap: 10, marginTop: 12, alignItems: 'center', justifyContent: 'space-between' }}>
+          <select className="select" style={{ flex: 1 }} value={agent} onChange={(e) => setAgent(e.target.value)}>
+            <option value="阿颖">阿颖写的</option>
+            <option value="阿言">阿言写的</option>
+          </select>
           <label className="memorable-toggle" onClick={() => setMemorable(!memorable)}>
             <span className={'toggle' + (memorable ? ' on' : '')} />
             <span>难忘</span>
