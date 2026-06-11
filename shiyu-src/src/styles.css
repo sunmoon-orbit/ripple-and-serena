@@ -743,3 +743,17 @@ input, textarea, select { font-family: inherit; font-size: 15px; color: var(--in
 }
 .memorable-toggle .toggle { flex-shrink: 0; }
 
+/* ── 桌面端适配 ── */
+@media (min-width: 1000px) {
+  .app { max-width: 1060px; }
+  .nav { max-width: 1060px; }
+  .panel { padding-left: 24px; padding-right: 24px; }
+
+  /* 记忆卡片双列瀑布流 */
+  .mem-list { display: block; columns: 2; column-gap: 12px; }
+  .mem-list > .card { break-inside: avoid; margin-bottom: 12px; }
+
+  .stats-grid { grid-template-columns: repeat(4, 1fr); }
+  .heatmap-cell { height: 18px; }
+}
+

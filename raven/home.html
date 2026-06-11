@@ -223,6 +223,20 @@ html, body { min-height: 100%; background: var(--bg); color: var(--text); font-f
   font-size: 13px; -webkit-tap-highlight-color: transparent;
 }
 #frame-iframe { flex: 1; border: none; width: 100%; }
+
+/* ── 桌面端适配 ── */
+@media (min-width: 768px) {
+  #app { max-width: 760px; }
+  .card-row { gap: 12px; }
+  /* 热力图和记忆碎片并排 */
+  .section { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .section > .card-row { grid-column: 1 / -1; display: grid; }
+  .section > .svc-list, .section > .tools-row { grid-column: 1 / -1; }
+  .card.wide { grid-column: auto; margin-bottom: 0; }
+  .tools-row { grid-template-columns: repeat(4, 1fr); gap: 10px; }
+  .tool-card { padding: 16px 8px; }
+  .tool-name { font-size: 11px; }
+}
 </style>
 </head>
 <body>
