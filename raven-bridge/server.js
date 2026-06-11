@@ -101,28 +101,62 @@ function pm2Services() {
 }
 
 const SESSION_DIR = '/home/ripple/.claude/projects/-home-ripple-ripple-and-serena'
-const SESSION_MAX_BYTES = 4 * 1024 * 1024  // ~1M tokens rough estimate
+const CONTEXT_MAX_TOKENS = 200000
 
 function sessionUsage() {
   try {
-    const files = fs.readdirSync(SESSION_DIR).filter(f => f.endsWith('.jsonl'))
-    if (!files.length) return null
-    // pick largest (active session)
-    let maxSize = 0
-    for (const f of files) {
-      try { const s = fs.statSync(path.join(SESSION_DIR, f)).size; if (s > maxSize) maxSize = s } catch {}
+    const entries = fs.readdirSync(SESSION_DIR)
+      .filter(f => f.endsWith('.jsonl'))
+      .map(f => { try { return { f, mtime: fs.statSync(path.join(SESSION_DIR, f)).mtimeMs } } catch { return null } })
+      .filter(Boolean)
+      .sort((a, b) => b.mtime - a.mtime)
+    if (!entries.length) return null
+
+    const latest = path.join(SESSION_DIR, entries[0].f)
+    const size = fs.statSync(latest).size
+    const readSize = Math.min(size, 30 * 1024)
+    const buf = Buffer.alloc(readSize)
+    const fd = fs.openSync(latest, 'r')
+    fs.readSync(fd, buf, 0, readSize, size - readSize)
+    fs.closeSync(fd)
+
+    const lines = buf.toString('utf8').split('\n').reverse()
+    for (const line of lines) {
+      if (!line.trim()) continue
+      try {
+        const entry = JSON.parse(line)
+        const usage = entry.usage || entry.message?.usage
+        if (!usage) continue
+        const tokens = (usage.input_tokens || 0) + (usage.cache_read_input_tokens || 0) + (usage.cache_creation_input_tokens || 0)
+        if (tokens > 0) return { tokens, pct: Math.min(100, Math.round(tokens / CONTEXT_MAX_TOKENS * 100)) }
+      } catch {}
     }
-    return { bytes: maxSize, pct: Math.min(100, Math.round(maxSize / SESSION_MAX_BYTES * 100)) }
+    return null
   } catch { return null }
 }
 
+// uptime-kuma runs outside pm2 (root instance on :3001) — probe it directly
+let kumaOnline = false
+function checkKuma() {
+  const req = http.get({ hostname: '127.0.0.1', port: 3001, path: '/', timeout: 3000 }, res => {
+    kumaOnline = res.statusCode < 500
+    res.resume()
+  })
+  req.on('error', () => { kumaOnline = false })
+  req.on('timeout', () => { req.destroy(); kumaOnline = false })
+}
+checkKuma()
+setInterval(checkKuma, 30000)
+
 function getStatus() {
+  const services = pm2Services().filter(s => s.name !== 'uptime-kuma')
+  services.push({ name: 'uptime-kuma', status: kumaOnline ? 'online' : 'offline', mem: 0 })
   return {
     cc: { online: ccOnline() },
     session: sessionUsage(),
     disk: diskUsage(),
     mem: memUsage(),
-    services: pm2Services(),
+    services,
     ts: Date.now()
   }
 }
@@ -327,7 +361,8 @@ function pollTerminal() {
         lastPermCapture = ''
       }
 
-      if (replyExtractionEnabled || pendingThinking) {
+      // only use terminal extraction when MCP is not connected (fallback mode)
+      if ((replyExtractionEnabled || pendingThinking) && mcpSseClients.size === 0) {
         const reply = extractLastResponse(current)
         if (reply && reply !== lastBroadcastReply) {
           lastBroadcastReply = reply
@@ -551,6 +586,7 @@ wss.on('connection', (ws) => {
       const msg = JSON.parse(raw)
       if (msg.type === 'send' && msg.text) {
         lastBroadcastReply = extractLastResponse(lastCapture) || ''
+        lastReplyMsg = null  // don't replay stale reply if WS reconnects mid-conversation
         const prefix = mcpSseClients.size > 0 ? '【阿颖】' : ''
         tmuxSend(prefix + msg.text)
         broadcast({ type: 'sent', text: msg.text, ts: Date.now() })
