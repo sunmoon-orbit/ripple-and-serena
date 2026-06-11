@@ -1,0 +1,17 @@
+<svg xmlns='http://www.w3.org/2000/svg' width='512' height='512' viewBox='0 0 512 512'>
+  <defs>
+    <linearGradient id='bg' x1='0%' y1='0%' x2='100%' y2='100%'>
+      <stop offset='0%' stop-color='#d4b892'/>
+      <stop offset='100%' stop-color='#c4a882'/>
+    </linearGradient>
+  </defs>
+  <!-- 通知大图标：满铺暖金底+深色 R，深色通知卡片上也清晰可见 -->
+  <!-- 满铺无圆角：Android 会自行做圆形/圆角遮罩，避免露出透明角 -->
+  <rect width='512' height='512' fill='url(#bg)'/>
+  <circle cx='256' cy='256' r='190' fill='none' stroke='#1f1f26' stroke-width='2' opacity='0.15'/>
+  <line x1='168' y1='138' x2='168' y2='378' stroke='#1f1f26' stroke-width='24' stroke-linecap='round'/>
+  <line x1='168' y1='138' x2='250' y2='138' stroke='#1f1f26' stroke-width='24' stroke-linecap='round'/>
+  <path d='M 250 138 Q 314 138 314 206 Q 314 274 250 274' fill='none' stroke='#1f1f26' stroke-width='24' stroke-linecap='round'/>
+  <line x1='168' y1='274' x2='250' y2='274' stroke='#1f1f26' stroke-width='24' stroke-linecap='round'/>
+  <path d='M 250 274 Q 282 318 330 378' fill='none' stroke='#1f1f26' stroke-width='24' stroke-linecap='round'/>
+</svg>

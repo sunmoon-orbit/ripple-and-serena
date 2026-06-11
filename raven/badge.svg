@@ -1,0 +1,9 @@
+<svg xmlns='http://www.w3.org/2000/svg' width='512' height='512' viewBox='0 0 512 512'>
+  <!-- 通知 badge：Android 要求单色+透明背景，系统会自行染色 -->
+  <!-- R letterform，加粗描边保证小尺寸下清晰 -->
+  <line x1='158' y1='100' x2='158' y2='412' stroke='#ffffff' stroke-width='44' stroke-linecap='round'/>
+  <line x1='158' y1='100' x2='252' y2='100' stroke='#ffffff' stroke-width='44' stroke-linecap='round'/>
+  <path d='M 252 100 Q 336 100 336 196 Q 336 292 252 292' fill='none' stroke='#ffffff' stroke-width='44' stroke-linecap='round'/>
+  <line x1='158' y1='292' x2='252' y2='292' stroke='#ffffff' stroke-width='44' stroke-linecap='round'/>
+  <path d='M 252 292 Q 292 344 352 412' fill='none' stroke='#ffffff' stroke-width='44' stroke-linecap='round'/>
+</svg>

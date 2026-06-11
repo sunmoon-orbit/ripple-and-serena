@@ -8,8 +8,9 @@ self.addEventListener('push', (e) => {
   e.waitUntil(
     self.registration.showNotification(data.title || '阿言', {
       body: data.body || '',
-      icon: data.icon || 'https://memory.ravenlove.cc/raven/home-icon-192.png',
-      badge: 'https://memory.ravenlove.cc/raven/home-icon-192.png',
+      // icon: 暖金底深色 R，深色通知卡上不隐身；badge 必须单色透明，否则 Android 回退 Chrome 图标
+      icon: data.icon || 'https://memory.ravenlove.cc/raven/push-icon-192.png',
+      badge: 'https://memory.ravenlove.cc/raven/badge-96.png',
       tag: 'raven-push',
       renotify: true,
     })
