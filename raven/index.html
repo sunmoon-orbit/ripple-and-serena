@@ -852,7 +852,9 @@ function appendMsg(text, role, save = true, ts = Date.now()) {
       if (stickerOnly) {
         el.classList.add('sticker-msg')
       }
-      const withStickers = text.replace(/\[sticker:([^\]]+)\]/g, (_, name) =>
+      // 终端抓取会把 ![alt](url) 剥成裸 URL：单独成行的图片 URL 还原成图片
+      const withImgs = text.replace(/^[ \t]*(https?:\/\/\S+\.(?:png|jpe?g|gif|webp))[ \t]*$/gim, '![]($1)')
+      const withStickers = withImgs.replace(/\[sticker:([^\]]+)\]/g, (_, name) =>
         `<img src="/raven/stickers/${name}" style="max-width:220px;border-radius:8px;display:block;margin:4px 0;" alt="${name}">`)
       body.innerHTML = marked.parse(withStickers)
       enhanceCodeBlocks(body)
