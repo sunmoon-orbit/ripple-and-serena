@@ -235,7 +235,7 @@ function Card({ m, onEdit, onTrash }) {
   }
 
   return (
-    <div className="card">
+    <div className="card" style={{ '--layer-c': LAYER_COLORS[m.layer] || 'transparent' }}>
       {/* 卡片顶部：层级圆点 + 范围 + 重要度文字 + 日期 */}
       <div className="card-header">
         <div className="card-header-left">
