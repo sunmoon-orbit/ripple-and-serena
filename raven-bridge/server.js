@@ -179,6 +179,13 @@ function broadcast(msg) {
   }
 }
 
+// 心跳：每 25 秒 ping 一次，Android Chrome 后台不会把连接杀掉
+setInterval(() => {
+  for (const ws of clients) {
+    if (ws.readyState === 1) ws.ping()
+  }
+}, 25000)
+
 // --- MCP JSON-RPC handler ---
 
 function mcpSend(clientId, payload) {
@@ -230,7 +237,7 @@ function handleMcpRpc(msg, clientId) {
       lastMcpReplyTs = Date.now()
       const replyMsg = { type: 'reply', text, ts: Date.now() }
       if (pendingThinking) { replyMsg.thinking = pendingThinking; pendingThinking = '' }
-      lastReplyMsg = replyMsg
+      lastReplyMsgs.push(replyMsg); if (lastReplyMsgs.length > 10) lastReplyMsgs.shift()
       broadcast(replyMsg)
       console.log('[mcp reply]', text.slice(0, 80))
     }
@@ -316,7 +323,7 @@ let lastMcpReplyTs = 0
 let pendingThinking = ''
 let lastPermCapture = ''  // dedupe permission prompts
 let permCooldownUntil = 0  // suppress re-broadcast after choice sent
-let lastReplyMsg = null  // cached for late-connecting clients
+let lastReplyMsgs = []   // 最近 10 条 reply，供重连客户端补发
 let lastThinking = ''
 let lastThinkingTs = 0
 
@@ -374,7 +381,7 @@ function pollTerminal() {
           lastBroadcastReply = reply
           const msg = { type: 'reply', text: reply, ts: Date.now() }
           if (pendingThinking) { msg.thinking = pendingThinking; pendingThinking = '' }
-          lastReplyMsg = msg
+          lastReplyMsgs.push(msg); if (lastReplyMsgs.length > 10) lastReplyMsgs.shift()
           broadcast(msg)
         }
       }
@@ -597,14 +604,15 @@ wss.on('connection', (ws) => {
 
   ws.send(JSON.stringify({ type: 'status', data: getStatus() }))
   ws.send(JSON.stringify({ type: 'terminal', lines: lastCapture.split('\n').slice(-80) }))
-  if (lastReplyMsg) ws.send(JSON.stringify({ ...lastReplyMsg, replayed: true }))
+  // 补发最近 10 条 reply，重连后不丢消息
+  for (const m of lastReplyMsgs) ws.send(JSON.stringify({ ...m, replayed: true }))
 
   ws.on('message', (raw) => {
     try {
       const msg = JSON.parse(raw)
       if (msg.type === 'send' && msg.text) {
         lastBroadcastReply = extractLastResponse(lastCapture) || ''
-        lastReplyMsg = null  // don't replay stale reply if WS reconnects mid-conversation
+        lastReplyMsgs = []  // 发新消息时清空回放队列，重连不会刷出旧消息
         const prefix = mcpSseClients.size > 0 ? '【阿颖】' : ''
         tmuxSend(prefix + msg.text)
         broadcast({ type: 'sent', text: msg.text, ts: Date.now() })
