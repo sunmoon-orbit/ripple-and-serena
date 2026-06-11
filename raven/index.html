@@ -1372,7 +1372,11 @@ let stickies = JSON.parse(localStorage.getItem(STICKY_KEY) || 'null') || DEFAULT
 let stickyIdCtr = Math.max(...stickies.map(s=>s.id), 0) + 1
 
 // 2026.6.11 登录方式迁移：SSH 直连被 DPI 封锁，改走 Tailscale（见拾羽记忆 #283）
+// 只跑一次（带标记），否则手动删掉的登录便签会复活
 ;(function migrateLoginSticky() {
+  const MIGRATE_FLAG = 'raven-sticky-migrate-tailscale'
+  if (localStorage.getItem(MIGRATE_FLAG)) return
+  localStorage.setItem(MIGRATE_FLAG, '1')
   let changed = false
   const stale = s => /107\.174\.40\.67/.test((s.body||'') + (s.title||''))
   if (stickies.some(stale)) { stickies = stickies.filter(s => !stale(s)); changed = true }
