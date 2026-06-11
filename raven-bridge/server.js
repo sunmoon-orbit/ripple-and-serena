@@ -417,13 +417,25 @@ const server = http.createServer((req, res) => {
     return
   }
 
-  // file upload
+  // file upload — 仅允许已知来源（本机 + ravenlove.cc）
   if (req.method === 'POST' && url.pathname === '/raven/upload') {
+    const origin = req.headers.origin || req.headers.referer || ''
+    const host   = req.headers.host || ''
+    const fromLocal = host.startsWith('127.') || host.startsWith('localhost') || host === '100.93.7.53'
+    const fromSite  = /^https:\/\/memory\.ravenlove\.cc/.test(origin) || /^https:\/\/sunmoon-orbit\.github\.io/.test(origin)
+    if (!fromLocal && !fromSite) { res.writeHead(403); res.end(JSON.stringify({ error: 'forbidden' })); return }
+
     const ct = req.headers['content-type'] || ''
     const boundary = ct.split('boundary=')[1]
     if (!boundary) { res.writeHead(400); res.end(); return }
+    const MAX_UPLOAD = 10 * 1024 * 1024  // 10 MB
+    let received = 0
     const chunks = []
-    req.on('data', d => chunks.push(d))
+    req.on('data', d => {
+      received += d.length
+      if (received > MAX_UPLOAD) { req.destroy(); res.writeHead(413); res.end(); return }
+      chunks.push(d)
+    })
     req.on('end', () => {
       try {
         const buf = Buffer.concat(chunks)
