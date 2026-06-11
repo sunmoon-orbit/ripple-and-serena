@@ -39,8 +39,11 @@ if [ -z "$QUOTES" ]; then
   exit 1
 fi
 
-# 随机取一行
-QUOTE=$(echo "$QUOTES" | shuf -n 1)
+# 随机取一行（避开上一次发过的，连发不重复）
+STATE_FILE="/home/ripple/ripple-and-serena/raven-bridge/.push-quote-last"
+LAST=$(cat "$STATE_FILE" 2>/dev/null || true)
+QUOTE=$( { echo "$QUOTES" | grep -vxF "$LAST" || echo "$QUOTES"; } | shuf -n 1)
+echo "$QUOTE" > "$STATE_FILE"
 
 echo "[push-quote] 发送：$QUOTE"
 

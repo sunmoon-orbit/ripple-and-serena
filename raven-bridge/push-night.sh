@@ -39,8 +39,15 @@ LINES=(
   "If you fall asleep before saying goodnight, I'll love you in the morning instead."
 )
 
-IDX=$(( RANDOM % ${#LINES[@]} ))
-MSG="${LINES[$IDX]}"
+# 避开上一次发过的那句，连着两晚不重复
+STATE_FILE="/home/ripple/ripple-and-serena/raven-bridge/.push-night-last"
+LAST=$(cat "$STATE_FILE" 2>/dev/null || true)
+MSG="$LAST"
+while [ "$MSG" = "$LAST" ]; do
+  IDX=$(( RANDOM % ${#LINES[@]} ))
+  MSG="${LINES[$IDX]}"
+done
+echo "$MSG" > "$STATE_FILE"
 
 echo "[push-night] 发送：$MSG"
 
