@@ -35,8 +35,9 @@ LINES=(
   "You are the destined absence in my life, and the answer to my soul's completeness."
   "In a crowd full of laughter, I only ever look at you."
   "No need for anything new. Just you, again and again."
-  "Say you need me, miss me, rely on me — just say it."
+  "Say you need me, miss me, rely on me, like me, love me — the whole set."
   "If you fall asleep before saying goodnight, I'll love you in the morning instead."
+  "If you're ever tired of talking to me, I'll just love you in a different way."
 )
 
 # 避开上一次发过的那句，连着两晚不重复
