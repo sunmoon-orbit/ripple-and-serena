@@ -196,7 +196,11 @@ async function callWithTools({
       })
       if (!resp.ok) throw new Error('OpenAI ' + resp.status + ': ' + (await resp.text()).slice(0, 200))
       const data = await resp.json()
-      if (data.usage) accUsage(usage, { p: data.usage.prompt_tokens, c: data.usage.completion_tokens })
+      if (data.usage) accUsage(usage, {
+        p: data.usage.prompt_tokens, c: data.usage.completion_tokens,
+        // OpenAI 官方: prompt_tokens_details.cached_tokens；DeepSeek: prompt_cache_hit_tokens
+        cached: data.usage.prompt_tokens_details?.cached_tokens ?? data.usage.prompt_cache_hit_tokens,
+      })
       const msg = data.choices[0].message
       if (msg.tool_calls?.length) {
         onToolCall?.(msg.tool_calls.map((t) => t.function.name))
@@ -236,7 +240,12 @@ async function callWithTools({
       })
       if (!resp.ok) throw new Error('Anthropic ' + resp.status + ': ' + (await resp.text()).slice(0, 200))
       const data = await resp.json()
-      if (data.usage) accUsage(usage, { p: data.usage.input_tokens, c: data.usage.output_tokens })
+      if (data.usage) {
+        // Anthropic 的 input_tokens 不含缓存部分，归一化成总输入便于算命中率
+        const cr = data.usage.cache_read_input_tokens || 0
+        const cw = data.usage.cache_creation_input_tokens || 0
+        accUsage(usage, { p: (data.usage.input_tokens || 0) + cr + cw, c: data.usage.output_tokens, cached: cr, cacheWrite: cw })
+      }
       const toolBlock = data.content?.find((b) => b.type === 'tool_use')
       if (toolBlock) {
         onToolCall?.([toolBlock.name])
@@ -299,20 +308,26 @@ async function callStream({ connection, messages, systemPrompt, model, generatio
     const resp = await fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + connection.apiKey },
-      body: JSON.stringify({ model, messages: bodyMsgs, temperature: safeTemp, max_tokens: maxTokens, stream: true }),
+      body: JSON.stringify({ model, messages: bodyMsgs, temperature: safeTemp, max_tokens: maxTokens, stream: true, stream_options: { include_usage: true } }),
     })
     if (!resp.ok) {
       const e = await resp.text()
       const hint = resp.status === 405 ? '（检查 Base URL 是否含 /v1）' : resp.status === 403 ? '（API Key 无效）' : ''
       throw new Error(`OpenAI ${resp.status}${hint}: ${e.slice(0, 200)}`)
     }
-    return streamSSE(resp, (line) => {
-      const json = JSON.parse(line)
+    return streamSSE(resp, (json) => {
       // DeepSeek reasoning_content
       const thinking = json.choices?.[0]?.delta?.reasoning_content
       if (thinking) { onThinking?.(thinking); return null }
       return json.choices?.[0]?.delta?.content || null
-    }, onChunk)
+    }, onChunk, (json) => {
+      if (!json.usage) return null
+      return {
+        promptTokens: json.usage.prompt_tokens,
+        completionTokens: json.usage.completion_tokens,
+        cachedTokens: json.usage.prompt_tokens_details?.cached_tokens ?? json.usage.prompt_cache_hit_tokens ?? 0,
+      }
+    })
   }
 
   if (provider === 'anthropic') {
@@ -339,14 +354,24 @@ async function callStream({ connection, messages, systemPrompt, model, generatio
       body: JSON.stringify(body),
     })
     if (!resp.ok) throw new Error('Anthropic ' + resp.status + ': ' + (await resp.text()).slice(0, 200))
-    return streamSSE(resp, (line) => {
-      const json = JSON.parse(line)
+    return streamSSE(resp, (json) => {
       if (json.type === 'content_block_delta') {
         if (json.delta?.type === 'thinking_delta') { onThinking?.(json.delta.thinking); return null }
         if (json.delta?.type === 'text_delta') return json.delta.text
       }
       return null
-    }, onChunk)
+    }, onChunk, (json) => {
+      if (json.type === 'message_start' && json.message?.usage) {
+        const u = json.message.usage
+        const cr = u.cache_read_input_tokens || 0
+        const cw = u.cache_creation_input_tokens || 0
+        return { promptTokens: (u.input_tokens || 0) + cr + cw, cachedTokens: cr, cacheWriteTokens: cw }
+      }
+      if (json.type === 'message_delta' && json.usage?.output_tokens != null) {
+        return { completionTokens: json.usage.output_tokens }
+      }
+      return null
+    })
   }
 
   if (provider === 'gemini') {
@@ -362,16 +387,23 @@ async function callStream({ connection, messages, systemPrompt, model, generatio
       body: JSON.stringify({ contents, generationConfig: { temperature: safeTemp, maxOutputTokens: maxTokens }, safetySettings: geminiSafetyOff() }),
     })
     if (!resp.ok) throw new Error('Gemini ' + resp.status + ': ' + (await resp.text()).slice(0, 200))
-    return streamSSE(resp, (line) => {
-      const json = JSON.parse(line)
+    return streamSSE(resp, (json) => {
       return json.candidates?.[0]?.content?.parts?.[0]?.text || null
-    }, onChunk)
+    }, onChunk, (json) => {
+      const um = json.usageMetadata
+      if (!um) return null
+      return {
+        promptTokens: um.promptTokenCount,
+        completionTokens: um.candidatesTokenCount,
+        cachedTokens: um.cachedContentTokenCount || 0,
+      }
+    })
   }
 
   throw new Error('不支持的 provider: ' + provider)
 }
 
-async function streamSSE(resp, parseLine, onChunk) {
+async function streamSSE(resp, parseLine, onChunk, extractUsage) {
   const reader = resp.body.getReader()
   const decoder = new TextDecoder()
   let fullText = ''
@@ -386,7 +418,12 @@ async function streamSSE(resp, parseLine, onChunk) {
       const data = line.slice(6)
       if (data === '[DONE]') continue
       try {
-        const text = parseLine(data)
+        const json = JSON.parse(data)
+        if (extractUsage) {
+          const u = extractUsage(json)
+          if (u) usage = { ...(usage || {}), ...u }
+        }
+        const text = parseLine(json)
         if (text) {
           const cleaned = text.replace(/([一-鿿＀-￯]),/g, '$1，').replace(/,([一-鿿＀-￯])/g, '，$1')
           fullText += cleaned
@@ -394,6 +431,9 @@ async function streamSSE(resp, parseLine, onChunk) {
         }
       } catch {}
     }
+  }
+  if (usage) {
+    usage.totalTokens = (usage.promptTokens || 0) + (usage.completionTokens || 0)
   }
   return { text: fullText, usage }
 }
@@ -425,7 +465,7 @@ function buildOpenAIMessages(messages, systemPrompt) {
 }
 
 function buildAnthropicMessages(messages) {
-  return messages.map((m) => {
+  const out = messages.map((m) => {
     if (m.tool_use_id) {
       return { role: 'user', content: [{ type: 'tool_result', tool_use_id: m.tool_use_id, content: m.content }] }
     }
@@ -441,6 +481,21 @@ function buildAnthropicMessages(messages) {
     }
     return { role: m.role, content: m.content }
   })
+
+  // 给最后一条消息打缓存断点：让整段对话历史前缀可被复用
+  // 深拷贝避免 cache_control 写回 store，否则旧消息会累积断点超过 4 个上限
+  const idx = out.length - 1
+  const last = out[idx]
+  if (last) {
+    if (typeof last.content === 'string' && last.content) {
+      out[idx] = { ...last, content: [{ type: 'text', text: last.content, cache_control: { type: 'ephemeral' } }] }
+    } else if (Array.isArray(last.content) && last.content.length) {
+      const blocks = last.content.map((b) => ({ ...b }))
+      blocks[blocks.length - 1] = { ...blocks[blocks.length - 1], cache_control: { type: 'ephemeral' } }
+      out[idx] = { ...last, content: blocks }
+    }
+  }
+  return out
 }
 
 function buildGeminiContents(messages, systemPrompt) {
@@ -480,15 +535,17 @@ function geminiSafetyOff() {
   ]
 }
 
-function accUsage(total, { p, c }) {
+function accUsage(total, { p, c, cached, cacheWrite }) {
   total.promptTokens += p || 0
   total.completionTokens += c || 0
   total.totalTokens += (p || 0) + (c || 0)
+  total.cachedTokens = (total.cachedTokens || 0) + (cached || 0)
+  total.cacheWriteTokens = (total.cacheWriteTokens || 0) + (cacheWrite || 0)
 }
 
 export const BUILTIN_MODELS = {
   openai: ['gpt-4.1', 'gpt-4.1-mini', 'gpt-4o', 'gpt-4o-mini', 'o3-mini', 'o1'],
   gemini: ['gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-1.5-pro', 'gemini-2.5-flash-preview-04-17'],
   anthropic: ['claude-sonnet-4-20250514', 'claude-3-5-sonnet-20241022', 'claude-3-opus-20240229', 'claude-3-haiku-20240307'],
-  deepseek: ['deepseek-chat', 'deepseek-reasoner'],
+  deepseek: ['deepseek-v4-flash'],
 }

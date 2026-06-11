@@ -74,7 +74,10 @@ export default function Chat() {
       const limited = applyContextLimit(allMsgs.map((m) => ({ role: m.role, content: m.content, images: m.images, thinking: m.thinking || undefined, tool_calls: m.tool_calls || undefined })))
 
       const now = new Date()
-      const timeCtx = `当前时间：${now.toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai', hour12: false })}`
+      // 时间只精确到小时：system prompt 每分每秒变化会击穿 API 的 prompt 缓存
+      const dateStr = now.toLocaleDateString('zh-CN', { timeZone: 'Asia/Shanghai', year: 'numeric', month: 'long', day: 'numeric', weekday: 'long' })
+      const hourStr = now.toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai', hour: 'numeric', hour12: false })
+      const timeCtx = `当前时间：${dateStr} ${parseInt(hourStr)}点左右`
       const moonCtxParts = [timeCtx]
       if (moonMemory?.enabled && moonMemory?.apiToken) {
         moonCtxParts.push(

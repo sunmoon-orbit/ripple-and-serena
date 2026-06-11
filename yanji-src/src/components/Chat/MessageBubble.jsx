@@ -158,7 +158,11 @@ export default function MessageBubble({ msg, onEdit }) {
         <div className="message-meta">
           <span className="message-time">{formatTime(msg.createdAt)}</span>
           {msg.tokenUsage && (
-            <span className="message-tokens">{msg.tokenUsage.totalTokens} tokens</span>
+            <span className="message-tokens">
+              {msg.tokenUsage.totalTokens} tokens
+              {msg.tokenUsage.cachedTokens > 0 && msg.tokenUsage.promptTokens > 0 &&
+                ` · 缓存${Math.round(msg.tokenUsage.cachedTokens / msg.tokenUsage.promptTokens * 100)}%`}
+            </span>
           )}
           {isUser && !isStreaming && !editing && onEdit && (
             <button className="msg-edit-icon-btn" onClick={() => { setEditText(msg.content); setEditing(true) }} title="编辑消息">
