@@ -287,6 +287,7 @@ export default function Chat() {
                 <div className="model-panel-label">自定义模型</div>
                 <div className="model-custom-row">
                   <input
+                    key={currentConnId}
                     className="model-custom-input"
                     placeholder="输入模型名称..."
                     defaultValue={currentModel}
