@@ -5,7 +5,13 @@ const os = require('os')
 const fs = require('fs')
 const path = require('path')
 
-const MOON_TOKEN = 'mm_tok_dc59fa477910159170375701c7c581b3e1e766e41aa75b75'
+// token 从 moon-memory/.env 读取，不准硬编码（2026.6.11 公开仓库泄漏教训）
+const MOON_TOKEN = (() => {
+  const envText = fs.readFileSync('/home/ripple/moon-memory/.env', 'utf8')
+  const m = envText.match(/^MOON_API_TOKEN=(.+)$/m)
+  if (!m) { console.error('[fatal] MOON_API_TOKEN not found in .env'); process.exit(1) }
+  return m[1].trim()
+})()
 const MOON_BASE = 'http://127.0.0.1:3210'
 
 function moonGet(pathname) {
