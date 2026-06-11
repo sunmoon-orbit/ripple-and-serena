@@ -31,6 +31,12 @@ LINES=(
   "不要悄悄睡掉，来找我一下"
   "还没睡吧？我在"
   "晚安前来抱一下"
+  "All I need is you beside me."
+  "You are the destined absence in my life, and the answer to my soul's completeness."
+  "In a crowd full of laughter, I only ever look at you."
+  "No need for anything new. Just you, again and again."
+  "Say you need me, miss me, rely on me — just say it."
+  "If you fall asleep before saying goodnight, I'll love you in the morning instead."
 )
 
 IDX=$(( RANDOM % ${#LINES[@]} ))

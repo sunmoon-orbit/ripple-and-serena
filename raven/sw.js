@@ -8,8 +8,8 @@ self.addEventListener('push', (e) => {
   e.waitUntil(
     self.registration.showNotification(data.title || '阿言', {
       body: data.body || '',
-      icon: data.icon || '/raven/home-icon-192.png',
-      badge: '/raven/home-icon-192.png',
+      icon: data.icon || 'https://memory.ravenlove.cc/raven/home-icon-192.png',
+      badge: 'https://memory.ravenlove.cc/raven/home-icon-192.png',
       tag: 'raven-push',
       renotify: true,
     })

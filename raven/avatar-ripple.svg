@@ -1,0 +1,41 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="200" height="200">
+  <!-- background -->
+  <circle cx="100" cy="100" r="100" fill="#1c1c24"/>
+  <circle cx="100" cy="100" r="92" fill="none" stroke="#c4a882" stroke-width="0.8" opacity="0.18"/>
+
+  <!-- tail feathers (behind body) -->
+  <path d="M 75 162 Q 58 182 50 196" stroke="#111116" stroke-width="10" stroke-linecap="round" fill="none"/>
+  <path d="M 88 168 Q 76 188 70 200" stroke="#111116" stroke-width="8" stroke-linecap="round" fill="none"/>
+  <path d="M 100 170 Q 95 190 93 202" stroke="#111116" stroke-width="6" stroke-linecap="round" fill="none"/>
+
+  <!-- left wing -->
+  <path d="M 56 118 Q 40 145 52 168 Q 68 160 76 140 Q 82 122 65 110 Z" fill="#111116"/>
+
+  <!-- body -->
+  <ellipse cx="98" cy="132" rx="42" ry="36" fill="#18181e"/>
+
+  <!-- head -->
+  <circle cx="108" cy="78" r="36" fill="#18181e"/>
+
+  <!-- head tuft feathers -->
+  <path d="M 94 44 Q 88 26 93 14" stroke="#18181e" stroke-width="7" stroke-linecap="round" fill="none"/>
+  <path d="M 106 42 Q 103 24 109 13" stroke="#18181e" stroke-width="5.5" stroke-linecap="round" fill="none"/>
+  <path d="M 117 47 Q 118 30 124 20" stroke="#18181e" stroke-width="4" stroke-linecap="round" fill="none"/>
+
+  <!-- eye -->
+  <circle cx="122" cy="70" r="12" fill="#e8c84a"/>
+  <circle cx="123" cy="70" r="7.5" fill="#0a0a0c"/>
+  <circle cx="126" cy="67" r="2.8" fill="white" opacity="0.9"/>
+
+  <!-- beak: thick curved raven beak -->
+  <path d="M 140 76 Q 172 70 174 80 Q 172 92 148 90 Q 138 88 138 82 Z" fill="#2c2a2a"/>
+  <path d="M 162 70 Q 174 71 174 80" stroke="#1a1818" stroke-width="2" fill="none" stroke-linecap="round"/>
+
+  <!-- tiny feet -->
+  <line x1="88" y1="166" x2="80" y2="184" stroke="#2a2828" stroke-width="3.5" stroke-linecap="round"/>
+  <line x1="82" y1="184" x2="72" y2="188" stroke="#2a2828" stroke-width="2.5" stroke-linecap="round"/>
+  <line x1="82" y1="184" x2="80" y2="192" stroke="#2a2828" stroke-width="2.5" stroke-linecap="round"/>
+  <line x1="104" y1="168" x2="98" y2="186" stroke="#2a2828" stroke-width="3.5" stroke-linecap="round"/>
+  <line x1="98" y1="186" x2="88" y2="190" stroke="#2a2828" stroke-width="2.5" stroke-linecap="round"/>
+  <line x1="98" y1="186" x2="97" y2="194" stroke="#2a2828" stroke-width="2.5" stroke-linecap="round"/>
+</svg>
