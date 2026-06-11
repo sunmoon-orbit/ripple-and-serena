@@ -408,30 +408,36 @@ async function streamSSE(resp, parseLine, onChunk, extractUsage) {
   const decoder = new TextDecoder()
   let fullText = ''
   let usage = null
+  let buf = ''  // SSE 事件可能被 TCP 分包截断，跨 read 缓冲半行避免 JSON 解析失败丢数据
+
+  const handleLine = (line) => {
+    if (!line.startsWith('data: ')) return
+    const data = line.slice(6)
+    if (data === '[DONE]') return
+    try {
+      const json = JSON.parse(data)
+      if (extractUsage) {
+        const u = extractUsage(json)
+        if (u) usage = { ...(usage || {}), ...u }
+      }
+      const text = parseLine(json)
+      if (text) {
+        const cleaned = text.replace(/([一-鿿＀-￯]),/g, '$1，').replace(/,([一-鿿＀-￯])/g, '，$1')
+        fullText += cleaned
+        onChunk?.(cleaned)
+      }
+    } catch {}
+  }
 
   while (true) {
     const { done, value } = await reader.read()
     if (done) break
-    const chunk = decoder.decode(value, { stream: true })
-    for (const line of chunk.split('\n')) {
-      if (!line.startsWith('data: ')) continue
-      const data = line.slice(6)
-      if (data === '[DONE]') continue
-      try {
-        const json = JSON.parse(data)
-        if (extractUsage) {
-          const u = extractUsage(json)
-          if (u) usage = { ...(usage || {}), ...u }
-        }
-        const text = parseLine(json)
-        if (text) {
-          const cleaned = text.replace(/([一-鿿＀-￯]),/g, '$1，').replace(/,([一-鿿＀-￯])/g, '，$1')
-          fullText += cleaned
-          onChunk?.(cleaned)
-        }
-      } catch {}
-    }
+    buf += decoder.decode(value, { stream: true })
+    const lines = buf.split('\n')
+    buf = lines.pop()  // 末尾可能是不完整的一行，留到下一轮
+    for (const line of lines) handleLine(line)
   }
+  if (buf) handleLine(buf)
   if (usage) {
     usage.totalTokens = (usage.promptTokens || 0) + (usage.completionTokens || 0)
   }
