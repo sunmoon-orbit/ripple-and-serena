@@ -391,7 +391,7 @@
   }
 
   .sticky-title { font-size: 11px; font-weight: 600; color: rgba(0,0,0,.45); }
-  .sticky-body { font-size: 13px; color: rgba(0,0,0,.75); word-break: break-all; flex: 1; line-height: 1.55; }
+  .sticky-body { font-size: 13px; color: rgba(0,0,0,.75); word-break: break-all; flex: 1; line-height: 1.55; white-space: pre-line; }
   .sticky-ts { font-size: 10px; color: rgba(0,0,0,.35); margin-top: 4px; }
   .sticky-del { position: absolute; top: 5px; right: 8px; font-size: 15px; color: rgba(0,0,0,.18); background: none; border: none; cursor: pointer; line-height: 1; }
   .att-clip .sticky-del { right: 28px; }
@@ -688,9 +688,9 @@
           <div class="qr-val">memory.ravenlove.cc</div>
           <div class="qr-copied">已复制</div>
         </div>
-        <div class="qr-card" onclick="qrCopy(this,'107.174.40.67')">
-          <div class="qr-label">服务器 IP</div>
-          <div class="qr-val">107.174.40.67</div>
+        <div class="qr-card" onclick="qrCopy(this,'100.93.7.53')">
+          <div class="qr-label">Tailscale IP</div>
+          <div class="qr-val">100.93.7.53</div>
           <div class="qr-copied">已复制</div>
         </div>
         <div class="qr-card" onclick="qrCopy(this,'3210')">
@@ -703,9 +703,9 @@
           <div class="qr-val">:3400</div>
           <div class="qr-copied">已复制</div>
         </div>
-        <div class="qr-card" onclick="qrCopy(this,'ssh root@107.174.40.67')">
-          <div class="qr-label">SSH 命令</div>
-          <div class="qr-val">ssh root@107…</div>
+        <div class="qr-card" onclick="qrCopy(this,'ssh -i C:\\Users\\lenovo\\.ssh\\id_ed25519 root@100.93.7.53')">
+          <div class="qr-label">SSH 命令（走 Tailscale）</div>
+          <div class="qr-val">ssh -i …id_ed25519 root@100…</div>
           <div class="qr-copied">已复制</div>
         </div>
         <div class="qr-card" onclick="qrCopy(this,'tmux attach -t cc')">
@@ -1368,6 +1368,23 @@ const DEFAULT_STICKIES = [
 ]
 let stickies = JSON.parse(localStorage.getItem(STICKY_KEY) || 'null') || DEFAULT_STICKIES
 let stickyIdCtr = Math.max(...stickies.map(s=>s.id), 0) + 1
+
+// 2026.6.11 登录方式迁移：SSH 直连被 DPI 封锁，改走 Tailscale（见拾羽记忆 #283）
+;(function migrateLoginSticky() {
+  let changed = false
+  const stale = s => /107\.174\.40\.67/.test((s.body||'') + (s.title||''))
+  if (stickies.some(stale)) { stickies = stickies.filter(s => !stale(s)); changed = true }
+  if (!stickies.some(s => (s.body||'').includes('100.93.7.53'))) {
+    stickies.push({
+      id: stickyIdCtr++,
+      title: '登录服务器（Tailscale）',
+      body: '1. 电脑 Tailscale 确认 Connected\n2. ssh -i C:\\Users\\lenovo\\.ssh\\id_ed25519 root@100.93.7.53\n3. su - ripple（免密码）\n4. tmux attach -t cc',
+      color: '#fef9c3', url: false, ts: '', att: 'pin'
+    })
+    changed = true
+  }
+  if (changed) saveStickies()
+})()
 
 function saveStickies() { localStorage.setItem(STICKY_KEY, JSON.stringify(stickies)) }
 
