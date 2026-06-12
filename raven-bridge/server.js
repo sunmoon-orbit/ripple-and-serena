@@ -320,6 +320,7 @@ let lastBroadcastReply = ''
 let isThinking = false
 let replyExtractionEnabled = false
 let lastMcpReplyTs = 0
+let lastUserMsgTs = 0   // 阿颖最近一次发消息的时间，用于「久未回复」兜底提取
 let pendingThinking = ''
 let lastPermCapture = ''  // dedupe permission prompts
 let permCooldownUntil = 0  // suppress re-broadcast after choice sent
@@ -374,8 +375,14 @@ function pollTerminal() {
         lastPermCapture = ''
       }
 
-      // only use terminal extraction when MCP is not connected (fallback mode)
-      if ((replyExtractionEnabled || pendingThinking) && mcpSseClients.size === 0) {
+      // 终端提取只作为兜底：MCP 没连上，且阿颖发了消息后 2 分钟内
+      // 没有任何正式回复（MCP/HTTP reply 都会更新 lastMcpReplyTs）才触发一次。
+      // 之前 pendingThinking 也能触发提取，导致终端里的工作输出被当成回复泄漏到前端。
+      if (
+        mcpSseClients.size === 0 &&
+        lastUserMsgTs > lastMcpReplyTs &&
+        Date.now() - lastUserMsgTs > 120000
+      ) {
         const reply = extractLastResponse(current)
         if (reply && reply !== lastBroadcastReply) {
           lastBroadcastReply = reply
@@ -383,6 +390,7 @@ function pollTerminal() {
           if (pendingThinking) { msg.thinking = pendingThinking; pendingThinking = '' }
           lastReplyMsgs.push(msg); if (lastReplyMsgs.length > 10) lastReplyMsgs.shift()
           broadcast(msg)
+          lastMcpReplyTs = Date.now()  // 标记已回复，避免同一条消息反复触发提取
         }
       }
     }, 1500)
@@ -653,6 +661,7 @@ wss.on('connection', (ws) => {
     try {
       const msg = JSON.parse(raw)
       if (msg.type === 'send' && msg.text) {
+        lastUserMsgTs = Date.now()
         lastBroadcastReply = extractLastResponse(lastCapture) || ''
         lastReplyMsgs = []  // 发新消息时清空回放队列，重连不会刷出旧消息
         const prefix = mcpSseClients.size > 0 ? '【阿颖】' : ''
