@@ -81,7 +81,10 @@ export default function MessageBubble({ msg, onEdit }) {
     }
     setTtsState('loading')
     try {
-      const plainText = msg.content.replace(/[#*`>_~\[\]]/g, '').slice(0, 500)
+      const plainText = msg.content
+        .replace(/!\[[^\]]*\]\([^)]*\)/g, '')   // 图片（贴图）整体去掉，不要朗读 URL
+        .replace(/\[([^\]]*)\]\([^)]*\)/g, '$1') // 链接只读文字
+        .replace(/[#*`>_~\[\]]/g, '').slice(0, 500)
       const config = { baseUrl: moonMemory.baseUrl, apiToken: moonMemory.apiToken }
       const { audio } = await synthesizeSpeech(config, plainText)
       const audioEl = new Audio(audio)
