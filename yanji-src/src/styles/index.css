@@ -1318,6 +1318,11 @@ textarea.form-input { display: block; margin: 8px 16px 12px; }
 .dream-start-btn:hover:not(:disabled) { opacity: 0.85; transform: translateY(-1px); }
 .dream-start-btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
 .dream-progress { margin: 0 20px 14px; font-size: 12px; color: var(--text-muted); }
+.dream-resolve-toggle {
+  display: flex; align-items: center; gap: 6px; cursor: pointer;
+  font-size: 12px; color: var(--text-mid);
+}
+.dream-resolve-toggle input { accent-color: var(--accent); cursor: pointer; }
 .dream-result {
   margin: 0 20px 20px;
   background: var(--card); border: 1px solid var(--border);
@@ -1529,6 +1534,26 @@ textarea.form-input { display: block; margin: 8px 16px 12px; }
 .message-meta:hover .msg-tts-btn { opacity: 1; }
 .msg-tts-btn:hover, .msg-tts-btn.active { color: var(--accent); opacity: 1; }
 @media (hover: none) { .msg-tts-btn { opacity: 0.5; } }
+
+/* 语音条（与归巢前端同款交互：点朗读切语音条，点音浪切回文字） */
+.voice-bar { display: flex; align-items: center; gap: 10px; min-width: 180px; padding: 2px 0; }
+.vb-play {
+  width: 28px; height: 28px; border-radius: 50%; flex-shrink: 0;
+  background: var(--accent); border: none; cursor: pointer;
+  display: flex; align-items: center; justify-content: center; color: #fff;
+}
+.vb-wave { flex: 1; display: flex; align-items: center; gap: 2px; height: 20px; cursor: pointer; }
+.vb-bar {
+  width: 3px; border-radius: 2px; background: var(--accent); opacity: .5;
+  animation: none; transition: height .1s;
+}
+.voice-bar.playing .vb-bar { animation: vb-bounce 1s infinite; opacity: .8; }
+.vb-bar:nth-child(1) { height: 6px; } .vb-bar:nth-child(2) { height: 12px; animation-delay: .1s; }
+.vb-bar:nth-child(3) { height: 16px; animation-delay: .2s; } .vb-bar:nth-child(4) { height: 10px; animation-delay: .15s; }
+.vb-bar:nth-child(5) { height: 14px; animation-delay: .25s; } .vb-bar:nth-child(6) { height: 8px; animation-delay: .05s; }
+.vb-bar:nth-child(7) { height: 12px; animation-delay: .2s; } .vb-bar:nth-child(8) { height: 6px; }
+@keyframes vb-bounce { 0%,100% { transform: scaleY(.4) } 50% { transform: scaleY(1) } }
+.vb-time { font-size: 11px; color: var(--text-muted); flex-shrink: 0; min-width: 24px; text-align: right; }
 .msg-edit-wrap {
   display: flex; flex-direction: column; gap: 6px;
   min-width: 200px; max-width: min(78%, 600px);
