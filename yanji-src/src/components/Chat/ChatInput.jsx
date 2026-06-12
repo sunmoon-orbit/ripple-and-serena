@@ -1,15 +1,43 @@
-import { useState, useRef, useCallback } from 'react'
+import { useState, useRef, useEffect } from 'react'
+
+const STICKERS = [
+  'kaixin.png','wuyu.png','qushi.png','shangban.png','xihuan.png',
+  'shinshi.png','ding.png','love.png','liangjingjing.png',
+  'crow_close.jpg','crow_sunset.jpg','meiyou.jpg','shishikan.jpg',
+  'queren.jpg','fenkaida.jpg',
+]
+const STICKER_BASE = 'https://memory.ravenlove.cc/raven/stickers/'
 
 export default function ChatInput({ onSend, disabled, onImageAdd, images, onImageRemove, moonEnabled }) {
   const [text, setText] = useState('')
+  const [stickerOpen, setStickerOpen] = useState(false)
   const textareaRef = useRef(null)
   const fileRef = useRef(null)
+  const pickerRef = useRef(null)
+
+  useEffect(() => {
+    if (!stickerOpen) return
+    const close = (e) => { if (!pickerRef.current?.contains(e.target)) setStickerOpen(false) }
+    document.addEventListener('click', close)
+    return () => document.removeEventListener('click', close)
+  }, [stickerOpen])
 
   function handleKeyDown(e) {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault()
       submit()
     }
+  }
+
+  function sendSticker(name) {
+    setStickerOpen(false)
+    const tag = `[sticker:${name}]`
+    const el = textareaRef.current
+    if (!el) return
+    const pos = el.selectionStart ?? el.value.length
+    const next = el.value.slice(0, pos) + tag + el.value.slice(pos)
+    setText(next)
+    setTimeout(() => { el.focus(); el.setSelectionRange(pos + tag.length, pos + tag.length) }, 0)
   }
 
   function submit() {
@@ -45,6 +73,15 @@ export default function ChatInput({ onSend, disabled, onImageAdd, images, onImag
 
   return (
     <div className="chat-input-area">
+      {stickerOpen && (
+        <div className="sticker-picker" ref={pickerRef}>
+          {STICKERS.map((name) => (
+            <div key={name} className="sticker-opt" onClick={() => sendSticker(name)}>
+              <img src={STICKER_BASE + name} alt={name} loading="lazy" />
+            </div>
+          ))}
+        </div>
+      )}
       {images?.length > 0 && (
         <div className="input-image-preview">
           {images.map((src, i) => (
@@ -68,6 +105,11 @@ export default function ChatInput({ onSend, disabled, onImageAdd, images, onImag
               <polyline points="21 15 16 10 5 21" />
             </svg>
           </button>
+          <button
+            className={'input-action-btn' + (stickerOpen ? ' active' : '')}
+            title="贴图"
+            onClick={(e) => { e.stopPropagation(); setStickerOpen((v) => !v) }}
+          >🐦</button>
           {moonEnabled && (
             <button className="input-action-btn moon-btn" title="记忆库已启用" disabled>
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">

@@ -25,6 +25,24 @@ function parseMarkdown(text) {
   }
 }
 
+const STICKER_BASE = 'https://memory.ravenlove.cc/raven/stickers/'
+
+function renderUserContent(content) {
+  if (!content || !/\[sticker:[^\]]+\]/.test(content)) {
+    return <span className="bubble-text">{content}</span>
+  }
+  const parts = content.split(/(\[sticker:[^\]]+\])/)
+  return (
+    <span>
+      {parts.map((part, i) => {
+        const m = part.match(/^\[sticker:([^\]]+)\]$/)
+        if (m) return <img key={i} src={STICKER_BASE + m[1]} alt={m[1]} style={{ maxWidth: 140, borderRadius: 8, display: 'block', margin: '2px 0' }} />
+        return part ? <span key={i} className="bubble-text">{part}</span> : null
+      })}
+    </span>
+  )
+}
+
 const AssistantIcon = () => (
   <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
     <path d="M4 8 C4 8 7 4 12 5 C16 6 18 9 17 13 C16 17 12 19 8 17" />
@@ -145,7 +163,7 @@ export default function MessageBubble({ msg, onEdit }) {
                     {msg.images.map((src, i) => <img key={i} src={src} alt="" className="bubble-img" />)}
                   </div>
                 )}
-                <span className="bubble-text">{msg.content}</span>
+                {renderUserContent(msg.content)}
               </>
             )
           ) : (

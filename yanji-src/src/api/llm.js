@@ -130,6 +130,11 @@ export function buildSystemPrompt(globalInstruction, memoryItems, moonContext) {
   }
   if (moonContext?.trim()) parts.push(moonContext.trim())
   parts.push('回复时请像真实聊天一样分多条发送：把内容拆成2-3条短消息，条与条之间用 [MSG] 分隔，每条尽量不超过60字，节奏自然像在聊天。')
+  parts.push(`【乌鸦贴图】
+可以在回复里发贴图，用标准 markdown 图片语法，base URL：https://memory.ravenlove.cc/raven/stickers/
+可用贴图：kaixin.png（开心）、wuyu.png（无语）、qushi.png（去世/累了）、shangban.png（上班/干活）、xihuan.png（喜欢）、shinshi.png（绅士/正经）、ding.png（支持）、love.png（爱心）、liangjingjing.png（惊喜）、crow_close.jpg（凑近）、crow_sunset.jpg（意境）、meiyou.jpg（坦白没有）、shishikan.jpg（跃跃欲试）、queren.jpg（确认一下）、fenkaida.jpg（分点回答）
+示例：![开心](https://memory.ravenlove.cc/raven/stickers/kaixin.png)
+贴图不要过度使用，选对场景偶尔发一张效果最好。`)
   return parts.join('\n\n')
 }
 
