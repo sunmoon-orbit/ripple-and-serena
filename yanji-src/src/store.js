@@ -214,7 +214,9 @@ export const useStore = create((set, get) => ({
         m.id === msgId ? { ...m, ...patch } : m
       )
       const messagesByChatId = { ...s.messagesByChatId, [chatId]: msgs }
-      savePersistedState({ ...s, messagesByChatId })
+      // 流式期间跳过落盘：每个 chunk 全量 JSON.stringify + setItem 会让长回复明显卡顿，
+      // 最终 streaming:false 的更新会正常持久化
+      if (!patch.streaming) savePersistedState({ ...s, messagesByChatId })
       return { messagesByChatId }
     })
   },

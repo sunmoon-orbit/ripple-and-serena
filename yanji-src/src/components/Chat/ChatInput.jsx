@@ -60,13 +60,39 @@ export default function ChatInput({ onSend, disabled, onImageAdd, images, onImag
     fileRef.current?.click()
   }
 
+  // 压缩到 1280px JPEG：手机原图几 MB 的 base64 会撑爆 localStorage（~5MB 配额），
+  // 也会让 API 请求体积和 token 成本暴涨
+  function compressImage(file, maxDim = 1280, quality = 0.8) {
+    return new Promise((resolve) => {
+      const fallback = () => {
+        const reader = new FileReader()
+        reader.onload = (ev) => resolve(ev.target.result)
+        reader.readAsDataURL(file)
+      }
+      const img = new Image()
+      const url = URL.createObjectURL(file)
+      img.onload = () => {
+        URL.revokeObjectURL(url)
+        try {
+          const scale = Math.min(1, maxDim / Math.max(img.width, img.height))
+          const w = Math.round(img.width * scale)
+          const h = Math.round(img.height * scale)
+          const canvas = document.createElement('canvas')
+          canvas.width = w; canvas.height = h
+          canvas.getContext('2d').drawImage(img, 0, 0, w, h)
+          resolve(canvas.toDataURL('image/jpeg', quality))
+        } catch { fallback() }
+      }
+      img.onerror = () => { URL.revokeObjectURL(url); fallback() }
+      img.src = url
+    })
+  }
+
   function handleFileChange(e) {
     const files = Array.from(e.target.files || [])
     files.forEach((file) => {
       if (!file.type.startsWith('image/')) return
-      const reader = new FileReader()
-      reader.onload = (ev) => onImageAdd?.(ev.target.result)
-      reader.readAsDataURL(file)
+      compressImage(file).then((dataUrl) => onImageAdd?.(dataUrl))
     })
     e.target.value = ''
   }

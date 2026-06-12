@@ -650,10 +650,13 @@ async function buildHeatmap() {
   // local history as fallback / supplement
   let hist = []
   try { hist = JSON.parse(localStorage.getItem('raven-chat-v1') || '[]') } catch {}
+  // 用本地日期（设备在北京时区，和服务端 activity.json 的键一致）；
+  // toISOString 是 UTC，凌晨的消息会被算到前一天
+  const dkey = d => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`
   const localCounts = {}
   hist.forEach(m => {
     if (!m.ts) return
-    const key = new Date(m.ts).toISOString().slice(0, 10)
+    const key = dkey(new Date(m.ts))
     localCounts[key] = (localCounts[key] || 0) + 1
   })
 
@@ -681,7 +684,7 @@ async function buildHeatmap() {
   for (let w = 0; w < totalDays; w++) {
     const d = new Date(startDay)
     d.setDate(d.getDate() + w)
-    const key = d.toISOString().slice(0, 10)
+    const key = dkey(d)
     const cnt = counts[key] || 0
     const lvl = cnt === 0 ? 0 : cnt < max * 0.25 ? 1 : cnt < max * 0.5 ? 2 : cnt < max * 0.75 ? 3 : 4
     const cell = document.createElement('div')
