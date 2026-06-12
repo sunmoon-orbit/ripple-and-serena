@@ -4,14 +4,14 @@ import { fetchMemories, createMemory, updateMemory, trashMemory, fetchHeatmap } 
 import { showToast } from '../Toast'
 import { formatTime } from '../../utils'
 
-const SCOPE_LABELS = { shared: '共享', private_qing: '私密', private_crow: '乌鸦' }
+const SCOPE_LABELS = { shared: '共享', 'private_阿颖': '私密·阿颖', 'private_阿言': '私密·阿言' }
 const LAYER_LABELS = { core: '核心', long: '长期', short: '短期', consciousness: '意识' }
 const LAYER_COLORS = { core: 'layer-core', long: 'layer-long', short: 'layer-short', consciousness: 'layer-consciousness' }
 
 const KNOWN_META_TAGS = new Set([
   'core', 'long', 'short', 'consciousness', '核心', '长期', '短期', '意识',
-  'shared', 'private_qing', 'private_crow', '共享', '私密', '乌鸦',
-  'crow', 'qing',
+  'shared', 'private_阿颖', 'private_阿言', '共享', '私密', '乌鸦',
+  '阿颖', '阿言',
 ])
 
 function HeatmapCell({ count, date }) {

@@ -46,11 +46,13 @@ ${context}
     const dream = await deepseek(prompt)
     console.log(`[dream] 生成：${dream}`)
 
-    // 3. 写入记忆库 private_crow
+    // 3. 写入记忆库 private_阿言（梦是阿言的私有记忆）
     const now = new Date().toISOString().slice(0, 10)
     await moonPost('/memories', {
       content: `【梦 · ${now}】\n${dream}`,
-      scope: 'private_crow',
+      owner: '阿言',
+      agent: '阿言',
+      scope: 'private_阿言',
       layer: 'consciousness',
       tags: '做梦,碎片,深夜',
       importance: 5,
