@@ -555,6 +555,48 @@ const server = http.createServer((req, res) => {
     return
   }
 
+  // activity tracking (heatmap — server-side, survives PWA reinstall)
+  if (req.method === 'GET' && url.pathname === '/raven/activity') {
+    let data = {}
+    try { data = JSON.parse(fs.readFileSync(path.join(__dirname, 'activity.json'), 'utf8')) } catch {}
+    res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-cache', 'Access-Control-Allow-Origin': '*' })
+    res.end(JSON.stringify(data))
+    return
+  }
+  if (req.method === 'POST' && url.pathname === '/raven/activity') {
+    const bj = new Date(Date.now() + 8 * 3600000)
+    const today = bj.toISOString().slice(0, 10)
+    let data = {}
+    try { data = JSON.parse(fs.readFileSync(path.join(__dirname, 'activity.json'), 'utf8')) } catch {}
+    data[today] = (data[today] || 0) + 1
+    try { fs.writeFileSync(path.join(__dirname, 'activity.json'), JSON.stringify(data)) } catch {}
+    res.writeHead(200); res.end('{}')
+    return
+  }
+
+  // fallback reply endpoint: POST /raven/reply {text, thinking?} — used when MCP tool isn't connected
+  if (req.method === 'POST' && url.pathname === '/raven/reply') {
+    let body = ''
+    req.on('data', d => body += d)
+    req.on('end', () => {
+      try {
+        const { text, thinking } = JSON.parse(body)
+        if (text) {
+          replyExtractionEnabled = false
+          pendingThinking = ''
+          lastMcpReplyTs = Date.now()
+          const msg = { type: 'reply', text, ts: Date.now() }
+          if (thinking) msg.thinking = thinking
+          lastReplyMsgs.push(msg); if (lastReplyMsgs.length > 10) lastReplyMsgs.shift()
+          broadcast(msg)
+          console.log('[http reply]', text.slice(0, 80))
+        }
+      } catch {}
+      res.writeHead(200); res.end('{}')
+    })
+    return
+  }
+
   // push proxy: vapid public key
   if (req.method === 'GET' && url.pathname === '/raven/push/vapid-public-key') {
     moonGet('/push/vapid-public-key')

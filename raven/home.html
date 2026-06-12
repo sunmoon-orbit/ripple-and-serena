@@ -639,16 +639,28 @@ function openExt() {
 }
 
 // ── heatmap (past 20 weeks from chat history)
-function buildHeatmap() {
+async function buildHeatmap() {
+  // server-side counts survive PWA reinstall
+  let serverCounts = {}
+  try {
+    const r = await fetch('/raven/activity')
+    if (r.ok) serverCounts = await r.json()
+  } catch {}
+
+  // local history as fallback / supplement
   let hist = []
   try { hist = JSON.parse(localStorage.getItem('raven-chat-v1') || '[]') } catch {}
-
-  // count messages per day
-  const counts = {}
+  const localCounts = {}
   hist.forEach(m => {
     if (!m.ts) return
     const key = new Date(m.ts).toISOString().slice(0, 10)
-    counts[key] = (counts[key] || 0) + 1
+    localCounts[key] = (localCounts[key] || 0) + 1
+  })
+
+  // merge: server as base, local fills gaps
+  const counts = { ...localCounts }
+  Object.entries(serverCounts).forEach(([k, v]) => {
+    counts[k] = Math.max(counts[k] || 0, v)
   })
 
   // build 20 weeks × 7 days grid, ending today
