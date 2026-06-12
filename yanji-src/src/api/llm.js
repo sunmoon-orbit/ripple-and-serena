@@ -251,12 +251,17 @@ async function callWithTools({
         const cw = data.usage.cache_creation_input_tokens || 0
         accUsage(usage, { p: (data.usage.input_tokens || 0) + cr + cw, c: data.usage.output_tokens, cached: cr, cacheWrite: cw })
       }
-      const toolBlock = data.content?.find((b) => b.type === 'tool_use')
-      if (toolBlock) {
-        onToolCall?.([toolBlock.name])
+      const toolBlocks = data.content?.filter((b) => b.type === 'tool_use') || []
+      if (toolBlocks.length) {
+        // 一次回复可能含多个 tool_use，每个都必须有对应 tool_result，否则 API 400
+        onToolCall?.(toolBlocks.map((b) => b.name))
         convo.push({ role: 'assistant', content: data.content })
-        const result = compressToolResult(await executeTool(toolBlock.name, toolBlock.input || {}, { searchConfig, moonMemoryConfig, onStatus }))
-        convo.push({ role: 'user', tool_use_id: toolBlock.id, content: result })
+        const results = []
+        for (const tb of toolBlocks) {
+          const result = compressToolResult(await executeTool(tb.name, tb.input || {}, { searchConfig, moonMemoryConfig, onStatus }))
+          results.push({ type: 'tool_result', tool_use_id: tb.id, content: result })
+        }
+        convo.push({ role: 'user', content: results })
         continue
       }
       finalText = data.content?.filter((b) => b.type === 'text').map((b) => b.text).join('') || ''
