@@ -247,21 +247,29 @@ export const useStore = create((set, get) => ({
     const { contextLimit } = get()
     const mode = contextLimit?.mode || 'none'
     if (mode === 'none') return messages
+    // 锚点式裁剪：切点按 step 对齐，只在跨过边界时才移动。
+    // 滑动窗口（slice(-max)）每条消息都改变开头，破坏 prompt 缓存的前缀匹配；
+    // 量化切点让前缀在多轮内保持稳定，代价是窗口比 max 略小。
     if (mode === 'rounds') {
       const max = (contextLimit.maxRounds || 50) * 2
-      return messages.length > max ? messages.slice(-max) : messages
+      if (messages.length <= max) return messages
+      const step = Math.max(2, Math.floor(max / 4) * 2)
+      const cut = Math.ceil((messages.length - max) / step) * step
+      return messages.slice(cut)
     }
     if (mode === 'tokens') {
       const maxTok = contextLimit.maxTokens || 30000
       let total = 0
-      const result = []
+      let minCut = 0
       for (let i = messages.length - 1; i >= 0; i--) {
-        const est = estimateTokens(messages[i].content)
-        if (total + est > maxTok && result.length > 0) break
-        total += est
-        result.unshift(messages[i])
+        total += estimateTokens(messages[i].content)
+        if (total > maxTok && i < messages.length - 1) { minCut = i + 1; break }
       }
-      return result
+      if (minCut === 0) return messages
+      const step = 8
+      let cut = Math.ceil(minCut / step) * step
+      if (cut >= messages.length) cut = messages.length - 1
+      return messages.slice(cut)
     }
     return messages
   },

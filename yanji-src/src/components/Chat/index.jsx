@@ -71,7 +71,18 @@ export default function Chat() {
 
     try {
       const allMsgs = getMessages(chat.id).filter((m) => !m.streaming)
-      const limited = applyContextLimit(allMsgs.map((m) => ({ role: m.role, content: m.content, images: m.images, thinking: m.thinking || undefined, tool_calls: m.tool_calls || undefined })))
+      // 旧消息的图片降级为占位文本：base64 图片占大量 token，留在历史里每轮都触发缓存重写
+      const IMG_KEEP_RECENT = 4
+      const limited = applyContextLimit(allMsgs.map((m, i, arr) => {
+        const keepImages = i >= arr.length - IMG_KEEP_RECENT
+        return {
+          role: m.role,
+          content: !keepImages && m.images?.length && !m.content ? '[图片]' : m.content,
+          images: keepImages ? m.images : undefined,
+          thinking: m.thinking || undefined,
+          tool_calls: m.tool_calls || undefined,
+        }
+      }))
 
       const now = new Date()
       // 时间只精确到小时：system prompt 每分每秒变化会击穿 API 的 prompt 缓存
