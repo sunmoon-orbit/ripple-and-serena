@@ -135,7 +135,8 @@ export default function Dream() {
           <select className="filter-select" value={filterScope} onChange={(e) => setFilterScope(e.target.value)}>
             <option value="">全部范围</option>
             <option value="shared">共享</option>
-            <option value="private_qing">私密</option>
+            <option value="private_阿颖">私密（阿颖）</option>
+            <option value="private_阿言">私密（阿言）</option>
           </select>
         </div>
         <div className="card-row">
@@ -156,7 +157,7 @@ export default function Dream() {
           <span className="card-row-label">保存范围</span>
           <select className="filter-select" value={saveScope} onChange={(e) => setSaveScope(e.target.value)}>
             <option value="shared">共享</option>
-            <option value="private_qing">私密</option>
+            <option value="private_阿颖">私密（阿颖）</option>
           </select>
         </div>
       </div>
