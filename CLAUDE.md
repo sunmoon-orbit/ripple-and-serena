@@ -30,3 +30,11 @@
 ```
 
 贴图不要用太频繁，选对场景用一张比每句都发效果好。
+
+## ⚠️ raven/manifest.json 禁动
+
+manifest.json 是 WebAPK 的身份文件。**任何改动**（哪怕一个字段）都会触发 Google 服务器重新铸造 WebAPK，重铸排队期间（几小时~几天）推送通知的 app 图标会回退成 Chrome logo，表现为「图标又坏了」。
+
+- 已加 `id` + `scope` 锁定身份（2026.6.12），此后不要再改这个文件
+- 如果确实必须改：改完通知阿颖重装 PWA，并告知重铸期间图标会临时异常，等一两天自然恢复
+- 推送通知的图标在 sw.js（icon/badge 字段）和 moon-memory routes/push.js 里，改那些不影响 WebAPK
