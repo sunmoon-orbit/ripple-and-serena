@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState, useCallback } from 'react'
+import { useMemo, useRef, useState, useCallback, useEffect } from 'react'
 import { marked } from 'marked'
 import hljs from 'highlight.js'
 import { formatTime } from '../../utils'
@@ -68,35 +68,63 @@ export default function MessageBubble({ msg, onEdit }) {
   const useImages = avatarConfig?.mode === 'image'
   const [editing, setEditing] = useState(false)
   const [ttsState, setTtsState] = useState('idle') // idle | loading | playing
-  const audioRef = useRef(null)
+  const [voiceMode, setVoiceMode] = useState(false) // 语音条模式：正文隐藏，显示音浪
+  const [ttsDuration, setTtsDuration] = useState(0)
+  const audioRef = useRef(null) // 缓存的 Audio，重播不再重新合成
+
+  // 卸载时停掉还在播的音频（切会话等场景）
+  useEffect(() => () => { audioRef.current?.pause() }, [])
+
+  const stopTts = useCallback(() => {
+    const a = audioRef.current
+    if (a) { a.pause(); a.currentTime = 0 }
+    setTtsState('idle')
+  }, [])
 
   const playTts = useCallback(async () => {
     if (!moonMemory?.enabled || !moonMemory?.baseUrl || !moonMemory?.apiToken) return
     if (ttsState === 'loading') return
-    if (ttsState === 'playing' && audioRef.current) {
-      audioRef.current.pause()
-      audioRef.current = null
-      setTtsState('idle')
-      return
+    if (ttsState === 'playing') { stopTts(); return }
+    setVoiceMode(true) // 跟归巢一致：点朗读先切成语音条
+    let audioEl = audioRef.current
+    if (!audioEl) {
+      setTtsState('loading')
+      try {
+        const plainText = msg.content
+          .replace(/!\[[^\]]*\]\([^)]*\)/g, '')   // 图片（贴图）整体去掉，不要朗读 URL
+          .replace(/\[([^\]]*)\]\([^)]*\)/g, '$1') // 链接只读文字
+          .replace(/[#*`>_~\[\]]/g, '').slice(0, 500)
+        const config = { baseUrl: moonMemory.baseUrl, apiToken: moonMemory.apiToken }
+        const { audio } = await synthesizeSpeech(config, plainText)
+        audioEl = new Audio(audio)
+        await new Promise((resolve, reject) => {
+          audioEl.onloadedmetadata = resolve
+          audioEl.onerror = reject
+        })
+        audioEl.onended = () => setTtsState('idle')
+        audioRef.current = audioEl
+        setTtsDuration(audioEl.duration || 0)
+      } catch {
+        setTtsState('idle')
+        return
+      }
     }
-    setTtsState('loading')
     try {
-      const plainText = msg.content
-        .replace(/!\[[^\]]*\]\([^)]*\)/g, '')   // 图片（贴图）整体去掉，不要朗读 URL
-        .replace(/\[([^\]]*)\]\([^)]*\)/g, '$1') // 链接只读文字
-        .replace(/[#*`>_~\[\]]/g, '').slice(0, 500)
-      const config = { baseUrl: moonMemory.baseUrl, apiToken: moonMemory.apiToken }
-      const { audio } = await synthesizeSpeech(config, plainText)
-      const audioEl = new Audio(audio)
-      audioRef.current = audioEl
-      audioEl.onended = () => setTtsState('idle')
-      audioEl.onerror = () => setTtsState('idle')
+      audioEl.currentTime = 0
       await audioEl.play()
       setTtsState('playing')
     } catch {
       setTtsState('idle')
     }
-  }, [msg.content, moonMemory, ttsState])
+  }, [msg.content, moonMemory, ttsState, stopTts])
+
+  // 点音浪区：退出语音条，切回文字
+  const exitVoiceMode = useCallback(() => {
+    stopTts()
+    setVoiceMode(false)
+  }, [stopTts])
+
+  const fmtDur = (s) => `${Math.floor(s / 60)}:${String(Math.round(s % 60)).padStart(2, '0')}`
   const [editText, setEditText] = useState(msg.content)
   const [thinkOpen, setThinkOpen] = useState(true)
 
@@ -169,6 +197,22 @@ export default function MessageBubble({ msg, onEdit }) {
                 {renderUserContent(msg.content)}
               </>
             )
+          ) : voiceMode ? (
+            <div className={`voice-bar${ttsState === 'playing' ? ' playing' : ''}`}>
+              <button className="vb-play" onClick={playTts} aria-label={ttsState === 'playing' ? '暂停' : '播放'}>
+                {ttsState === 'loading' ? (
+                  <svg viewBox="0 0 24 24" width="12" height="12" fill="currentColor"><circle cx="4" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="20" cy="12" r="2"/></svg>
+                ) : ttsState === 'playing' ? (
+                  <svg viewBox="0 0 24 24" width="12" height="12" fill="currentColor"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>
+                ) : (
+                  <svg viewBox="0 0 24 24" width="12" height="12" fill="currentColor"><polygon points="5,3 19,12 5,21"/></svg>
+                )}
+              </button>
+              <div className="vb-wave" onClick={exitVoiceMode} title="点击切回文字">
+                {Array.from({ length: 8 }).map((_, i) => <div key={i} className="vb-bar" />)}
+              </div>
+              <span className="vb-time">{ttsDuration ? fmtDur(ttsDuration) : '…'}</span>
+            </div>
           ) : (
             <div
               className="bubble-markdown"

@@ -49,6 +49,16 @@ export async function updateMemory(config, id, body) {
   })
 }
 
+// 调整记忆状态（importance / pinned / resolved）。resolved=1 表示已了结沉底
+export async function traceMemory(config, id, body) {
+  const { baseUrl, apiToken } = config
+  return request(baseUrl, `/memories/${id}/trace`, {
+    method: 'POST',
+    headers: headers(apiToken),
+    body: JSON.stringify(body || {}),
+  })
+}
+
 export async function trashMemory(config, id) {
   const { baseUrl, apiToken } = config
   return request(baseUrl, `/memories/${id}/trash`, {

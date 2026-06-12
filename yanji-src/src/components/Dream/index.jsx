@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useStore } from '../../store'
-import { fetchMemories, createMemory } from '../../api/moonMemory'
+import { fetchMemories, createMemory, traceMemory } from '../../api/moonMemory'
 import { sendMessage, buildSystemPrompt } from '../../api/llm'
 import { showToast } from '../Toast'
 
@@ -29,6 +29,8 @@ export default function Dream() {
   const [saveScope, setSaveScope] = useState('shared')
   const [saveLayer, setSaveLayer] = useState('long')
   const [connId, setConnId] = useState(activeConnectionId || connections[0]?.id || '')
+  const [markResolved, setMarkResolved] = useState(true) // 整合后把来源标记为已了结
+  const [sourceIds, setSourceIds] = useState([])
 
   const cfg = moonMemory
   const conn = connections.find((c) => c.id === connId) || connections[0]
@@ -43,15 +45,18 @@ export default function Dream() {
 
     try {
       setPhase('fetching')
-      const mems = await fetchMemories(cfg, {
+      const fetched = await fetchMemories(cfg, {
         layer: filterLayer || undefined,
         scope: filterScope || undefined,
         limit: 50,
       })
+      // 跳过已了结的（上次整合过的来源），避免同一批碎片反复整合
+      const mems = fetched.filter((m) => !m.resolved)
       setFetchedCount(mems.length)
+      setSourceIds(mems.map((m) => m.id))
 
       if (!mems.length) {
-        showToast('没有找到符合条件的记忆', 'info')
+        showToast('没有找到符合条件的记忆（已了结的会自动跳过）', 'info')
         setPhase('idle')
         return
       }
@@ -86,6 +91,7 @@ export default function Dream() {
   async function handleSave() {
     if (!resultText.trim()) return
     try {
+      setPhase('saving')
       const m = await createMemory(cfg, {
         content: resultText.trim(),
         scope: saveScope,
@@ -95,9 +101,20 @@ export default function Dream() {
         tags: 'dream,整合',
       })
       setSavedId(m.id)
-      showToast(`已保存为记忆 #${m.id}`, 'success')
+      // 把来源记忆标记为已了结（resolved），不删除、可在记忆库里找回，但不再参与下次整合
+      if (markResolved && sourceIds.length) {
+        let ok = 0
+        for (const id of sourceIds) {
+          try { await traceMemory(cfg, id, { resolved: 1 }); ok++ } catch { /* 单条失败不阻塞 */ }
+        }
+        showToast(`已保存为记忆 #${m.id}，${ok}/${sourceIds.length} 条来源已标记为已了结`, 'success')
+      } else {
+        showToast(`已保存为记忆 #${m.id}`, 'success')
+      }
+      setPhase('done')
     } catch (e) {
       showToast(e.message, 'error')
+      setPhase('done')
     }
   }
 
@@ -159,6 +176,13 @@ export default function Dream() {
             <option value="shared">共享</option>
             <option value="private_阿颖">私密（阿颖）</option>
           </select>
+        </div>
+        <div className="card-row">
+          <span className="card-row-label">整合后了结来源</span>
+          <label className="dream-resolve-toggle" title="保存后把来源记忆标记为已了结：不删除，但下次整合自动跳过">
+            <input type="checkbox" checked={markResolved} onChange={(e) => setMarkResolved(e.target.checked)} />
+            <span>来源记忆标记为已了结（防止重复整合）</span>
+          </label>
         </div>
       </div>
 
