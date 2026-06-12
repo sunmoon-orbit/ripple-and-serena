@@ -289,6 +289,21 @@
   #send-btn:active { transform: scale(.9); }
   #send-btn svg { width: 16px; height: 16px; fill: #1a1a1f; }
 
+  /* sticker picker */
+  #sticker-btn { background: none; border: none; cursor: pointer; padding: 6px; color: var(--text-dim); font-size: 18px; flex-shrink: 0; align-self: flex-end; line-height: 1; }
+  #sticker-btn:active { transform: scale(.9); }
+  #sticker-picker {
+    display: none; position: absolute; bottom: 62px; left: 0; right: 0;
+    background: var(--surface); border: 1px solid var(--border); border-radius: 12px;
+    padding: 10px; margin: 0 8px;
+    display: none; grid-template-columns: repeat(5, 1fr); gap: 6px;
+    z-index: 50;
+  }
+  #sticker-picker.open { display: grid; }
+  .sticker-opt { cursor: pointer; border-radius: 8px; overflow: hidden; aspect-ratio: 1; }
+  .sticker-opt img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .sticker-opt:active { transform: scale(.92); }
+
   /* scroll-to-bottom */
   #scroll-btn {
     position: absolute; bottom: 68px; right: 14px;
@@ -597,6 +612,7 @@
     </div>
     <button id="scroll-btn" aria-label="滚到底部">↓</button>
     <div id="attach-preview"></div>
+    <div id="sticker-picker"></div>
     <div id="chat-input-row">
       <button id="attach-btn" aria-label="附件">
         <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
@@ -604,6 +620,7 @@
         </svg>
       </button>
       <input type="file" id="file-input" style="display:none" accept="image/*,*/*">
+      <button id="sticker-btn" aria-label="贴图">🐦</button>
       <textarea id="chat-input" rows="1" placeholder="发消息给 Ripple…"></textarea>
       <button id="send-btn">
         <svg viewBox="0 0 24 24"><path d="M2 21l21-9L2 3v7l15 2-15 2z"/></svg>
@@ -859,7 +876,17 @@ function appendMsg(text, role, save = true, ts = Date.now()) {
       body.innerHTML = marked.parse(withStickers)
       enhanceCodeBlocks(body)
     } else {
-      body.textContent = text
+      if (/\[sticker:[^\]]+\]/.test(text)) {
+        const stickerOnly = /^\s*\[sticker:[^\]]+\]\s*$/.test(text)
+        if (stickerOnly) el.classList.add('sticker-msg')
+        body.innerHTML = text
+          .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+          .replace(/\[sticker:([^\]]+)\]/g, (_, name) =>
+            `<img src="/raven/stickers/${name}" style="max-width:180px;border-radius:8px;display:block;margin:4px 0;" alt="${name}">`)
+          .replace(/\n/g, '<br>')
+      } else {
+        body.textContent = text
+      }
     }
     el.appendChild(body)
 
@@ -935,6 +962,7 @@ function appendMsg(text, role, save = true, ts = Date.now()) {
   if (save && role !== 'system') {
     chatHistory.push({ text, role, ts })
     saveHistory(chatHistory)
+    fetch('/raven/activity', { method: 'POST' }).catch(() => {})
   }
   return el
 }
@@ -946,10 +974,10 @@ function restoreHistory() {
   })
 }
 
-function sendMsg() {
+function sendMsg(overrideText) {
   const inp = document.getElementById('chat-input')
-  let text = inp.value.trim()
-  if (pendingFiles && pendingFiles.length) {
+  let text = overrideText || inp.value.trim()
+  if (!overrideText && pendingFiles && pendingFiles.length) {
     const paths = pendingFiles.map(f => `[附件: ${f.path}]`).join(' ')
     text = text ? `${text}\n${paths}` : paths
     pendingFiles = []
@@ -957,11 +985,10 @@ function sendMsg() {
   }
   if (!text || !ws || ws.readyState !== 1) return
   ws.send(JSON.stringify({ type: 'send', text }))
-  inp.value = ''
-  inp.style.height = 'auto'
+  if (!overrideText) { inp.value = ''; inp.style.height = 'auto' }
 }
 
-document.getElementById('send-btn').addEventListener('click', sendMsg)
+document.getElementById('send-btn').addEventListener('click', () => sendMsg())
 document.getElementById('chat-input').addEventListener('keydown', (e) => {
   const isMobile = /Android|iPhone|iPad/i.test(navigator.userAgent)
   if (e.key === 'Enter' && !e.shiftKey && !isMobile) { e.preventDefault(); sendMsg() }
@@ -1304,6 +1331,36 @@ let pendingFiles = []  // [{ name, path }]
 document.getElementById('attach-btn').addEventListener('click', () => {
   document.getElementById('file-input').click()
 })
+
+// ── sticker picker ────────────────────────────────────────────────────────
+const STICKERS = [
+  'kaixin.png','wuyu.png','qushi.png','shangban.png','xihuan.png',
+  'shinshi.png','ding.png','love.png','liangjingjing.png',
+  'crow_close.jpg','crow_sunset.jpg','meiyou.jpg','shishikan.jpg',
+  'queren.jpg','fenkaida.jpg'
+]
+const stickerPicker = document.getElementById('sticker-picker')
+STICKERS.forEach(name => {
+  const div = document.createElement('div')
+  div.className = 'sticker-opt'
+  div.innerHTML = `<img src="/raven/stickers/${name}" alt="${name}">`
+  div.addEventListener('click', () => {
+    stickerPicker.classList.remove('open')
+    const inp = document.getElementById('chat-input')
+    const tag = `[sticker:${name}]`
+    const pos = inp.selectionStart ?? inp.value.length
+    inp.value = inp.value.slice(0, pos) + tag + inp.value.slice(pos)
+    inp.focus()
+    inp.setSelectionRange(pos + tag.length, pos + tag.length)
+    inp.dispatchEvent(new Event('input'))
+  })
+  stickerPicker.appendChild(div)
+})
+document.getElementById('sticker-btn').addEventListener('click', (e) => {
+  e.stopPropagation()
+  stickerPicker.classList.toggle('open')
+})
+document.addEventListener('click', () => stickerPicker.classList.remove('open'))
 
 document.getElementById('file-input').addEventListener('change', async (e) => {
   const file = e.target.files[0]
