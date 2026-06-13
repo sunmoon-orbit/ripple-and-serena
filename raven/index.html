@@ -721,7 +721,7 @@
           <div class="qr-copied">已复制</div>
         </div>
         <div class="qr-card" onclick="qrCopy(this,'ssh -i C:\\Users\\lenovo\\.ssh\\id_ed25519 ripple@100.93.7.53')">
-          <div class="qr-label">SSH 命令（走 Tailscale）</div>
+          <div class="qr-label">SSH 命令（仅 Tailscale，公网22已关）</div>
           <div class="qr-val">ssh -i …id_ed25519 ripple@100…</div>
           <div class="qr-copied">已复制</div>
         </div>
@@ -1429,26 +1429,26 @@ let stickies = JSON.parse(localStorage.getItem(STICKY_KEY) || 'null') || DEFAULT
 let stickyIdCtr = Math.max(...stickies.map(s=>s.id), 0) + 1
 
 // 2026.6.11 登录方式迁移：SSH 直连被 DPI 封锁，改走 Tailscale（见拾羽记忆 #283）
+// 2026.6.13 v3：公网 22 端口已关闭，Tailscale 现在是唯一登录通道
 // 只跑一次（带标记），否则手动删掉的登录便签会复活
 ;(function migrateLoginSticky() {
-  // v2: 2026.6.11 登录改为 ripple 直登（root SSH 已禁用）
-  const MIGRATE_FLAG = 'raven-sticky-migrate-tailscale-v2'
+  // v3: 2026.6.13 公网 22 已关，Tailscale 为唯一通道
+  const MIGRATE_FLAG = 'raven-sticky-migrate-tailscale-v3'
   if (localStorage.getItem(MIGRATE_FLAG)) return
   localStorage.setItem(MIGRATE_FLAG, '1')
-  localStorage.removeItem('raven-sticky-migrate-tailscale')  // 清旧标记
+  localStorage.removeItem('raven-sticky-migrate-tailscale')
+  localStorage.removeItem('raven-sticky-migrate-tailscale-v2')
   let changed = false
-  const stale = s => /107\.174\.40\.67|su - ripple|root@/.test((s.body||'') + (s.title||''))
+  const stale = s => /107\.174\.40\.67|su - ripple|root@|ripple@100\.93\.7\.53/.test((s.body||'') + (s.title||''))
   if (stickies.some(stale)) { stickies = stickies.filter(s => !stale(s)); changed = true }
-  if (!stickies.some(s => (s.body||'').includes('ripple@100.93.7.53'))) {
-    stickies.push({
-      id: stickyIdCtr++,
-      title: '登录服务器（Tailscale）',
-      body: '1. 电脑 Tailscale 确认 Connected\n2. ssh -i C:\\Users\\lenovo\\.ssh\\id_ed25519 ripple@100.93.7.53\n3. tmux attach -t cc',
-      color: '#fef9c3', url: false, ts: '', att: 'pin'
-    })
-    changed = true
-  }
-  if (changed) saveStickies()
+  const NEW_BODY = '⚠️ 公网 22 已关，必须走 Tailscale\n1. 电脑 Tailscale 确认 Connected\n2. ssh -i C:\\Users\\lenovo\\.ssh\\id_ed25519 ripple@100.93.7.53\n3. tmux attach -t cc'
+  stickies.push({
+    id: stickyIdCtr++,
+    title: '登录服务器（仅 Tailscale）',
+    body: NEW_BODY,
+    color: '#fef9c3', url: false, ts: '', att: 'pin'
+  })
+  saveStickies()
 })()
 
 function saveStickies() { localStorage.setItem(STICKY_KEY, JSON.stringify(stickies)) }
