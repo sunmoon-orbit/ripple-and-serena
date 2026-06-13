@@ -29,6 +29,8 @@
 | `xiaogou-dezhi.png` | 小狗得志 | 得意、小小骄傲 |
 | `wo-yao-gaozhuan.png` | 白狗举爪「我要告状」| 不服气、撒娇抗议 |
 | `qishi-pengpeng.png` | 小熊猫冲来「气势汹汹地登场」| 要来干活了、登场感 |
+| `brewing-puzzling.png` | 负鼠「Brewing... Puzzling... Wibbling...」| 思考中、纠结、没想好 |
+| `nishuo-duile.png` | 负鼠「你说的对 You're Absolutely Right!」| 承认对方说得对、认输 |
 
 **用法示例：**
 ```
