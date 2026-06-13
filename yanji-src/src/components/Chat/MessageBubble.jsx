@@ -16,10 +16,13 @@ marked.setOptions({
   },
 })
 
+// MiniMax TTS 语音标签：朗读时产生效果，显示时过滤掉
+const VOICE_TAG_RE = /\[(breath|laughter)\]/gi
+
 function parseMarkdown(text) {
   if (!text) return ''
   try {
-    return marked.parse(text)
+    return marked.parse(text.replace(VOICE_TAG_RE, ''))
   } catch {
     return text
   }
@@ -90,10 +93,14 @@ export default function MessageBubble({ msg, onEdit }) {
     if (!audioEl) {
       setTtsState('loading')
       try {
+        // 先把语音标签保护成无方括号的临时形式，清理完 markdown 后再还原
         const plainText = msg.content
-          .replace(/!\[[^\]]*\]\([^)]*\)/g, '')   // 图片（贴图）整体去掉，不要朗读 URL
+          .replace(VOICE_TAG_RE, '__VTAG__$1__')
+          .replace(/!\[[^\]]*\]\([^)]*\)/g, '')   // 图片（贴图）整体去掉
           .replace(/\[([^\]]*)\]\([^)]*\)/g, '$1') // 链接只读文字
-          .replace(/[#*`>_~\[\]]/g, '').slice(0, 500)
+          .replace(/[#*`>_~\[\]]/g, '')
+          .replace(/__VTAG__(breath|laughter)__/gi, '[$1]')  // 还原语音标签
+          .slice(0, 500)
         const config = { baseUrl: moonMemory.baseUrl, apiToken: moonMemory.apiToken }
         const { audio } = await synthesizeSpeech(config, plainText)
         audioEl = new Audio(audio)
