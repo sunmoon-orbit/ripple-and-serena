@@ -26,6 +26,7 @@ export default function Chat() {
   const [bgMenuOpen, setBgMenuOpen] = useState(false)
   const [bgImage, setBgImage] = useState(() => localStorage.getItem('yanji-bg-image') || '')
   const bgFileRef = useRef(null)
+  const importFileRef = useRef(null)
 
   const activeChat = getActiveChat()
   // prefer the chat's own connectionId, fall back to global active connection
@@ -199,6 +200,35 @@ export default function Chat() {
     setBgMenuOpen(false)
   }
 
+  // ── Backup / Restore ─────────────────────────────────────────────────────
+  function handleBackupExport() {
+    setBgMenuOpen(false)
+    const raw = localStorage.getItem('llm_hub_state_v1') || '{}'
+    const blob = new Blob([raw], { type: 'application/json;charset=utf-8' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `yanji-backup-${new Date().toISOString().slice(0,10)}.json`
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+
+  function handleBackupImport(e) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    const reader = new FileReader()
+    reader.onload = (ev) => {
+      try {
+        JSON.parse(ev.target.result) // validate JSON
+        if (!window.confirm('导入会覆盖当前所有对话记录，确定吗？')) return
+        localStorage.setItem('llm_hub_state_v1', ev.target.result)
+        window.location.reload()
+      } catch { showToast('文件格式不对，请选 yanji 导出的 JSON', 'error') }
+    }
+    reader.readAsText(file, 'utf-8')
+    e.target.value = ''
+  }
+
   // ── Export ───────────────────────────────────────────────────────────────
   function handleExport() {
     if (!activeChat || !messages.length) return
@@ -264,8 +294,10 @@ export default function Chat() {
             {bgMenuOpen && (
               <div className="bg-menu" onClick={(e) => e.stopPropagation()}>
                 {activeChat && messages.length > 0 && (
-                  <button onClick={() => { setBgMenuOpen(false); handleExport() }}>导出对话</button>
+                  <button onClick={() => { setBgMenuOpen(false); handleExport() }}>导出当前对话</button>
                 )}
+                <button onClick={handleBackupExport}>备份全部数据</button>
+                <button onClick={() => { setBgMenuOpen(false); importFileRef.current?.click() }}>恢复备份</button>
                 <button onClick={() => { setBgMenuOpen(false); bgFileRef.current?.click() }}>设置背景图</button>
                 <button onClick={clearBg}>清除背景图</button>
               </div>
@@ -374,6 +406,7 @@ export default function Chat() {
           onImageRemove={(i) => setPendingImages((p) => p.filter((_, idx) => idx !== i))}
         />
         <input ref={bgFileRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={handleBgUpload} />
+        <input ref={importFileRef} type="file" accept=".json" style={{ display: 'none' }} onChange={handleBackupImport} />
       </div>
     </div>
   )
