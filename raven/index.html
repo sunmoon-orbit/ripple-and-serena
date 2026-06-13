@@ -791,6 +791,7 @@ function enhanceCodeBlocks(container) {
 const WS_URL = 'wss://memory.ravenlove.cc/raven/ws'
 let ws = null
 let reconnectTimer = null
+let lastWsActivity = 0
 
 function connect() {
   ws = new WebSocket(WS_URL)
@@ -805,6 +806,7 @@ function connect() {
   }
   ws.onerror = () => ws.close()
   ws.onmessage = (e) => {
+    lastWsActivity = Date.now()
     try {
       const msg = JSON.parse(e.data)
       if (msg.type === 'terminal') renderTerminal(msg.lines)
@@ -1609,6 +1611,16 @@ applyTheme(currentTheme)
 
 restoreHistory()
 connect()
+
+// 手机切到后台再回来时 WebSocket 可能已断，主动重连
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible') {
+    if (!ws || ws.readyState === WebSocket.CLOSED || ws.readyState === WebSocket.CLOSING) {
+      if (reconnectTimer) { clearTimeout(reconnectTimer); reconnectTimer = null }
+      connect()
+    }
+  }
+})
 
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker.register('./sw.js')
