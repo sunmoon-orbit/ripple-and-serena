@@ -25,6 +25,7 @@ export default function Chat() {
   const [pendingImages, setPendingImages] = useState([])
   const [bgMenuOpen, setBgMenuOpen] = useState(false)
   const [bgImage, setBgImage] = useState(() => localStorage.getItem('yanji-bg-image') || '')
+  const [chatTheme, setChatTheme] = useState(() => localStorage.getItem('yanji-chat-theme') || '')
   const bgFileRef = useRef(null)
   const importFileRef = useRef(null)
 
@@ -200,6 +201,13 @@ export default function Chat() {
     setBgMenuOpen(false)
   }
 
+  function toggleWechatTheme() {
+    const next = chatTheme === 'wechat' ? '' : 'wechat'
+    localStorage.setItem('yanji-chat-theme', next)
+    setChatTheme(next)
+    setBgMenuOpen(false)
+  }
+
   // ── Backup / Restore ─────────────────────────────────────────────────────
   function handleBackupExport() {
     setBgMenuOpen(false)
@@ -300,6 +308,7 @@ export default function Chat() {
                 <button onClick={() => { setBgMenuOpen(false); importFileRef.current?.click() }}>恢复备份</button>
                 <button onClick={() => { setBgMenuOpen(false); bgFileRef.current?.click() }}>设置背景图</button>
                 <button onClick={clearBg}>清除背景图</button>
+                <button onClick={toggleWechatTheme}>{chatTheme === 'wechat' ? '取消微信风' : '微信风气泡'}</button>
               </div>
             )}
           </div>
@@ -383,6 +392,7 @@ export default function Chat() {
         {/* Messages */}
         <div
           className="chat-messages"
+          data-chat-theme={chatTheme || undefined}
           style={bgImage ? { backgroundImage: `url(${bgImage})`, backgroundSize: 'cover', backgroundPosition: 'center' } : {}}
           onClick={() => bgMenuOpen && setBgMenuOpen(false)}
         >
