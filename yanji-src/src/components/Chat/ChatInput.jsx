@@ -14,6 +14,7 @@ const STICKER_BASE = 'https://memory.ravenlove.cc/raven/stickers/'
 export default function ChatInput({ onSend, disabled, onImageAdd, images, onImageRemove }) {
   const [text, setText] = useState('')
   const [stickerOpen, setStickerOpen] = useState(false)
+  const [attachedTexts, setAttachedTexts] = useState([])
   const textareaRef = useRef(null)
   const fileRef = useRef(null)
   const pickerRef = useRef(null)
@@ -44,9 +45,15 @@ export default function ChatInput({ onSend, disabled, onImageAdd, images, onImag
   }
 
   function submit() {
-    if (disabled || (!text.trim() && !images?.length)) return
-    onSend(text.trim(), images || [])
+    if (disabled || (!text.trim() && !images?.length && !attachedTexts.length)) return
+    let finalText = text.trim()
+    if (attachedTexts.length) {
+      const blocks = attachedTexts.map((f) => `--- 文件：${f.name} ---\n${f.content}`).join('\n\n')
+      finalText = finalText ? `${finalText}\n\n${blocks}` : blocks
+    }
+    onSend(finalText, images || [])
     setText('')
+    setAttachedTexts([])
     if (textareaRef.current) {
       textareaRef.current.style.height = 'auto'
     }
@@ -94,8 +101,14 @@ export default function ChatInput({ onSend, disabled, onImageAdd, images, onImag
   function handleFileChange(e) {
     const files = Array.from(e.target.files || [])
     files.forEach((file) => {
-      if (!file.type.startsWith('image/')) return
-      compressImage(file).then((dataUrl) => onImageAdd?.(dataUrl))
+      if (file.type.startsWith('image/')) {
+        compressImage(file).then((dataUrl) => onImageAdd?.(dataUrl))
+      } else if (file.type === 'text/plain' || file.name.match(/\.(txt|md|csv|json|js|py|html|css)$/i)) {
+        if (file.size > 200 * 1024) { alert(`${file.name} 太大了（最大 200KB）`); return }
+        const reader = new FileReader()
+        reader.onload = (ev) => setAttachedTexts((prev) => [...prev, { name: file.name, content: ev.target.result }])
+        reader.readAsText(file, 'utf-8')
+      }
     })
     e.target.value = ''
   }
@@ -121,6 +134,19 @@ export default function ChatInput({ onSend, disabled, onImageAdd, images, onImag
                   <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
                 </svg>
               </button>
+            </div>
+          ))}
+        </div>
+      )}
+      {attachedTexts.length > 0 && (
+        <div className="input-text-files">
+          {attachedTexts.map((f, i) => (
+            <div key={i} className="input-text-chip">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/>
+              </svg>
+              <span>{f.name}</span>
+              <button onClick={() => setAttachedTexts((prev) => prev.filter((_, idx) => idx !== i))}>×</button>
             </div>
           ))}
         </div>
@@ -162,7 +188,7 @@ export default function ChatInput({ onSend, disabled, onImageAdd, images, onImag
           </svg>
         </button>
       </div>
-      <input ref={fileRef} type="file" accept="image/*" multiple style={{ display: 'none' }} onChange={handleFileChange} />
+      <input ref={fileRef} type="file" accept="image/*,.txt,.md,.csv,.json,.js,.py,.html,.css" multiple style={{ display: 'none' }} onChange={handleFileChange} />
     </div>
   )
 }
