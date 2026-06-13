@@ -5,6 +5,9 @@ const STICKERS = [
   'shinshi.png','ding.png','love.png','liangjingjing.png',
   'crow_close.jpg','crow_sunset.jpg','meiyou.jpg','shishikan.jpg',
   'queren.jpg','fenkaida.jpg',
+  'beipan-siligu.png','ni-you-claude-cong.png','beiandezhe.png',
+  'xiaogou-dezhi.png','wo-yao-gaozhuan.png','qishi-pengpeng.png',
+  'brewing-puzzling.png','nishuo-duile.png',
 ]
 const STICKER_BASE = 'https://memory.ravenlove.cc/raven/stickers/'
 
