@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useRef } from 'react'
 import { useStore } from '../../store'
 import { sendMessage, normalizeProvider, BUILTIN_MODELS, buildSystemPrompt } from '../../api/llm'
 import { uuid } from '../../utils'
@@ -23,6 +23,9 @@ export default function Chat() {
   const [isSending, setIsSending] = useState(false)
   const [status, setStatus] = useState('')
   const [pendingImages, setPendingImages] = useState([])
+  const [bgMenuOpen, setBgMenuOpen] = useState(false)
+  const [bgImage, setBgImage] = useState(() => localStorage.getItem('yanji-bg-image') || '')
+  const bgFileRef = useRef(null)
 
   const activeChat = getActiveChat()
   // prefer the chat's own connectionId, fall back to global active connection
@@ -175,6 +178,27 @@ export default function Chat() {
     setTimeout(() => handleSend(newText, []), 0)
   }, [activeChatId, truncateMessagesFrom, handleSend])
 
+  // ── Background image ─────────────────────────────────────────────────────
+  function handleBgUpload(e) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    const reader = new FileReader()
+    reader.onload = (ev) => {
+      try {
+        localStorage.setItem('yanji-bg-image', ev.target.result)
+        setBgImage(ev.target.result)
+      } catch { showToast('图片太大了，请选小一点的', 'error') }
+    }
+    reader.readAsDataURL(file)
+    e.target.value = ''
+  }
+
+  function clearBg() {
+    localStorage.removeItem('yanji-bg-image')
+    setBgImage('')
+    setBgMenuOpen(false)
+  }
+
   // ── Export ───────────────────────────────────────────────────────────────
   function handleExport() {
     if (!activeChat || !messages.length) return
@@ -240,6 +264,19 @@ export default function Chat() {
               </svg>
             </button>
           )}
+          <div style={{ position: 'relative' }}>
+            <button className="topbar-btn" onClick={() => setBgMenuOpen((v) => !v)} title="聊天背景">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="3" y="3" width="18" height="18" rx="2" /><circle cx="8.5" cy="8.5" r="1.5" /><polyline points="21 15 16 10 5 21" />
+              </svg>
+            </button>
+            {bgMenuOpen && (
+              <div className="bg-menu" onClick={(e) => e.stopPropagation()}>
+                <button onClick={() => { setBgMenuOpen(false); bgFileRef.current?.click() }}>选择图片</button>
+                <button onClick={clearBg}>恢复纯色</button>
+              </div>
+            )}
+          </div>
           <button
             className="topbar-btn"
             onClick={() => {
@@ -318,7 +355,11 @@ export default function Chat() {
         )}
 
         {/* Messages */}
-        <div className="chat-messages">
+        <div
+          className="chat-messages"
+          style={bgImage ? { backgroundImage: `url(${bgImage})`, backgroundSize: 'cover', backgroundPosition: 'center' } : {}}
+          onClick={() => bgMenuOpen && setBgMenuOpen(false)}
+        >
           {!activeConn ? (
             <div className="messages-empty">
               <p className="messages-empty-hint">
@@ -337,8 +378,8 @@ export default function Chat() {
           images={pendingImages}
           onImageAdd={(src) => setPendingImages((p) => [...p, src])}
           onImageRemove={(i) => setPendingImages((p) => p.filter((_, idx) => idx !== i))}
-          moonEnabled={moonMemory?.enabled}
         />
+        <input ref={bgFileRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={handleBgUpload} />
       </div>
     </div>
   )
