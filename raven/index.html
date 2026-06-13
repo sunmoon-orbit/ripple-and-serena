@@ -1438,9 +1438,8 @@ let stickyIdCtr = Math.max(...stickies.map(s=>s.id), 0) + 1
   localStorage.setItem(MIGRATE_FLAG, '1')
   localStorage.removeItem('raven-sticky-migrate-tailscale')
   localStorage.removeItem('raven-sticky-migrate-tailscale-v2')
-  let changed = false
   const stale = s => /107\.174\.40\.67|su - ripple|root@|ripple@100\.93\.7\.53/.test((s.body||'') + (s.title||''))
-  if (stickies.some(stale)) { stickies = stickies.filter(s => !stale(s)); changed = true }
+  stickies = stickies.filter(s => !stale(s))
   const NEW_BODY = '⚠️ 公网 22 已关，必须走 Tailscale\n1. 电脑 Tailscale 确认 Connected\n2. ssh -i C:\\Users\\lenovo\\.ssh\\id_ed25519 ripple@100.93.7.53\n3. tmux attach -t cc'
   stickies.push({
     id: stickyIdCtr++,
