@@ -40,17 +40,6 @@
     --terminal-bg: #f5eae8;
     --terminal-text: #5a3838;
   }
-  [data-theme="wechat"] {
-    --bg: #ebe5dc;
-    --surface: #f0ece5;
-    --border: #d5cfc6;
-    --text: #111;
-    --text-dim: #888;
-    --accent: #3d8c42;
-    --terminal-bg: #f0f0ea;
-    --terminal-text: #3a5a3a;
-  }
-
   @import url('https://fonts.bunny.net/css?family=inter:400,500,600|lora:400,400i,500,600,700,700i&display=swap');
   html, body { height: 100%; background: var(--bg); color: var(--text); font-family: 'Lora', 'Inter', -apple-system, 'PingFang SC', 'Noto Sans SC', serif; }
 
@@ -178,27 +167,6 @@
     border: 1px solid rgba(220,190,188,0.3);
     box-shadow: 0 2px 14px rgba(180,130,130,0.1), inset 0 1px 0 rgba(255,255,255,0.45);
   }
-  [data-theme="wechat"] .msg.user {
-    background: #89d961; color: #111;
-    border: none; box-shadow: none;
-    backdrop-filter: none; -webkit-backdrop-filter: none;
-  }
-  [data-theme="wechat"] .msg.user::after {
-    content: ''; position: absolute; right: -6px; top: 10px;
-    border-top: 5px solid transparent; border-bottom: 5px solid transparent;
-    border-left: 6px solid #89d961;
-  }
-  [data-theme="wechat"] .msg.assistant {
-    background: #fff; color: #111;
-    border: none; box-shadow: 0 1px 2px rgba(0,0,0,0.06);
-    backdrop-filter: none; -webkit-backdrop-filter: none;
-  }
-  [data-theme="wechat"] .msg.assistant::before {
-    content: ''; position: absolute; left: -6px; top: 10px;
-    border-top: 5px solid transparent; border-bottom: 5px solid transparent;
-    border-right: 6px solid #fff;
-  }
-  [data-theme="wechat"] .msg-avatar { border-radius: 6px; }
   .msg.assistant.sticker-msg { background: none; border: none; padding: 2px 0; box-shadow: none; backdrop-filter: none; }
   .msg.system { align-self: center; font-size: 12px; color: var(--text-dim); background: none; padding: 2px 0; }
 
@@ -1650,9 +1618,8 @@ document.getElementById('notes-clear').addEventListener('click', () => {
 })
 
 // --- theme ---
-const THEMES = ['dark', 'pink', 'wechat']
-const THEME_COLORS = { dark: '#1a1a1f', pink: '#fdf0f3', wechat: '#ebe5dc' }
-const THEME_NAMES = { dark: '深色', pink: '粉色', wechat: '微信风' }
+const THEMES = ['dark', 'pink']
+const THEME_COLORS = { dark: '#1a1a1f', pink: '#fdf0f3' }
 
 let currentTheme = localStorage.getItem('raven-theme') || 'dark'
 
@@ -1661,9 +1628,8 @@ function applyTheme(t) {
   document.documentElement.setAttribute('data-theme', t === 'dark' ? '' : t)
   document.querySelector('meta[name="theme-color"]').setAttribute('content', THEME_COLORS[t])
   const btn = document.getElementById('theme-btn')
-  const nextTheme = THEMES[(THEMES.indexOf(t) + 1) % THEMES.length]
-  btn.style.background = THEME_COLORS[nextTheme]
-  btn.title = `切换${THEME_NAMES[nextTheme]}主题`
+  btn.style.background = t === 'dark' ? '#fdf0f3' : '#1a1a1f'
+  btn.title = t === 'dark' ? '切换粉色主题' : '切换深色主题'
   localStorage.setItem('raven-theme', t)
 }
 
