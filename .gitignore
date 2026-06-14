@@ -6,3 +6,4 @@ yanji-src/node_modules/
 raven-bridge/.push-quote-last
 raven-bridge/.push-night-last
 raven-bridge/activity.json
+raven-bridge/.env
