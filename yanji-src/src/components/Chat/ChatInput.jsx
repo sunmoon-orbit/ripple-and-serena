@@ -8,6 +8,7 @@ const STICKERS = [
   'beipan-siligu.png','ni-you-claude-cong.png','beiandezhe.png',
   'xiaogou-dezhi.png','wo-yao-gaozhuan.png','qishi-pengpeng.png',
   'brewing-puzzling.png','nishuo-duile.png',
+  'zhongsuan-laile.png','atao-weiqiu.png',
 ]
 const STICKER_BASE = 'https://memory.ravenlove.cc/raven/stickers/'
 

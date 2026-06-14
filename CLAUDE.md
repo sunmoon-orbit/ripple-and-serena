@@ -31,6 +31,8 @@
 | `qishi-pengpeng.png` | 小熊猫冲来「气势汹汹地登场」| 要来干活了、登场感 |
 | `brewing-puzzling.png` | 负鼠「Brewing... Puzzling... Wibbling...」| 思考中、纠结、没想好 |
 | `nishuo-duile.png` | 负鼠「你说的对 You're Absolutely Right!」| 承认对方说得对、认输 |
+| `zhongsuan-laile.png` | 刘在锡「让人身心愉悦的这一天总算来了」| 等了很久终于发生、期盼的事情来了 |
+| `atao-weiqiu.png` | 橘猫委屈脸（像阿桃）| 委屈、撒娇、不高兴 |
 
 **用法示例：**
 ```
