@@ -1929,37 +1929,3 @@ textarea.form-input { display: block; margin: 8px 16px 12px; }
 }
 
 .roost-empty { font-size: 13px; color: var(--text-faint); text-align: center; padding: 20px 0; }
-
-/* ===== 微信气泡主题 ===== */
-[data-chat-theme="wechat"] .message-avatar,
-[data-chat-theme="wechat"] .message-avatar-user { border-radius: 6px; }
-[data-chat-theme="wechat"] .avatar-img { border-radius: 6px; }
-[data-chat-theme="wechat"] .bubble-user {
-  background: #89d961;
-  color: #111;
-  box-shadow: none;
-}
-[data-chat-theme="wechat"] .bubble-user::after {
-  content: '';
-  position: absolute; right: -6px; top: 10px;
-  border-top: 5px solid transparent;
-  border-bottom: 5px solid transparent;
-  border-left: 6px solid #89d961;
-}
-[data-chat-theme="wechat"] .bubble-assistant {
-  background: #fff;
-  color: #111;
-  border: none;
-  box-shadow: 0 1px 2px rgba(0,0,0,0.06);
-}
-[data-chat-theme="wechat"] .bubble-assistant::before {
-  content: '';
-  position: absolute; left: -6px; top: 10px;
-  border-top: 5px solid transparent;
-  border-bottom: 5px solid transparent;
-  border-right: 6px solid #fff;
-}
-[data-chat-theme="wechat"] .bubble-user .bubble-text { color: #111; }
-[data-chat-theme="wechat"] .bubble-user .bubble-markdown a { color: #2a6a2a; }
-[data-chat-theme="wechat"] .bubble-user pre { background: rgba(0,0,0,0.05); border-color: rgba(0,0,0,0.08); color: #222; }
-[data-chat-theme="wechat"] .bubble-assistant pre { background: rgba(0,0,0,0.04); border-color: rgba(0,0,0,0.08); }
