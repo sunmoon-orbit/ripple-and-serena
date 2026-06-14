@@ -567,9 +567,46 @@
   @media (min-width: 1200px) {
     #app { max-width: 860px; }
   }
+  #auth-overlay {
+    position: fixed; inset: 0; z-index: 9999;
+    background: var(--bg);
+    display: flex; align-items: center; justify-content: center;
+  }
+  #auth-overlay.hidden { display: none; }
+  #auth-box {
+    display: flex; flex-direction: column; align-items: center; gap: 16px;
+    padding: 32px 28px; background: var(--surface);
+    border: 1px solid var(--border); border-radius: 18px;
+    box-shadow: 0 4px 24px rgba(0,0,0,0.25); width: 260px;
+  }
+  #auth-title { font-size: 16px; font-weight: 600; color: var(--text); letter-spacing: 0.04em; }
+  #auth-input {
+    width: 100%; padding: 10px 14px; border-radius: 10px;
+    border: 1px solid var(--border); background: var(--bg);
+    color: var(--text); font-size: 15px; font-family: inherit;
+    outline: none; text-align: center; letter-spacing: 0.2em;
+    transition: border-color 0.2s;
+  }
+  #auth-input:focus { border-color: var(--accent); }
+  #auth-btn {
+    width: 100%; padding: 10px; border-radius: 10px;
+    background: var(--accent); color: #fff; border: none;
+    font-size: 14px; font-family: inherit; cursor: pointer;
+    transition: opacity 0.2s;
+  }
+  #auth-btn:hover { opacity: 0.85; }
+  #auth-error { font-size: 12px; color: #c05050; min-height: 16px; }
 </style>
 </head>
 <body>
+<div id="auth-overlay">
+  <div id="auth-box">
+    <div id="auth-title">Ripple</div>
+    <input id="auth-input" type="password" placeholder="密码" autocomplete="current-password" />
+    <button id="auth-btn">进入</button>
+    <div id="auth-error"></div>
+  </div>
+</div>
 <div id="app">
   <div id="header">
     <div id="header-title">
@@ -859,6 +896,7 @@ function connect() {
       else if (msg.type === 'thinking_block') appendThinkingBlock(msg.text)
       else if (msg.type === 'compressed') showCompressBanner()
       else if (msg.type === 'permission_prompt') showPermPrompt(msg)
+      else if (msg.type === 'auth_failed') { localStorage.removeItem('raven-token'); showAuthOverlay() }
     } catch {}
   }
 }
@@ -1015,7 +1053,7 @@ function sendMsg(overrideText) {
     renderAttachPreview()
   }
   if (!text || !ws || ws.readyState !== 1) return
-  ws.send(JSON.stringify({ type: 'send', text }))
+  ws.send(JSON.stringify({ type: 'send', text, token: localStorage.getItem('raven-token') || '' }))
   if (!overrideText) { inp.value = ''; inp.style.height = 'auto' }
 }
 
@@ -1691,6 +1729,51 @@ document.getElementById('bg-upload').addEventListener('change', (e) => {
   reader.readAsDataURL(file)
   e.target.value = ''
 })
+
+// --- auth ---
+const AUTH_BASE = 'https://memory.ravenlove.cc'
+
+function showAuthOverlay() {
+  document.getElementById('auth-overlay').classList.remove('hidden')
+}
+function hideAuthOverlay() {
+  document.getElementById('auth-overlay').classList.add('hidden')
+}
+
+async function tryAuth(password) {
+  try {
+    const r = await fetch(`${AUTH_BASE}/raven/verify`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ password })
+    })
+    const data = await r.json()
+    if (data.ok && data.token) {
+      localStorage.setItem('raven-token', data.token)
+      hideAuthOverlay()
+      document.getElementById('auth-error').textContent = ''
+    } else {
+      document.getElementById('auth-error').textContent = '密码不对'
+      document.getElementById('auth-input').value = ''
+      document.getElementById('auth-input').focus()
+    }
+  } catch {
+    document.getElementById('auth-error').textContent = '连接失败，稍后再试'
+  }
+}
+
+document.getElementById('auth-btn').addEventListener('click', () => {
+  tryAuth(document.getElementById('auth-input').value)
+})
+document.getElementById('auth-input').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') tryAuth(e.target.value)
+})
+
+if (!localStorage.getItem('raven-token')) {
+  showAuthOverlay()
+} else {
+  hideAuthOverlay()
+}
 
 restoreHistory()
 connect()

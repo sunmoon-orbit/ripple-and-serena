@@ -4,6 +4,16 @@ const { execFileSync, spawnSync } = require('child_process')
 const os = require('os')
 const fs = require('fs')
 const path = require('path')
+const crypto = require('crypto')
+
+const PW_HASH = (() => {
+  try {
+    const t = fs.readFileSync(path.join(__dirname, '.env'), 'utf8')
+    const m = t.match(/^RAVEN_PASSWORD_HASH=(.+)$/m)
+    return m ? m[1].trim() : null
+  } catch { return null }
+})()
+const validTokens = new Set()
 
 // token 从 moon-memory/.env 读取，不准硬编码（2026.6.11 公开仓库泄漏教训）
 const MOON_TOKEN = (() => {
@@ -323,6 +333,7 @@ let lastMcpReplyTs = 0
 let lastUserMsgTs = 0   // 阿颖最近一次发消息的时间，用于「久未回复」兜底提取
 let pendingThinking = ''
 let lastPermCapture = ''  // dedupe permission prompts
+let lastPermData = null   // 最近一次权限提示数据，重连时补发
 let permCooldownUntil = 0  // suppress re-broadcast after choice sent
 let lastReplyMsgs = []   // 最近 10 条 reply，供重连客户端补发
 let lastThinking = ''
@@ -368,7 +379,8 @@ function pollTerminal() {
             if (m) options.push({ num: m[1], text: m[2].trim() })
           }
           const descLine = lines.slice(0, promptIdx).reverse().find(l => l.trim()) || ''
-          broadcast({ type: 'permission_prompt', desc: descLine.trim(), options, ts: Date.now() })
+          lastPermData = { type: 'permission_prompt', desc: descLine.trim(), options, ts: Date.now() }
+          broadcast(lastPermData)
           console.log('[perm] prompt detected, options:', options.length)
         }
       } else {
@@ -429,6 +441,28 @@ const server = http.createServer((req, res) => {
   } else if (req.method === 'GET' && url.pathname === '/raven/last-thinking') {
     res.writeHead(200, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' })
     res.end(JSON.stringify({ thinking: lastThinking, ts: lastThinkingTs }))
+    return
+  }
+
+  // 密码验证
+  if (req.method === 'POST' && url.pathname === '/raven/verify') {
+    let body = ''
+    req.on('data', d => body += d)
+    req.on('end', () => {
+      try {
+        const { password } = JSON.parse(body)
+        const hash = crypto.createHash('sha256').update(password || '').digest('hex')
+        if (PW_HASH && hash === PW_HASH) {
+          const token = crypto.randomBytes(24).toString('hex')
+          validTokens.add(token)
+          res.writeHead(200, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' })
+          res.end(JSON.stringify({ ok: true, token }))
+        } else {
+          res.writeHead(401, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' })
+          res.end(JSON.stringify({ ok: false }))
+        }
+      } catch { res.writeHead(400); res.end() }
+    })
     return
   }
 
@@ -656,11 +690,19 @@ wss.on('connection', (ws) => {
   ws.send(JSON.stringify({ type: 'terminal', lines: lastCapture.split('\n').slice(-80) }))
   // 补发最近 10 条 reply，重连后不丢消息
   for (const m of lastReplyMsgs) ws.send(JSON.stringify({ ...m, replayed: true }))
+  // 补发待处理的权限提示（断线重连时弹窗不丢失）
+  if (lastPermData && Date.now() >= permCooldownUntil) {
+    ws.send(JSON.stringify(lastPermData))
+  }
 
   ws.on('message', (raw) => {
     try {
       const msg = JSON.parse(raw)
       if (msg.type === 'send' && msg.text) {
+        if (PW_HASH && !validTokens.has(msg.token)) {
+          ws.send(JSON.stringify({ type: 'auth_failed' }))
+          return
+        }
         lastUserMsgTs = Date.now()
         lastBroadcastReply = extractLastResponse(lastCapture) || ''
         lastReplyMsgs = []  // 发新消息时清空回放队列，重连不会刷出旧消息
@@ -671,6 +713,7 @@ wss.on('connection', (ws) => {
       if (msg.type === 'permission' && msg.choice) {
         tmuxSend(msg.choice)
         lastPermCapture = ''
+        lastPermData = null
         permCooldownUntil = Date.now() + 15000  // 15s cooldown after choice
         console.log('[perm] choice sent:', msg.choice)
       }
