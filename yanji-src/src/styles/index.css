@@ -1935,7 +1935,7 @@ textarea.form-input { display: block; margin: 8px 16px 12px; }
 [data-chat-theme="wechat"] .message-avatar-user { border-radius: 6px; }
 [data-chat-theme="wechat"] .avatar-img { border-radius: 6px; }
 [data-chat-theme="wechat"] .bubble-user {
-  background: #95ec69;
+  background: #89d961;
   color: #111;
   box-shadow: none;
 }
@@ -1944,7 +1944,7 @@ textarea.form-input { display: block; margin: 8px 16px 12px; }
   position: absolute; right: -6px; top: 10px;
   border-top: 5px solid transparent;
   border-bottom: 5px solid transparent;
-  border-left: 6px solid #95ec69;
+  border-left: 6px solid #89d961;
 }
 [data-chat-theme="wechat"] .bubble-assistant {
   background: #fff;
