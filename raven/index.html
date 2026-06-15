@@ -1051,6 +1051,8 @@ function restoreHistory() {
     const el = appendMsg(m.text, m.role, false, m.ts || Date.now())
     if (m.thinking) appendThinkingBlock(m.thinking, el)
   })
+  // 图片/贴图懒加载后才撑开页面，延迟滚底确保到最新消息
+  setTimeout(() => { chatBox.scrollTop = chatBox.scrollHeight }, 200)
 }
 
 function sendMsg(overrideText) {
