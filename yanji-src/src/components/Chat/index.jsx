@@ -102,6 +102,19 @@ export default function Chat() {
           '- search_memories：用户询问过去的事、需要回忆时调用。\n' +
           '写入时无需征询用户同意，直接执行。'
         )
+        // 自动拉取核心记忆作为背景（layer=core，最多8条）
+        try {
+          const base = (moonMemory.baseUrl || 'https://memory.ravenlove.cc').replace(/\/$/, '')
+          const resp = await fetch(`${base}/memories?layer=core&limit=8`, {
+            headers: { Authorization: `Bearer ${moonMemory.apiToken}` }
+          })
+          if (resp.ok) {
+            const coreList = await resp.json()
+            if (Array.isArray(coreList) && coreList.length > 0) {
+              moonCtxParts.push('【核心记忆】\n' + coreList.map(m => '- ' + m.content).join('\n'))
+            }
+          }
+        } catch {}
       }
       const systemPrompt = buildSystemPrompt(globalInstruction, memoryItems, moonCtxParts.join('\n\n'))
       let fullText = ''
@@ -406,6 +419,7 @@ export default function Chat() {
           images={pendingImages}
           onImageAdd={(src) => setPendingImages((p) => [...p, src])}
           onImageRemove={(i) => setPendingImages((p) => p.filter((_, idx) => idx !== i))}
+          moonMemory={moonMemory}
         />
         <input ref={bgFileRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={handleBgUpload} />
         <input ref={importFileRef} type="file" accept=".json" style={{ display: 'none' }} onChange={handleBackupImport} />

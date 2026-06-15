@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useCallback } from 'react'
 
 const STICKERS = [
   'kaixin.png','wuyu.png','qushi.png','shangban.png','xihuan.png',
@@ -12,13 +12,18 @@ const STICKERS = [
 ]
 const STICKER_BASE = 'https://memory.ravenlove.cc/raven/stickers/'
 
-export default function ChatInput({ onSend, disabled, onImageAdd, images, onImageRemove }) {
+export default function ChatInput({ onSend, disabled, onImageAdd, images, onImageRemove, moonMemory }) {
   const [text, setText] = useState('')
   const [stickerOpen, setStickerOpen] = useState(false)
+  const [historyOpen, setHistoryOpen] = useState(false)
+  const [historyQ, setHistoryQ] = useState('')
+  const [historyResults, setHistoryResults] = useState([])
+  const [historyLoading, setHistoryLoading] = useState(false)
   const [attachedTexts, setAttachedTexts] = useState([])
   const textareaRef = useRef(null)
   const fileRef = useRef(null)
   const pickerRef = useRef(null)
+  const historyRef = useRef(null)
 
   useEffect(() => {
     if (!stickerOpen) return
@@ -26,6 +31,33 @@ export default function ChatInput({ onSend, disabled, onImageAdd, images, onImag
     document.addEventListener('click', close)
     return () => document.removeEventListener('click', close)
   }, [stickerOpen])
+
+  useEffect(() => {
+    if (!historyOpen) return
+    const close = (e) => { if (!historyRef.current?.contains(e.target)) setHistoryOpen(false) }
+    document.addEventListener('click', close)
+    return () => document.removeEventListener('click', close)
+  }, [historyOpen])
+
+  const searchHistory = useCallback(async (q) => {
+    if (!q.trim() || !moonMemory?.enabled || !moonMemory?.apiToken) return
+    setHistoryLoading(true)
+    try {
+      const base = (moonMemory.baseUrl || 'https://memory.ravenlove.cc').replace(/\/$/, '')
+      const resp = await fetch(`${base}/archive/search?q=${encodeURIComponent(q)}&limit=10`, {
+        headers: { Authorization: `Bearer ${moonMemory.apiToken}` }
+      })
+      if (resp.ok) setHistoryResults(await resp.json())
+    } catch {}
+    setHistoryLoading(false)
+  }, [moonMemory])
+
+  function attachHistory(item) {
+    const label = `历史对话（${item.title || '存档'}）`
+    const content = `[${item.role === 'human' ? '阿颖' : '阿言'}] ${item.content}`
+    setAttachedTexts((prev) => [...prev, { name: label, content }])
+    setHistoryOpen(false)
+  }
 
   function handleKeyDown(e) {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -114,6 +146,8 @@ export default function ChatInput({ onSend, disabled, onImageAdd, images, onImag
     e.target.value = ''
   }
 
+  const canSearchHistory = moonMemory?.enabled && moonMemory?.apiToken
+
   return (
     <div className="chat-input-area">
       {stickerOpen && (
@@ -123,6 +157,37 @@ export default function ChatInput({ onSend, disabled, onImageAdd, images, onImag
               <img src={STICKER_BASE + name} alt={name} loading="lazy" />
             </div>
           ))}
+        </div>
+      )}
+      {historyOpen && canSearchHistory && (
+        <div className="history-panel" ref={historyRef}>
+          <div className="history-search-row">
+            <input
+              className="history-search-input"
+              placeholder="搜索历史对话..."
+              value={historyQ}
+              onChange={(e) => setHistoryQ(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && searchHistory(historyQ)}
+              autoFocus
+            />
+            <button className="history-search-btn" onClick={() => searchHistory(historyQ)} disabled={historyLoading}>
+              {historyLoading ? '…' : '搜'}
+            </button>
+          </div>
+          <div className="history-results">
+            {historyResults.length === 0 && !historyLoading && (
+              <div className="history-empty">输入关键词后按搜索</div>
+            )}
+            {historyResults.map((item) => (
+              <div key={item.id} className="history-item" onClick={() => attachHistory(item)}>
+                <div className="history-item-meta">
+                  <span className="history-item-role">{item.role === 'human' ? '阿颖' : '阿言'}</span>
+                  <span className="history-item-title">{item.title || '存档'}</span>
+                </div>
+                <div className="history-item-content">{(item.content || '').slice(0, 120)}{(item.content || '').length > 120 ? '…' : ''}</div>
+              </div>
+            ))}
+          </div>
         </div>
       )}
       {images?.length > 0 && (
@@ -164,8 +229,20 @@ export default function ChatInput({ onSend, disabled, onImageAdd, images, onImag
           <button
             className={'input-action-btn' + (stickerOpen ? ' active' : '')}
             title="贴图"
-            onClick={(e) => { e.stopPropagation(); setStickerOpen((v) => !v) }}
+            onClick={(e) => { e.stopPropagation(); setStickerOpen((v) => !v); setHistoryOpen(false) }}
           >🐦</button>
+          {canSearchHistory && (
+            <button
+              className={'input-action-btn' + (historyOpen ? ' active' : '')}
+              title="搜历史对话"
+              onClick={(e) => { e.stopPropagation(); setHistoryOpen((v) => !v); setStickerOpen(false) }}
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+                <line x1="11" y1="8" x2="11" y2="14"/><line x1="8" y1="11" x2="14" y2="11"/>
+              </svg>
+            </button>
+          )}
         </div>
         <textarea
           ref={textareaRef}
