@@ -858,6 +858,7 @@ const WS_URL = 'wss://memory.ravenlove.cc/raven/ws'
 let ws = null
 let reconnectTimer = null
 let lastWsActivity = 0
+const shownMsgIds = new Set()  // 已显示的消息 ID，防止重连后重复显示
 
 function connect() {
   ws = new WebSocket(WS_URL)
@@ -879,9 +880,14 @@ function connect() {
       else if (msg.type === 'status') renderStatus(msg.data)
       else if (msg.type === 'sent') appendMsg(msg.text, 'user')
       else if (msg.type === 'reply') {
-        const alreadyShown = msg.replayed && chatHistory.length && chatHistory[chatHistory.length - 1].text === msg.text && chatHistory[chatHistory.length - 1].role === 'assistant'
+        const alreadyShown = msg.replayed && (
+          msg.id ? shownMsgIds.has(msg.id) :
+          chatHistory.length && chatHistory[chatHistory.length - 1].text === msg.text && chatHistory[chatHistory.length - 1].role === 'assistant'
+        )
+        if (msg.id && !msg.replayed) shownMsgIds.add(msg.id)
         if (!alreadyShown) {
-          const msgEl = appendMsg(msg.text, 'assistant')
+          if (msg.id) shownMsgIds.add(msg.id)
+          const msgEl = appendMsg(msg.text, 'assistant', true, msg.ts || Date.now(), msg.id || null)
           if (msg.thinking) {
             appendThinkingBlock(msg.thinking, msgEl)
             const last = chatHistory[chatHistory.length - 1]
@@ -918,13 +924,15 @@ function saveHistory(items) {
 }
 
 let chatHistory = loadHistory()
+// 从已存历史中恢复 shownMsgIds，防止页面刷新后重复显示
+chatHistory.forEach(m => { if (m.msgId) shownMsgIds.add(m.msgId) })
 
 function fmtTime(ts) {
   const d = new Date(ts)
   return d.getHours().toString().padStart(2,'0') + ':' + d.getMinutes().toString().padStart(2,'0')
 }
 
-function appendMsg(text, role, save = true, ts = Date.now()) {
+function appendMsg(text, role, save = true, ts = Date.now(), msgId = null) {
   const el = document.createElement('div')
   el.className = `msg ${role}`
 
@@ -1029,7 +1037,9 @@ function appendMsg(text, role, save = true, ts = Date.now()) {
   if (atBottom) box.scrollTop = box.scrollHeight
 
   if (save && role !== 'system') {
-    chatHistory.push({ text, role, ts })
+    const entry = { text, role, ts }
+    if (msgId) entry.msgId = msgId
+    chatHistory.push(entry)
     saveHistory(chatHistory)
     fetch('/raven/activity', { method: 'POST' }).catch(() => {})
   }
@@ -1416,7 +1426,7 @@ const stickerPicker = document.getElementById('sticker-picker')
 STICKERS.forEach(name => {
   const div = document.createElement('div')
   div.className = 'sticker-opt'
-  div.innerHTML = `<img src="/raven/stickers/${name}" alt="${name}">`
+  div.innerHTML = `<img src="/raven/stickers/${name}" alt="${name}" loading="lazy">`
   div.addEventListener('click', () => {
     stickerPicker.classList.remove('open')
     const inp = document.getElementById('chat-input')

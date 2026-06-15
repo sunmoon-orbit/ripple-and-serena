@@ -13,7 +13,14 @@ const PW_HASH = (() => {
     return m ? m[1].trim() : null
   } catch { return null }
 })()
-const validTokens = new Set()
+const TOKENS_FILE = path.join(__dirname, '.valid-tokens.json')
+function loadTokens() {
+  try { return new Set(JSON.parse(fs.readFileSync(TOKENS_FILE, 'utf8'))) } catch { return new Set() }
+}
+function saveTokens(set) {
+  try { fs.writeFileSync(TOKENS_FILE, JSON.stringify([...set])) } catch {}
+}
+const validTokens = loadTokens()
 
 // token 从 moon-memory/.env 读取，不准硬编码（2026.6.11 公开仓库泄漏教训）
 const MOON_TOKEN = (() => {
@@ -68,6 +75,38 @@ if (!fs.existsSync(UPLOAD_DIR)) fs.mkdirSync(UPLOAD_DIR, { recursive: true })
 const PORT = 3400
 const TMUX_SESSION = 'cc'
 const POLL_INTERVAL_MS = 800
+
+// L0 对话存档：按北京时间每天一个对话，external_id = 'raven-YYYY-MM-DD'
+let convByDay = {}  // { 'YYYY-MM-DD': convId }
+
+function todayBj() {
+  return new Date(Date.now() + 8 * 3600000).toISOString().slice(0, 10)
+}
+
+async function getOrCreateTodayConv() {
+  const today = todayBj()
+  if (convByDay[today]) return convByDay[today]
+  try {
+    const r = await moonPost('/archive/conversations', {
+      source: 'raven', external_id: `raven-${today}`, title: `raven ${today}`
+    })
+    convByDay[today] = r.data.id
+    // 只保留最近 7 天的缓存
+    const keys = Object.keys(convByDay).sort()
+    if (keys.length > 7) keys.slice(0, keys.length - 7).forEach(k => delete convByDay[k])
+    return r.data.id
+  } catch (e) {
+    console.error('[archive] getOrCreateTodayConv:', e.message)
+    return null
+  }
+}
+
+function archiveMsg(role, content) {
+  getOrCreateTodayConv().then(convId => {
+    if (!convId) return
+    moonPost(`/archive/conversations/${convId}/messages`, { role, content }).catch(() => {})
+  }).catch(() => {})
+}
 
 // --- tmux helpers ---
 
@@ -189,12 +228,20 @@ function broadcast(msg) {
   }
 }
 
-// 心跳：每 25 秒 ping 一次，Android Chrome 后台不会把连接杀掉
+// 没有 WS 客户端在线时发推送提醒，避免阿颖错过回复
+function pushReplyNotif(text) {
+  if (clients.size > 0) return  // 有人在线，不需要推送
+  const snippet = text.length > 60 ? text.slice(0, 60) + '…' : text
+  moonPost('/push/send-fixed', { title: '阿言回复了', body: snippet, icon: '/raven/push-icon-192.png' })
+    .catch(() => {})
+}
+
+// 心跳：每 10 秒 ping 一次，减少 Android Chrome 后台掉线
 setInterval(() => {
   for (const ws of clients) {
     if (ws.readyState === 1) ws.ping()
   }
-}, 25000)
+}, 10000)
 
 // --- MCP JSON-RPC handler ---
 
@@ -245,10 +292,12 @@ function handleMcpRpc(msg, clientId) {
       lastBroadcastReply = text
       replyExtractionEnabled = false
       lastMcpReplyTs = Date.now()
-      const replyMsg = { type: 'reply', text, ts: Date.now() }
+      archiveMsg('assistant', text)
+      const replyMsg = { type: 'reply', text, ts: Date.now(), id: `r${Date.now()}${Math.random().toString(36).slice(2,6)}` }
       if (pendingThinking) { replyMsg.thinking = pendingThinking; pendingThinking = '' }
-      lastReplyMsgs.push(replyMsg); if (lastReplyMsgs.length > 10) lastReplyMsgs.shift()
+      lastReplyMsgs.push(replyMsg); if (lastReplyMsgs.length > 50) lastReplyMsgs.shift()
       broadcast(replyMsg)
+      pushReplyNotif(text)
       console.log('[mcp reply]', text.slice(0, 80))
     }
     mcpSend(clientId, { jsonrpc: '2.0', id, result: { content: [{ type: 'text', text: '已发送' }] } })
@@ -387,24 +436,8 @@ function pollTerminal() {
         lastPermCapture = ''
       }
 
-      // 终端提取只作为兜底：MCP 没连上，且阿颖发了消息后 2 分钟内
-      // 没有任何正式回复（MCP/HTTP reply 都会更新 lastMcpReplyTs）才触发一次。
-      // 之前 pendingThinking 也能触发提取，导致终端里的工作输出被当成回复泄漏到前端。
-      if (
-        mcpSseClients.size === 0 &&
-        lastUserMsgTs > lastMcpReplyTs &&
-        Date.now() - lastUserMsgTs > 120000
-      ) {
-        const reply = extractLastResponse(current)
-        if (reply && reply !== lastBroadcastReply) {
-          lastBroadcastReply = reply
-          const msg = { type: 'reply', text: reply, ts: Date.now() }
-          if (pendingThinking) { msg.thinking = pendingThinking; pendingThinking = '' }
-          lastReplyMsgs.push(msg); if (lastReplyMsgs.length > 10) lastReplyMsgs.shift()
-          broadcast(msg)
-          lastMcpReplyTs = Date.now()  // 标记已回复，避免同一条消息反复触发提取
-        }
-      }
+      // tmux 提取路径已禁用：HTTP fallback (/raven/reply) 是唯一的正式回复渠道，
+      // 不再需要从终端猜测回复内容，避免工作输出误发到前端。
     }, 1500)
   }
 }
@@ -455,6 +488,7 @@ const server = http.createServer((req, res) => {
         if (PW_HASH && hash === PW_HASH) {
           const token = crypto.randomBytes(24).toString('hex')
           validTokens.add(token)
+          saveTokens(validTokens)
           res.writeHead(200, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' })
           res.end(JSON.stringify({ ok: true, token }))
         } else {
@@ -627,10 +661,11 @@ const server = http.createServer((req, res) => {
           replyExtractionEnabled = false
           pendingThinking = ''
           lastMcpReplyTs = Date.now()
-          const msg = { type: 'reply', text, ts: Date.now() }
+          const msg = { type: 'reply', text, ts: Date.now(), id: `r${Date.now()}${Math.random().toString(36).slice(2,6)}` }
           if (thinking) msg.thinking = thinking
-          lastReplyMsgs.push(msg); if (lastReplyMsgs.length > 10) lastReplyMsgs.shift()
+          lastReplyMsgs.push(msg); if (lastReplyMsgs.length > 50) lastReplyMsgs.shift()
           broadcast(msg)
+          pushReplyNotif(text)
           console.log('[http reply]', text.slice(0, 80))
         }
       } catch {}
@@ -705,7 +740,8 @@ wss.on('connection', (ws) => {
         }
         lastUserMsgTs = Date.now()
         lastBroadcastReply = extractLastResponse(lastCapture) || ''
-        lastReplyMsgs = []  // 发新消息时清空回放队列，重连不会刷出旧消息
+        lastReplyMsgs = []  // 发新消息时清空回放队列，重连不会刷旧消息
+        archiveMsg('human', msg.text)
         const prefix = mcpSseClients.size > 0 ? '【阿颖】' : ''
         tmuxSend(prefix + msg.text)
         broadcast({ type: 'sent', text: msg.text, ts: Date.now() })
