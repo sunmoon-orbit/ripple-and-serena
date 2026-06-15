@@ -859,6 +859,7 @@ let ws = null
 let reconnectTimer = null
 let lastWsActivity = 0
 const shownMsgIds = new Set()  // 已显示的消息 ID，防止重连后重复显示
+let pendingOutbox = []  // WS 断开时积压的待发消息
 
 function connect() {
   ws = new WebSocket(WS_URL)
@@ -866,6 +867,11 @@ function connect() {
   ws.onopen = () => {
     setConn(true)
     if (reconnectTimer) { clearTimeout(reconnectTimer); reconnectTimer = null }
+    // 重连后补发积压的消息
+    while (pendingOutbox.length) {
+      const payload = pendingOutbox.shift()
+      ws.send(JSON.stringify(payload))
+    }
   }
   ws.onclose = () => {
     setConn(false)
@@ -1064,8 +1070,14 @@ function sendMsg(overrideText) {
     pendingFiles = []
     renderAttachPreview()
   }
-  if (!text || !ws || ws.readyState !== 1) return
-  ws.send(JSON.stringify({ type: 'send', text, token: localStorage.getItem('raven-token') || '' }))
+  const payload = { type: 'send', text, token: localStorage.getItem('raven-token') || '' }
+  if (!ws || ws.readyState !== 1) {
+    pendingOutbox.push(payload)
+    appendMsg('[消息已暂存，重连后自动发送]', 'system', false)
+    if (!reconnectTimer) connect()
+    return
+  }
+  ws.send(JSON.stringify(payload))
   if (!overrideText) { inp.value = ''; inp.style.height = 'auto' }
 }
 
