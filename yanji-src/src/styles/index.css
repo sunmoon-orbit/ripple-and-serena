@@ -816,6 +816,7 @@ textarea.form-input { display: block; margin: 8px 16px 12px; }
   border-bottom: 1px solid var(--border);
   background: color-mix(in srgb, var(--bg) 88%, transparent);
   -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px);
+  position: relative; z-index: 10;
 }
 .topbar-btn {
   width: 34px; height: 34px;

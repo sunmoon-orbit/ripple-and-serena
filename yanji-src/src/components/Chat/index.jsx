@@ -1,4 +1,5 @@
 import { useState, useCallback, useRef } from 'react'
+import { createPortal } from 'react-dom'
 import { useStore } from '../../store'
 import { sendMessage, normalizeProvider, BUILTIN_MODELS, buildSystemPrompt } from '../../api/llm'
 import { uuid } from '../../utils'
@@ -291,18 +292,19 @@ export default function Chat() {
                 <circle cx="12" cy="5" r="1" fill="currentColor" /><circle cx="12" cy="12" r="1" fill="currentColor" /><circle cx="12" cy="19" r="1" fill="currentColor" />
               </svg>
             </button>
-            {bgMenuOpen && (
-              <div className="bg-menu" onClick={(e) => e.stopPropagation()}>
-                {activeChat && messages.length > 0 && (
-                  <button onClick={() => { setBgMenuOpen(false); handleExport() }}>导出当前对话</button>
-                )}
-                <button onClick={handleBackupExport}>备份全部数据</button>
-                <button onClick={() => { setBgMenuOpen(false); importFileRef.current?.click() }}>恢复备份</button>
-                <button onClick={() => { setBgMenuOpen(false); bgFileRef.current?.click() }}>设置背景图</button>
-                <button onClick={clearBg}>清除背景图</button>
-              </div>
-            )}
           </div>
+          {bgMenuOpen && createPortal(
+            <div className="bg-menu" onClick={(e) => e.stopPropagation()}>
+              {activeChat && messages.length > 0 && (
+                <button onClick={() => { setBgMenuOpen(false); handleExport() }}>导出当前对话</button>
+              )}
+              <button onClick={handleBackupExport}>备份全部数据</button>
+              <button onClick={() => { setBgMenuOpen(false); importFileRef.current?.click() }}>恢复备份</button>
+              <button onClick={() => { setBgMenuOpen(false); bgFileRef.current?.click() }}>设置背景图</button>
+              <button onClick={clearBg}>清除背景图</button>
+            </div>,
+            document.body
+          )}
           <button
             className="topbar-btn"
             onClick={() => {
