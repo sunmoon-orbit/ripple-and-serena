@@ -348,8 +348,8 @@
     display: none; position: absolute; bottom: 62px; left: 0; right: 0;
     background: var(--surface); border: 1px solid var(--border); border-radius: 12px;
     padding: 10px; margin: 0 8px;
-    display: none; grid-template-columns: repeat(5, 1fr); gap: 6px;
-    z-index: 50; max-height: 260px; overflow-y: auto;
+    grid-template-columns: repeat(auto-fill, minmax(60px, 1fr)); gap: 6px;
+    z-index: 50; max-height: 260px; overflow-x: hidden; overflow-y: auto;
   }
   #sticker-picker.open { display: grid; }
   .sticker-opt { cursor: pointer; border-radius: 8px; overflow: hidden; aspect-ratio: 1; }
