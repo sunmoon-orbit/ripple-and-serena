@@ -423,14 +423,14 @@ function pollTerminal() {
           const lines = current.split('\n')
           const promptIdx = lines.findIndex(l => PERM_RE.test(l))
           const options = []
-          for (let i = promptIdx + 1; i < Math.min(promptIdx + 8, lines.length); i++) {
-            const m = lines[i].match(/^\s*(\d+)\.\s+(.+)/)
+          for (let i = promptIdx + 1; i < Math.min(promptIdx + 20, lines.length); i++) {
+            const m = lines[i].match(/^[\s❯]*(\d+)[.)]\s*(.+)/)
             if (m) options.push({ num: m[1], text: m[2].trim() })
           }
           const descLine = lines.slice(0, promptIdx).reverse().find(l => l.trim()) || ''
           lastPermData = { type: 'permission_prompt', desc: descLine.trim(), options, ts: Date.now() }
           broadcast(lastPermData)
-          console.log('[perm] prompt detected, options:', options.length)
+
         }
       } else {
         lastPermCapture = ''

@@ -25,6 +25,7 @@ const DEFAULT_STATE = {
     limit: 5,
   },
   theme: 'claude',
+  glassOpacity: 0.3,
   // UI-only (not persisted)
   activePanel: 'roost',
 }
@@ -51,7 +52,7 @@ const persistedKeys = [
   'connections', 'activeConnectionId', 'chats', 'activeChatId',
   'messagesByChatId', 'globalInstruction', 'summariesByChatId',
   'generationConfig', 'memoryItems', 'tokenStats', 'contextLimit',
-  'searchConfig', 'avatarConfig', 'autoTools', 'moonMemory', 'theme',
+  'searchConfig', 'avatarConfig', 'autoTools', 'moonMemory', 'theme', 'glassOpacity',
 ]
 
 function mergeWithDefaults(persisted) {
@@ -80,6 +81,7 @@ export const useStore = create((set, get) => ({
   // ─── panel navigation ─────────────────────────────────────────────
   setActivePanel: (panel) => set({ activePanel: panel }),
   setTheme: (theme) => set((s) => { savePersistedState({ ...s, theme }); return { theme } }),
+  setGlassOpacity: (v) => set((s) => { savePersistedState({ ...s, glassOpacity: v }); return { glassOpacity: v } }),
   setAvatarConfig: (patch) => set((s) => {
     const avatarConfig = { ...s.avatarConfig, ...patch }
     savePersistedState({ ...s, avatarConfig })

@@ -35,13 +35,22 @@ function Splash({ onDone }) {
 export default function App() {
   const activePanel = useStore((s) => s.activePanel)
   const theme = useStore((s) => s.theme)
+  const glassOpacity = useStore((s) => s.glassOpacity ?? 0.3)
   const [showSplash, setShowSplash] = useState(true)
   const [showHome, setShowHome] = useState(false)
 
   useEffect(() => {
     const t = theme && theme !== 'default' ? theme : ''
     document.documentElement.setAttribute('data-theme', t)
-  }, [theme])
+    if (theme === 'glass') {
+      const a = glassOpacity ?? 0.3
+      document.documentElement.style.setProperty('--bubble-user-bg', `rgba(126,184,200,${a})`)
+      document.documentElement.style.setProperty('--bubble-asst-bg', `rgba(255,255,255,${a})`)
+    } else {
+      document.documentElement.style.removeProperty('--bubble-user-bg')
+      document.documentElement.style.removeProperty('--bubble-asst-bg')
+    }
+  }, [theme, glassOpacity])
 
   return (
     <>
