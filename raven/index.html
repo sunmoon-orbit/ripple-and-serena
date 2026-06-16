@@ -48,7 +48,7 @@
   @media (min-width: 768px) {
     #app {
       display: grid;
-      grid-template-columns: 180px 1fr;
+      grid-template-columns: 130px 1fr;
       grid-template-rows: auto 1fr;
       width: 100%;
       max-width: none;
@@ -62,10 +62,10 @@
       grid-column: 1; grid-row: 1 / 3;
       flex-direction: column; justify-content: flex-start;
       border-bottom: none; border-right: 1px solid var(--border);
-      padding: 12px 0 0; width: 180px; overflow-y: auto;
+      padding: 12px 0 0; width: 130px; overflow-y: auto;
     }
     .tab {
-      padding: 13px 20px; font-size: 13px; text-align: left;
+      padding: 13px 16px; font-size: 13px; text-align: left;
       border-bottom: none; letter-spacing: 0;
     }
     .tab.active {
@@ -78,7 +78,7 @@
 
     #chat-messages { max-width: 760px; margin: 0 auto; padding: 16px 24px; }
     .msg { max-width: 65%; }
-    #sticker-picker { bottom: 58px; left: 4px; right: 4px; }
+    #sticker-picker { bottom: 62px; left: 8px; right: auto; width: 340px; }
   }
 
   /* --- header --- */
