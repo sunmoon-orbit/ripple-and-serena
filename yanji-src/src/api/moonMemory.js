@@ -140,11 +140,19 @@ export async function executeMemoryTool(toolName, args, config) {
   }
   if (toolName === 'search_memories') {
     try {
-      const results = await fetchMemories(config, {
-        q: args.query,
-        scope: args.scope,
-        limit: Math.min(args.limit || 5, 20),
-      })
+      const limit = Math.min(args.limit || 5, 20)
+      // 把多词查询拆成单词分别搜索，结果按 id 去重合并（避免短语匹配漏掉相关记忆）
+      const terms = String(args.query || '').trim().split(/\s+/).filter(Boolean)
+      const seen = new Set()
+      const results = []
+      for (const term of terms) {
+        const hits = await fetchMemories(config, { q: term, scope: args.scope, limit })
+        for (const m of hits) {
+          if (!seen.has(m.id)) { seen.add(m.id); results.push(m) }
+          if (results.length >= limit) break
+        }
+        if (results.length >= limit) break
+      }
       if (!results.length) return '未找到相关记忆'
       return results.map((m, i) =>
         `${i + 1}. [${m.scope || 'shared'}] ${m.content}${m.tags ? ` (${m.tags})` : ''}`

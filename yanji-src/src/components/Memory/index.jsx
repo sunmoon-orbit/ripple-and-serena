@@ -42,6 +42,7 @@ export default function Memory() {
   const [editId, setEditId] = useState(null)
   const [editContent, setEditContent] = useState('')
   const [editTags, setEditTags] = useState('')
+  const [expandedIds, setExpandedIds] = useState(new Set())
 
   const cfg = moonMemory
 
@@ -207,7 +208,12 @@ export default function Memory() {
             ) : (
               <>
                 <div className="memory-card-body">
-                  <p className="memory-content">{m.content}</p>
+                  <p className={`memory-content${expandedIds.has(m.id) ? ' expanded' : ''}`}>{m.content}</p>
+                  {m.content.length > 120 && (
+                    <button className="mem-expand-btn" onClick={() => setExpandedIds(prev => { const s = new Set(prev); s.has(m.id) ? s.delete(m.id) : s.add(m.id); return s })}>
+                      {expandedIds.has(m.id) ? '收起' : '展开'}
+                    </button>
+                  )}
                   {(() => { const tags = m.tags ? m.tags.split(',').map(t => t.trim()).filter(t => t && !KNOWN_META_TAGS.has(t)) : []; return tags.length > 0 && <div className="memory-tags">{tags.map((t, i) => <span key={i} className="memory-tag">{t}</span>)}</div> })()}
                 </div>
                 <div className="memory-card-footer">

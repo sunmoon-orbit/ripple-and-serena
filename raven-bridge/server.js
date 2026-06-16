@@ -703,11 +703,17 @@ const server = http.createServer((req, res) => {
     if (filePath === '/') filePath = '/index.html'
     const abs = path.join(STATIC_DIR, filePath)
     if (!abs.startsWith(STATIC_DIR)) { res.writeHead(403); res.end(); return }
-    fs.readFile(abs, (err, data) => {
+    fs.stat(abs, (err, stat) => {
       if (err) { res.writeHead(404); res.end(); return }
       const ext = path.extname(abs)
-      res.writeHead(200, { 'Content-Type': MIME[ext] || 'application/octet-stream', 'Cache-Control': 'no-cache' })
-      res.end(data)
+      const headers = {
+        'Content-Type': MIME[ext] || 'application/octet-stream',
+        'Content-Length': stat.size,
+        'Cache-Control': 'no-cache',
+      }
+      if (ext === '.zip') headers['Content-Disposition'] = `attachment; filename="${path.basename(abs)}"`
+      res.writeHead(200, headers)
+      fs.createReadStream(abs).pipe(res)
     })
     return
   }

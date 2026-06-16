@@ -314,12 +314,16 @@
     background: var(--surface); border: 1px solid var(--border); border-radius: 12px;
     padding: 10px; margin: 0 8px;
     display: none; grid-template-columns: repeat(5, 1fr); gap: 6px;
-    z-index: 50;
+    z-index: 50; max-height: 260px; overflow-y: auto;
   }
   #sticker-picker.open { display: grid; }
   .sticker-opt { cursor: pointer; border-radius: 8px; overflow: hidden; aspect-ratio: 1; }
   .sticker-opt img { width: 100%; height: 100%; object-fit: cover; display: block; }
   .sticker-opt:active { transform: scale(.92); }
+  #sticker-picker::-webkit-scrollbar { width: 3px; }
+  #sticker-picker::-webkit-scrollbar-track { background: transparent; }
+  #sticker-picker::-webkit-scrollbar-thumb { background: var(--accent); border-radius: 99px; opacity: .5; }
+  #sticker-picker { scrollbar-width: thin; scrollbar-color: var(--accent) transparent; }
 
   /* scroll-to-bottom */
   #scroll-btn {
@@ -663,7 +667,8 @@
     <div class="tab" data-tab="notes">备忘</div>
   </div>
 
-  <input type="file" id="avatar-upload" accept="image/*" style="display:none">
+  <input type="file" id="avatar-upload-raven" accept="image/*" style="position:absolute;width:0;height:0;opacity:0;overflow:hidden">
+  <input type="file" id="avatar-upload-serena" accept="image/*" style="position:absolute;width:0;height:0;opacity:0;overflow:hidden">
   <input type="file" id="bg-upload" accept="image/*" style="display:none">
   <div id="bg-menu">
     <button id="bg-upload-btn">选择图片</button>
@@ -1021,18 +1026,20 @@ function appendMsg(text, role, save = true, ts = Date.now(), msgId = null) {
     if (role === 'user') wrap.style.justifyContent = 'flex-end'
     const avatarEl = document.createElement('img')
     avatarEl.className = 'msg-avatar'
+    const avatarLabel = document.createElement('label')
+    avatarLabel.title = '点击换头像'
+    avatarLabel.style.cursor = 'pointer'
+    avatarLabel.appendChild(avatarEl)
     if (role === 'assistant') {
       avatarEl.src = localStorage.getItem('raven-avatar') || '/raven/avatar-ripple.svg'
-      avatarEl.title = '点击换头像'
-      avatarEl.addEventListener('click', e => { e.stopPropagation(); document.getElementById('avatar-upload').trigger = 'assistant'; document.getElementById('avatar-upload').click() })
-      wrap.appendChild(avatarEl)
+      avatarLabel.htmlFor = 'avatar-upload-raven'
+      wrap.appendChild(avatarLabel)
       wrap.appendChild(el)
     } else {
       avatarEl.src = localStorage.getItem('serena-avatar') || '/raven/avatar-serena.svg'
-      avatarEl.title = '点击换头像'
-      avatarEl.addEventListener('click', e => { e.stopPropagation(); document.getElementById('avatar-upload')._target = 'user'; document.getElementById('avatar-upload').click() })
+      avatarLabel.htmlFor = 'avatar-upload-serena'
       wrap.appendChild(el)
-      wrap.appendChild(avatarEl)
+      wrap.appendChild(avatarLabel)
     }
     box.insertBefore(wrap, document.getElementById('thinking'))
   } else {
@@ -1102,10 +1109,8 @@ chatBox.addEventListener('scroll', () => {
 scrollBtn.addEventListener('click', () => { chatBox.scrollTop = chatBox.scrollHeight })
 
 // --- avatar upload ---
-document.getElementById('avatar-upload').addEventListener('change', function() {
-  const file = this.files[0]
+function handleAvatarUpload(file, isUser) {
   if (!file) return
-  const isUser = this._target === 'user'
   const reader = new FileReader()
   reader.onload = e => {
     const url = e.target.result
@@ -1128,8 +1133,12 @@ document.getElementById('avatar-upload').addEventListener('change', function() {
     }
   }
   reader.readAsDataURL(file)
-  this._target = null
-  this.value = ''
+}
+document.getElementById('avatar-upload-raven').addEventListener('change', function() {
+  handleAvatarUpload(this.files[0], false); this.value = ''
+})
+document.getElementById('avatar-upload-serena').addEventListener('change', function() {
+  handleAvatarUpload(this.files[0], true); this.value = ''
 })
 
 // --- calendar ---
@@ -1434,7 +1443,24 @@ const STICKERS = [
   'beipan-siligu.png','ni-you-claude-cong.png','beiandezhe.png',
   'xiaogou-dezhi.png','wo-yao-gaozhuan.png','qishi-pengpeng.png',
   'brewing-puzzling.png','nishuo-duile.png',
-  'zhongsuan-laile.png','atao-weiqiu.png'
+  'zhongsuan-laile.png','atao-weiqiu.png',
+  // 猫猫系列
+  's-tieti.jpg','s-tieti2.jpg','s-aixin.jpg','s-aixin2.jpg','s-love.jpg',
+  's-haixiu.jpg','s-shufu.jpg','s-xihuan.jpg','s-wozai.jpg','s-yiqipa.jpg',
+  's-motou.jpg','s-motou2.jpg','s-naoxiaba.jpg','s-nilian.jpg','s-dapugu.jpg',
+  's-yaer.jpg','s-baituo.jpg','s-hi.jpg',
+  's-kaixin-changge.jpg','s-kaixin2.jpg','s-jiaoa.jpg','s-xixi.jpg',
+  's-en.jpg','s-sheme.jpg','s-wenhao.jpg','s-wenhao2.jpg',
+  's-jinzhang.jpg','s-zhongji.jpg','s-haipa.jpg','s-emo.jpg','s-zhamao.jpg',
+  's-shengqi.jpg','s-no.jpg',
+  's-weiquku.jpg','s-weiqui.jpg','s-ku.jpg','s-ku2.jpg','s-suoyi-ku.jpg','s-zaidi-ku.jpg',
+  's-buyaozou.jpg','s-bupei.jpg','s-xinsui.jpg','s-jusang.jpg',
+  's-yundao.jpg','s-yundao2.jpg','s-shuijiao.jpg','s-shuizhao.jpg','s-gangxingwu.jpg',
+  's-ele.jpg','s-xiangjichi.jpg','s-xiang-chi.jpg','s-maidanglao.jpg','s-fengkuang.jpg',
+  's-zuofan.jpg','s-tinyinyue.jpg','s-pang.jpg','s-modudu.jpg',
+  's-tianshi.jpg','s-jiaojiao.jpg','s-ding2.jpg',
+  's-qianfei.jpg','s-quanshi.jpg','s-haiyaoyao.jpg','s-meiyoule.jpg',
+  's-zaixiele.jpg','s-zhidaole.jpg','s-zaiyebugandele.jpg','s-wanan.jpg',
 ]
 const stickerPicker = document.getElementById('sticker-picker')
 STICKERS.forEach(name => {

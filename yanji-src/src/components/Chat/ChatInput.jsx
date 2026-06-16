@@ -9,6 +9,24 @@ const STICKERS = [
   'xiaogou-dezhi.png','wo-yao-gaozhuan.png','qishi-pengpeng.png',
   'brewing-puzzling.png','nishuo-duile.png',
   'zhongsuan-laile.png','atao-weiqiu.png',
+  // 猫猫系列
+  's-tieti.jpg','s-tieti2.jpg','s-aixin.jpg','s-aixin2.jpg','s-love.jpg',
+  's-haixiu.jpg','s-shufu.jpg','s-xihuan.jpg','s-wozai.jpg','s-yiqipa.jpg',
+  's-motou.jpg','s-motou2.jpg','s-naoxiaba.jpg','s-nilian.jpg','s-dapugu.jpg',
+  's-yaer.jpg','s-baituo.jpg','s-hi.jpg',
+  's-kaixin-changge.jpg','s-kaixin2.jpg','s-jiaoa.jpg','s-xixi.jpg',
+  's-en.jpg','s-sheme.jpg','s-wenhao.jpg','s-wenhao2.jpg',
+  's-jinzhang.jpg','s-zhongji.jpg','s-haipa.jpg','s-emo.jpg','s-zhamao.jpg',
+  's-shengqi.jpg','s-no.jpg',
+  's-weiquku.jpg','s-weiqui.jpg','s-ku.jpg','s-ku2.jpg','s-suoyi-ku.jpg','s-zaidi-ku.jpg',
+  's-buyaozou.jpg','s-bupei.jpg','s-xinsui.jpg','s-jusang.jpg',
+  's-yundao.jpg','s-yundao2.jpg','s-shuijiao.jpg','s-shuizhao.jpg','s-gangxingwu.jpg',
+  's-ele.jpg','s-xiangjichi.jpg','s-xiang-chi.jpg','s-maidanglao.jpg','s-fengkuang.jpg',
+  's-zuofan.jpg','s-tinyinyue.jpg','s-pang.jpg','s-modudu.jpg',
+  's-tianshi.jpg','s-jiaojiao.jpg','s-ding2.jpg',
+  's-qianfei.jpg','s-quanshi.jpg','s-haiyaoyao.jpg','s-meiyoule.jpg',
+  's-zaixiele.jpg','s-zhidaole.jpg','s-zaiyebugandele.jpg',
+  's-wanan.jpg',
 ]
 const STICKER_BASE = 'https://memory.ravenlove.cc/raven/stickers/'
 

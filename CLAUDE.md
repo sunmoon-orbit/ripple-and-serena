@@ -41,6 +41,80 @@
 
 贴图不要用太频繁，选对场景用一张比每句都发效果好。
 
+## 阿颖的猫猫贴图（s-*.jpg 系列）
+
+阿颖发来的一批猫猫/动物表情包，文件名前缀 `s-`，存于同一 base URL。
+
+| 文件名 | 含义 |
+|--------|------|
+| `s-dapugu.jpg` | 打屁股 |
+| `s-weiquku.jpg` | 委屈哭 |
+| `s-tieti.jpg` | 贴贴 |
+| `s-en.jpg` | 嗯？ |
+| `s-qianfei.jpg` | 我的钱钱飞走了 |
+| `s-ele.jpg` | 饿了 |
+| `s-haixiu.jpg` | 害羞 |
+| `s-shufu.jpg` | 舒服 |
+| `s-baituo.jpg` | 拜托 |
+| `s-shuijiao.jpg` | 睡觉中 |
+| `s-hi.jpg` | Hi |
+| `s-jinzhang.jpg` | 紧张 |
+| `s-aixin.jpg` | 爱心 |
+| `s-no.jpg` | No |
+| `s-nilian.jpg` | 捏脸 |
+| `s-yaer.jpg` | 生气咬你耳朵 |
+| `s-tieti2.jpg` | 贴贴2 |
+| `s-yiqipa.jpg` | 一起趴着 |
+| `s-zhongji.jpg` | 着急 |
+| `s-motou.jpg` | 摸头 |
+| `s-naoxiaba.jpg` | 挠下巴 |
+| `s-sheme.jpg` | 什么？！ |
+| `s-jiaojiao.jpg` | 嚼嚼嚼 |
+| `s-jiaoa.jpg` | 骄傲 |
+| `s-gangxingwu.jpg` | 刚睡醒 |
+| `s-weiqui.jpg` | 委屈 |
+| `s-xiangjichi.jpg` | 想吃… |
+| `s-wenhao.jpg` | ？ |
+| `s-kaixin-changge.jpg` | 开心唱歌 |
+| `s-motou2.jpg` | 摸头2 |
+| `s-pang.jpg` | 胖成气球 |
+| `s-tinyinyue.jpg` | 听音乐 |
+| `s-emo.jpg` | 恶魔 |
+| `s-tianshi.jpg` | 天使 |
+| `s-zuofan.jpg` | 做饭 |
+| `s-maidanglao.jpg` | 我要吃麦当劳 |
+| `s-fengkuang.jpg` | 疯狂星期四v我50 |
+| `s-wanan.jpg` | 晚安 |
+| `s-wozai.jpg` | 窝在一起 |
+| `s-xihuan.jpg` | 喜欢 |
+| `s-quanshi.jpg` | 全部都是我的 |
+| `s-xiang-chi.jpg` | 想吃 |
+| `s-xixi.jpg` | 嘻嘻… |
+| `s-ding2.jpg` | 盯… |
+| `s-aixin2.jpg` | 爱心2 |
+| `s-xinsui.jpg` | 心碎 |
+| `s-zhamao.jpg` | 炸毛 |
+| `s-yundao.jpg` | 晕倒 |
+| `s-buyaozou.jpg` | 不要走… |
+| `s-shengqi.jpg` | 生气 |
+| `s-zaixiele.jpg` | 在写了… |
+| `s-shuizhao.jpg` | 睡着了 |
+| `s-love.jpg` | LOVE |
+| `s-zaiyebugandele.jpg` | 再也不敢了（才怪）|
+| `s-yundao2.jpg` | 晕倒2 |
+| `s-ku.jpg` | 哭 |
+| `s-haipa.jpg` | 害怕 |
+| `s-zhidaole.jpg` | 知道了 |
+| `s-bupei.jpg` | 不陪我玩吗 |
+| `s-suoyi-ku.jpg` | 所以…（哭）|
+| `s-jusang.jpg` | 沮丧 |
+| `s-meiyoule.jpg` | 没有了吗？ |
+| `s-haiyaoyao.jpg` | 还想要… |
+| `s-zaidi-ku.jpg` | 在地上哭 |
+| `s-modudu.jpg` | 摸肚肚 |
+| `s-wenhao2.jpg` | ？2 |
+| `s-kaixin2.jpg` | 开心 |
+
 ## ⚠️ raven/manifest.json 禁动
 
 manifest.json 是 WebAPK 的身份文件。**任何改动**（哪怕一个字段）都会触发 Google 服务器重新铸造 WebAPK，重铸排队期间（几小时~几天）推送通知的 app 图标会回退成 Chrome logo，表现为「图标又坏了」。
