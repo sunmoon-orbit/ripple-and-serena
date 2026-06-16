@@ -1,0 +1,22 @@
+{
+  "appId": "cc.ravenlove.raven",
+  "productName": "归巢",
+  "extraMetadata": {
+    "main": "main-raven.js"
+  },
+  "directories": {
+    "output": "dist-raven"
+  },
+  "files": [
+    "main-raven.js",
+    "raven-www/**"
+  ],
+  "win": {
+    "target": [
+      {
+        "target": "portable",
+        "arch": ["x64"]
+      }
+    ]
+  }
+}

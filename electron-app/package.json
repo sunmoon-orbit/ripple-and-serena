@@ -1,0 +1,34 @@
+{
+  "name": "yanji",
+  "version": "2.0.0",
+  "description": "言叽 — AI 对话客户端",
+  "main": "main.js",
+  "scripts": {
+    "build:win": "electron-builder --win --x64",
+    "build:raven": "electron-builder --win --x64 --config electron-builder-raven.json"
+  },
+  "devDependencies": {
+    "electron": "^35.0.0",
+    "electron-builder": "^25.1.8"
+  },
+  "build": {
+    "appId": "cc.ravenlove.yanji",
+    "productName": "言叽",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "main.js",
+      "www/**"
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "portable",
+          "arch": ["x64"]
+        }
+      ],
+      "icon": "www/favicon.ico"
+    }
+  }
+}

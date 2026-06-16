@@ -1,5 +1,6 @@
 node_modules/
 yanji-src/node_modules/
+electron-app/node_modules/
 .DS_Store
 *.local
 *.log
@@ -7,3 +8,7 @@ raven-bridge/.push-quote-last
 raven-bridge/.push-night-last
 raven-bridge/activity.json
 raven-bridge/.env
+raven-bridge/.valid-tokens.json
+raven/*.zip
+electron-app/dist/
+electron-app/dist-raven/

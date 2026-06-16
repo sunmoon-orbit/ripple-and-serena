@@ -179,6 +179,26 @@ export async function sendMessage({
   })
 }
 
+// 从文本里提取代理混入的工具调用 JSON，格式：{"name":"xxx","arguments":{...}}
+function extractTextToolCall(text) {
+  const re = /\{[^{}]*"name"\s*:\s*"([^"]+)"[^{}]*"arguments"\s*:\s*(\{(?:[^{}]|\{[^{}]*\})*\})[^{}]*\}/s
+  const m = text.match(re)
+  if (!m) return null
+  try {
+    // 只保留工具调用 JSON 之前的文本，丢弃之后的内容（模型幻觉出的假结果）
+    const before = text.slice(0, m.index).trim()
+    return { name: m[1], args: JSON.parse(m[2]), remaining: before }
+  } catch { return null }
+}
+
+// 过滤掉模型幻觉出的 {"result": ...} 或 [{"id": ...}] 格式假结果
+function stripFakeToolResult(text) {
+  return text
+    .replace(/\{"result"\s*:\s*"[^"]*"\}/g, '')
+    .replace(/\[\{"id"\s*:.*?\}\]/gs, '')
+    .trim()
+}
+
 // ─── Tool-use loop (non-streaming, supports multi-turn) ─────────────────────
 
 async function callWithTools({
@@ -225,7 +245,23 @@ async function callWithTools({
         }
         continue
       }
-      finalText = msg.content || ''
+      // 部分代理（如带 -thinking 后缀的模型）不走标准 tool_calls 字段，
+      // 而是把工具调用 JSON 直接混入文本输出；执行后直接返回结果，不再循环（避免二次 LLM 乱生成）
+      if (msg.content) {
+        const textTc = extractTextToolCall(msg.content)
+        if (textTc) {
+          onToolCall?.([textTc.name])
+          try {
+            const result = compressToolResult(await executeTool(textTc.name, textTc.args, { searchConfig, moonMemoryConfig, onStatus }))
+            const cleanPrefix = stripFakeToolResult(textTc.remaining)
+            finalText = cleanPrefix ? `${cleanPrefix}\n\n${result}` : result
+          } catch (e) {
+            finalText = stripFakeToolResult(textTc.remaining) || `工具调用失败: ${e.message}`
+          }
+          break
+        }
+      }
+      finalText = stripFakeToolResult(msg.content || '')
       if (msg.reasoning_content) onThinking?.(msg.reasoning_content)
       break
     }
@@ -504,9 +540,11 @@ function buildAnthropicMessages(messages) {
     return { role: m.role, content: m.content }
   })
 
-  // 给最后一条消息打缓存断点：让整段对话历史前缀可被复用
+  // 给倒数第二条消息打缓存断点（即上一轮 assistant 回复）
+  // 这样下一轮可读取整段历史前缀，命中率随对话增长而提升
+  // 打在最后一条（新用户消息）只能缓存一条，命中率极低
   // 深拷贝避免 cache_control 写回 store，否则旧消息会累积断点超过 4 个上限
-  const idx = out.length - 1
+  const idx = out.length >= 2 ? out.length - 2 : out.length - 1
   const last = out[idx]
   if (last) {
     if (typeof last.content === 'string' && last.content) {

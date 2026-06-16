@@ -177,6 +177,7 @@ export default function Settings() {
   const [fetchingModels, setFetchingModels] = useState(false)
   const [moonHealthStatus, setMoonHealthStatus] = useState('')
   const [newMemContent, setNewMemContent] = useState('')
+  const [expandedMemIds, setExpandedMemIds] = useState(new Set())
   const [tab, setTab] = useState('connections')
   const [pushEnabled, setPushEnabled] = useState(false)
   const [pushLoading, setPushLoading] = useState(false)
@@ -400,7 +401,7 @@ export default function Settings() {
               {memoryItems.map((item) => (
                 <div key={item.id} className="card-row memory-item-row">
                   <input type="checkbox" checked={item.enabled !== false} onChange={() => toggleMemoryItem(item.id)} className="mem-checkbox" />
-                  <span className="mem-item-content">{item.content}</span>
+                  <span className={`mem-item-content${expandedMemIds.has(item.id) ? ' expanded' : ''}`} onClick={() => setExpandedMemIds(prev => { const s = new Set(prev); s.has(item.id) ? s.delete(item.id) : s.add(item.id); return s })} title="点击展开/收起">{item.content}</span>
                   <button className="mem-action-btn danger" onClick={() => deleteMemoryItem(item.id)}>
                     <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
                       <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
@@ -408,20 +409,22 @@ export default function Settings() {
                   </button>
                 </div>
               ))}
-              <div className="card-row">
-                <input
+              <div className="card-row" style={{ alignItems: 'flex-start' }}>
+                <textarea
                   className="form-input"
                   placeholder="添加记忆条目..."
                   value={newMemContent}
                   onChange={(e) => setNewMemContent(e.target.value)}
+                  rows={3}
+                  style={{ resize: 'vertical', minHeight: '60px' }}
                   onKeyDown={(e) => {
-                    if (e.key === 'Enter' && newMemContent.trim()) {
+                    if (e.key === 'Enter' && e.ctrlKey && newMemContent.trim()) {
                       addMemoryItem(newMemContent.trim())
                       setNewMemContent('')
                     }
                   }}
                 />
-                <button className="btn-sm btn-primary" onClick={() => {
+                <button className="btn-sm btn-primary" style={{ marginTop: '2px' }} onClick={() => {
                   if (newMemContent.trim()) { addMemoryItem(newMemContent.trim()); setNewMemContent('') }
                 }}>添加</button>
               </div>

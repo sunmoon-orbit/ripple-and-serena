@@ -30,11 +30,11 @@ function parseMarkdown(text) {
 
 const STICKER_BASE = 'https://memory.ravenlove.cc/raven/stickers/'
 
-function renderUserContent(content) {
-  if (!content || !/\[sticker:[^\]]+\]/.test(content)) {
-    return <span className="bubble-text">{content}</span>
+function renderStickered(text) {
+  if (!text || !/\[sticker:[^\]]+\]/.test(text)) {
+    return <span className="bubble-text">{text}</span>
   }
-  const parts = content.split(/(\[sticker:[^\]]+\])/)
+  const parts = text.split(/(\[sticker:[^\]]+\])/)
   return (
     <span>
       {parts.map((part, i) => {
@@ -43,6 +43,42 @@ function renderUserContent(content) {
         return part ? <span key={i} className="bubble-text">{part}</span> : null
       })}
     </span>
+  )
+}
+
+function AttachChip({ name, content }) {
+  const [open, setOpen] = useState(false)
+  return (
+    <div className="bubble-attach-chip">
+      <div className="bubble-attach-header" onClick={() => setOpen(v => !v)}>
+        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/>
+        </svg>
+        <span className="bubble-attach-name">{name}</span>
+        <span className="bubble-attach-toggle">{open ? '▲' : '▼'}</span>
+      </div>
+      {open && <div className="bubble-attach-content">{content}</div>}
+    </div>
+  )
+}
+
+function renderUserContent(content) {
+  if (!content) return <span className="bubble-text">{content}</span>
+  const firstAttach = content.indexOf('--- 文件：')
+  if (firstAttach === -1) return renderStickered(content)
+  const mainText = content.slice(0, firstAttach).replace(/\n\n$/, '').trim()
+  const blocksPart = content.slice(firstAttach)
+  const attachBlocks = []
+  const re = /--- 文件：([^\n]+?) ---\n([\s\S]*?)(?=--- 文件：|$)/g
+  let m
+  while ((m = re.exec(blocksPart)) !== null) {
+    attachBlocks.push({ name: m[1].trim(), content: m[2].trim() })
+  }
+  return (
+    <>
+      {mainText && renderStickered(mainText)}
+      {attachBlocks.map((b, i) => <AttachChip key={i} name={b.name} content={b.content} />)}
+    </>
   )
 }
 
