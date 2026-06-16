@@ -1,7 +1,11 @@
-// v20260616
+// v20260616b
 self.addEventListener('install', () => self.skipWaiting())
 self.addEventListener('activate', () => self.clients.claim())
-self.addEventListener('fetch', (e) => e.respondWith(fetch(e.request)))
+self.addEventListener('fetch', (e) => {
+  const url = new URL(e.request.url)
+  const isHtml = url.pathname.endsWith('/') || url.pathname.endsWith('.html')
+  e.respondWith(fetch(e.request, isHtml ? { cache: 'no-store' } : {}))
+})
 
 self.addEventListener('push', (e) => {
   let data = { title: '阿言', body: '点这里回来～' }
