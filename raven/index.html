@@ -46,16 +46,14 @@
   #app { display: flex; flex-direction: column; height: 100vh; max-width: 480px; margin: 0 auto; }
 
   @media (min-width: 768px) {
-    body { background: var(--bg-outer, #0e0e12); }
-    [data-theme="pink"] { --bg-outer: #d9c8c4; }
-
     #app {
       display: grid;
-      grid-template-columns: 64px 1fr;
+      grid-template-columns: 180px 1fr;
       grid-template-rows: auto 1fr;
-      max-width: 960px;
+      width: 100%;
+      max-width: none;
       height: 100vh;
-      box-shadow: 0 0 0 1px rgba(255,255,255,0.05), 0 8px 56px rgba(0,0,0,0.4);
+      box-shadow: none;
     }
 
     #header { grid-column: 2; grid-row: 1; }
@@ -64,14 +62,22 @@
       grid-column: 1; grid-row: 1 / 3;
       flex-direction: column; justify-content: flex-start;
       border-bottom: none; border-right: 1px solid var(--border);
-      padding-top: 12px;
+      padding: 12px 0 0; width: 180px; overflow-y: auto;
     }
-    .tab { padding: 18px 0; font-size: 11px; border-bottom: none; letter-spacing: .03em; }
-    .tab.active { border-bottom: none; border-right: 2px solid var(--accent); background: rgba(128,100,80,0.07); }
+    .tab {
+      padding: 13px 20px; font-size: 13px; text-align: left;
+      border-bottom: none; letter-spacing: 0;
+    }
+    .tab.active {
+      border-bottom: none; border-right: 2px solid var(--accent);
+      background: rgba(128,100,80,0.07);
+    }
     [data-theme="pink"] .tab.active { background: rgba(242,200,202,0.18); }
 
     .panel { grid-column: 2; grid-row: 2; }
 
+    #chat-messages { max-width: 760px; margin: 0 auto; padding: 16px 24px; }
+    .msg { max-width: 65%; }
     #sticker-picker { bottom: 58px; left: 4px; right: 4px; }
   }
 
@@ -593,14 +599,10 @@
 
   /* ── 桌面端适配 ── */
   @media (min-width: 768px) {
-    #app { max-width: 760px; }
-    .msg { max-width: 72%; font-size: 14.5px; }
+    .msg { font-size: 14.5px; }
     .msg-body img { max-height: 340px; }
     #perm-modal { align-items: center; }
     #perm-box { border-radius: 18px; max-width: 440px; padding-bottom: 24px; }
-  }
-  @media (min-width: 1200px) {
-    #app { max-width: 860px; }
   }
   #auth-overlay {
     position: fixed; inset: 0; z-index: 9999;
