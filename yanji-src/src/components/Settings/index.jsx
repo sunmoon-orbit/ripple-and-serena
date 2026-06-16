@@ -163,11 +163,11 @@ function ConnectionCard({ conn, onSave, onDelete, onActivate, isActive }) {
 export default function Settings() {
   const store = useStore()
   const {
-    connections, activeConnectionId, tokenStats, moonMemory, theme, avatarConfig,
+    connections, activeConnectionId, tokenStats, moonMemory, theme, glassOpacity, avatarConfig,
     globalInstruction, generationConfig, contextLimit, searchConfig, autoTools,
     addConnection, updateConnection, deleteConnection, setActiveConnection,
     setGlobalInstruction, setGenerationConfig, setContextLimit, setSearchConfig,
-    setAutoTools, setMoonMemory, setTheme, setAvatarConfig,
+    setAutoTools, setMoonMemory, setTheme, setGlassOpacity, setAvatarConfig,
     memoryItems, addMemoryItem, toggleMemoryItem, deleteMemoryItem,
   } = store
 
@@ -244,6 +244,7 @@ export default function Settings() {
     { id: 'default', name: '暮山紫', color: '#bfb5d8' },
     { id: 'xilan', name: '夕岚', color: '#deb7b8' },
     { id: 'claude', name: 'Claude', color: '#c8745a' },
+    { id: 'glass', name: '烟水', color: '#7eb8c8' },
   ]
 
   async function checkMoonHealth() {
@@ -607,6 +608,22 @@ export default function Settings() {
                     </button>
                   ))}
                 </div>
+                {(theme || 'default') === 'glass' && (
+                  <div className="card-row" style={{ marginTop: 14, paddingTop: 12, borderTop: '1px solid var(--border)' }}>
+                    <span className="card-row-label">气泡透明度</span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <input
+                        type="range" min="0.1" max="0.6" step="0.05"
+                        value={glassOpacity ?? 0.3}
+                        onChange={(e) => setGlassOpacity(Number(e.target.value))}
+                        style={{ width: 100, accentColor: 'var(--accent)' }}
+                      />
+                      <span style={{ fontSize: 12, color: 'var(--text-muted)', minWidth: 30 }}>
+                        {Math.round((glassOpacity ?? 0.3) * 100)}%
+                      </span>
+                    </div>
+                  </div>
+                )}
               </div>
             </Section>
             <Section title="聊天头像">
