@@ -78,7 +78,6 @@
 
     #chat-messages { max-width: 760px; margin: 0 auto; padding: 16px 24px; }
     .msg { max-width: 65%; }
-    #sticker-picker { bottom: 62px; left: 8px; right: auto; width: 340px; }
   }
 
   /* --- header --- */
@@ -360,6 +359,9 @@
   #sticker-picker::-webkit-scrollbar-track { background: transparent; }
   #sticker-picker::-webkit-scrollbar-thumb { background: var(--accent); border-radius: 99px; opacity: .5; }
   #sticker-picker { scrollbar-width: thin; scrollbar-color: var(--accent) transparent; }
+  @media (min-width: 768px) {
+    #sticker-picker { left: 8px; right: auto; width: 320px; }
+  }
 
   /* scroll-to-bottom */
   #scroll-btn {
