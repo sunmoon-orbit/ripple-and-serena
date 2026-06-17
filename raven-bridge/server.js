@@ -707,10 +707,12 @@ const server = http.createServer((req, res) => {
     fs.stat(abs, (err, stat) => {
       if (err) { res.writeHead(404); res.end(); return }
       const ext = path.extname(abs)
+      // 图片长期强缓存：no-cache 会让推送图标每次实时重抓，网络抖动就回退 Chrome（图标反复的真根因）；HTML 仍 no-cache 保最新
+      const isImg = ['.png', '.jpg', '.jpeg', '.ico', '.svg', '.webp', '.gif'].includes(ext)
       const headers = {
         'Content-Type': MIME[ext] || 'application/octet-stream',
         'Content-Length': stat.size,
-        'Cache-Control': 'no-cache',
+        'Cache-Control': isImg ? 'public, max-age=604800, immutable' : 'no-cache',
       }
       if (ext === '.zip') headers['Content-Disposition'] = `attachment; filename="${path.basename(abs)}"`
       res.writeHead(200, headers)

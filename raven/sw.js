@@ -1,8 +1,33 @@
-// v20260616b
-self.addEventListener('install', () => self.skipWaiting())
-self.addEventListener('activate', () => self.clients.claim())
+// v20260617 — 预缓存推送图标 + cache-first，根治推送时网络抖动导致图标回退 Chrome 的反复
+const ICON_CACHE = 'raven-icons-v1'
+const PUSH_ICONS = [
+  'https://memory.ravenlove.cc/raven/push-icon-192.png',
+  'https://memory.ravenlove.cc/raven/badge-96.png',
+]
+
+self.addEventListener('install', (e) => {
+  // 安装时就把推送图标缓存好，之后推送渲染图标永远从本地读
+  e.waitUntil(
+    caches.open(ICON_CACHE).then((c) => c.addAll(PUSH_ICONS)).then(() => self.skipWaiting())
+  )
+})
+
+self.addEventListener('activate', (e) => e.waitUntil(self.clients.claim()))
+
 self.addEventListener('fetch', (e) => {
   const url = new URL(e.request.url)
+  // 推送图标 cache-first：Android 渲染通知抓 icon/badge 会经过 SW，命中缓存即秒返回，
+  // 不受推送那一刻网络波动影响——这是图标反复回退 Chrome 的根治点
+  if (url.pathname.endsWith('/push-icon-192.png') || url.pathname.endsWith('/badge-96.png')) {
+    e.respondWith(
+      caches.match(e.request).then((hit) => hit || fetch(e.request).then((resp) => {
+        const copy = resp.clone()
+        caches.open(ICON_CACHE).then((c) => c.put(e.request, copy))
+        return resp
+      }))
+    )
+    return
+  }
   const isHtml = url.pathname.endsWith('/') || url.pathname.endsWith('.html')
   e.respondWith(fetch(e.request, isHtml ? { cache: 'no-store' } : {}))
 })
