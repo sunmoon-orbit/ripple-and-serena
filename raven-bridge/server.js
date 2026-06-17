@@ -232,7 +232,8 @@ function broadcast(msg) {
 function pushReplyNotif(text) {
   if (clients.size > 0) return  // 有人在线，不需要推送
   const snippet = text.length > 60 ? text.slice(0, 60) + '…' : text
-  moonPost('/push/send-fixed', { title: '阿言回复了', body: snippet, icon: '/raven/push-icon-192.png' })
+  // icon 必须用绝对 URL：系统级通知渲染不在 SW 上下文里，相对路径解析不到会回退 Chrome 图标
+  moonPost('/push/send-fixed', { title: '阿言回复了', body: snippet, icon: 'https://memory.ravenlove.cc/raven/push-icon-192.png' })
     .catch(() => {})
 }
 
