@@ -62,7 +62,9 @@ function ConnectionCard({ conn, onSave, onDelete, onActivate, isActive }) {
     setFetchingModels(true)
     try {
       const resp = await fetch(`${base}/models`, { headers: { Authorization: `Bearer ${form.apiKey}` } })
-      if (!resp.ok) throw new Error(resp.status)
+      if (!resp.ok) throw new Error(`HTTP ${resp.status}`)
+      const ct = resp.headers.get('content-type') || ''
+      if (!ct.includes('json')) throw new Error('返回了非 JSON 内容，请检查 Base URL 是否正确（如末尾是否缺少 /v1）')
       const data = await resp.json()
       const ids = (data.data || []).map((m) => m.id).filter(Boolean).sort()
       if (!ids.length) throw new Error('未返回模型列表')
@@ -274,7 +276,9 @@ export default function Settings() {
     setFetchingModels(true)
     try {
       const resp = await fetch(`${base}/models`, { headers: { Authorization: `Bearer ${newConn.apiKey}` } })
-      if (!resp.ok) throw new Error(resp.status)
+      if (!resp.ok) throw new Error(`HTTP ${resp.status}`)
+      const ct = resp.headers.get('content-type') || ''
+      if (!ct.includes('json')) throw new Error('返回了非 JSON 内容，请检查 Base URL 是否正确（如末尾是否缺少 /v1）')
       const data = await resp.json()
       const ids = (data.data || []).map((m) => m.id).filter(Boolean).sort()
       if (!ids.length) throw new Error('未返回模型列表')

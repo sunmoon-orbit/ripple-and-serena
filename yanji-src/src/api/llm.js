@@ -270,7 +270,7 @@ async function callWithTools({
     if (provider === 'anthropic') {
       const url = buildApiUrl(connection.baseUrl, 'anthropic')
       const bodyMsgs = buildAnthropicMessages(convo)
-      const body = { model, max_tokens: maxTokens, messages: bodyMsgs, tools: formattedTools }
+      const body = { model, max_tokens: maxTokens, messages: bodyMsgs, tools: formattedTools, temperature: safeTemp }
       if (systemPrompt?.trim()) {
         body.system = [{ type: 'text', text: systemPrompt, cache_control: { type: 'ephemeral' } }]
       }
@@ -385,7 +385,8 @@ async function callStream({ connection, messages, systemPrompt, model, generatio
   if (provider === 'anthropic') {
     const url = buildApiUrl(connection.baseUrl, 'anthropic')
     const bodyMsgs = buildAnthropicMessages(messages)
-    const isThinkingModel = (model || '').includes('3-7') || (model || '').includes('4')
+    // 3-7 及 4 系列以上（opus-4-8 / sonnet-4-6 / haiku-4-5，未来 opus-5-x 等）都支持 extended thinking
+    const isThinkingModel = (model || '').includes('3-7') || /claude-[a-z]+-([4-9]|\d{2,})/.test(model || '')
     const body = { model, max_tokens: maxTokens, messages: bodyMsgs, stream: true }
     if (systemPrompt?.trim()) {
       body.system = [{ type: 'text', text: systemPrompt, cache_control: { type: 'ephemeral' } }]
