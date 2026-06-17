@@ -636,6 +636,9 @@
   #auth-btn:hover { opacity: 0.85; }
   #auth-error { font-size: 12px; color: #c05050; min-height: 16px; }
 </style>
+<!-- 预加载推送图标进浏览器缓存：配合服务端强缓存，推送时图标直接命中缓存、不再实时抓取回退 Chrome -->
+<link rel="preload" as="image" href="push-icon-192.png">
+<link rel="preload" as="image" href="badge-96.png">
 </head>
 <body>
 <div id="auth-overlay">

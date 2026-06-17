@@ -1,4 +1,4 @@
-// v20260617 — 预缓存推送图标 + cache-first，根治推送时网络抖动导致图标回退 Chrome 的反复
+// v20260617b — 预缓存推送图标 + cache-first（根治图标回退 Chrome）；每条推送唯一 tag，多条独立不折叠
 const ICON_CACHE = 'raven-icons-v1'
 const PUSH_ICONS = [
   'https://memory.ravenlove.cc/raven/push-icon-192.png',
@@ -41,8 +41,8 @@ self.addEventListener('push', (e) => {
       // icon: 暖金底深色 R，深色通知卡上不隐身；badge 必须单色透明，否则 Android 回退 Chrome 图标
       icon: data.icon || 'https://memory.ravenlove.cc/raven/push-icon-192.png',
       badge: 'https://memory.ravenlove.cc/raven/badge-96.png',
-      tag: 'raven-push',
-      renotify: true,
+      // 唯一 tag：多条推送各自独立显示，不互相覆盖（错过的也都留着）
+      tag: 'raven-' + Date.now(),
     })
   )
 })
