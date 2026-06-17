@@ -265,7 +265,7 @@ export default function ChatInput({ onSend, disabled, onImageAdd, images, onImag
         <textarea
           ref={textareaRef}
           className="chat-input-textarea"
-          placeholder="输入消息... (Shift+Enter 换行)"
+          placeholder="输入消息…"
           value={text}
           onChange={handleInput}
           onKeyDown={handleKeyDown}
