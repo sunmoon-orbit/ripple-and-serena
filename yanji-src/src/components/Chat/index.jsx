@@ -68,9 +68,14 @@ export default function Chat() {
     const conn = connections.find((c) => c.id === chat.connectionId) || activeConn
     if (!conn?.apiKey) { showToast('连接未配置 API Key', 'error'); return }
 
-    // Add user message (append inject prompt if inject mode is on)
-    const injectedContent = injectMode && injectPrompt ? `${text}\n\n${injectPrompt}` : text
-    const userMsg = addMessage(chat.id, { role: 'user', content: injectedContent, images: images.length ? images : undefined })
+    // Add user message. 注入模式：原文照常显示给阿颖，注入词只藏在 injected 字段里，
+    // 发往模型时才拼到句尾——前端看不到，更美观。
+    const userMsg = addMessage(chat.id, {
+      role: 'user',
+      content: text,
+      images: images.length ? images : undefined,
+      injected: injectMode && injectPrompt ? injectPrompt : undefined,
+    })
     setPendingImages([])
 
     // Add placeholder assistant message
@@ -85,9 +90,11 @@ export default function Chat() {
       const IMG_KEEP_RECENT = 4
       const limited = applyContextLimit(allMsgs.map((m, i, arr) => {
         const keepImages = i >= arr.length - IMG_KEEP_RECENT
+        const baseContent = !keepImages && m.images?.length && !m.content ? '[图片]' : m.content
         return {
           role: m.role,
-          content: !keepImages && m.images?.length && !m.content ? '[图片]' : m.content,
+          // 注入词只在发往模型时拼回句尾，不进前端显示
+          content: m.injected ? `${baseContent}\n\n${m.injected}` : baseContent,
           images: keepImages ? m.images : undefined,
           thinking: m.thinking || undefined,
           tool_calls: m.tool_calls || undefined,
