@@ -176,6 +176,8 @@ export default function MessageBubble({ msg, onEdit }) {
   // 不用原生 <details>（受控 open 在部分浏览器/React 下会和原生状态错位），改纯按钮+条件渲染，稳。
   const [thinkOpen, setThinkOpen] = useState(isStreaming)
   useEffect(() => { setThinkOpen(isStreaming) }, [isStreaming])
+  // 用户语音消息：默认语音条样式，点一下切到文字，再点切回（仿 chat 语音切换）
+  const [voiceTextMode, setVoiceTextMode] = useState(false)
   // 有些模型/代理把 <think>/<next_thinking>/<reasoning> 等标签塞进思考文本里，展示时剥掉
   const thinkingText = (msg.thinking || '').replace(/<\/?[a-zA-Z_][\w:-]*>/g, '').trim()
 
@@ -250,25 +252,26 @@ export default function MessageBubble({ msg, onEdit }) {
                   </div>
                 )}
                 {msg.voice ? (
-                  <div className="user-voice">
-                    {/* 跟助手语音条同一套样式：播放按钮 + 波形 + 时长，点播放朗读本条 */}
-                    <div className={`voice-bar user-vb${ttsState === 'playing' ? ' playing' : ''}`}>
-                      <button className="vb-play" onClick={playTts} aria-label={ttsState === 'playing' ? '暂停' : '播放'}>
-                        {ttsState === 'loading' ? (
-                          <svg viewBox="0 0 24 24" width="12" height="12" fill="currentColor"><circle cx="4" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="20" cy="12" r="2"/></svg>
-                        ) : ttsState === 'playing' ? (
-                          <svg viewBox="0 0 24 24" width="12" height="12" fill="currentColor"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>
-                        ) : (
-                          <svg viewBox="0 0 24 24" width="12" height="12" fill="currentColor"><polygon points="5,3 19,12 5,21"/></svg>
-                        )}
-                      </button>
+                  voiceTextMode ? (
+                    // 文字视图：点一下切回语音条
+                    <div className="user-voice-text" onClick={() => setVoiceTextMode(false)} title="点击切回语音条">
+                      {renderUserContent(msg.content)}
+                    </div>
+                  ) : (
+                    // 语音条视图：麦克风图标 + 波形 + 时长，点一下转文字（不带播放，自己说的不用听）
+                    <div className="voice-bar user-vb" onClick={() => setVoiceTextMode(true)} title="点击转文字">
+                      <span className="vb-mic">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
+                          <path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/>
+                        </svg>
+                      </span>
                       <div className="vb-wave">
                         {Array.from({ length: 8 }).map((_, i) => <div key={i} className="vb-bar" />)}
                       </div>
                       <span className="vb-time">{msg.voiceDuration ? fmtDur(msg.voiceDuration) : '0:00'}</span>
                     </div>
-                    {msg.content && <div className="user-voice-text">{renderUserContent(msg.content)}</div>}
-                  </div>
+                  )
                 ) : renderUserContent(msg.content)}
               </>
             )

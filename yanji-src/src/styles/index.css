@@ -1804,16 +1804,19 @@ textarea.form-input { display: block; margin: 8px 16px 12px; }
 @keyframes vb-bounce { 0%,100% { transform: scaleY(.4) } 50% { transform: scaleY(1) } }
 .vb-time { font-size: 11px; color: var(--text-muted); flex-shrink: 0; min-width: 24px; text-align: right; }
 
-/* 用户语音消息：复用助手 .voice-bar 同款，仅在橙色气泡上换成白色配色（统一风格） */
-.user-voice { display: flex; flex-direction: column; gap: 7px; }
-.user-vb .vb-play { background: rgba(255,255,255,0.9); color: var(--accent); }
+/* 用户语音消息：复用助手 .voice-bar 同款波形，橙色气泡上换白色配色（与文字气泡统一）。
+   不带播放（自己说的不用听），点一下整条在语音条 / 文字之间切换。 */
+.user-vb { cursor: pointer; }
+.user-vb .vb-mic {
+  width: 28px; height: 28px; border-radius: 50%; flex-shrink: 0;
+  background: rgba(255,255,255,0.9); color: var(--accent);
+  display: flex; align-items: center; justify-content: center;
+}
 .user-vb .vb-bar { background: #fff; opacity: .85; }
-.user-vb.playing .vb-bar { opacity: 1; }
 .user-vb .vb-time { color: rgba(255,255,255,0.9); }
 .user-voice-text {
-  font-size: 13px; opacity: .9; line-height: 1.5;
+  font-size: 14px; line-height: 1.5; cursor: pointer;
   white-space: pre-wrap; word-break: break-word;
-  padding-top: 6px; border-top: 1px solid rgba(255,255,255,0.2);
 }
 .msg-edit-wrap {
   display: flex; flex-direction: column; gap: 6px;
