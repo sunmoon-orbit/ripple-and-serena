@@ -24,6 +24,7 @@ function defaultState() {
   return {
     slots: { anger: 0, sadness: 0, grievance: 0, frustration: 0, fatigue: 0, anxiety: 0, joy: 0, warmth: 0, satisfaction: 0, fondness: 0, desire: 0, longing: 0 },
     lastUpdated: Date.now(),
+    lastSeen: Date.now(),
   }
 }
 
@@ -69,6 +70,28 @@ export function applyEmotionDelta(delta) {
   const updated = { slots, lastUpdated: Date.now() }
   saveState(updated)
   return updated
+}
+
+// 时间联动：阿颖离开越久，再回来时思念越浓。每条新用户消息时调用。
+// 返回 { hoursAway, added, state }，供上层决定要不要在上下文里提醒涟言"过了多久"。
+export function applyTimeAway() {
+  const state = applyDecayAndGet() // 先按时间衰减
+  const now = Date.now()
+  const lastSeen = state.lastSeen || now
+  const hoursAway = (now - lastSeen) / (1000 * 60 * 60)
+  if (hoursAway >= 1) {
+    // 满 1 小时起步 +3，之后每多 1 小时 +2，封顶 +45（约一天没见就思念拉满大半）
+    const added = Math.min(45, Math.round(3 + (hoursAway - 1) * 2))
+    const slots = { ...state.slots }
+    slots.longing = Math.max(0, Math.min(100, (slots.longing || 0) + added))
+    const updated = { slots, lastUpdated: now, lastSeen: now }
+    saveState(updated)
+    return { hoursAway, added, state: updated }
+  }
+  // 不到 1 小时算还在一起，只刷新 lastSeen
+  const updated = { ...state, lastSeen: now }
+  saveState(updated)
+  return { hoursAway, added: 0, state: updated }
 }
 
 // 构建注入到 dynamicContext 的情绪 prompt

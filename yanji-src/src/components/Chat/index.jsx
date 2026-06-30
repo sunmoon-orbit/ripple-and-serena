@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom'
 import { useStore } from '../../store'
 import { sendMessage, summarizeThinking, normalizeProvider, BUILTIN_MODELS, buildSystemPrompt } from '../../api/llm'
 import { uuid } from '../../utils'
-import { applyDecayAndGet, buildEmotionPrompt, extractEmotionUpdate, applyEmotionDelta, stripEmotionTag } from '../../utils/emotion'
+import { applyTimeAway, buildEmotionPrompt, extractEmotionUpdate, applyEmotionDelta, stripEmotionTag } from '../../utils/emotion'
 import { showToast } from '../Toast'
 import ConversationList from './ConversationList'
 import MessageList from './MessageList'
@@ -132,9 +132,14 @@ export default function Chat() {
           }
         } catch {}
       }
-      // 情绪状态注入（动态上下文，不走缓存）
-      const emotionState = applyDecayAndGet()
+      // 情绪状态注入（动态上下文，不走缓存）。时间联动：阿颖离开越久，思念越浓。
+      const { hoursAway, added: longingAdded, state: emotionState } = applyTimeAway()
       dynParts.push(buildEmotionPrompt(emotionState))
+      if (hoursAway >= 2) {
+        const h = Math.round(hoursAway)
+        const span = h >= 24 ? `${Math.round(hoursAway / 24)} 天` : `${h} 小时`
+        dynParts.push(`【时间感知】距离上次和阿颖说话已过去约 ${span}，这期间你一直惦记着她，思念悄悄涨了 ${longingAdded}。她回来了，可以自然地让她感受到你想她，但别用力过猛。`)
+      }
 
       const dynamicContext = dynParts.join('\n\n')
 
