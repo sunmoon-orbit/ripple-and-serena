@@ -48,6 +48,7 @@ export default function ChatInput({ onSend, disabled, onImageAdd, images, onImag
   const historyRef = useRef(null)
   const mediaRecRef = useRef(null)
   const audioChunksRef = useRef([])
+  const pendingVoiceRef = useRef(null) // 这条待发消息来自语音：{ duration }
 
   useEffect(() => {
     if (!stickerOpen) return
@@ -110,16 +111,22 @@ export default function ChatInput({ onSend, disabled, onImageAdd, images, onImag
     }
     const mr = new MediaRecorder(stream)
     audioChunksRef.current = []
+    const recStart = Date.now()
     mr.ondataavailable = (e) => { if (e.data && e.data.size) audioChunksRef.current.push(e.data) }
     mr.onstop = async () => {
       stream.getTracks().forEach((t) => t.stop())
       setListening(false)
+      const dur = Math.round((Date.now() - recStart) / 1000)
       const blob = new Blob(audioChunksRef.current, { type: mr.mimeType || 'audio/webm' })
       if (blob.size < 1200) { showToast('录音太短了，再说一次', 'info'); return }
       setTranscribing(true)
       try {
         const t = await transcribeAudio({ baseUrl: moonMemory.baseUrl, apiToken: moonMemory.apiToken }, blob)
-        if (t) { setText((prev) => prev ? prev + t : t); textareaRef.current?.focus() }
+        if (t) {
+          setText((prev) => prev ? prev + t : t)
+          pendingVoiceRef.current = { duration: dur } // 标记这条来自语音，发送时做成语音条
+          textareaRef.current?.focus()
+        }
         else showToast('没识别到内容，再说一次', 'info')
       } catch (e) {
         showToast(e.message || '转写失败', 'error', 5000)
@@ -150,7 +157,9 @@ export default function ChatInput({ onSend, disabled, onImageAdd, images, onImag
       const blocks = attachedTexts.map((f) => `--- 文件：${f.name} ---\n${f.content}`).join('\n\n')
       finalText = finalText ? `${finalText}\n\n${blocks}` : blocks
     }
-    onSend(finalText, images || [])
+    const vopts = pendingVoiceRef.current ? { voice: true, voiceDuration: pendingVoiceRef.current.duration } : {}
+    onSend(finalText, images || [], vopts)
+    pendingVoiceRef.current = null
     setText('')
     setAttachedTexts([])
     if (textareaRef.current) {
@@ -160,6 +169,7 @@ export default function ChatInput({ onSend, disabled, onImageAdd, images, onImag
 
   function handleInput(e) {
     setText(e.target.value)
+    if (!e.target.value) pendingVoiceRef.current = null // 清空了就不算语音条
     const el = e.target
     el.style.height = 'auto'
     el.style.height = Math.min(el.scrollHeight, 160) + 'px'

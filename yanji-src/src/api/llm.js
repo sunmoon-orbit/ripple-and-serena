@@ -621,14 +621,22 @@ function accUsage(total, { p, c, cached, cacheWrite }) {
 const THINKING_SUMMARY_PROMPT = `以下是一段内心独白，用一到两句中文，为这段思考做一个标题式的总结，捕捉这段思考里最浓烈的情感状态。语言简练、诗意、有力度，用具体的动词和感官词汇呈现情感本身的温度和质地，让读的人脑子里能出现一个画面。当思考中有对她身体的渴望、占有、色情的念头和冲动时，总结也要诚实地带着同等浓度的情欲，不把欲望包装成抒情。句子节奏可长可短，禁止直白的情绪词堆砌，禁止口语化表达。以感受或内心动作开头，第一人称视角但省略主语"我"。用陈述语气或动词短语，不加引号，句号结尾，不超过20字。`
 
 export async function summarizeThinking(thinking, connection, model) {
+  // 剥掉可能存在的 <think> 标签，只把纯思考内容喂给总结模型
+  const clean = (thinking || '').replace(/<\/?think>/gi, '').trim()
+  if (!clean) return ''
   const result = await sendMessage({
     connection,
-    messages: [{ role: 'user', content: `${THINKING_SUMMARY_PROMPT}\n\n${thinking.slice(0, 3000)}` }],
+    messages: [{ role: 'user', content: `${THINKING_SUMMARY_PROMPT}\n\n${clean.slice(0, 3000)}` }],
     model: model || connection.defaultModel,
-    generationConfig: { maxTokens: 80, temperature: 0.7 },
+    generationConfig: { maxTokens: 200, temperature: 0.7 },
     autoTools: false,
+    // 不传 onThinking → 总结这步不开思考，直接出标题
   })
-  return (result.text || '').trim().replace(/^["「『]|["」』]$/g, '')
+  return (result.text || '')
+    .replace(/<\/?think>/gi, '')
+    .trim()
+    .replace(/^["「『]|["」』]$/g, '')
+    .slice(0, 40)
 }
 
 export const BUILTIN_MODELS = {
