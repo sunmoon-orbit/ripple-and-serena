@@ -41,6 +41,7 @@ export default function SettingsPanel() {
   const [health, setHealth] = useState(null)
   const [healthLoading, setHealthLoading] = useState(false)
   const [importing, setImporting] = useState(false)
+  const [importProgress, setImportProgress] = useState('')
   const importRef = useRef()
 
   function saveConn() {
@@ -81,15 +82,28 @@ export default function SettingsPanel() {
     const file = e.target.files?.[0]
     if (!file) return
     setImporting(true)
+    setImportProgress('')
     try {
       const text = await file.text()
       const data = JSON.parse(text)
-      const r = await api.importClaudeAI(data)
-      showToast(`导入完成，新增 ${r.imported} 条对话`, 'success')
+      if (!Array.isArray(data)) throw new Error('文件格式不对，需要是数组格式的 conversations.json')
+
+      // 分批上传：浏览器本地解析后，每批只发少量对话，避免整个大文件一次性 POST 撞体积/超时上限。
+      // 这样文件再大也不会撞墙——只是批次变多。重复导入安全（服务端按 uuid + 消息双重去重）。
+      const BATCH = 15
+      let imported = 0
+      for (let i = 0; i < data.length; i += BATCH) {
+        const batch = data.slice(i, i + BATCH)
+        setImportProgress(`${Math.min(i + BATCH, data.length)}/${data.length}`)
+        const r = await api.importClaudeAI(batch)
+        imported += (r && r.imported) || 0
+      }
+      showToast(`导入完成，共处理 ${data.length} 条对话，新增 ${imported} 条`, 'success')
     } catch (err) {
       showToast('导入失败：' + err.message, 'error')
     } finally {
       setImporting(false)
+      setImportProgress('')
       if (importRef.current) importRef.current.value = ''
     }
   }
@@ -181,13 +195,13 @@ export default function SettingsPanel() {
       <div className="section-title"><Upload size={15} style={{ verticalAlign: -2, marginRight: 6 }} />导入对话历史</div>
       <div className="settings-card">
         <p style={{ fontSize: 13, opacity: 0.6, margin: '0 0 10px' }}>
-          上传 Claude 官方导出的 <code>conversations.json</code>，或言叽导出的 .md 文件（.md 请用命令行脚本）。重复导入安全，已存在的对话会跳过。
+          上传 Claude 官方导出的 <code>conversations.json</code>，或言叽导出的 .md 文件（.md 请用命令行脚本）。文件会在本地分批上传，再大也不怕；重复导入安全，已存在的对话会跳过。
         </p>
         <input ref={importRef} type="file" accept=".json" style={{ display: 'none' }} onChange={handleImportClaudeAI} />
         <button className="btn btn-ghost" style={{ width: '100%', justifyContent: 'center' }}
           onClick={() => importRef.current?.click()} disabled={importing}>
           <Upload size={14} style={{ marginRight: 6 }} />
-          {importing ? '导入中…' : '选择 conversations.json'}
+          {importing ? (importProgress ? `导入中… ${importProgress}` : '导入中…') : '选择 conversations.json'}
         </button>
       </div>
 
