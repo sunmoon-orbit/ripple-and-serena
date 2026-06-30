@@ -39,4 +39,5 @@ export const api = {
   time: () => req('/context/time'),
   health: () => req('/health'),
   maintainHealth: () => req('/maintain/health'),
+  importClaudeAI: (data) => req('/archive/import/claude-ai', { method: 'POST', body: JSON.stringify(data) }),
 }

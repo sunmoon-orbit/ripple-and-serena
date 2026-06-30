@@ -249,6 +249,7 @@ function Card({ m, onEdit, onTrash }) {
             <span className="badge badge-scope">{SCOPES[m.scope] || m.scope}</span>
           )}
           {impLabel && <span className="imp-text">{impLabel}</span>}
+          {m.resolved ? <span className="badge badge-resolved">已了结</span> : null}
           {emotionColor(m.valence) && (
             <span style={{ width: 7, height: 7, borderRadius: '50%', background: emotionColor(m.valence), display: 'inline-block', flexShrink: 0 }} title={`情绪 ${m.valence > 0 ? '+' : ''}${m.valence?.toFixed(2)}`} />
           )}
