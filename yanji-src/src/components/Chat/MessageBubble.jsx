@@ -172,7 +172,11 @@ export default function MessageBubble({ msg, onEdit }) {
 
   const fmtDur = (s) => `${Math.floor(s / 60)}:${String(Math.round(s % 60)).padStart(2, '0')}`
   const [editText, setEditText] = useState(msg.content)
-  const [thinkOpen, setThinkOpen] = useState(true)
+  // 思考过程：流式时展开（实时看着想），结束后自动收起，只留一句标题式总结
+  const [thinkOpen, setThinkOpen] = useState(isStreaming)
+  useEffect(() => {
+    if (!isStreaming) setThinkOpen(false)
+  }, [isStreaming])
 
   const html = useMemo(() => {
     if (isUser) return null
