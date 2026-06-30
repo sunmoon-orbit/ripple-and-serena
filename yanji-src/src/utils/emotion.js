@@ -94,7 +94,9 @@ export function extractEmotionUpdate(text) {
   const clean = (text || '').replace(/<es>[\s\S]*?<\/es>/gi, '').trimEnd()
   if (!match) return { clean, delta: null }
   try {
-    return { clean, delta: JSON.parse(match[1]) }
+    // AI 按提示会写成 {"j":+8} —— JSON 不允许数字前导 +，先把 +N 清理成 N 再解析
+    const jsonStr = match[1].replace(/([:,]\s*)\+/g, '$1')
+    return { clean, delta: JSON.parse(jsonStr) }
   } catch {
     return { clean, delta: null }
   }
