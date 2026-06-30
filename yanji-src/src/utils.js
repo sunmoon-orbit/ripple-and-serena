@@ -16,13 +16,13 @@ export function formatTime(ts) {
   if (!ts) return ''
   const d = new Date(ts)
   const now = new Date()
-  const diff = now - d
-  if (diff < 60000) return '刚刚'
-  if (diff < 3600000) return Math.floor(diff / 60000) + '分钟前'
-  if (diff < 86400000) return Math.floor(diff / 3600000) + '小时前'
-  const days = Math.floor(diff / 86400000)
-  if (days < 7) return days + '天前'
-  return d.toLocaleDateString('zh-CN', { month: 'numeric', day: 'numeric' })
+  const hhmm = d.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', hour12: false })
+  const isToday = d.toDateString() === now.toDateString()
+  if (isToday) return hhmm
+  const isThisYear = d.getFullYear() === now.getFullYear()
+  const md = `${d.getMonth() + 1}/${d.getDate()}`
+  if (isThisYear) return `${md} ${hhmm}`
+  return `${d.getFullYear()}/${md} ${hhmm}`
 }
 
 export function estimateTokens(text) {

@@ -8,14 +8,13 @@ self.addEventListener('push', (event) => {
   let payload
   try { payload = event.data.json() } catch { payload = { title: '言叽', body: event.data.text() } }
 
-  // 绝对 URL（用 SW scope 拼，自动适配部署域名）：系统级通知不在 SW 上下文里，
-  // 相对路径加载不到图标会回退成 Chrome 图标
   const base = self.registration.scope
   event.waitUntil(
     self.registration.showNotification(payload.title || '言叽', {
       body: payload.body || '',
       icon: base + 'icon-192.png',
-      badge: base + 'icon-192.png',
+      // badge 必须单色透明，否则 Android 会回退成 Chrome 图标
+      badge: 'https://memory.ravenlove.cc/raven/badge-96.png',
       data: { url: payload.url || base },
       vibrate: [200, 100, 200],
     })

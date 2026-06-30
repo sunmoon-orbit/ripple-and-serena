@@ -15,7 +15,7 @@ function Section({ title, children }) {
   )
 }
 
-function AvatarUpload({ label, value, onChange }) {
+function AvatarUpload({ label, value, onChange, shape }) {
   function handleFile(e) {
     const file = e.target.files?.[0]
     if (!file) return
@@ -23,13 +23,14 @@ function AvatarUpload({ label, value, onChange }) {
     reader.onload = (ev) => onChange(ev.target.result)
     reader.readAsDataURL(file)
   }
+  const radius = shape === 'square' ? '6px' : '50%'
   return (
     <div className="avatar-upload-row">
       <span className="card-row-label">{label}</span>
       <div className="avatar-upload-area">
         {value
-          ? <img src={value} alt={label} className="avatar-preview" />
-          : <div className="avatar-preview avatar-preview-empty">
+          ? <img src={value} alt={label} className="avatar-preview" style={{ borderRadius: radius }} />
+          : <div className="avatar-preview avatar-preview-empty" style={{ borderRadius: radius }}>
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
                 <circle cx="12" cy="8" r="4" /><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7" />
               </svg>
@@ -166,10 +167,11 @@ export default function Settings() {
   const store = useStore()
   const {
     connections, activeConnectionId, tokenStats, moonMemory, theme, glassOpacity, avatarConfig,
-    globalInstruction, generationConfig, contextLimit, searchConfig, autoTools,
+    globalInstruction, generationConfig, contextLimit, searchConfig, autoTools, injectMode, injectPrompt,
     addConnection, updateConnection, deleteConnection, setActiveConnection,
     setGlobalInstruction, setGenerationConfig, setContextLimit, setSearchConfig,
     setAutoTools, setMoonMemory, setTheme, setGlassOpacity, setAvatarConfig,
+    setInjectMode, setInjectPrompt,
     memoryItems, addMemoryItem, toggleMemoryItem, deleteMemoryItem,
   } = store
 
@@ -546,25 +548,57 @@ export default function Settings() {
             <Section title="上下文限制">
               <div className="settings-card">
                 <div className="card-row">
-                  <span className="card-row-label">模式</span>
-                  <select className="filter-select" value={contextLimit.mode} onChange={(e) => setContextLimit({ mode: e.target.value })}>
-                    <option value="none">不限制</option>
-                    <option value="rounds">按轮数</option>
-                    <option value="tokens">按 Token 数</option>
-                  </select>
+                  <span className="card-row-label">发送时截断历史</span>
+                  <label className="dream-resolve-toggle">
+                    <input type="checkbox" checked={contextLimit.mode !== 'none'} onChange={(e) => setContextLimit({ mode: e.target.checked ? 'rounds' : 'none' })} />
+                    <span>{contextLimit.mode !== 'none' ? '已开启' : '不限制'}</span>
+                  </label>
                 </div>
-                {contextLimit.mode === 'rounds' && (
-                  <div className="card-row">
-                    <span className="card-row-label">最大轮数</span>
-                    <input className="form-input form-input-sm" type="number" value={contextLimit.maxRounds ?? 50} onChange={(e) => setContextLimit({ maxRounds: Number(e.target.value) })} />
-                  </div>
+                {contextLimit.mode !== 'none' && (
+                  <>
+                    <div className="card-row">
+                      <span className="card-row-label">模式</span>
+                      <select className="filter-select" value={contextLimit.mode} onChange={(e) => setContextLimit({ mode: e.target.value })}>
+                        <option value="rounds">按轮数</option>
+                        <option value="tokens">按 Token 数</option>
+                      </select>
+                    </div>
+                    {contextLimit.mode === 'rounds' && (
+                      <div className="card-row">
+                        <span className="card-row-label">最大轮数</span>
+                        <input className="form-input form-input-sm" type="number" min="10" max="200" value={contextLimit.maxRounds ?? 50} onChange={(e) => setContextLimit({ maxRounds: Number(e.target.value) })} />
+                      </div>
+                    )}
+                    {contextLimit.mode === 'tokens' && (
+                      <div className="card-row">
+                        <span className="card-row-label">最大 Tokens</span>
+                        <input className="form-input form-input-sm" type="number" min="1000" max="200000" step="1000" value={contextLimit.maxTokens ?? 30000} onChange={(e) => setContextLimit({ maxTokens: Number(e.target.value) })} />
+                      </div>
+                    )}
+                  </>
                 )}
-                {contextLimit.mode === 'tokens' && (
-                  <div className="card-row">
-                    <span className="card-row-label">最大 Tokens</span>
-                    <input className="form-input form-input-sm" type="number" value={contextLimit.maxTokens ?? 30000} onChange={(e) => setContextLimit({ maxTokens: Number(e.target.value) })} />
-                  </div>
-                )}
+              </div>
+            </Section>
+            <Section title="注入提示词">
+              <div className="settings-card">
+                <div className="card-row">
+                  <span className="card-row-label">注入模式</span>
+                  <label className="toggle">
+                    <input type="checkbox" checked={injectMode !== false} onChange={(e) => setInjectMode(e.target.checked)} />
+                    <span className="toggle-track" />
+                  </label>
+                </div>
+                <div className="form-row">
+                  <label className="form-label">注入内容（追加在每条用户消息末尾）</label>
+                  <textarea
+                    className="form-input"
+                    rows={3}
+                    value={injectPrompt || ''}
+                    onChange={(e) => setInjectPrompt(e.target.value)}
+                    placeholder="追加在每条用户消息末尾的提示词..."
+                    style={{ resize: 'vertical', fontFamily: 'inherit' }}
+                  />
+                </div>
               </div>
             </Section>
             <Section title="工具">
@@ -645,17 +679,32 @@ export default function Settings() {
                     >图片</button>
                   </div>
                 </div>
+                <div className="card-row">
+                  <span className="card-row-label">头像形状</span>
+                  <div className="avatar-mode-toggle">
+                    <button
+                      className={'avatar-mode-btn' + ((avatarConfig?.shape || 'circle') === 'circle' ? ' active' : '')}
+                      onClick={() => setAvatarConfig({ shape: 'circle' })}
+                    >圆形</button>
+                    <button
+                      className={'avatar-mode-btn' + (avatarConfig?.shape === 'square' ? ' active' : '')}
+                      onClick={() => setAvatarConfig({ shape: 'square' })}
+                    >方形</button>
+                  </div>
+                </div>
                 {avatarConfig?.mode === 'image' && (
                   <>
                     <AvatarUpload
                       label="我的头像"
                       value={avatarConfig.userImage}
                       onChange={(img) => setAvatarConfig({ userImage: img })}
+                      shape={avatarConfig?.shape}
                     />
                     <AvatarUpload
                       label="助手头像"
                       value={avatarConfig.assistantImage}
                       onChange={(img) => setAvatarConfig({ assistantImage: img })}
+                      shape={avatarConfig?.shape}
                     />
                   </>
                 )}

@@ -38,10 +38,12 @@ export default function ChatInput({ onSend, disabled, onImageAdd, images, onImag
   const [historyResults, setHistoryResults] = useState([])
   const [historyLoading, setHistoryLoading] = useState(false)
   const [attachedTexts, setAttachedTexts] = useState([])
+  const [listening, setListening] = useState(false)
   const textareaRef = useRef(null)
   const fileRef = useRef(null)
   const pickerRef = useRef(null)
   const historyRef = useRef(null)
+  const srRef = useRef(null)
 
   useEffect(() => {
     if (!stickerOpen) return
@@ -78,10 +80,30 @@ export default function ChatInput({ onSend, disabled, onImageAdd, images, onImag
   }
 
   function handleKeyDown(e) {
-    if (e.key === 'Enter' && !e.shiftKey) {
+    if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
       e.preventDefault()
       submit()
     }
+  }
+
+  function toggleVoice() {
+    const SR = window.SpeechRecognition || window.webkitSpeechRecognition
+    if (!SR) { alert('浏览器不支持语音识别，请用 Chrome / Edge'); return }
+    if (listening) { srRef.current?.stop(); setListening(false); return }
+    const sr = new SR()
+    sr.lang = 'zh-CN'
+    sr.continuous = false
+    sr.interimResults = false
+    sr.onresult = (e) => {
+      const t = e.results[0][0].transcript
+      setText((prev) => prev ? prev + t : t)
+      textareaRef.current?.focus()
+    }
+    sr.onend = () => setListening(false)
+    sr.onerror = () => setListening(false)
+    srRef.current = sr
+    sr.start()
+    setListening(true)
   }
 
   function sendSticker(name) {
@@ -249,6 +271,18 @@ export default function ChatInput({ onSend, disabled, onImageAdd, images, onImag
             title="贴图"
             onClick={(e) => { e.stopPropagation(); setStickerOpen((v) => !v); setHistoryOpen(false) }}
           >🐦</button>
+          <button
+            className={'input-action-btn' + (listening ? ' active' : '')}
+            title={listening ? '停止录音' : '语音输入'}
+            onClick={toggleVoice}
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
+              <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
+              <line x1="12" y1="19" x2="12" y2="23"/>
+              <line x1="8" y1="23" x2="16" y2="23"/>
+            </svg>
+          </button>
           {canSearchHistory && (
             <button
               className={'input-action-btn' + (historyOpen ? ' active' : '')}

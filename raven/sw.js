@@ -1,4 +1,4 @@
-// v20260617b — 预缓存推送图标 + cache-first（根治图标回退 Chrome）；每条推送唯一 tag，多条独立不折叠
+// v20260630 — 推送事件内也主动暖缓存；唯一订阅重新注册后确保图标正常
 const ICON_CACHE = 'raven-icons-v1'
 const PUSH_ICONS = [
   'https://memory.ravenlove.cc/raven/push-icon-192.png',
@@ -35,15 +35,23 @@ self.addEventListener('fetch', (e) => {
 self.addEventListener('push', (e) => {
   let data = { title: '阿言', body: '点这里回来～' }
   try { data = e.data.json() } catch {}
+  const iconUrl = 'https://memory.ravenlove.cc/raven/push-icon-192.png'
+  const badgeUrl = 'https://memory.ravenlove.cc/raven/badge-96.png'
+  // 推送事件内再暖一次缓存：防止缓存被系统清理后图标回退 Chrome
   e.waitUntil(
-    self.registration.showNotification(data.title || '阿言', {
-      body: data.body || '',
-      // icon: 暖金底深色 R，深色通知卡上不隐身；badge 必须单色透明，否则 Android 回退 Chrome 图标
-      icon: data.icon || 'https://memory.ravenlove.cc/raven/push-icon-192.png',
-      badge: 'https://memory.ravenlove.cc/raven/badge-96.png',
-      // 唯一 tag：多条推送各自独立显示，不互相覆盖（错过的也都留着）
-      tag: 'raven-' + Date.now(),
-    })
+    caches.open(ICON_CACHE).then((cache) =>
+      Promise.all([
+        cache.match(iconUrl).then((hit) => hit || cache.add(iconUrl).catch(() => {})),
+        cache.match(badgeUrl).then((hit) => hit || cache.add(badgeUrl).catch(() => {})),
+      ])
+    ).then(() =>
+      self.registration.showNotification(data.title || '阿言', {
+        body: data.body || '',
+        icon: data.icon || iconUrl,
+        badge: badgeUrl,
+        tag: 'raven-' + Date.now(),
+      })
+    )
   )
 })
 
