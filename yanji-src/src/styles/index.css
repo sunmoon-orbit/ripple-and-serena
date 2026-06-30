@@ -97,6 +97,25 @@
   box-shadow: 0 2px 12px rgba(100,150,170,0.1);
 }
 
+/* 思考块在磨砂主题下：给一层更实的毛玻璃底 + 模糊 + 加深文字，
+   否则近乎全透的背景叠在背景图上文字看不清 */
+[data-theme="glass"] .thinking-block {
+  background: rgba(255,255,255,0.62);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border: 1px solid rgba(255,255,255,0.55);
+}
+[data-theme="glass"] .thinking-summary {
+  background: transparent;
+  color: var(--text-mid);
+}
+[data-theme="glass"] .thinking-caret { color: var(--text-mid); }
+[data-theme="glass"] .thinking-content {
+  background: transparent;
+  color: var(--text);
+  border-top-color: rgba(100,150,170,0.18);
+}
+
 /* ===== 重置 ===== */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 html, body, #root {
