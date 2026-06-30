@@ -133,6 +133,26 @@ function useLetters(moonMemory) {
 const LETTER_CATS = [['all', '全部'], ['love', '鸾笺'], ['penpal', '笔友']]
 const emptyCompose = { category: 'penpal', direction: 'in', sender: '', recipient: '', title: '', body: '', sent_at: '' }
 
+// 带翅膀的心 —— 鸾笺专属小图案
+function WingedHeart({ size = 18 }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 64 64" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M32 22 C28 13 14 13 14 25 C14 37 32 50 32 50 C32 50 50 37 50 25 C50 13 36 13 32 22 Z" />
+      <path d="M14 27 C7 22 2 25 2 31 C6 28 9 29 12 32" />
+      <path d="M50 27 C57 22 62 25 62 31 C58 28 55 29 52 32" />
+    </svg>
+  )
+}
+
+// 素信封 —— 笔友类
+function EnvelopeMini({ size = 17 }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="2" y="5" width="20" height="14" rx="2" /><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7" />
+    </svg>
+  )
+}
+
 // ══════════════════════════════════════════════════════════════════════════════
 export default function Roost() {
   const moonMemory = useStore(s => s.moonMemory)
@@ -533,7 +553,7 @@ export default function Roost() {
                         <span>{(l.sent_at || l.created_at || '').slice(0, 10)}</span>
                       </div>
                     </div>
-                    <span className="roost-letter-stamp">{l.category === 'love' ? '❤' : '✉'}</span>
+                    <span className={'roost-letter-stamp' + (l.category === 'love' ? ' love' : '')}>{l.category === 'love' ? <WingedHeart /> : <EnvelopeMini />}</span>
                   </div>
                 ))}
                 {visibleLetters.length === 0 && <div className="roost-empty">还没有信，写一封？</div>}
@@ -587,6 +607,9 @@ export default function Roost() {
             </div>
             <div className="roost-modal-body">
               <div className={'roost-letter-paper' + (selectedLetter.category === 'love' ? ' love' : '')}>
+                {selectedLetter.category === 'love' && (
+                  <div className="roost-letter-deco" aria-hidden="true"><WingedHeart size={56} /></div>
+                )}
                 <div className="roost-letter-paper-head">
                   <span>{selectedLetter.direction === 'out' ? `致 ${selectedLetter.recipient || ''}` : `${selectedLetter.sender || ''} 寄`}</span>
                   <span>{(selectedLetter.sent_at || selectedLetter.created_at || '').slice(0, 10)}</span>
