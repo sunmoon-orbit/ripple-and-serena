@@ -876,7 +876,9 @@ textarea.form-input { display: block; margin: 8px 16px 12px; }
   border-radius: 100px; padding: 3px 10px;
   display: inline-flex; align-items: center;
   cursor: pointer; transition: all 0.15s; white-space: nowrap;
+  min-width: 0; max-width: 100%; overflow: hidden;
 }
+.topbar-model-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
 .topbar-model-btn:hover { background: rgba(191,181,216,0.18); color: var(--accent); }
 
 .bg-menu {

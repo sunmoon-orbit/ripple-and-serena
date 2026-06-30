@@ -1,5 +1,14 @@
 # 项目说明 — ripple-and-serena
 
+## ⚠️ 言叽改完必须 push 到 GitHub（否则阿颖看不到）
+
+阿颖日常用的言叽入口是 **GitHub Pages**（`sunmoon-orbit.github.io/ripple-and-serena/yanji/`），它只服务 git 仓库里 committed 的 `yanji/`。
+
+- 本地 `cd yanji-src && npm run build` 只更新服务器本地的 `yanji/`（即 `memory.ravenlove.cc/...` 那个入口），**阿颖看不到**
+- 改完言叽，**最后一步必须**：`git add yanji-src/ yanji/ && git commit && git push origin main`，GitHub Actions（yanji-build.yml）会重新构建部署
+- 跟阿颖说「做好了」之前，先确认已 push
+- 验证：`curl -s https://sunmoon-orbit.github.io/ripple-and-serena/yanji/index.html | grep -o 'assets/index-[A-Za-z0-9_]*\.js'` 对比本地 build 的 hash 是否一致
+
 ## 乌鸦贴图工具
 
 和阿颖聊天时可以发送乌鸦贴图，方法：在 reply() 里用 markdown 图片语法。
