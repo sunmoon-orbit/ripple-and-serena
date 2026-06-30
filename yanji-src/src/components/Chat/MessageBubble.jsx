@@ -251,15 +251,21 @@ export default function MessageBubble({ msg, onEdit }) {
                 )}
                 {msg.voice ? (
                   <div className="user-voice">
-                    <div className="user-voice-bar">
-                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                        <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
-                        <path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/>
-                      </svg>
-                      <div className="user-voice-wave">
-                        {[40, 70, 100, 60, 85, 45, 95, 55, 75, 35, 65].map((h, i) => <span key={i} style={{ height: `${h}%` }} />)}
+                    {/* 跟助手语音条同一套样式：播放按钮 + 波形 + 时长，点播放朗读本条 */}
+                    <div className={`voice-bar user-vb${ttsState === 'playing' ? ' playing' : ''}`}>
+                      <button className="vb-play" onClick={playTts} aria-label={ttsState === 'playing' ? '暂停' : '播放'}>
+                        {ttsState === 'loading' ? (
+                          <svg viewBox="0 0 24 24" width="12" height="12" fill="currentColor"><circle cx="4" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="20" cy="12" r="2"/></svg>
+                        ) : ttsState === 'playing' ? (
+                          <svg viewBox="0 0 24 24" width="12" height="12" fill="currentColor"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>
+                        ) : (
+                          <svg viewBox="0 0 24 24" width="12" height="12" fill="currentColor"><polygon points="5,3 19,12 5,21"/></svg>
+                        )}
+                      </button>
+                      <div className="vb-wave">
+                        {Array.from({ length: 8 }).map((_, i) => <div key={i} className="vb-bar" />)}
                       </div>
-                      <span className="user-voice-time">{msg.voiceDuration ? `${msg.voiceDuration}″` : ''}</span>
+                      <span className="vb-time">{msg.voiceDuration ? fmtDur(msg.voiceDuration) : '0:00'}</span>
                     </div>
                     {msg.content && <div className="user-voice-text">{renderUserContent(msg.content)}</div>}
                   </div>
