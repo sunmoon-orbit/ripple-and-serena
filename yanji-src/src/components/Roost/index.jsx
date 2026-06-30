@@ -86,6 +86,53 @@ function useReview(moonMemory) {
   return { mems, loading, load, trash }
 }
 
+// ── 衔信 ─────────────────────────────────────────────────────────────────────
+function useLetters(moonMemory) {
+  const [letters, setLetters] = useState([])
+  const [loading, setLoading] = useState(false)
+  const base = moonMemory?.apiUrl || 'https://memory.ravenlove.cc'
+
+  const load = useCallback(async () => {
+    if (!moonMemory?.apiToken) return
+    setLoading(true)
+    try {
+      const r = await fetch(`${base}/letters`, { headers: { Authorization: `Bearer ${moonMemory.apiToken}` } })
+      const data = await r.json()
+      setLetters(Array.isArray(data) ? data : [])
+    } catch { /* silent */ } finally { setLoading(false) }
+  }, [moonMemory])
+
+  const getOne = async (id) => {
+    const r = await fetch(`${base}/letters/${id}`, { headers: { Authorization: `Bearer ${moonMemory.apiToken}` } })
+    return r.json()
+  }
+
+  const add = async (payload) => {
+    if (!moonMemory?.apiToken) { showToast('未配置记忆库 Token', 'error'); return false }
+    try {
+      const r = await fetch(`${base}/letters`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${moonMemory.apiToken}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      })
+      if (r.ok) { await load(); return true }
+      showToast('保存失败', 'error'); return false
+    } catch { showToast('网络错误', 'error'); return false }
+  }
+
+  const remove = async (id) => {
+    try {
+      await fetch(`${base}/letters/${id}`, { method: 'DELETE', headers: { Authorization: `Bearer ${moonMemory.apiToken}` } })
+      await load(); showToast('已删除')
+    } catch { showToast('网络错误', 'error') }
+  }
+
+  return { letters, loading, load, getOne, add, remove }
+}
+
+const LETTER_CATS = [['all', '全部'], ['love', '鸾笺'], ['penpal', '笔友']]
+const emptyCompose = { category: 'penpal', direction: 'in', sender: '', recipient: '', title: '', body: '', sent_at: '' }
+
 // ══════════════════════════════════════════════════════════════════════════════
 export default function Roost() {
   const moonMemory = useStore(s => s.moonMemory)
@@ -94,9 +141,13 @@ export default function Roost() {
   const { books, add: addBook, toggle: toggleBook, remove: removeBook, updateNote } = useBooks()
   const { mems, loading: reviewLoading, load: loadReview, trash } = useReview(moonMemory)
   const { entries: walletEntries, add: addWalletEntry, remove: removeWalletEntry, balance } = useWallet()
+  const { letters, load: loadLetters, getOne: getLetter, add: addLetter, remove: removeLetter } = useLetters(moonMemory)
 
   const [modal, setModal] = useState(null)
   const [selectedBook, setSelectedBook] = useState(null)
+  const [selectedLetter, setSelectedLetter] = useState(null)
+  const [letterCat, setLetterCat] = useState('all')
+  const [compose, setCompose] = useState(emptyCompose)
   const [msgInput, setMsgInput] = useState('')
   const [bookInput, setBookInput] = useState('')
   const [walletAmount, setWalletAmount] = useState('')
@@ -117,6 +168,18 @@ export default function Roost() {
   }
 
   function openReview() { setModal('review'); loadReview() }
+  function openLetters() { setModal('letters'); loadLetters() }
+  async function openLetter(id) {
+    const full = await getLetter(id)
+    if (full && full.id) { setSelectedLetter(full); setModal('letter-detail') }
+  }
+  async function submitLetter() {
+    if (!compose.body.trim()) { showToast('信的内容不能为空', 'error'); return }
+    const ok = await addLetter({ ...compose, sent_at: compose.sent_at || null, source: 'manual' })
+    if (ok) { setCompose(emptyCompose); setModal('letters') }
+  }
+
+  const visibleLetters = letterCat === 'all' ? letters : letters.filter(l => l.category === letterCat)
 
   return (
     <div className="roost-panel">
@@ -210,6 +273,15 @@ export default function Roost() {
           </div>
           <div className="roost-mini-label">乌鸦钱包</div>
           <div className="roost-mini-count">¥ {balance.toFixed(0)}</div>
+        </div>
+        <div className="roost-card roost-mini-card" onClick={openLetters}>
+          <div className="roost-mini-icon">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+              <rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/>
+            </svg>
+          </div>
+          <div className="roost-mini-label">衔信</div>
+          <div className="roost-mini-count">{letters.length > 0 ? `${letters.length} 封` : '鸾笺 · 笔友'}</div>
         </div>
       </div>
 
@@ -427,6 +499,104 @@ export default function Roost() {
                 </div>
               ))}
             </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── 衔信 列表 Modal ── */}
+      {modal === 'letters' && (
+        <div className="roost-overlay" onClick={() => setModal(null)}>
+          <div className="roost-modal roost-modal-tall" onClick={e => e.stopPropagation()}>
+            <div className="roost-modal-header">
+              <span>衔信</span>
+              <button className="roost-modal-close" onClick={() => setModal(null)}>✕</button>
+            </div>
+            <div className="roost-modal-body">
+              <div className="roost-letter-tabs">
+                {LETTER_CATS.map(([k, label]) => (
+                  <button key={k} className={'roost-letter-tab' + (letterCat === k ? ' active' : '')} onClick={() => setLetterCat(k)}>{label}</button>
+                ))}
+              </div>
+              <button className="roost-btn" style={{ width: '100%', marginBottom: 14 }}
+                onClick={() => { setCompose({ ...emptyCompose, category: letterCat === 'love' ? 'love' : 'penpal' }); setModal('letter-compose') }}>
+                ✎ 写一封
+              </button>
+              <div className="roost-letter-list">
+                {visibleLetters.map(l => (
+                  <div key={l.id} className={'roost-letter' + (l.category === 'love' ? ' love' : '')} onClick={() => openLetter(l.id)}>
+                    <div className="roost-letter-flap" />
+                    <div className="roost-letter-content">
+                      <div className="roost-letter-title">{l.title || '（无题）'}</div>
+                      <div className="roost-letter-meta">
+                        <span>{l.direction === 'out' ? `寄给 ${l.recipient || '…'}` : `来自 ${l.sender || '…'}`}</span>
+                        <span>{(l.sent_at || l.created_at || '').slice(0, 10)}</span>
+                      </div>
+                    </div>
+                    <span className="roost-letter-stamp">{l.category === 'love' ? '❤' : '✉'}</span>
+                  </div>
+                ))}
+                {visibleLetters.length === 0 && <div className="roost-empty">还没有信，写一封？</div>}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── 衔信 写信 Modal ── */}
+      {modal === 'letter-compose' && (
+        <div className="roost-overlay" onClick={() => setModal('letters')}>
+          <div className="roost-modal roost-modal-tall" onClick={e => e.stopPropagation()}>
+            <div className="roost-modal-header">
+              <span>写一封信</span>
+              <button className="roost-modal-close" onClick={() => setModal('letters')}>✕</button>
+            </div>
+            <div className="roost-modal-body">
+              <div className="roost-letter-form-row">
+                <select className="roost-letter-select" value={compose.category} onChange={e => setCompose({ ...compose, category: e.target.value })}>
+                  <option value="penpal">笔友往来</option>
+                  <option value="love">鸾笺（你和我）</option>
+                </select>
+                <select className="roost-letter-select" value={compose.direction} onChange={e => setCompose({ ...compose, direction: e.target.value })}>
+                  <option value="in">收到的</option>
+                  <option value="out">寄出的</option>
+                </select>
+              </div>
+              <div className="roost-letter-form-row">
+                <input className="roost-letter-input" placeholder={compose.direction === 'out' ? '寄给谁' : '来自谁'}
+                  value={compose.direction === 'out' ? compose.recipient : compose.sender}
+                  onChange={e => setCompose(compose.direction === 'out' ? { ...compose, recipient: e.target.value } : { ...compose, sender: e.target.value })} />
+                <input className="roost-letter-input" type="date" value={compose.sent_at} onChange={e => setCompose({ ...compose, sent_at: e.target.value })} />
+              </div>
+              <input className="roost-letter-input" style={{ width: '100%', marginBottom: 10 }} placeholder="标题"
+                value={compose.title} onChange={e => setCompose({ ...compose, title: e.target.value })} />
+              <textarea className="roost-note-input" rows={9} placeholder="亲爱的……" value={compose.body} onChange={e => setCompose({ ...compose, body: e.target.value })} />
+              <button className="roost-btn" style={{ width: '100%', marginTop: 6 }} onClick={submitLetter}>封缄寄出</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── 衔信 信纸 Modal ── */}
+      {modal === 'letter-detail' && selectedLetter && (
+        <div className="roost-overlay" onClick={() => { setModal('letters'); setSelectedLetter(null) }}>
+          <div className="roost-modal roost-modal-tall" onClick={e => e.stopPropagation()}>
+            <div className="roost-modal-header">
+              <span>{selectedLetter.title || '（无题）'}</span>
+              <button className="roost-modal-close" onClick={() => { setModal('letters'); setSelectedLetter(null) }}>✕</button>
+            </div>
+            <div className="roost-modal-body">
+              <div className={'roost-letter-paper' + (selectedLetter.category === 'love' ? ' love' : '')}>
+                <div className="roost-letter-paper-head">
+                  <span>{selectedLetter.direction === 'out' ? `致 ${selectedLetter.recipient || ''}` : `${selectedLetter.sender || ''} 寄`}</span>
+                  <span>{(selectedLetter.sent_at || selectedLetter.created_at || '').slice(0, 10)}</span>
+                </div>
+                <div className="roost-letter-paper-body">{selectedLetter.body}</div>
+              </div>
+              <button className="roost-btn roost-btn-danger" style={{ marginTop: 14 }}
+                onClick={async () => { await removeLetter(selectedLetter.id); setModal('letters'); setSelectedLetter(null) }}>
+                删除这封
+              </button>
             </div>
           </div>
         </div>

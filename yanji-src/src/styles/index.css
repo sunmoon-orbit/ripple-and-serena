@@ -2190,6 +2190,85 @@ textarea.form-input { display: block; margin: 8px 16px 12px; }
 
 .roost-empty { font-size: 13px; color: var(--text-faint); text-align: center; padding: 20px 0; }
 
+/* ── 衔信 ── */
+.roost-letter-tabs {
+  display: flex; gap: 6px; background: var(--border);
+  border-radius: 10px; padding: 4px;
+}
+.roost-letter-tab {
+  flex: 1; padding: 7px 0; border: none; cursor: pointer;
+  border-radius: 7px; font-size: 13px; font-family: inherit;
+  background: transparent; color: var(--text-faint); font-weight: 400;
+  transition: all 0.18s;
+}
+.roost-letter-tab.active { background: var(--accent); color: #fff; font-weight: 600; }
+
+.roost-letter-list { display: flex; flex-direction: column; gap: 10px; }
+.roost-letter {
+  position: relative; display: flex; align-items: center; gap: 12px;
+  padding: 14px 14px 14px 16px; cursor: pointer;
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 10px; overflow: hidden;
+  transition: transform 0.15s, box-shadow 0.15s;
+}
+.roost-letter:hover { transform: translateY(-1px); box-shadow: 0 4px 14px rgba(0,0,0,0.06); }
+.roost-letter::before {
+  content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 4px;
+  background: var(--accent); opacity: 0.5;
+}
+.roost-letter.love::before { background: #e07a8c; opacity: 0.7; }
+.roost-letter-flap {
+  width: 26px; height: 20px; flex-shrink: 0;
+  border: 1.5px solid var(--accent); border-radius: 3px;
+  position: relative; opacity: 0.6;
+}
+.roost-letter-flap::after {
+  content: ''; position: absolute; inset: -1.5px;
+  border-top: 11px solid var(--accent); border-left: 13px solid transparent;
+  border-right: 13px solid transparent; opacity: 0.45;
+}
+.roost-letter.love .roost-letter-flap,
+.roost-letter.love .roost-letter-flap::after { border-color: #e07a8c; border-top-color: #e07a8c; }
+.roost-letter-content { flex: 1; min-width: 0; }
+.roost-letter-title {
+  font-size: 14px; font-weight: 600; color: var(--text);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.roost-letter-meta {
+  display: flex; justify-content: space-between; gap: 8px;
+  font-size: 11px; color: var(--text-faint); margin-top: 4px;
+}
+.roost-letter-stamp { font-size: 16px; opacity: 0.6; flex-shrink: 0; }
+
+/* 写信表单 */
+.roost-letter-form-row { display: flex; gap: 8px; }
+.roost-letter-select, .roost-letter-input {
+  flex: 1; min-width: 0; box-sizing: border-box;
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 8px; padding: 9px 11px; font-size: 14px;
+  color: var(--text); font-family: inherit;
+}
+
+/* 信纸 */
+.roost-letter-paper {
+  background: linear-gradient(var(--surface), var(--surface)) padding-box;
+  border: 1px solid var(--border); border-radius: 12px;
+  padding: 18px 18px 22px;
+  background-image: repeating-linear-gradient(transparent, transparent 27px, var(--border) 27px, var(--border) 28px);
+  background-position: 0 44px;
+}
+.roost-letter-paper.love { border-color: #e9b8c2; }
+.roost-letter-paper-head {
+  display: flex; justify-content: space-between; gap: 8px;
+  font-size: 12px; color: var(--text-faint);
+  padding-bottom: 12px; margin-bottom: 4px;
+  border-bottom: 1px dashed var(--border);
+}
+.roost-letter-paper-body {
+  font-size: 14.5px; color: var(--text); line-height: 28px;
+  white-space: pre-wrap; word-break: break-word;
+}
+
 /* ── 共读 CoRead ── */
 .coread-modal { max-width: 540px; }
 .coread-conv-list { display: flex; flex-direction: column; gap: 8px; }
