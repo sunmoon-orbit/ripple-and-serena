@@ -629,9 +629,11 @@ export async function summarizeThinking(thinking, connection, model) {
     connection,
     messages: [{ role: 'user', content: `${THINKING_SUMMARY_PROMPT}\n\n${clean.slice(0, 3000)}` }],
     model: model || connection.defaultModel,
-    generationConfig: { maxTokens: 200, temperature: 0.7 },
+    // maxTokens 给足：有些推理模型（DeepSeek-R1 等）会先消耗 token 思考，给少了正文(总结)会空。
+    // 实际只输出 ~20 字，成本可控。
+    generationConfig: { maxTokens: 1000, temperature: 0.7 },
     autoTools: false,
-    // 不传 onThinking → 总结这步不开思考，直接出标题
+    // 不传 onThinking → Anthropic 不开 extended thinking；其它推理模型的 reasoning_content 直接丢弃
   })
   return (result.text || '')
     .replace(/<\/?[a-zA-Z_][\w:-]*>/g, '')
