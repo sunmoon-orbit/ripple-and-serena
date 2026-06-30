@@ -103,7 +103,7 @@ export default function ChatInput({ onSend, disabled, onImageAdd, images, onImag
     const sr = new SR()
     sr.lang = 'zh-CN'
     sr.continuous = false
-    sr.interimResults = true
+    sr.interimResults = false
     let got = ''
     let lastErr = ''
     const t0 = Date.now()

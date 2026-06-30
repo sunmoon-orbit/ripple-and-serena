@@ -94,9 +94,13 @@ export default function VoiceCall({ onClose, onSend }) {
     if (!srWanted.current || !mounted.current) return
     const SR = window.SpeechRecognition || window.webkitSpeechRecognition
     if (!SR) return
+    // 防止 onend 重启与 TTS 结束重启撞车，产生两个并行实例（会互相 abort）
+    if (srRef.current) { try { srRef.current.stop() } catch {} srRef.current = null }
     const sr = new SR()
     sr.lang = 'zh-CN'
-    sr.continuous = true
+    // 安卓 Chrome 的 continuous=true 会采音但永远不返回结果，必须用 false +
+    // onend 自动重启来实现"持续听"（半双工通话）
+    sr.continuous = false
     sr.interimResults = true
     sr.onresult = (e) => {
       let interim = ''
