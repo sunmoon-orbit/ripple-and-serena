@@ -218,7 +218,7 @@ async function callWithTools({
     // ── OpenAI ──────────────────────────────────────────────────────
     if (provider === 'openai') {
       const url = buildApiUrl(connection.baseUrl, 'openai')
-      const bodyMsgs = buildOpenAIMessages(convo, systemPrompt)
+      const bodyMsgs = buildOpenAIMessages(convo, systemPrompt, iter === 0 ? dynamicContext : undefined)
       const body = { model, messages: bodyMsgs, temperature: safeTemp, max_tokens: maxTokens, tools: formattedTools, tool_choice: 'auto' }
       const resp = await fetch(url, {
         method: 'POST',
@@ -317,7 +317,7 @@ async function callWithTools({
       if (!base.includes('/v1')) base = base.replace(/\/$/, '') + '/' + apiVer
       base = base.replace(/\/$/, '')
       const url = `${base}/models/${encodeURIComponent(model)}:generateContent?key=${connection.apiKey}`
-      const contents = buildGeminiContents(convo, systemPrompt)
+      const contents = buildGeminiContents(convo, systemPrompt, iter === 0 ? dynamicContext : undefined)
       const body = {
         contents,
         tools: formattedTools,
@@ -356,7 +356,7 @@ async function callStream({ connection, messages, systemPrompt, dynamicContext, 
 
   if (provider === 'openai') {
     const url = buildApiUrl(connection.baseUrl, 'openai')
-    const bodyMsgs = buildOpenAIMessages(messages, systemPrompt)
+    const bodyMsgs = buildOpenAIMessages(messages, systemPrompt, dynamicContext)
     const resp = await fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + connection.apiKey },
@@ -433,7 +433,7 @@ async function callStream({ connection, messages, systemPrompt, dynamicContext, 
     if (!base.includes('/v1')) base = base.replace(/\/$/, '') + '/' + apiVer
     base = base.replace(/\/$/, '')
     const url = `${base}/models/${encodeURIComponent(model)}:streamGenerateContent?alt=sse&key=${connection.apiKey}`
-    const contents = buildGeminiContents(messages, systemPrompt)
+    const contents = buildGeminiContents(messages, systemPrompt, dynamicContext)
     const resp = await fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -499,10 +499,19 @@ async function streamSSE(resp, parseLine, onChunk, extractUsage) {
 
 // ─── Message format helpers ─────────────────────────────────────────────────
 
-function buildOpenAIMessages(messages, systemPrompt) {
+function buildOpenAIMessages(messages, systemPrompt, dynamicContext) {
   const out = []
   if (systemPrompt?.trim()) out.push({ role: 'system', content: systemPrompt })
-  for (const m of messages) {
+  // 找最后一条用户消息的下标，用于注入实时上下文（时间/核心记忆/情绪状态）
+  let lastUserIdx = -1
+  for (let i = messages.length - 1; i >= 0; i--) {
+    if (messages[i].role === 'user') { lastUserIdx = i; break }
+  }
+  const dynPrefix = dynamicContext?.trim()
+    ? `[以下为系统自动注入的实时上下文，并非用户发送]\n${dynamicContext.trim()}\n[实时上下文结束]\n\n`
+    : ''
+  messages.forEach((m, i) => {
+    const inject = i === lastUserIdx && dynPrefix
     if (m.role === 'tool') {
       out.push({ role: 'tool', tool_call_id: m.tool_call_id, content: m.content })
     } else if (m.role === 'assistant' && m.tool_calls) {
@@ -511,15 +520,15 @@ function buildOpenAIMessages(messages, systemPrompt) {
       if (rc) am.reasoning_content = rc
       out.push(am)
     } else if (m.images?.length) {
-      const parts = [{ type: 'text', text: m.content || '' }]
+      const parts = [{ type: 'text', text: (inject ? dynPrefix : '') + (m.content || '') }]
       for (const img of m.images) parts.push({ type: 'image_url', image_url: { url: img } })
       out.push({ role: m.role, content: parts })
     } else if (m.role === 'assistant' && (m.thinking || m.reasoning_content)) {
       out.push({ role: 'assistant', content: m.content, reasoning_content: m.thinking || m.reasoning_content })
     } else {
-      out.push({ role: m.role, content: m.content })
+      out.push({ role: m.role, content: inject ? dynPrefix + (m.content || '') : m.content })
     }
-  }
+  })
   return out
 }
 
@@ -573,14 +582,22 @@ function buildAnthropicMessages(messages, dynamicContext) {
   return out
 }
 
-function buildGeminiContents(messages, systemPrompt) {
+function buildGeminiContents(messages, systemPrompt, dynamicContext) {
   const out = []
   if (systemPrompt?.trim()) {
     out.push({ role: 'user', parts: [{ text: '[系统指令]\n' + systemPrompt }] })
     out.push({ role: 'model', parts: [{ text: '好的，我会遵循这些指令。' }] })
   }
-  for (const m of messages) {
+  let lastUserIdx = -1
+  for (let i = messages.length - 1; i >= 0; i--) {
+    if (messages[i].role === 'user') { lastUserIdx = i; break }
+  }
+  const dynPrefix = dynamicContext?.trim()
+    ? `[以下为系统自动注入的实时上下文，并非用户发送]\n${dynamicContext.trim()}\n[实时上下文结束]\n\n`
+    : ''
+  messages.forEach((m, i) => {
     const role = m.role === 'assistant' ? 'model' : 'user'
+    const inject = i === lastUserIdx ? dynPrefix : ''
     if (m.functionResponse) {
       out.push({ role: 'function', parts: [{ functionResponse: m.functionResponse }] })
     } else if (m.functionCall) {
@@ -591,12 +608,12 @@ function buildGeminiContents(messages, systemPrompt) {
         const match = img.match(/^data:(.+);base64,(.+)$/)
         if (match) parts.push({ inline_data: { mime_type: match[1], data: match[2] } })
       }
-      parts.push({ text: m.content || '' })
+      parts.push({ text: inject + (m.content || '') })
       out.push({ role, parts })
     } else {
-      out.push({ role, parts: [{ text: m.content }] })
+      out.push({ role, parts: [{ text: inject + (m.content || '') }] })
     }
-  }
+  })
   return out
 }
 
