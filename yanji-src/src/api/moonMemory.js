@@ -87,6 +87,46 @@ export async function synthesizeSpeech(config, text, voiceId) {
   })
 }
 
+// ─── 共读：历史对话 + 标注 + 书签 ───────────────────────────────────────────
+export async function fetchArchiveConversations(config) {
+  const { baseUrl, apiToken } = config
+  return request(baseUrl, '/archive/conversations', { headers: headers(apiToken) })
+}
+
+export async function fetchArchiveConversation(config, id) {
+  const { baseUrl, apiToken } = config
+  return request(baseUrl, `/archive/conversations/${id}`, { headers: headers(apiToken) })
+}
+
+export async function fetchAnnotations(config, convId) {
+  const { baseUrl, apiToken } = config
+  return request(baseUrl, `/archive/conversations/${convId}/annotations`, { headers: headers(apiToken) })
+}
+
+export async function createAnnotation(config, convId, body) {
+  const { baseUrl, apiToken } = config
+  return request(baseUrl, `/archive/conversations/${convId}/annotations`, {
+    method: 'POST', headers: headers(apiToken), body: JSON.stringify(body),
+  })
+}
+
+export async function deleteAnnotation(config, annoId) {
+  const { baseUrl, apiToken } = config
+  return request(baseUrl, `/archive/annotations/${annoId}`, { method: 'DELETE', headers: headers(apiToken) })
+}
+
+export async function fetchBookmark(config, convId) {
+  const { baseUrl, apiToken } = config
+  return request(baseUrl, `/archive/conversations/${convId}/bookmark`, { headers: headers(apiToken) })
+}
+
+export async function saveBookmark(config, convId, messageId, updatedBy) {
+  const { baseUrl, apiToken } = config
+  return request(baseUrl, `/archive/conversations/${convId}/bookmark`, {
+    method: 'PUT', headers: headers(apiToken), body: JSON.stringify({ message_id: messageId, updated_by: updatedBy }),
+  })
+}
+
 export async function fetchPushSchedule(config) {
   const { baseUrl, apiToken } = config
   return request(baseUrl, '/push/schedule', { headers: headers(apiToken) })
