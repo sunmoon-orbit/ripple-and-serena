@@ -1,8 +1,8 @@
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import { api } from '../api'
 import { useStore, hashPassword } from '../store'
 import { showToast } from './Toast'
-import { Plug, KeyRound, Palette, Activity, RefreshCw, CheckCircle2, AlertTriangle, XCircle } from 'lucide-react'
+import { Plug, KeyRound, Palette, Activity, RefreshCw, CheckCircle2, AlertTriangle, XCircle, Upload } from 'lucide-react'
 
 const THEMES = [
   { id: 'light',    label: 'Light',    dot: '#5A7A98' },
@@ -40,6 +40,8 @@ export default function SettingsPanel() {
   const [newPw, setNewPw] = useState('')
   const [health, setHealth] = useState(null)
   const [healthLoading, setHealthLoading] = useState(false)
+  const [importing, setImporting] = useState(false)
+  const importRef = useRef()
 
   function saveConn() {
     setConn({ baseUrl: url.trim(), apiToken: token.trim() })
@@ -74,6 +76,23 @@ export default function SettingsPanel() {
   }
 
   const backup = health ? fmtBackup(health) : null
+
+  async function handleImportClaudeAI(e) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setImporting(true)
+    try {
+      const text = await file.text()
+      const data = JSON.parse(text)
+      const r = await api.importClaudeAI(data)
+      showToast(`导入完成，新增 ${r.imported} 条对话`, 'success')
+    } catch (err) {
+      showToast('导入失败：' + err.message, 'error')
+    } finally {
+      setImporting(false)
+      if (importRef.current) importRef.current.value = ''
+    }
+  }
 
   return (
     <div className="panel">
@@ -157,6 +176,19 @@ export default function SettingsPanel() {
         <div className="field"><label>旧密码</label><input className="input" type="password" value={oldPw} onChange={(e) => setOldPw(e.target.value)} /></div>
         <div className="field"><label>新密码</label><input className="input" type="password" value={newPw} onChange={(e) => setNewPw(e.target.value)} /></div>
         <button className="btn btn-primary" style={{ width: '100%', justifyContent: 'center' }} onClick={changePw}>更新密码</button>
+      </div>
+
+      <div className="section-title"><Upload size={15} style={{ verticalAlign: -2, marginRight: 6 }} />导入对话历史</div>
+      <div className="settings-card">
+        <p style={{ fontSize: 13, opacity: 0.6, margin: '0 0 10px' }}>
+          上传 Claude 官方导出的 <code>conversations.json</code>，或言叽导出的 .md 文件（.md 请用命令行脚本）。重复导入安全，已存在的对话会跳过。
+        </p>
+        <input ref={importRef} type="file" accept=".json" style={{ display: 'none' }} onChange={handleImportClaudeAI} />
+        <button className="btn btn-ghost" style={{ width: '100%', justifyContent: 'center' }}
+          onClick={() => importRef.current?.click()} disabled={importing}>
+          <Upload size={14} style={{ marginRight: 6 }} />
+          {importing ? '导入中…' : '选择 conversations.json'}
+        </button>
       </div>
 
       <div className="section-title"><Palette size={15} style={{ verticalAlign: -2, marginRight: 6 }} />外观</div>
