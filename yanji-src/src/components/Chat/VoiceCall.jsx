@@ -1,15 +1,8 @@
-import { useState, useRef, useEffect, useCallback } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import { useStore } from '../../store'
-import { synthesizeSpeech } from '../../api/moonMemory'
+import { synthesizeSpeech, transcribeAudio } from '../../api/moonMemory'
 import { showToast } from '../Toast'
-
-const SR_ERR_MSG = {
-  'not-allowed': '麦克风权限被拒绝，去浏览器设置允许后重开通话',
-  'service-not-allowed': '系统没开语音服务（部分安卓机要装/开 Google 语音）',
-  'network': '语音识别要联网（走 Google 服务），检查网络',
-  'audio-capture': '没找到麦克风',
-}
 
 const VOICE_TAG_RE = /\[(breath|laughter)\]/gi
 
@@ -29,12 +22,13 @@ export default function VoiceCall({ onClose, onSend }) {
   const messages = messagesByChatId[activeChatId] || []
 
   const [ttsState, setTtsState] = useState('idle') // idle | loading | playing
-  const [transcript, setTranscript] = useState('')
+  const [recording, setRecording] = useState(false)
+  const [transcribing, setTranscribing] = useState(false)
   const [aiText, setAiText] = useState('')
   const [duration, setDuration] = useState(0)
 
-  const srRef = useRef(null)
-  const srWanted = useRef(true)
+  const recRef = useRef(null)
+  const recChunks = useRef([])
   const ttsCtxRef = useRef(null)
   const lastTtsId = useRef(null)
   const speakQueue = useRef([])
@@ -54,6 +48,7 @@ export default function VoiceCall({ onClose, onSend }) {
 
     return () => {
       mounted.current = false
+      try { recRef.current?.stop() } catch {}
       try { ttsCtxRef.current?.close() } catch {}
     }
   }, [])
@@ -83,56 +78,50 @@ export default function VoiceCall({ onClose, onSend }) {
     }
   }, [messages])
 
-  function stopSr() {
-    if (srRef.current) {
-      try { srRef.current.stop() } catch {}
-      srRef.current = null
+  // ── 录音转写（push-to-talk）：点一下开始，再点一下结束并发送 ──
+  async function toggleRecord() {
+    if (transcribing) return
+    if (recording) { // 停止 → onstop 转写
+      try { recRef.current?.stop() } catch {}
+      return
     }
+    if (ttsState !== 'idle') return // 对方说话时不录
+    if (!moonMemory?.apiToken) { showToast('语音通话需要先连接记忆库', 'error'); return }
+    if (!navigator.mediaDevices?.getUserMedia || !window.MediaRecorder) {
+      showToast('当前浏览器不支持录音', 'error'); return
+    }
+    let stream
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+    } catch (e) {
+      showToast('麦克风打不开：' + (e.message || e.name), 'error', 5000); return
+    }
+    const mr = new MediaRecorder(stream)
+    recChunks.current = []
+    mr.ondataavailable = (e) => { if (e.data && e.data.size) recChunks.current.push(e.data) }
+    mr.onstop = async () => {
+      stream.getTracks().forEach((t) => t.stop())
+      setRecording(false)
+      const blob = new Blob(recChunks.current, { type: mr.mimeType || 'audio/webm' })
+      if (blob.size < 1200) { showToast('录音太短了，再说一次', 'info'); return }
+      setTranscribing(true)
+      try {
+        const text = await transcribeAudio({ baseUrl: moonMemory.baseUrl, apiToken: moonMemory.apiToken }, blob)
+        if (text && mounted.current) onSend(`[voice] ${text}`, [])
+        else if (!text) showToast('没识别到内容，再说一次', 'info')
+      } catch (e) {
+        showToast(e.message || '转写失败', 'error', 5000)
+      } finally {
+        if (mounted.current) setTranscribing(false)
+      }
+    }
+    recRef.current = mr
+    mr.start()
+    setRecording(true)
   }
-
-  const startSr = useCallback(() => {
-    if (!srWanted.current || !mounted.current) return
-    const SR = window.SpeechRecognition || window.webkitSpeechRecognition
-    if (!SR) return
-    // 防止 onend 重启与 TTS 结束重启撞车，产生两个并行实例（会互相 abort）
-    if (srRef.current) { try { srRef.current.stop() } catch {} srRef.current = null }
-    const sr = new SR()
-    sr.lang = 'zh-CN'
-    // 安卓 Chrome 的 continuous=true 会采音但永远不返回结果，必须用 false +
-    // onend 自动重启来实现"持续听"（半双工通话）
-    sr.continuous = false
-    sr.interimResults = true
-    sr.onresult = (e) => {
-      let interim = ''
-      for (let i = e.resultIndex; i < e.results.length; i++) {
-        const piece = (e.results[i][0]?.transcript || '').trim()
-        if (e.results[i].isFinal) {
-          if (mounted.current) setTranscript('')
-          if (piece) onSend(`[voice] ${piece}`, [])
-        } else {
-          interim += piece
-        }
-      }
-      if (interim && mounted.current) setTranscript(interim)
-    }
-    sr.onend = () => {
-      // 安卓 Chrome 的 continuous 经常每句话后就 end，这里自动重启续听
-      if (srWanted.current && mounted.current) setTimeout(startSr, 450)
-    }
-    sr.onerror = (e) => {
-      // no-speech / aborted 是正常的静默/打断，自动续听即可；其它错误提示一次
-      if (e.error && e.error !== 'no-speech' && e.error !== 'aborted') {
-        showToast(SR_ERR_MSG[e.error] || `语音通话识别出错：${e.error}`, 'error', 5000)
-      }
-      if (srWanted.current && mounted.current) setTimeout(startSr, 1000)
-    }
-    try { sr.start() } catch {}
-    srRef.current = sr
-  }, [onSend])
 
   async function drainQueue() {
     speakBusy.current = true
-    stopSr()
     while (speakQueue.current.length && mounted.current) {
       const text = speakQueue.current.shift()
       if (mounted.current) { setAiText(text); setTtsState('loading') }
@@ -140,7 +129,6 @@ export default function VoiceCall({ onClose, onSend }) {
     }
     if (mounted.current) { setAiText(''); setTtsState('idle') }
     speakBusy.current = false
-    if (srWanted.current && mounted.current) setTimeout(startSr, 250)
   }
 
   async function speakOne(text) {
@@ -173,30 +161,19 @@ export default function VoiceCall({ onClose, onSend }) {
     })
   }
 
-  // Start recognition after mount
-  useEffect(() => {
-    const t = setTimeout(startSr, 600)
-    return () => {
-      clearTimeout(t)
-      srWanted.current = false
-      stopSr()
-    }
-  }, [startSr])
-
   function handleClose() {
-    srWanted.current = false
-    stopSr()
+    try { recRef.current?.stop() } catch {}
     onClose()
   }
 
   const fmtDur = (s) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`
 
-  const statusLabel = ttsState === 'loading' ? '合成中…'
+  const statusLabel = transcribing ? '识别中…'
+    : recording ? '录音中…说完点一下发送'
+    : ttsState === 'loading' ? '合成中…'
     : ttsState === 'playing' ? '对方说话中'
-    : transcript ? '识别中…'
-    : '倾听中…'
+    : '点麦克风说话'
 
-  const isListening = ttsState === 'idle'
   const isPlaying = ttsState === 'playing'
 
   return createPortal(
@@ -207,7 +184,7 @@ export default function VoiceCall({ onClose, onSend }) {
         <div className="vc-status">{statusLabel}</div>
 
         {/* Waveform animation */}
-        <div className={`vc-wave${isPlaying ? ' playing' : isListening ? ' listening' : ''}`}>
+        <div className={`vc-wave${isPlaying ? ' playing' : recording ? ' listening' : ''}`}>
           {Array.from({ length: 10 }).map((_, i) => (
             <div key={i} className="vc-bar" style={{ animationDelay: `${i * 0.07}s` }} />
           ))}
@@ -215,19 +192,36 @@ export default function VoiceCall({ onClose, onSend }) {
 
         {/* Text display */}
         <div className="vc-text-area">
-          {aiText ? (
-            <p className="vc-ai-text">{aiText}</p>
-          ) : transcript ? (
-            <p className="vc-transcript">{transcript}</p>
-          ) : null}
+          {aiText ? <p className="vc-ai-text">{aiText}</p> : null}
         </div>
 
-        {/* Hang up */}
-        <button className="vc-hangup" onClick={handleClose} title="挂断">
-          <svg width="26" height="26" viewBox="0 0 24 24" fill="currentColor">
-            <path d="M6.6 10.8c1.4 2.8 3.8 5.1 6.6 6.6l2.2-2.2c.27-.27.67-.36 1-.25 1.12.37 2.33.57 3.57.57.55 0 1 .45 1 1V20c0 .55-.45 1-1 1-9.39 0-17-7.61-17-17 0-.55.45-1 1-1h3.5c.55 0 1 .45 1 1 0 1.25.2 2.45.57 3.57.11.35.03.74-.25 1.01L6.6 10.8z"/>
-          </svg>
-        </button>
+        {/* Push-to-talk + hang up */}
+        <div className="vc-controls">
+          <button
+            className={'vc-mic' + (recording ? ' recording' : '') + (transcribing ? ' busy' : '')}
+            onClick={toggleRecord}
+            disabled={transcribing || ttsState !== 'idle'}
+            title={recording ? '点一下结束并发送' : '点一下开始说话'}
+          >
+            {transcribing ? (
+              <svg className="vc-spin" width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round">
+                <path d="M21 12a9 9 0 1 1-6.219-8.56"/>
+              </svg>
+            ) : (
+              <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
+                <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
+                <line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/>
+              </svg>
+            )}
+          </button>
+
+          <button className="vc-hangup" onClick={handleClose} title="挂断">
+            <svg width="26" height="26" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M6.6 10.8c1.4 2.8 3.8 5.1 6.6 6.6l2.2-2.2c.27-.27.67-.36 1-.25 1.12.37 2.33.57 3.57.57.55 0 1 .45 1 1V20c0 .55-.45 1-1 1-9.39 0-17-7.61-17-17 0-.55.45-1 1-1h3.5c.55 0 1 .45 1 1 0 1.25.2 2.45.57 3.57.11.35.03.74-.25 1.01L6.6 10.8z"/>
+            </svg>
+          </button>
+        </div>
       </div>
     </div>,
     document.body

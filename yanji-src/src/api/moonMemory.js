@@ -78,6 +78,25 @@ export async function checkHealth(config) {
   return request(baseUrl, '/health')
 }
 
+// 录音转文字：上传音频到服务端 /stt（SiliconFlow），绕开安卓 Chrome 不可用的 Web Speech API
+export async function transcribeAudio(config, blob) {
+  const { baseUrl, apiToken } = config
+  const form = new FormData()
+  form.append('audio', blob, 'audio.webm')
+  const url = baseUrl.replace(/\/$/, '') + '/stt'
+  const resp = await fetch(url, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${apiToken}` }, // 不要手动设 Content-Type，让浏览器带 boundary
+    body: form,
+  })
+  if (!resp.ok) {
+    const t = await resp.text().catch(() => '')
+    throw new Error(`转写失败 ${resp.status}: ${t.slice(0, 120)}`)
+  }
+  const data = await resp.json()
+  return (data.text || '').trim()
+}
+
 export async function synthesizeSpeech(config, text, voiceId) {
   const { baseUrl, apiToken } = config
   return request(baseUrl, '/tts', {
