@@ -153,6 +153,20 @@ function EnvelopeMini({ size = 17 }) {
   )
 }
 
+// 一对鸟脚印 —— 空状态点缀（呼应乌鸦）
+function BirdTracks() {
+  return (
+    <svg width="42" height="42" viewBox="0 0 48 48" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+      <g>
+        <path d="M16 22 L11 13" /><path d="M16 22 L16 11" /><path d="M16 22 L21 13" /><path d="M16 22 L16 29" />
+      </g>
+      <g opacity="0.6">
+        <path d="M32 34 L27 25" /><path d="M32 34 L32 23" /><path d="M32 34 L37 25" /><path d="M32 34 L32 41" />
+      </g>
+    </svg>
+  )
+}
+
 // ══════════════════════════════════════════════════════════════════════════════
 export default function Roost() {
   const moonMemory = useStore(s => s.moonMemory)
@@ -556,7 +570,12 @@ export default function Roost() {
                     <span className={'roost-letter-stamp' + (l.category === 'love' ? ' love' : '')}>{l.category === 'love' ? <WingedHeart /> : <EnvelopeMini />}</span>
                   </div>
                 ))}
-                {visibleLetters.length === 0 && <div className="roost-empty">还没有信，写一封？</div>}
+                {visibleLetters.length === 0 && (
+                  <div className="roost-letter-empty">
+                    <BirdTracks />
+                    <span>还没有信，写一封？</span>
+                  </div>
+                )}
               </div>
             </div>
           </div>
