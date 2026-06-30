@@ -1,14 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { showToast } from '../Toast'
-
-const SR_ERR_MSG = {
-  'not-allowed': '麦克风权限被拒绝，去浏览器设置里允许',
-  'service-not-allowed': '系统没开语音服务（部分安卓机要装/开 Google 语音）',
-  'no-speech': '没听到声音，靠近一点再说',
-  'network': '语音识别要联网（走 Google 服务），检查网络',
-  'aborted': '识别被中断了',
-  'audio-capture': '没找到麦克风',
-}
+import { transcribeAudio } from '../../api/moonMemory'
 
 const STICKERS = [
   'kaixin.png','wuyu.png','qushi.png','shangban.png','xihuan.png',
@@ -48,12 +40,14 @@ export default function ChatInput({ onSend, disabled, onImageAdd, images, onImag
   const [historyResults, setHistoryResults] = useState([])
   const [historyLoading, setHistoryLoading] = useState(false)
   const [attachedTexts, setAttachedTexts] = useState([])
-  const [listening, setListening] = useState(false)
+  const [listening, setListening] = useState(false)     // 录音中
+  const [transcribing, setTranscribing] = useState(false) // 转写中
   const textareaRef = useRef(null)
   const fileRef = useRef(null)
   const pickerRef = useRef(null)
   const historyRef = useRef(null)
-  const srRef = useRef(null)
+  const mediaRecRef = useRef(null)
+  const audioChunksRef = useRef([])
 
   useEffect(() => {
     if (!stickerOpen) return
@@ -96,54 +90,46 @@ export default function ChatInput({ onSend, disabled, onImageAdd, images, onImag
     }
   }
 
-  function toggleVoice() {
-    const SR = window.SpeechRecognition || window.webkitSpeechRecognition
-    if (!SR) { alert('浏览器不支持语音识别，请用 Chrome / Edge'); return }
-    if (listening) { srRef.current?.stop(); setListening(false); return }
-    const sr = new SR()
-    sr.lang = 'zh-CN'
-    sr.continuous = false
-    sr.interimResults = false
-    let got = ''
-    let lastErr = ''
-    const t0 = Date.now()
-    const flags = { audio: false, sound: false, speech: false }
-    sr.onaudiostart = () => { flags.audio = true }
-    sr.onsoundstart = () => { flags.sound = true }
-    sr.onspeechstart = () => { flags.speech = true }
-    sr.onresult = (e) => {
-      let finalPiece = ''
-      for (let i = e.resultIndex; i < e.results.length; i++) {
-        if (e.results[i].isFinal) finalPiece += e.results[i][0]?.transcript || ''
-      }
-      if (finalPiece) {
-        got += finalPiece
-        setText((prev) => prev ? prev + finalPiece : finalPiece)
-        textareaRef.current?.focus()
-      }
+  // 录音 → 上传服务端 SiliconFlow 转写。安卓 Chrome 的 Web Speech API 不可用，改用这条路。
+  // 点一下开始录音，再点一下停止并转写——阿颖手动控制说完没说完。
+  async function toggleVoice() {
+    if (transcribing) return
+    if (listening) { // 停止录音 → 触发 onstop 转写
+      try { mediaRecRef.current?.stop() } catch {}
+      return
     }
-    sr.onend = () => {
+    if (!moonMemory?.apiToken) { showToast('语音转文字需要先在设置里连接记忆库', 'error'); return }
+    if (!navigator.mediaDevices?.getUserMedia || !window.MediaRecorder) {
+      showToast('当前浏览器不支持录音', 'error'); return
+    }
+    let stream
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+    } catch (e) {
+      showToast('麦克风打不开：' + (e.message || e.name), 'error', 5000); return
+    }
+    const mr = new MediaRecorder(stream)
+    audioChunksRef.current = []
+    mr.ondataavailable = (e) => { if (e.data && e.data.size) audioChunksRef.current.push(e.data) }
+    mr.onstop = async () => {
+      stream.getTracks().forEach((t) => t.stop())
       setListening(false)
-      if (got || lastErr) return
-      const dt = Date.now() - t0
-      // 诊断：没结果也没报错时，看生命周期事件卡在哪一步
-      const diag = !flags.audio
-        ? `麦克风没启动（${dt}ms 就结束，可能被其它App占用或系统语音服务没开）`
-        : !flags.sound
-        ? `麦克风开了但没收到任何声音（检查录音权限/麦克风硬件，${dt}ms）`
-        : !flags.speech
-        ? `收到声音但没识别成语音（说大声点/靠近点，${dt}ms）`
-        : `识别服务没返回文字（Google 语音服务可能没装语言包，${dt}ms）`
-      showToast('没识别到内容｜' + diag, 'info', 6000)
+      const blob = new Blob(audioChunksRef.current, { type: mr.mimeType || 'audio/webm' })
+      if (blob.size < 1200) { showToast('录音太短了，再说一次', 'info'); return }
+      setTranscribing(true)
+      try {
+        const t = await transcribeAudio({ baseUrl: moonMemory.baseUrl, apiToken: moonMemory.apiToken }, blob)
+        if (t) { setText((prev) => prev ? prev + t : t); textareaRef.current?.focus() }
+        else showToast('没识别到内容，再说一次', 'info')
+      } catch (e) {
+        showToast(e.message || '转写失败', 'error', 5000)
+      } finally {
+        setTranscribing(false)
+      }
     }
-    sr.onerror = (e) => {
-      lastErr = e.error
-      setListening(false)
-      showToast(SR_ERR_MSG[e.error] || `语音识别出错：${e.error}`, 'error', 5000)
-    }
-    srRef.current = sr
-    try { sr.start(); setListening(true) }
-    catch (err) { showToast('无法启动语音识别：' + err.message, 'error') }
+    mediaRecRef.current = mr
+    mr.start()
+    setListening(true)
   }
 
   function sendSticker(name) {
@@ -312,16 +298,23 @@ export default function ChatInput({ onSend, disabled, onImageAdd, images, onImag
             onClick={(e) => { e.stopPropagation(); setStickerOpen((v) => !v); setHistoryOpen(false) }}
           >🐦</button>
           <button
-            className={'input-action-btn' + (listening ? ' active' : '')}
-            title={listening ? '停止录音' : '语音输入'}
+            className={'input-action-btn' + (listening ? ' recording' : '') + (transcribing ? ' active' : '')}
+            title={transcribing ? '转写中…' : listening ? '点一下结束并转文字' : '语音输入（点一下开始录音）'}
             onClick={toggleVoice}
+            disabled={transcribing}
           >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
-              <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
-              <line x1="12" y1="19" x2="12" y2="23"/>
-              <line x1="8" y1="23" x2="16" y2="23"/>
-            </svg>
+            {transcribing ? (
+              <svg className="spin" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                <path d="M21 12a9 9 0 1 1-6.219-8.56"/>
+              </svg>
+            ) : (
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
+                <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
+                <line x1="12" y1="19" x2="12" y2="23"/>
+                <line x1="8" y1="23" x2="16" y2="23"/>
+              </svg>
+            )}
           </button>
           {canSearchHistory && (
             <button
