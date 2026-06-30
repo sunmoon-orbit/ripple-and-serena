@@ -176,8 +176,8 @@ export default function MessageBubble({ msg, onEdit }) {
   // 不用原生 <details>（受控 open 在部分浏览器/React 下会和原生状态错位），改纯按钮+条件渲染，稳。
   const [thinkOpen, setThinkOpen] = useState(isStreaming)
   useEffect(() => { setThinkOpen(isStreaming) }, [isStreaming])
-  // 有些模型/代理把 <think></think> 标签直接塞进思考文本里，展示时剥掉
-  const thinkingText = (msg.thinking || '').replace(/<\/?think>/gi, '').trim()
+  // 有些模型/代理把 <think>/<next_thinking>/<reasoning> 等标签塞进思考文本里，展示时剥掉
+  const thinkingText = (msg.thinking || '').replace(/<\/?[a-zA-Z_][\w:-]*>/g, '').trim()
 
   const html = useMemo(() => {
     if (isUser) return null
@@ -257,11 +257,11 @@ export default function MessageBubble({ msg, onEdit }) {
                         <path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/>
                       </svg>
                       <div className="user-voice-wave">
-                        {Array.from({ length: 9 }).map((_, i) => <span key={i} style={{ height: `${30 + (i * 37) % 70}%` }} />)}
+                        {[40, 70, 100, 60, 85, 45, 95, 55, 75, 35, 65].map((h, i) => <span key={i} style={{ height: `${h}%` }} />)}
                       </div>
                       <span className="user-voice-time">{msg.voiceDuration ? `${msg.voiceDuration}″` : ''}</span>
                     </div>
-                    <div className="user-voice-text">{renderUserContent(msg.content)}</div>
+                    {msg.content && <div className="user-voice-text">{renderUserContent(msg.content)}</div>}
                   </div>
                 ) : renderUserContent(msg.content)}
               </>
