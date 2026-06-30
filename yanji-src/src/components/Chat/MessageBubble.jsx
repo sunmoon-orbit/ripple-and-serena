@@ -258,13 +258,11 @@ export default function MessageBubble({ msg, onEdit }) {
                       {renderUserContent(msg.content)}
                     </div>
                   ) : (
-                    // 语音条视图：麦克风图标 + 波形 + 时长，点一下转文字（不带播放，自己说的不用听）
+                    // 语音条视图：跟助手语音条同款三角形播放键 + 波形 + 时长。
+                    // 三角键只为统一外观，点了不放声音（没存音频）；整条点击转文字。
                     <div className="voice-bar user-vb" onClick={() => setVoiceTextMode(true)} title="点击转文字">
                       <span className="vb-mic">
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                          <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
-                          <path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/>
-                        </svg>
+                        <svg viewBox="0 0 24 24" width="12" height="12" fill="currentColor"><polygon points="5,3 19,12 5,21"/></svg>
                       </span>
                       <div className="vb-wave">
                         {Array.from({ length: 8 }).map((_, i) => <div key={i} className="vb-bar" />)}
