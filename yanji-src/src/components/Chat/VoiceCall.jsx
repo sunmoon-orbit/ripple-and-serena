@@ -98,16 +98,18 @@ export default function VoiceCall({ onClose, onSend }) {
     }
     const mr = new MediaRecorder(stream)
     recChunks.current = []
+    const recStart = Date.now()
     mr.ondataavailable = (e) => { if (e.data && e.data.size) recChunks.current.push(e.data) }
     mr.onstop = async () => {
       stream.getTracks().forEach((t) => t.stop())
       setRecording(false)
+      const dur = Math.round((Date.now() - recStart) / 1000)
       const blob = new Blob(recChunks.current, { type: mr.mimeType || 'audio/webm' })
       if (blob.size < 1200) { showToast('录音太短了，再说一次', 'info'); return }
       setTranscribing(true)
       try {
         const text = await transcribeAudio({ baseUrl: moonMemory.baseUrl, apiToken: moonMemory.apiToken }, blob)
-        if (text && mounted.current) onSend(`[voice] ${text}`, [])
+        if (text && mounted.current) onSend(text, [], { voice: true, voiceDuration: dur })
         else if (!text) showToast('没识别到内容，再说一次', 'info')
       } catch (e) {
         showToast(e.message || '转写失败', 'error', 5000)

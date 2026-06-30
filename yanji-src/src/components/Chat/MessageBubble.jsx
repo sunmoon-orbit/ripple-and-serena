@@ -172,11 +172,12 @@ export default function MessageBubble({ msg, onEdit }) {
 
   const fmtDur = (s) => `${Math.floor(s / 60)}:${String(Math.round(s % 60)).padStart(2, '0')}`
   const [editText, setEditText] = useState(msg.content)
-  // 思考过程：流式时展开（实时看着想），结束后自动收起，只留一句标题式总结
+  // 思考过程：流式时展开（实时看着想），结束后自动收起，只留一句标题式总结。
+  // 不用原生 <details>（受控 open 在部分浏览器/React 下会和原生状态错位），改纯按钮+条件渲染，稳。
   const [thinkOpen, setThinkOpen] = useState(isStreaming)
-  useEffect(() => {
-    if (!isStreaming) setThinkOpen(false)
-  }, [isStreaming])
+  useEffect(() => { setThinkOpen(isStreaming) }, [isStreaming])
+  // 有些模型/代理把 <think></think> 标签直接塞进思考文本里，展示时剥掉
+  const thinkingText = (msg.thinking || '').replace(/<\/?think>/gi, '').trim()
 
   const html = useMemo(() => {
     if (isUser) return null
@@ -205,16 +206,19 @@ export default function MessageBubble({ msg, onEdit }) {
             {msg.toolCalls.map((n, i) => <span key={i} className="tool-chip">{n}</span>)}
           </div>
         )}
-        {msg.thinking && (
-          <details className="thinking-block" open={thinkOpen} onToggle={(e) => setThinkOpen(e.currentTarget.open)}>
-            <summary>
+        {thinkingText && (
+          <div className={'thinking-block' + (thinkOpen ? ' open' : '')}>
+            <button type="button" className="thinking-summary" onClick={() => setThinkOpen((o) => !o)}>
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/>
               </svg>
-              {msg.thinkingSummary || (isStreaming ? '思考中…' : '思考过程')}
-            </summary>
-            <div className="thinking-content">{msg.thinking}</div>
-          </details>
+              <span className="thinking-summary-text">{msg.thinkingSummary || (isStreaming ? '思考中…' : '思考过程')}</span>
+              <svg className="thinking-caret" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="6 9 12 15 18 9"/>
+              </svg>
+            </button>
+            {thinkOpen && <div className="thinking-content">{thinkingText}</div>}
+          </div>
         )}
         <div className={`message-bubble ${isUser ? 'bubble-user' : 'bubble-assistant'}${isStreaming ? ' streaming' : ''}`}>
           {isUser ? (
@@ -245,7 +249,21 @@ export default function MessageBubble({ msg, onEdit }) {
                     {msg.images.map((src, i) => <img key={i} src={src} alt="" className="bubble-img" />)}
                   </div>
                 )}
-                {renderUserContent(msg.content)}
+                {msg.voice ? (
+                  <div className="user-voice">
+                    <div className="user-voice-bar">
+                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
+                        <path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/>
+                      </svg>
+                      <div className="user-voice-wave">
+                        {Array.from({ length: 9 }).map((_, i) => <span key={i} style={{ height: `${30 + (i * 37) % 70}%` }} />)}
+                      </div>
+                      <span className="user-voice-time">{msg.voiceDuration ? `${msg.voiceDuration}″` : ''}</span>
+                    </div>
+                    <div className="user-voice-text">{renderUserContent(msg.content)}</div>
+                  </div>
+                ) : renderUserContent(msg.content)}
               </>
             )
           ) : voiceMode ? (

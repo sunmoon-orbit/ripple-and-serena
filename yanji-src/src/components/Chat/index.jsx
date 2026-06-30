@@ -52,7 +52,7 @@ export default function Chat() {
   }
 
   // ── Send ─────────────────────────────────────────────────────────────────
-  const handleSend = useCallback(async (text, images) => {
+  const handleSend = useCallback(async (text, images, opts = {}) => {
     if (isSending || (!text && !images.length)) return
 
     let chat = activeChat
@@ -75,6 +75,9 @@ export default function Chat() {
       content: text,
       images: images.length ? images : undefined,
       injected: injectMode && injectPrompt ? injectPrompt : undefined,
+      // 语音消息：标记为语音条样式 + 时长（秒）
+      voice: opts.voice || undefined,
+      voiceDuration: opts.voice ? (opts.voiceDuration || 0) : undefined,
     })
     setPendingImages([])
 
@@ -473,7 +476,7 @@ export default function Chat() {
       {callOpen && (
         <VoiceCall
           onClose={() => setCallOpen(false)}
-          onSend={(text, images) => handleSend(text, images)}
+          onSend={(text, images, opts) => handleSend(text, images, opts)}
         />
       )}
     </div>
