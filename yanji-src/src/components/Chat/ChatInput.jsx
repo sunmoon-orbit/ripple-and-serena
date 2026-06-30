@@ -1,4 +1,14 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
+import { showToast } from '../Toast'
+
+const SR_ERR_MSG = {
+  'not-allowed': '麦克风权限被拒绝，去浏览器设置里允许',
+  'service-not-allowed': '系统没开语音服务（部分安卓机要装/开 Google 语音）',
+  'no-speech': '没听到声音，靠近一点再说',
+  'network': '语音识别要联网（走 Google 服务），检查网络',
+  'aborted': '识别被中断了',
+  'audio-capture': '没找到麦克风',
+}
 
 const STICKERS = [
   'kaixin.png','wuyu.png','qushi.png','shangban.png','xihuan.png',
@@ -93,17 +103,30 @@ export default function ChatInput({ onSend, disabled, onImageAdd, images, onImag
     const sr = new SR()
     sr.lang = 'zh-CN'
     sr.continuous = false
-    sr.interimResults = false
+    sr.interimResults = true
+    let got = ''
     sr.onresult = (e) => {
-      const t = e.results[0][0].transcript
-      setText((prev) => prev ? prev + t : t)
-      textareaRef.current?.focus()
+      let finalPiece = ''
+      for (let i = e.resultIndex; i < e.results.length; i++) {
+        if (e.results[i].isFinal) finalPiece += e.results[i][0]?.transcript || ''
+      }
+      if (finalPiece) {
+        got += finalPiece
+        setText((prev) => prev ? prev + finalPiece : finalPiece)
+        textareaRef.current?.focus()
+      }
     }
-    sr.onend = () => setListening(false)
-    sr.onerror = () => setListening(false)
+    sr.onend = () => {
+      setListening(false)
+      if (!got) showToast('没识别到内容，再试一次（说完停顿一下）', 'info')
+    }
+    sr.onerror = (e) => {
+      setListening(false)
+      showToast(SR_ERR_MSG[e.error] || `语音识别出错：${e.error}`, 'error', 5000)
+    }
     srRef.current = sr
-    sr.start()
-    setListening(true)
+    try { sr.start(); setListening(true) }
+    catch (err) { showToast('无法启动语音识别：' + err.message, 'error') }
   }
 
   function sendSticker(name) {
