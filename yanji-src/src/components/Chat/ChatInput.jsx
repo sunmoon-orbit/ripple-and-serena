@@ -105,6 +105,12 @@ export default function ChatInput({ onSend, disabled, onImageAdd, images, onImag
     sr.continuous = false
     sr.interimResults = true
     let got = ''
+    let lastErr = ''
+    const t0 = Date.now()
+    const flags = { audio: false, sound: false, speech: false }
+    sr.onaudiostart = () => { flags.audio = true }
+    sr.onsoundstart = () => { flags.sound = true }
+    sr.onspeechstart = () => { flags.speech = true }
     sr.onresult = (e) => {
       let finalPiece = ''
       for (let i = e.resultIndex; i < e.results.length; i++) {
@@ -118,9 +124,20 @@ export default function ChatInput({ onSend, disabled, onImageAdd, images, onImag
     }
     sr.onend = () => {
       setListening(false)
-      if (!got) showToast('没识别到内容，再试一次（说完停顿一下）', 'info')
+      if (got || lastErr) return
+      const dt = Date.now() - t0
+      // 诊断：没结果也没报错时，看生命周期事件卡在哪一步
+      const diag = !flags.audio
+        ? `麦克风没启动（${dt}ms 就结束，可能被其它App占用或系统语音服务没开）`
+        : !flags.sound
+        ? `麦克风开了但没收到任何声音（检查录音权限/麦克风硬件，${dt}ms）`
+        : !flags.speech
+        ? `收到声音但没识别成语音（说大声点/靠近点，${dt}ms）`
+        : `识别服务没返回文字（Google 语音服务可能没装语言包，${dt}ms）`
+      showToast('没识别到内容｜' + diag, 'info', 6000)
     }
     sr.onerror = (e) => {
+      lastErr = e.error
       setListening(false)
       showToast(SR_ERR_MSG[e.error] || `语音识别出错：${e.error}`, 'error', 5000)
     }
