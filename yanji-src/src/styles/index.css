@@ -2093,7 +2093,9 @@ textarea.form-input { display: block; margin: 8px 16px 12px; }
   padding: 4px 8px;
 }
 .roost-modal-body {
-  flex: 1; overflow-y: auto; padding: 16px 20px;
+  flex: 1; min-height: 0; overflow-y: auto;
+  -webkit-overflow-scrolling: touch; overscroll-behavior: contain;
+  padding: 16px 20px;
   display: flex; flex-direction: column; gap: 12px;
 }
 
