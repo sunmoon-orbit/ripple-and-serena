@@ -2131,3 +2131,64 @@ textarea.form-input { display: block; margin: 8px 16px 12px; }
 }
 
 .roost-empty { font-size: 13px; color: var(--text-faint); text-align: center; padding: 20px 0; }
+
+/* ── 共读 CoRead ── */
+.coread-modal { max-width: 540px; }
+.coread-conv-list { display: flex; flex-direction: column; gap: 8px; }
+.coread-conv-item {
+  padding: 12px 14px; border-radius: 12px; cursor: pointer;
+  background: var(--card); border: 1px solid var(--border); transition: all 0.15s;
+}
+.coread-conv-item:hover { border-color: var(--accent); background: color-mix(in srgb, var(--card) 92%, var(--accent)); }
+.coread-conv-title { font-size: 14px; color: var(--text); font-weight: 500; margin-bottom: 4px; }
+.coread-conv-meta { display: flex; gap: 8px; align-items: center; }
+.coread-conv-source {
+  font-size: 10px; color: var(--accent); padding: 1px 7px; border-radius: 100px;
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+}
+.coread-conv-date { font-size: 11px; color: var(--text-faint); }
+
+.coread-back { background: none; border: none; color: var(--accent); font-size: 13px; cursor: pointer; padding: 0; }
+.coread-reader-title { font-size: 14px; font-weight: 500; max-width: 60%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.coread-stream { display: flex; flex-direction: column; gap: 14px; }
+.coread-msg { display: flex; flex-direction: column; gap: 4px; max-width: 88%; }
+.coread-msg.mine { align-self: flex-start; }
+.coread-msg.hers { align-self: flex-end; align-items: flex-end; }
+.coread-msg-role { font-size: 11px; color: var(--text-faint); padding: 0 4px; }
+.coread-bubble {
+  font-size: 14px; line-height: 1.65; padding: 9px 13px; border-radius: 14px;
+  white-space: pre-wrap; word-break: break-word; cursor: pointer;
+  background: var(--card); border: 1px solid var(--border); color: var(--text);
+  transition: box-shadow 0.15s;
+}
+.coread-msg.hers .coread-bubble { background: color-mix(in srgb, var(--accent) 14%, var(--card)); }
+.coread-msg.bookmarked .coread-bubble { outline: 2px dashed var(--accent); outline-offset: 2px; }
+.coread-anno {
+  display: flex; align-items: center; gap: 6px; font-size: 12px;
+  padding: 5px 10px; border-radius: 8px; border-left: 3px solid;
+  background: color-mix(in srgb, var(--card) 80%, transparent); margin: 0 4px;
+}
+.coread-anno-author { font-weight: 600; color: var(--accent); flex-shrink: 0; }
+.coread-anno-note { color: var(--text-muted); flex: 1; }
+.coread-anno-del { background: none; border: none; color: var(--text-faint); cursor: pointer; font-size: 11px; }
+.coread-msg-tools { display: flex; gap: 10px; padding: 0 4px; }
+.coread-msg-tools button {
+  background: none; border: none; font-size: 11px; color: var(--text-faint); cursor: pointer; padding: 0;
+}
+.coread-msg-tools button:hover { color: var(--accent); }
+
+.coread-anno-compose {
+  position: absolute; bottom: 0; left: 0; right: 0;
+  background: var(--surface); border-top: 1px solid var(--border);
+  padding: 12px 16px; display: flex; flex-direction: column; gap: 8px;
+  box-shadow: 0 -4px 16px rgba(0,0,0,0.12);
+}
+.coread-color-row { display: flex; gap: 8px; }
+.coread-color-dot { width: 24px; height: 24px; border-radius: 50%; border: 2px solid transparent; cursor: pointer; }
+.coread-color-dot.active { border-color: var(--text); }
+.coread-anno-input {
+  width: 100%; border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px;
+  font-size: 13px; font-family: inherit; resize: none; background: var(--bg); color: var(--text);
+}
+.coread-anno-actions { display: flex; justify-content: flex-end; gap: 8px; }
+.coread-reader { position: relative; }

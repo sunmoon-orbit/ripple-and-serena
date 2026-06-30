@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { useStore } from '../../store'
 import { showToast } from '../Toast'
 import { createLullaby } from '../../audio/lullaby'
+import CoRead from './CoRead'
 
 const START_DATE = new Date('2025-10-10T00:00:00+08:00')
 const STORAGE_KEY_MSG    = 'roost_messages'
@@ -174,6 +175,15 @@ export default function Roost() {
           <div className="roost-mini-label">书单</div>
           <div className="roost-mini-count">{books.length} 本</div>
         </div>
+        <div className="roost-card roost-mini-card" onClick={() => setModal('coread')}>
+          <div className="roost-mini-icon">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/>
+            </svg>
+          </div>
+          <div className="roost-mini-label">共读</div>
+          <div className="roost-mini-count">一起翻旧时光</div>
+        </div>
         <div className="roost-card roost-mini-card" onClick={openReview}>
           <div className="roost-mini-icon">
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
@@ -213,6 +223,9 @@ export default function Roost() {
           <path d="M9 18l6-6-6-6"/>
         </svg>
       </div>
+
+      {/* ── 共读 Modal ── */}
+      {modal === 'coread' && <CoRead onClose={() => setModal(null)} />}
 
       {/* ── 留言 Modal ── */}
       {modal === 'message' && (
