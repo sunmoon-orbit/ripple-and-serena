@@ -2,6 +2,14 @@ import { useState, useRef, useEffect, useCallback } from 'react'
 import { createPortal } from 'react-dom'
 import { useStore } from '../../store'
 import { synthesizeSpeech } from '../../api/moonMemory'
+import { showToast } from '../Toast'
+
+const SR_ERR_MSG = {
+  'not-allowed': '麦克风权限被拒绝，去浏览器设置允许后重开通话',
+  'service-not-allowed': '系统没开语音服务（部分安卓机要装/开 Google 语音）',
+  'network': '语音识别要联网（走 Google 服务），检查网络',
+  'audio-capture': '没找到麦克风',
+}
 
 const VOICE_TAG_RE = /\[(breath|laughter)\]/gi
 
@@ -104,12 +112,17 @@ export default function VoiceCall({ onClose, onSend }) {
       if (interim && mounted.current) setTranscript(interim)
     }
     sr.onend = () => {
+      // 安卓 Chrome 的 continuous 经常每句话后就 end，这里自动重启续听
       if (srWanted.current && mounted.current) setTimeout(startSr, 450)
     }
-    sr.onerror = () => {
+    sr.onerror = (e) => {
+      // no-speech / aborted 是正常的静默/打断，自动续听即可；其它错误提示一次
+      if (e.error && e.error !== 'no-speech' && e.error !== 'aborted') {
+        showToast(SR_ERR_MSG[e.error] || `语音通话识别出错：${e.error}`, 'error', 5000)
+      }
       if (srWanted.current && mounted.current) setTimeout(startSr, 1000)
     }
-    sr.start()
+    try { sr.start() } catch {}
     srRef.current = sr
   }, [onSend])
 
