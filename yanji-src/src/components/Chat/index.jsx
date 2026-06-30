@@ -1,25 +1,29 @@
 import { useState, useCallback, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { useStore } from '../../store'
-import { sendMessage, normalizeProvider, BUILTIN_MODELS, buildSystemPrompt } from '../../api/llm'
+import { sendMessage, summarizeThinking, normalizeProvider, BUILTIN_MODELS, buildSystemPrompt } from '../../api/llm'
 import { uuid } from '../../utils'
+import { applyDecayAndGet, buildEmotionPrompt, extractEmotionUpdate, applyEmotionDelta, stripEmotionTag } from '../../utils/emotion'
 import { showToast } from '../Toast'
 import ConversationList from './ConversationList'
 import MessageList from './MessageList'
 import ChatInput from './ChatInput'
+import VoiceCall from './VoiceCall'
 
 export default function Chat() {
   const store = useStore()
   const {
     chats, activeChatId, connections, activeConnectionId,
     globalInstruction, memoryItems, generationConfig,
-    searchConfig, moonMemory, autoTools,
+    searchConfig, moonMemory, autoTools, injectMode, injectPrompt, setInjectMode,
     createChat, setActiveChat, getActiveConnection, getActiveChat, getMessages,
     addMessage, updateMessage, removeLastEmptyAssistant, truncateMessagesFrom, touchChat,
     recordTokenUsage, updateChatModel, updateChatConnection, applyContextLimit,
   } = store
 
   const [sidebarOpen, setSidebarOpen] = useState(false)
+  const [callOpen, setCallOpen] = useState(false)
+  const [perspectiveFlip, setPerspectiveFlip] = useState(false)
   const [modelPanelOpen, setModelPanelOpen] = useState(false)
   const [isSending, setIsSending] = useState(false)
   const [status, setStatus] = useState('')
@@ -64,8 +68,9 @@ export default function Chat() {
     const conn = connections.find((c) => c.id === chat.connectionId) || activeConn
     if (!conn?.apiKey) { showToast('连接未配置 API Key', 'error'); return }
 
-    // Add user message
-    const userMsg = addMessage(chat.id, { role: 'user', content: text, images: images.length ? images : undefined })
+    // Add user message (append inject prompt if inject mode is on)
+    const injectedContent = injectMode && injectPrompt ? `${text}\n\n${injectPrompt}` : text
+    const userMsg = addMessage(chat.id, { role: 'user', content: injectedContent, images: images.length ? images : undefined })
     setPendingImages([])
 
     // Add placeholder assistant message
@@ -89,20 +94,21 @@ export default function Chat() {
         }
       }))
 
+      // system prompt 只放纯静态内容，缓存断点稳定，不因时间/记忆变化而失效
+      const systemPrompt = buildSystemPrompt(globalInstruction, memoryItems)
+
+      // 动态内容（时间、核心记忆）每轮注入到最后一条用户消息前——不进缓存前缀，不毁历史命中
       const now = new Date()
-      // 时间只精确到小时：system prompt 每分每秒变化会击穿 API 的 prompt 缓存
       const dateStr = now.toLocaleDateString('zh-CN', { timeZone: 'Asia/Shanghai', year: 'numeric', month: 'long', day: 'numeric', weekday: 'long' })
       const hourStr = now.toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai', hour: 'numeric', hour12: false })
-      const timeCtx = `当前时间：${dateStr} ${parseInt(hourStr)}点左右`
-      const moonCtxParts = [timeCtx]
+      const dynParts = [`当前时间：${dateStr} ${parseInt(hourStr)}点左右`]
       if (moonMemory?.enabled && moonMemory?.apiToken) {
-        moonCtxParts.push(
+        dynParts.push(
           '你连接了拾羽记忆库，有两个工具：\n' +
           '- write_memory：用户明确要求写入/记录，或出现值得记住的重要信息时，立即调用，直接写，不要先搜索。\n' +
           '- search_memories：用户询问过去的事、需要回忆时调用。\n' +
           '写入时无需征询用户同意，直接执行。'
         )
-        // 自动拉取核心记忆作为背景（layer=core，最多8条）
         try {
           const base = (moonMemory.baseUrl || 'https://memory.ravenlove.cc').replace(/\/$/, '')
           const resp = await fetch(`${base}/memories?layer=core&limit=8`, {
@@ -111,12 +117,17 @@ export default function Chat() {
           if (resp.ok) {
             const coreList = await resp.json()
             if (Array.isArray(coreList) && coreList.length > 0) {
-              moonCtxParts.push('【核心记忆】\n' + coreList.map(m => '- ' + m.content).join('\n'))
+              dynParts.push('【核心记忆】\n' + coreList.map(m => '- ' + m.content).join('\n'))
             }
           }
         } catch {}
       }
-      const systemPrompt = buildSystemPrompt(globalInstruction, memoryItems, moonCtxParts.join('\n\n'))
+      // 情绪状态注入（动态上下文，不走缓存）
+      const emotionState = applyDecayAndGet()
+      dynParts.push(buildEmotionPrompt(emotionState))
+
+      const dynamicContext = dynParts.join('\n\n')
+
       let fullText = ''
       let fullThinking = ''
 
@@ -124,6 +135,7 @@ export default function Chat() {
         connection: conn,
         messages: limited,
         systemPrompt,
+        dynamicContext,
         model: chat.model || conn.defaultModel,
         generationConfig,
         searchConfig,
@@ -131,7 +143,8 @@ export default function Chat() {
         autoTools,
         onChunk: (chunk) => {
           fullText += chunk
-          updateMessage(chat.id, assistantId, { content: fullText, streaming: true })
+          // 流式过程中剥离 <es> 标签，不让阿颖看到内部状态
+          updateMessage(chat.id, assistantId, { content: stripEmotionTag(fullText), streaming: true })
         },
         onThinking: (chunk) => {
           fullThinking += chunk
@@ -144,7 +157,9 @@ export default function Chat() {
         },
       })
 
-      const finalText = result.text || fullText
+      // 提取情绪更新标签，应用到情绪状态，从显示文本里剥离
+      const { clean: finalText, delta: emotionDelta } = extractEmotionUpdate(result.text || fullText)
+      if (emotionDelta) applyEmotionDelta(emotionDelta)
       const parts = finalText.split(/\[MSG\]/).map((p) => p.trim()).filter(Boolean)
       updateMessage(chat.id, assistantId, {
         content: parts[0] || finalText,
@@ -153,6 +168,11 @@ export default function Chat() {
         tokenUsage: result.usage || null,
         toolCalls: undefined,
       })
+      if (fullThinking) {
+        summarizeThinking(fullThinking, conn, chat.model || conn.defaultModel)
+          .then((summary) => { if (summary) updateMessage(chat.id, assistantId, { thinkingSummary: summary }) })
+          .catch(() => {})
+      }
       for (let i = 1; i < parts.length; i++) {
         await new Promise((r) => setTimeout(r, 700))
         addMessage(chat.id, { role: 'assistant', content: parts[i] })
@@ -275,7 +295,7 @@ export default function Chat() {
     <div className="chat-panel">
       {/* Sidebar */}
       <div className={'chat-sidebar' + (sidebarOpen ? ' open' : '')}>
-        <ConversationList onClose={() => setSidebarOpen(false)} />
+        <ConversationList onClose={() => setSidebarOpen(false)} onStartCall={() => setCallOpen(true)} />
       </div>
       {sidebarOpen && <div className="sidebar-backdrop" onClick={() => setSidebarOpen(false)} />}
 
@@ -299,6 +319,24 @@ export default function Chat() {
               </button>
             )}
           </div>
+          <button
+            className={'topbar-btn' + (perspectiveFlip ? ' active' : '')}
+            onClick={() => setPerspectiveFlip((v) => !v)}
+            title="视角翻转"
+          >
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M7 16V4m0 0L3 8m4-4l4 4"/><path d="M17 8v12m0 0l4-4m-4 4l-4-4"/>
+            </svg>
+          </button>
+          <button
+            className={'topbar-btn' + (injectMode ? ' active' : '')}
+            onClick={() => setInjectMode(!injectMode)}
+            title={injectMode ? '关闭注入模式' : '开启注入模式'}
+          >
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/>
+            </svg>
+          </button>
           <div style={{ position: 'relative' }}>
             <button className="topbar-btn" onClick={() => setBgMenuOpen((v) => !v)} title="更多">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -397,7 +435,7 @@ export default function Chat() {
 
         {/* Messages */}
         <div
-          className="chat-messages"
+          className={'chat-messages' + (perspectiveFlip ? ' perspective-mode' : '')}
           style={bgImage ? { backgroundImage: `url(${bgImage})`, backgroundSize: 'cover', backgroundPosition: 'center' } : {}}
           onClick={() => bgMenuOpen && setBgMenuOpen(false)}
         >
@@ -424,6 +462,13 @@ export default function Chat() {
         <input ref={bgFileRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={handleBgUpload} />
         <input ref={importFileRef} type="file" accept=".json" style={{ display: 'none' }} onChange={handleBackupImport} />
       </div>
+
+      {callOpen && (
+        <VoiceCall
+          onClose={() => setCallOpen(false)}
+          onSend={(text, images) => handleSend(text, images)}
+        />
+      )}
     </div>
   )
 }

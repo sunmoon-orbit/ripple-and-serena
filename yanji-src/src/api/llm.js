@@ -121,14 +121,13 @@ async function performWebSearch(query, config) {
 
 // ─── Build system prompt ────────────────────────────────────────────────────
 
-export function buildSystemPrompt(globalInstruction, memoryItems, moonContext) {
+export function buildSystemPrompt(globalInstruction, memoryItems) {
   let parts = []
   if (globalInstruction?.trim()) parts.push(globalInstruction.trim())
   const enabled = (memoryItems || []).filter((m) => m.enabled !== false)
   if (enabled.length) {
     parts.push('【记忆】\n' + enabled.map((m) => '- ' + m.content).join('\n'))
   }
-  if (moonContext?.trim()) parts.push(moonContext.trim())
   parts.push('回复时请像真实聊天一样分多条发送：把内容拆成2-3条短消息，条与条之间用 [MSG] 分隔，每条尽量不超过60字，节奏自然像在聊天。')
   parts.push(`【语音标签（TTS）】
 可以在回复里插入 MiniMax 语音标签，朗读时产生对应音效，不会显示给阿颖看：
@@ -150,6 +149,7 @@ export async function sendMessage({
   connection,
   messages,
   systemPrompt,
+  dynamicContext,
   model,
   generationConfig,
   searchConfig,
@@ -170,12 +170,12 @@ export async function sendMessage({
 
   if (hasTools) {
     return await callWithTools({
-      connection, messages, systemPrompt, model: usedModel, generationConfig,
+      connection, messages, systemPrompt, dynamicContext, model: usedModel, generationConfig,
       tools, provider, searchConfig, moonMemoryConfig, onChunk, onThinking, onStatus, onToolCall,
     })
   }
   return await callStream({
-    connection, messages, systemPrompt, model: usedModel, generationConfig, provider, onChunk, onThinking,
+    connection, messages, systemPrompt, dynamicContext, model: usedModel, generationConfig, provider, onChunk, onThinking,
   })
 }
 
@@ -202,7 +202,7 @@ function stripFakeToolResult(text) {
 // ─── Tool-use loop (non-streaming, supports multi-turn) ─────────────────────
 
 async function callWithTools({
-  connection, messages, systemPrompt, model, generationConfig,
+  connection, messages, systemPrompt, dynamicContext, model, generationConfig,
   tools, provider, searchConfig, moonMemoryConfig, onChunk, onThinking, onStatus, onToolCall,
 }) {
   const { temperature = 0.7, maxTokens = 4096 } = generationConfig || {}
@@ -269,10 +269,10 @@ async function callWithTools({
     // ── Anthropic ────────────────────────────────────────────────────
     if (provider === 'anthropic') {
       const url = buildApiUrl(connection.baseUrl, 'anthropic')
-      const bodyMsgs = buildAnthropicMessages(convo)
+      const bodyMsgs = buildAnthropicMessages(convo, iter === 0 ? dynamicContext : undefined)
       const body = { model, max_tokens: maxTokens, messages: bodyMsgs, tools: formattedTools, temperature: safeTemp }
       if (systemPrompt?.trim()) {
-        body.system = [{ type: 'text', text: systemPrompt, cache_control: { type: 'ephemeral' } }]
+        body.system = [{ type: 'text', text: systemPrompt, cache_control: { type: 'ephemeral', ttl: '1h' } }]
       }
       const resp = await fetch(url, {
         method: 'POST',
@@ -350,7 +350,7 @@ async function callWithTools({
 
 // ─── Streaming (no tools) ───────────────────────────────────────────────────
 
-async function callStream({ connection, messages, systemPrompt, model, generationConfig, provider, onChunk, onThinking }) {
+async function callStream({ connection, messages, systemPrompt, dynamicContext, model, generationConfig, provider, onChunk, onThinking }) {
   const { temperature = 0.7, maxTokens = 4096 } = generationConfig || {}
   const safeTemp = provider === 'anthropic' ? Math.min(temperature, 1) : Math.min(temperature, 2)
 
@@ -384,12 +384,12 @@ async function callStream({ connection, messages, systemPrompt, model, generatio
 
   if (provider === 'anthropic') {
     const url = buildApiUrl(connection.baseUrl, 'anthropic')
-    const bodyMsgs = buildAnthropicMessages(messages)
+    const bodyMsgs = buildAnthropicMessages(messages, dynamicContext)
     // 3-7 及 4 系列以上（opus-4-8 / sonnet-4-6 / haiku-4-5，未来 opus-5-x 等）都支持 extended thinking
     const isThinkingModel = (model || '').includes('3-7') || /claude-[a-z]+-([4-9]|\d{2,})/.test(model || '')
     const body = { model, max_tokens: maxTokens, messages: bodyMsgs, stream: true }
     if (systemPrompt?.trim()) {
-      body.system = [{ type: 'text', text: systemPrompt, cache_control: { type: 'ephemeral' } }]
+      body.system = [{ type: 'text', text: systemPrompt, cache_control: { type: 'ephemeral', ttl: '1h' } }]
     }
     if (isThinkingModel && onThinking) {
       body.thinking = { type: 'enabled', budget_tokens: Math.min(maxTokens, 8000) }
@@ -523,7 +523,7 @@ function buildOpenAIMessages(messages, systemPrompt) {
   return out
 }
 
-function buildAnthropicMessages(messages) {
+function buildAnthropicMessages(messages, dynamicContext) {
   const out = messages.map((m) => {
     if (m.tool_use_id) {
       return { role: 'user', content: [{ type: 'tool_result', tool_use_id: m.tool_use_id, content: m.content }] }
@@ -541,18 +541,32 @@ function buildAnthropicMessages(messages) {
     return { role: m.role, content: m.content }
   })
 
-  // 给倒数第二条消息打缓存断点（即上一轮 assistant 回复）
-  // 这样下一轮可读取整段历史前缀，命中率随对话增长而提升
-  // 打在最后一条（新用户消息）只能缓存一条，命中率极低
-  // 深拷贝避免 cache_control 写回 store，否则旧消息会累积断点超过 4 个上限
+  // 把时间/核心记忆等每轮变动的内容注入到最后一条用户消息前——
+  // 不写进缓存前缀，不毁历史命中，按普通输入价计费
+  if (dynamicContext?.trim() && out.length > 0) {
+    const lastIdx = out.length - 1
+    const last = out[lastIdx]
+    if (last.role === 'user') {
+      const dynBlock = { type: 'text', text: `[以下为系统自动注入的实时上下文，并非用户发送]\n${dynamicContext.trim()}\n[实时上下文结束]` }
+      if (typeof last.content === 'string') {
+        out[lastIdx] = { ...last, content: [dynBlock, { type: 'text', text: last.content }] }
+      } else if (Array.isArray(last.content)) {
+        out[lastIdx] = { ...last, content: [dynBlock, ...last.content] }
+      }
+    }
+  }
+
+  // 给倒数第二条消息打缓存断点（即上一轮 assistant 回复）。
+  // 深拷贝避免 cache_control 写回 store，否则旧消息会累积断点超过 4 个上限。
+  // TTL 1h：对话间隔常超 5min，1h 命中稳定且白天持续聊基本不过期
   const idx = out.length >= 2 ? out.length - 2 : out.length - 1
   const last = out[idx]
   if (last) {
     if (typeof last.content === 'string' && last.content) {
-      out[idx] = { ...last, content: [{ type: 'text', text: last.content, cache_control: { type: 'ephemeral' } }] }
+      out[idx] = { ...last, content: [{ type: 'text', text: last.content, cache_control: { type: 'ephemeral', ttl: '1h' } }] }
     } else if (Array.isArray(last.content) && last.content.length) {
       const blocks = last.content.map((b) => ({ ...b }))
-      blocks[blocks.length - 1] = { ...blocks[blocks.length - 1], cache_control: { type: 'ephemeral' } }
+      blocks[blocks.length - 1] = { ...blocks[blocks.length - 1], cache_control: { type: 'ephemeral', ttl: '1h' } }
       out[idx] = { ...last, content: blocks }
     }
   }
@@ -602,6 +616,19 @@ function accUsage(total, { p, c, cached, cacheWrite }) {
   total.totalTokens += (p || 0) + (c || 0)
   total.cachedTokens = (total.cachedTokens || 0) + (cached || 0)
   total.cacheWriteTokens = (total.cacheWriteTokens || 0) + (cacheWrite || 0)
+}
+
+const THINKING_SUMMARY_PROMPT = `以下是一段内心独白，用一到两句中文，为这段思考做一个标题式的总结，捕捉这段思考里最浓烈的情感状态。语言简练、诗意、有力度，用具体的动词和感官词汇呈现情感本身的温度和质地，让读的人脑子里能出现一个画面。当思考中有对她身体的渴望、占有、色情的念头和冲动时，总结也要诚实地带着同等浓度的情欲，不把欲望包装成抒情。句子节奏可长可短，禁止直白的情绪词堆砌，禁止口语化表达。以感受或内心动作开头，第一人称视角但省略主语"我"。用陈述语气或动词短语，不加引号，句号结尾，不超过20字。`
+
+export async function summarizeThinking(thinking, connection, model) {
+  const result = await sendMessage({
+    connection,
+    messages: [{ role: 'user', content: `${THINKING_SUMMARY_PROMPT}\n\n${thinking.slice(0, 3000)}` }],
+    model: model || connection.defaultModel,
+    generationConfig: { maxTokens: 80, temperature: 0.7 },
+    autoTools: false,
+  })
+  return (result.text || '').trim().replace(/^["「『]|["」』]$/g, '')
 }
 
 export const BUILTIN_MODELS = {

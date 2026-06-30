@@ -61,13 +61,20 @@ function moonPost(pathname, body) {
 }
 
 const STATIC_DIR = path.join(__dirname, '..', 'raven')
+const YANJI_DIR = path.join(__dirname, '..', 'yanji')
 const UPLOAD_DIR = '/tmp/raven-uploads'
 const MIME = {
   '.html': 'text/html; charset=utf-8',
   '.js':   'application/javascript',
+  '.css':  'text/css',
   '.json': 'application/json',
   '.png':  'image/png',
+  '.jpg':  'image/jpeg',
   '.ico':  'image/x-icon',
+  '.svg':  'image/svg+xml',
+  '.webp': 'image/webp',
+  '.woff2': 'font/woff2',
+  '.woff':  'font/woff',
 }
 
 if (!fs.existsSync(UPLOAD_DIR)) fs.mkdirSync(UPLOAD_DIR, { recursive: true })
@@ -694,6 +701,35 @@ const server = http.createServer((req, res) => {
       moonPost(moonPath, parsed)
         .then(r => { res.writeHead(r.status, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' }); res.end(JSON.stringify(r.data)) })
         .catch(() => { res.writeHead(500); res.end('{}') })
+    })
+    return
+  }
+
+  // static files under /ripple-and-serena/yanji/
+  if (req.method === 'GET' && url.pathname.startsWith('/ripple-and-serena/yanji/')) {
+    let filePath = url.pathname.slice('/ripple-and-serena/yanji'.length) || '/'
+    if (filePath === '/') filePath = '/index.html'
+    const abs = path.join(YANJI_DIR, filePath)
+    if (!abs.startsWith(YANJI_DIR)) { res.writeHead(403); res.end(); return }
+    fs.stat(abs, (err, stat) => {
+      if (err) {
+        // SPA fallback: serve index.html for unknown paths
+        const idx = path.join(YANJI_DIR, 'index.html')
+        fs.stat(idx, (e2) => {
+          if (e2) { res.writeHead(404); res.end(); return }
+          res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-cache' })
+          fs.createReadStream(idx).pipe(res)
+        })
+        return
+      }
+      const ext = path.extname(abs)
+      const isImg = ['.png', '.jpg', '.jpeg', '.ico', '.svg', '.webp', '.gif', '.woff2', '.woff'].includes(ext)
+      res.writeHead(200, {
+        'Content-Type': MIME[ext] || 'application/octet-stream',
+        'Content-Length': stat.size,
+        'Cache-Control': isImg ? 'public, max-age=604800, immutable' : 'no-cache',
+      })
+      fs.createReadStream(abs).pipe(res)
     })
     return
   }

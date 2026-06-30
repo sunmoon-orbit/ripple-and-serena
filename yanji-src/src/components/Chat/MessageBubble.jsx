@@ -64,10 +64,12 @@ function AttachChip({ name, content }) {
 
 function renderUserContent(content) {
   if (!content) return <span className="bubble-text">{content}</span>
-  const firstAttach = content.indexOf('--- 文件：')
-  if (firstAttach === -1) return renderStickered(content)
-  const mainText = content.slice(0, firstAttach).replace(/\n\n$/, '').trim()
-  const blocksPart = content.slice(firstAttach)
+  // Strip [voice] prefix added by voice call mode (display only)
+  const displayContent = content.startsWith('[voice] ') ? content.slice(8) : content
+  const firstAttach = displayContent.indexOf('--- 文件：')
+  if (firstAttach === -1) return renderStickered(displayContent)
+  const mainText = displayContent.slice(0, firstAttach).replace(/\n\n$/, '').trim()
+  const blocksPart = displayContent.slice(firstAttach)
   const attachBlocks = []
   const re = /--- 文件：([^\n]+?) ---\n([\s\S]*?)(?=--- 文件：|$)/g
   let m
@@ -105,6 +107,7 @@ export default function MessageBubble({ msg, onEdit }) {
   const isStreaming = msg.streaming
   const { avatarConfig, moonMemory } = useStore()
   const useImages = avatarConfig?.mode === 'image'
+  const avatarRadius = avatarConfig?.shape === 'square' ? '6px' : '50%'
   const [editing, setEditing] = useState(false)
   const [ttsState, setTtsState] = useState('idle') // idle | loading | playing
   const [voiceMode, setVoiceMode] = useState(false) // 语音条模式：正文隐藏，显示音浪
@@ -179,16 +182,16 @@ export default function MessageBubble({ msg, onEdit }) {
   return (
     <div className={`message-row ${isUser ? 'message-row-user' : 'message-row-assistant'}`}>
       {!isUser && (
-        <div className="message-avatar">
+        <div className="message-avatar" style={{ borderRadius: avatarRadius }}>
           {useImages && avatarConfig.assistantImage
-            ? <img src={avatarConfig.assistantImage} alt="助手" className="avatar-img" />
+            ? <img src={avatarConfig.assistantImage} alt="助手" className="avatar-img" style={{ borderRadius: avatarRadius }} />
             : <AssistantIcon />}
         </div>
       )}
       {isUser && (
-        <div className="message-avatar message-avatar-user">
+        <div className="message-avatar message-avatar-user" style={{ borderRadius: avatarRadius }}>
           {useImages && avatarConfig.userImage
-            ? <img src={avatarConfig.userImage} alt="我" className="avatar-img" />
+            ? <img src={avatarConfig.userImage} alt="我" className="avatar-img" style={{ borderRadius: avatarRadius }} />
             : <UserIcon />}
         </div>
       )}
@@ -204,7 +207,7 @@ export default function MessageBubble({ msg, onEdit }) {
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/>
               </svg>
-              思考过程{isStreaming ? '…' : ''}
+              {msg.thinkingSummary || (isStreaming ? '思考中…' : '思考过程')}
             </summary>
             <div className="thinking-content">{msg.thinking}</div>
           </details>
@@ -218,10 +221,11 @@ export default function MessageBubble({ msg, onEdit }) {
                   value={editText}
                   onChange={(e) => setEditText(e.target.value)}
                   autoFocus
+                  enterKeyHint="enter"
                   onKeyDown={(e) => {
-                    if (e.key === 'Escape') setEditing(false)
+                    if (e.key === 'Escape') { e.preventDefault(); setEditing(false) }
                     if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
-                      onEdit?.(msg, editText); setEditing(false)
+                      e.preventDefault(); onEdit?.(msg, editText); setEditing(false)
                     }
                   }}
                 />
@@ -277,6 +281,21 @@ export default function MessageBubble({ msg, onEdit }) {
               <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
                 <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+              </svg>
+            </button>
+          )}
+          {!isUser && !isStreaming && (
+            <button className="msg-edit-icon-btn" title="下载为文件" onClick={() => {
+              const blob = new Blob([msg.content], { type: 'text/markdown;charset=utf-8' })
+              const url = URL.createObjectURL(blob)
+              const a = document.createElement('a')
+              a.href = url; a.download = `reply-${msg.id || Date.now()}.md`; a.click()
+              URL.revokeObjectURL(url)
+            }}>
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                <polyline points="7 10 12 15 17 10"/>
+                <line x1="12" y1="15" x2="12" y2="3"/>
               </svg>
             </button>
           )}
