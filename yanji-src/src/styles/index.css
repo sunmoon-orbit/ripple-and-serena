@@ -2458,3 +2458,118 @@ textarea.form-input { display: block; margin: 8px 16px 12px; }
 }
 .coread-anno-actions { display: flex; justify-content: flex-end; gap: 8px; }
 .coread-reader { position: relative; }
+
+/* ── 音乐：点歌卡片 / 迷你播放器 / 歌单 ───────────────────────── */
+/* 聊天里的点歌卡片 */
+.music-card {
+  display: flex; align-items: center; gap: 10px;
+  margin: 8px 0; padding: 10px 12px;
+  background: var(--accent-dim); border: 1px solid var(--border-md);
+  border-radius: 12px; max-width: 320px;
+}
+.music-card-cover {
+  width: 42px; height: 42px; flex-shrink: 0; border-radius: 8px;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--accent-soft); color: #fff; overflow: hidden;
+}
+.music-card-cover img { width: 100%; height: 100%; object-fit: cover; }
+.music-card-main { flex: 1; min-width: 0; }
+.music-card-title { font-size: 14px; font-weight: 600; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.music-card-artist { font-size: 12px; color: var(--text-muted); margin-top: 1px; }
+.music-card-reason { font-size: 12px; color: var(--text-mid); margin-top: 4px; line-height: 1.4; }
+.music-card-err { font-size: 11.5px; color: #c76b6b; margin-top: 4px; }
+.music-card-play {
+  width: 34px; height: 34px; flex-shrink: 0; border: none; cursor: pointer;
+  border-radius: 50%; background: var(--accent); color: #fff;
+  display: flex; align-items: center; justify-content: center;
+}
+.music-card-play:active { transform: scale(0.92); }
+
+/* 底部常驻迷你播放器 */
+.mini-player {
+  position: fixed; left: 0; right: 0; bottom: 0; z-index: 900;
+  background: var(--bg-sidebar); border-top: 1px solid var(--border-md);
+  box-shadow: 0 -2px 12px rgba(0,0,0,0.06);
+  padding-bottom: env(safe-area-inset-bottom, 0);
+}
+.mp-progress { height: 3px; background: var(--border); cursor: pointer; }
+.mp-progress-fill { height: 100%; background: var(--accent); transition: width 0.15s linear; }
+.mp-body { display: flex; align-items: center; gap: 10px; padding: 8px 12px; }
+.mp-info { display: flex; align-items: center; gap: 10px; flex: 1; min-width: 0; cursor: pointer; }
+.mp-cover {
+  width: 38px; height: 38px; flex-shrink: 0; border-radius: 7px; overflow: hidden;
+  background: var(--accent-soft); color: #fff;
+  display: flex; align-items: center; justify-content: center;
+}
+.mp-cover img { width: 100%; height: 100%; object-fit: cover; }
+.mp-meta { flex: 1; min-width: 0; }
+.mp-title { font-size: 13.5px; font-weight: 600; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.mp-artist { font-size: 11.5px; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.mp-btn {
+  width: 36px; height: 36px; flex-shrink: 0; border: none; background: none; cursor: pointer;
+  color: var(--accent); display: flex; align-items: center; justify-content: center; border-radius: 50%;
+}
+.mp-btn:active { transform: scale(0.9); }
+.mp-close { color: var(--text-muted); }
+
+/* 全屏歌词播放器 */
+.mp-full {
+  position: fixed; inset: 0; z-index: 1200; background: var(--bg);
+  display: flex; flex-direction: column; align-items: center;
+  padding: 0 22px calc(24px + env(safe-area-inset-bottom, 0));
+  animation: mpSlideUp 0.28s ease;
+}
+@keyframes mpSlideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
+.mp-full-head { width: 100%; padding: 8px 0; display: flex; }
+.mp-full-back { border: none; background: none; color: var(--text-mid); cursor: pointer; padding: 6px; }
+.mp-full-cover {
+  width: 180px; height: 180px; border-radius: 16px; margin: 14px 0 18px;
+  background: var(--accent-soft); color: #fff; overflow: hidden;
+  display: flex; align-items: center; justify-content: center;
+  box-shadow: 0 8px 30px rgba(0,0,0,0.12);
+}
+.mp-full-cover img { width: 100%; height: 100%; object-fit: cover; }
+.mp-full-title { font-size: 19px; font-weight: 700; color: var(--text); text-align: center; }
+.mp-full-artist { font-size: 13.5px; color: var(--text-muted); margin-top: 4px; }
+.mp-lyrics {
+  flex: 1; min-height: 0; width: 100%; max-width: 460px; overflow-y: auto;
+  margin: 18px 0; text-align: center; -webkit-overflow-scrolling: touch;
+  mask-image: linear-gradient(180deg, transparent, #000 18%, #000 82%, transparent);
+}
+.mp-lyric-line { font-size: 14.5px; color: var(--text-faint); padding: 9px 0; line-height: 1.4; transition: all 0.2s; cursor: pointer; }
+.mp-lyric-line.active { color: var(--accent); font-size: 16px; font-weight: 600; }
+.mp-lyric-empty { color: var(--text-muted); font-size: 13px; padding-top: 40px; }
+.mp-full-ctrl { width: 100%; max-width: 460px; display: flex; align-items: center; gap: 10px; }
+.mp-time { font-size: 11px; color: var(--text-muted); flex-shrink: 0; min-width: 32px; text-align: center; }
+.mp-full-bar { flex: 1; height: 4px; border-radius: 2px; background: var(--border); cursor: pointer; }
+.mp-full-bar-fill { height: 100%; border-radius: 2px; background: var(--accent); }
+.mp-full-btns { display: flex; justify-content: center; margin-top: 18px; }
+.mp-full-play {
+  width: 58px; height: 58px; border: none; cursor: pointer; border-radius: 50%;
+  background: var(--accent); color: #fff; display: flex; align-items: center; justify-content: center;
+  box-shadow: 0 4px 16px var(--accent-dim);
+}
+.mp-full-play:active { transform: scale(0.94); }
+
+/* 歌单：涟言点给你的歌 */
+.mpick-card {
+  display: flex; align-items: center; gap: 10px; padding: 10px 8px;
+  border-bottom: 1px solid var(--border);
+}
+.mpick-play {
+  width: 30px; height: 30px; flex-shrink: 0; border: none; cursor: pointer; border-radius: 50%;
+  background: var(--accent-dim); color: var(--accent);
+  display: flex; align-items: center; justify-content: center;
+}
+.mpick-play:active { transform: scale(0.9); }
+.mpick-main { flex: 1; min-width: 0; cursor: pointer; }
+.mpick-title { font-size: 14px; font-weight: 600; color: var(--text); }
+.mpick-artist { font-weight: 400; color: var(--text-muted); font-size: 12.5px; }
+.mpick-reason { font-size: 12px; color: var(--text-mid); margin-top: 3px; line-height: 1.4; }
+.mpick-date { font-size: 11px; color: var(--text-faint); margin-top: 3px; }
+.mpick-heart { border: none; background: none; cursor: pointer; color: var(--text-faint); padding: 4px; flex-shrink: 0; }
+.mpick-heart.on { color: #e08a9a; }
+.mpick-del { border: none; background: none; cursor: pointer; color: var(--text-faint); padding: 4px; flex-shrink: 0; }
+
+/* 播放条出现时，把聊天输入框上推让位（约播放条高度 55px） */
+body.mp-active .chat-input-area { margin-bottom: 55px; }

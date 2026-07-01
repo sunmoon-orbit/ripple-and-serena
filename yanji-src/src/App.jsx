@@ -9,6 +9,7 @@ import Settings from './components/Settings'
 import Home from './components/Home'
 import Roost from './components/Roost'
 import Toast from './components/Toast'
+import MiniPlayer from './components/Chat/MiniPlayer'
 
 function Splash({ onDone }) {
   const [fading, setFading] = useState(false)
@@ -67,6 +68,7 @@ export default function App() {
           {activePanel === 'settings' && <Settings />}
         </div>
         <Toast />
+        <MiniPlayer />
       </div>
     </>
   )
