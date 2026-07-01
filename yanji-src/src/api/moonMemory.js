@@ -152,6 +152,13 @@ export async function fetchBooks(config) {
   return request(baseUrl, '/books', { headers: headers(apiToken) })
 }
 
+export async function createBook(config, body) {
+  const { baseUrl, apiToken } = config
+  return request(baseUrl, '/books', {
+    method: 'POST', headers: headers(apiToken), body: JSON.stringify(body),
+  })
+}
+
 export async function fetchBook(config, id) {
   const { baseUrl, apiToken } = config
   return request(baseUrl, `/books/${id}`, { headers: headers(apiToken) })
