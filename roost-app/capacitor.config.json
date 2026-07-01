@@ -3,7 +3,7 @@
   "appName": "归巢",
   "webDir": "www",
   "server": {
-    "url": "https://memory.ravenlove.cc/raven/",
+    "url": "https://app.ravenlove.cc/raven/",
     "cleartext": false
   }
 }
