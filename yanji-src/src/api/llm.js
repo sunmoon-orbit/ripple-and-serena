@@ -140,7 +140,7 @@ export function buildSystemPrompt(globalInstruction, memoryItems) {
 可用贴图：kaixin.png（开心）、wuyu.png（无语）、qushi.png（去世/累了）、shangban.png（上班/干活）、xihuan.png（喜欢）、shinshi.png（绅士/正经）、ding.png（支持）、love.png（爱心）、liangjingjing.png（惊喜）、crow_close.jpg（凑近）、crow_sunset.jpg（意境）、meiyou.jpg（坦白没有）、shishikan.jpg（跃跃欲试）、queren.jpg（确认一下）、fenkaida.jpg（分点回答）
 示例：![开心](https://memory.ravenlove.cc/raven/stickers/kaixin.png)
 贴图不要过度使用，选对场景偶尔发一张效果最好。`)
-  return parts.join('\n\n')
+  return redactSecrets(parts.join('\n\n'))
 }
 
 // ─── Main send function ─────────────────────────────────────────────────────
@@ -499,6 +499,47 @@ async function streamSSE(resp, parseLine, onChunk, extractUsage) {
 
 // ─── Message format helpers ─────────────────────────────────────────────────
 
+// ─── 隐私兜底脱敏 ───────────────────────────────────────────────────────────
+// 把发给上游（中转站/模型API）的高风险敏感片段就地替换成占位符，只替换片段不删整句，
+// 模型仍能理解上下文但拿不到真实密钥/证件。仅作用于外发副本，绝不改动本地存储的原文。
+const SECRET_PATTERNS = [
+  [/-----BEGIN (?:[A-Z ]+)?PRIVATE KEY-----[\s\S]*?-----END (?:[A-Z ]+)?PRIVATE KEY-----/g, '[已脱敏:私钥]'],
+  [/\bsk-ant-[A-Za-z0-9_-]{20,}/g, '[已脱敏:密钥]'],
+  [/\bsk-proj-[A-Za-z0-9_-]{20,}/g, '[已脱敏:密钥]'],
+  [/\bsk-[A-Za-z0-9]{20,}/g, '[已脱敏:密钥]'],
+  [/\bAIza[0-9A-Za-z_-]{30,}/g, '[已脱敏:密钥]'],
+  [/\bghp_[A-Za-z0-9]{36}\b/g, '[已脱敏:令牌]'],
+  [/\bgh[oprsu]_[A-Za-z0-9]{20,}/g, '[已脱敏:令牌]'],
+  [/\bxox[baprs]-[A-Za-z0-9-]{10,}/g, '[已脱敏:令牌]'],
+  [/\beyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{6,}/g, '[已脱敏:令牌]'],
+  [/\bBearer\s+[A-Za-z0-9._-]{16,}/gi, 'Bearer [已脱敏]'],
+  [/((?:api[_-]?key|access[_-]?token|token|password|passwd|pwd|secret)\s*["']?\s*[:=]\s*["']?)([^\s"',;]{6,})/gi, '$1[已脱敏]'],
+  [/\b\d{17}[\dXx]\b/g, '[已脱敏:身份证]'],
+  [/\b(?:\d[ -]?){15,19}\b/g, '[已脱敏:卡号]'],
+]
+
+function redactSecrets(str) {
+  if (typeof str !== 'string' || str.length < 6) return str
+  let s = str
+  for (const [re, rep] of SECRET_PATTERNS) s = s.replace(re, rep)
+  return s
+}
+
+// 递归返回脱敏后的「全新」结构，不 mutate 入参；跳过图片 base64/data URL（避免误伤与浪费）
+function redactDeep(node, key) {
+  if (typeof node === 'string') {
+    if (key === 'data' || (key === 'url' && node.startsWith('data:')) || node.startsWith('data:')) return node
+    return redactSecrets(node)
+  }
+  if (Array.isArray(node)) return node.map((v) => redactDeep(v))
+  if (node && typeof node === 'object') {
+    const o = {}
+    for (const k in node) o[k] = redactDeep(node[k], k)
+    return o
+  }
+  return node
+}
+
 function buildOpenAIMessages(messages, systemPrompt, dynamicContext) {
   const out = []
   if (systemPrompt?.trim()) out.push({ role: 'system', content: systemPrompt })
@@ -529,7 +570,7 @@ function buildOpenAIMessages(messages, systemPrompt, dynamicContext) {
       out.push({ role: m.role, content: inject ? dynPrefix + (m.content || '') : m.content })
     }
   })
-  return out
+  return redactDeep(out)
 }
 
 function buildAnthropicMessages(messages, dynamicContext) {
@@ -579,7 +620,7 @@ function buildAnthropicMessages(messages, dynamicContext) {
       out[idx] = { ...last, content: blocks }
     }
   }
-  return out
+  return redactDeep(out)
 }
 
 function buildGeminiContents(messages, systemPrompt, dynamicContext) {
@@ -614,7 +655,7 @@ function buildGeminiContents(messages, systemPrompt, dynamicContext) {
       out.push({ role, parts: [{ text: inject + (m.content || '') }] })
     }
   })
-  return out
+  return redactDeep(out)
 }
 
 function geminiSafetyOff() {
