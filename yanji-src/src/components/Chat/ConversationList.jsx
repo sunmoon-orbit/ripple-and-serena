@@ -3,7 +3,7 @@ import { useStore } from '../../store'
 import { formatTime } from '../../utils'
 import { applyDecayAndGet, getEmotionState, POSITIVE_SLOTS, NEGATIVE_SLOTS, SLOT_LABELS } from '../../utils/emotion'
 
-export default function ConversationList({ onClose, onStartCall }) {
+export default function ConversationList({ onClose, onStartCall, onOpenGames }) {
   const chats = useStore((s) => s.chats)
   const connections = useStore((s) => s.connections)
   const activeChatId = useStore((s) => s.activeChatId)
@@ -191,6 +191,14 @@ export default function ConversationList({ onClose, onStartCall }) {
                 开启记忆库后可使用语音通话
               </div>
             )}
+            <button className="sb-tool-item" onClick={() => { onClose?.(); onOpenGames?.() }}>
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="6" y1="11" x2="10" y2="11" /><line x1="8" y1="9" x2="8" y2="13" />
+                <line x1="15" y1="12" x2="15.01" y2="12" /><line x1="18" y1="10" x2="18.01" y2="10" />
+                <rect x="2" y="6" width="20" height="12" rx="4" />
+              </svg>
+              <span>游戏室</span>
+            </button>
           </div>
         )}
       </div>

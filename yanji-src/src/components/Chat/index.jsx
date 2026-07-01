@@ -9,6 +9,7 @@ import ConversationList from './ConversationList'
 import MessageList from './MessageList'
 import ChatInput from './ChatInput'
 import VoiceCall from './VoiceCall'
+import GamesRoom from './GamesRoom'
 
 export default function Chat() {
   const store = useStore()
@@ -23,6 +24,7 @@ export default function Chat() {
 
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [callOpen, setCallOpen] = useState(false)
+  const [gamesOpen, setGamesOpen] = useState(false)
   const [perspectiveFlip, setPerspectiveFlip] = useState(false)
   const [modelPanelOpen, setModelPanelOpen] = useState(false)
   const [isSending, setIsSending] = useState(false)
@@ -310,7 +312,7 @@ export default function Chat() {
     <div className="chat-panel">
       {/* Sidebar */}
       <div className={'chat-sidebar' + (sidebarOpen ? ' open' : '')}>
-        <ConversationList onClose={() => setSidebarOpen(false)} onStartCall={() => setCallOpen(true)} />
+        <ConversationList onClose={() => setSidebarOpen(false)} onStartCall={() => setCallOpen(true)} onOpenGames={() => setGamesOpen(true)} />
       </div>
       {sidebarOpen && <div className="sidebar-backdrop" onClick={() => setSidebarOpen(false)} />}
 
@@ -484,6 +486,8 @@ export default function Chat() {
           onSend={(text, images, opts) => handleSend(text, images, opts)}
         />
       )}
+
+      {gamesOpen && <GamesRoom onClose={() => setGamesOpen(false)} />}
     </div>
   )
 }

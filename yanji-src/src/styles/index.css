@@ -2284,6 +2284,120 @@ textarea.form-input { display: block; margin: 8px 16px 12px; }
   white-space: pre-wrap; word-break: break-word;
 }
 
+/* ── 游戏室 GamesRoom ── */
+.games-back {
+  background: none; border: none; color: var(--accent);
+  font-size: 14px; cursor: pointer; padding: 2px 0;
+}
+.games-empty { text-align: center; color: var(--text-faint); font-size: 13px; padding: 28px 0; }
+.games-empty-sm { color: var(--text-faint); font-size: 12.5px; padding: 8px 0; }
+
+.games-card {
+  display: flex; align-items: center; gap: 12px;
+  padding: 12px 14px; border-radius: 14px; cursor: pointer;
+  background: var(--card); border: 1px solid var(--border); transition: all 0.15s;
+}
+.games-card:hover { border-color: var(--accent); background: color-mix(in srgb, var(--card) 92%, var(--accent)); }
+.games-card.ended { opacity: 0.6; }
+.games-card-icon { font-size: 26px; line-height: 1; flex-shrink: 0; }
+.games-card-main { flex: 1; min-width: 0; }
+.games-card-name {
+  font-size: 14.5px; color: var(--text); font-weight: 500;
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+}
+.games-card-progress {
+  font-size: 12px; color: var(--text-faint); margin-top: 3px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.games-badge {
+  font-size: 10.5px; padding: 1px 7px; border-radius: 8px; font-weight: 400;
+  background: color-mix(in srgb, var(--accent) 16%, transparent); color: var(--accent);
+}
+.games-badge-cc { background: color-mix(in srgb, #4a90a4 22%, transparent); color: #4a90a4; }
+.games-badge-chat { background: color-mix(in srgb, #b57ba6 22%, transparent); color: #b57ba6; }
+.games-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+.games-dot-playing { background: #5bbf8a; }
+.games-dot-paused { background: #d9a441; }
+.games-dot-ended { background: var(--text-faint); }
+.games-add { width: 100%; margin-top: 4px; }
+
+/* 详情 */
+.games-detail-head { display: flex; align-items: center; gap: 14px; }
+.games-detail-icon { font-size: 40px; line-height: 1; }
+.games-detail-name { font-size: 17px; font-weight: 600; color: var(--text); }
+.games-detail-meta { display: flex; align-items: center; gap: 8px; margin-top: 5px; }
+.games-detail-status { font-size: 12px; color: var(--text-faint); }
+.games-detail-summary { font-size: 13.5px; color: var(--text-muted, var(--text-faint)); line-height: 1.6; }
+.games-detail-progress {
+  font-size: 13px; color: var(--text); line-height: 1.6;
+  background: var(--surface); border-radius: 10px; padding: 9px 12px;
+}
+.games-attr-board {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 8px;
+}
+.games-attr {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 10px; padding: 8px 11px;
+}
+.games-attr-label { display: block; font-size: 11px; color: var(--text-faint); }
+.games-attr-value { display: block; font-size: 15px; color: var(--text); font-weight: 500; margin-top: 2px; }
+
+.games-section-title { font-size: 13px; font-weight: 600; color: var(--text); margin-top: 4px; }
+.games-log-add { display: flex; flex-direction: column; gap: 6px; }
+.games-log-add-row { display: flex; gap: 6px; }
+.games-log-btn { flex-shrink: 0; padding: 8px 16px; }
+
+.games-timeline { display: flex; flex-direction: column; gap: 8px; }
+.games-log {
+  border-left: 2px solid var(--border); padding: 2px 0 2px 12px; position: relative;
+}
+.games-log::before {
+  content: ''; position: absolute; left: -5px; top: 6px;
+  width: 8px; height: 8px; border-radius: 50%; background: var(--accent);
+}
+.games-log-top { display: flex; align-items: center; gap: 8px; }
+.games-log-day { font-size: 12px; color: var(--accent); font-weight: 500; }
+.games-log-time { font-size: 11px; color: var(--text-faint); }
+.games-log-del {
+  margin-left: auto; background: none; border: none; color: var(--text-faint);
+  font-size: 11px; cursor: pointer; opacity: 0.5;
+}
+.games-log-del:hover { opacity: 1; color: #c0392b; }
+.games-log-note { font-size: 13px; color: var(--text); line-height: 1.55; margin-top: 2px; white-space: pre-wrap; word-break: break-word; }
+
+.games-detail-actions { display: flex; gap: 8px; margin-top: 6px; }
+.games-detail-actions .roost-btn { flex: 1; }
+
+/* 表单 */
+.games-flabel { font-size: 12px; color: var(--text-faint); margin-top: 4px; }
+.games-input {
+  width: 100%; box-sizing: border-box;
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 10px; padding: 9px 11px; font-size: 14px; color: var(--text);
+  font-family: inherit;
+}
+.games-input-sm { padding: 7px 9px; font-size: 13px; }
+.games-form-2col { display: flex; gap: 10px; }
+.games-form-2col > div { flex: 1; }
+.games-icon-row { display: flex; flex-wrap: wrap; gap: 6px; }
+.games-icon-opt {
+  font-size: 20px; width: 38px; height: 38px; border-radius: 10px;
+  background: var(--surface); border: 1px solid var(--border); cursor: pointer;
+}
+.games-icon-opt.on { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 15%, transparent); }
+.games-attr-edit { display: flex; gap: 6px; align-items: center; }
+.games-attr-edit .games-input-sm:first-child { flex: 0 0 34%; }
+.games-attr-del {
+  background: none; border: none; color: var(--text-faint); cursor: pointer;
+  font-size: 13px; padding: 4px; flex-shrink: 0;
+}
+.games-attr-add {
+  background: none; border: 1px dashed var(--border); color: var(--text-faint);
+  border-radius: 10px; padding: 8px; font-size: 13px; cursor: pointer; font-family: inherit;
+}
+.games-attr-add:hover { border-color: var(--accent); color: var(--accent); }
+.games-save { width: 100%; margin-top: 8px; }
+
 /* ── 共读 CoRead ── */
 .coread-modal { max-width: 540px; }
 .coread-conv-list { display: flex; flex-direction: column; gap: 8px; }
