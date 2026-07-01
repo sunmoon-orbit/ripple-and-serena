@@ -32,7 +32,7 @@ const STICKERS = [
 ]
 const STICKER_BASE = 'https://memory.ravenlove.cc/raven/stickers/'
 
-export default function ChatInput({ onSend, disabled, onImageAdd, images, onImageRemove, moonMemory }) {
+export default function ChatInput({ onSend, disabled, onImageAdd, images, onImageRemove, moonMemory, quoted, onClearQuote }) {
   const [text, setText] = useState('')
   const [stickerOpen, setStickerOpen] = useState(false)
   const [historyOpen, setHistoryOpen] = useState(false)
@@ -158,8 +158,10 @@ export default function ChatInput({ onSend, disabled, onImageAdd, images, onImag
       finalText = finalText ? `${finalText}\n\n${blocks}` : blocks
     }
     const vopts = pendingVoiceRef.current ? { voice: true, voiceDuration: pendingVoiceRef.current.duration } : {}
+    if (quoted) vopts.quote = quoted
     onSend(finalText, images || [], vopts)
     pendingVoiceRef.current = null
+    onClearQuote?.()
     setText('')
     setAttachedTexts([])
     if (textareaRef.current) {
@@ -291,6 +293,19 @@ export default function ChatInput({ onSend, disabled, onImageAdd, images, onImag
               <button onClick={() => setAttachedTexts((prev) => prev.filter((_, idx) => idx !== i))}>×</button>
             </div>
           ))}
+        </div>
+      )}
+      {quoted && (
+        <div className="input-quote-bar">
+          <div className="input-quote-body">
+            <span className="input-quote-who">引用{quoted.role === 'user' ? '我' : '涟言'}</span>
+            <span className="input-quote-text">{quoted.content}</span>
+          </div>
+          <button className="input-quote-close" onClick={onClearQuote} title="取消引用">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round">
+              <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+            </svg>
+          </button>
         </div>
       )}
       <div className="chat-input-row">

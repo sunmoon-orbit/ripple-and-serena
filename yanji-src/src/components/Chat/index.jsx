@@ -27,6 +27,7 @@ export default function Chat() {
   const [callOpen, setCallOpen] = useState(false)
   const [gamesOpen, setGamesOpen] = useState(false)
   const [musicOpen, setMusicOpen] = useState(false)
+  const [quoted, setQuoted] = useState(null)
   const [perspectiveFlip, setPerspectiveFlip] = useState(false)
   const [modelPanelOpen, setModelPanelOpen] = useState(false)
   const [isSending, setIsSending] = useState(false)
@@ -78,6 +79,7 @@ export default function Chat() {
       role: 'user',
       content: text,
       images: images.length ? images : undefined,
+      quote: opts.quote || undefined,
       injected: injectMode && injectPrompt ? injectPrompt : undefined,
       // 语音消息：标记为语音条样式 + 时长（秒）
       voice: opts.voice || undefined,
@@ -98,10 +100,16 @@ export default function Chat() {
       const limited = applyContextLimit(allMsgs.map((m, i, arr) => {
         const keepImages = i >= arr.length - IMG_KEEP_RECENT
         const baseContent = !keepImages && m.images?.length && !m.content ? '[图片]' : m.content
+        // 引用回复：把被引用的原话拼在这条消息前面，让模型知道在回应哪句
+        let c = baseContent
+        if (m.quote) {
+          const who = m.quote.role === 'user' ? '我之前说' : '你（涟言）之前说'
+          c = `> 引用${who}：「${m.quote.content}」\n\n${c}`
+        }
         return {
           role: m.role,
           // 注入词只在发往模型时拼回句尾，不进前端显示
-          content: m.injected ? `${baseContent}\n\n${m.injected}` : baseContent,
+          content: m.injected ? `${c}\n\n${m.injected}` : c,
           images: keepImages ? m.images : undefined,
           thinking: m.thinking || undefined,
           tool_calls: m.tool_calls || undefined,
@@ -465,7 +473,20 @@ export default function Chat() {
               </p>
             </div>
           ) : (
-            <MessageList messages={messages} status={status} onEdit={handleEditMessage} />
+            <MessageList
+              messages={messages}
+              status={status}
+              onEdit={handleEditMessage}
+              activeChatId={activeChatId}
+              onQuote={(m) => setQuoted({
+                role: m.role,
+                content: (m.content || '')
+                  .replace(/\[music:[^\]]+\]/g, '')
+                  .replace(/\[sticker:[^\]]+\]/g, '')
+                  .replace(/!\[[^\]]*\]\([^)]*\)/g, '')
+                  .trim().slice(0, 140),
+              })}
+            />
           )}
         </div>
 
@@ -477,6 +498,8 @@ export default function Chat() {
           onImageAdd={(src) => setPendingImages((p) => [...p, src])}
           onImageRemove={(i) => setPendingImages((p) => p.filter((_, idx) => idx !== i))}
           moonMemory={moonMemory}
+          quoted={quoted}
+          onClearQuote={() => setQuoted(null)}
         />
         <input ref={bgFileRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={handleBgUpload} />
         <input ref={importFileRef} type="file" accept=".json" style={{ display: 'none' }} onChange={handleBackupImport} />
