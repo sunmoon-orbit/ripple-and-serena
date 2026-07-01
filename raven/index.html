@@ -635,6 +635,55 @@
   }
   #auth-btn:hover { opacity: 0.85; }
   #auth-error { font-size: 12px; color: #c05050; min-height: 16px; }
+
+  /* 点歌卡片 */
+  .rv-music {
+    display: flex; align-items: center; gap: 10px; margin: 8px 0;
+    padding: 10px 12px; max-width: 340px;
+    background: var(--surface); border: 1px solid var(--border); border-radius: 12px;
+  }
+  .rv-music-cover {
+    width: 42px; height: 42px; flex-shrink: 0; border-radius: 8px; overflow: hidden;
+    background: var(--accent); color: var(--bg);
+    display: flex; align-items: center; justify-content: center;
+  }
+  .rv-music-cover img { width: 100%; height: 100%; object-fit: cover; }
+  .rv-music-main { flex: 1; min-width: 0; }
+  .rv-music-title { font-size: 14px; font-weight: 600; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .rv-music-artist { font-size: 12px; color: var(--text-dim); margin-top: 1px; }
+  .rv-music-reason { font-size: 12px; color: var(--text-dim); margin-top: 4px; line-height: 1.4; }
+  .rv-music-play {
+    width: 34px; height: 34px; flex-shrink: 0; border: none; cursor: pointer; border-radius: 50%;
+    background: var(--accent); color: var(--bg);
+    display: flex; align-items: center; justify-content: center;
+  }
+  .rv-music-play:active { transform: scale(0.92); }
+
+  /* 底部迷你播放器 */
+  #rv-player {
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: 950;
+    background: var(--surface); border-top: 1px solid var(--border);
+    box-shadow: 0 -2px 12px rgba(0,0,0,0.18);
+    display: none; padding-bottom: env(safe-area-inset-bottom, 0);
+  }
+  #rv-player.show { display: block; }
+  .rvp-progress { height: 3px; background: var(--border); cursor: pointer; }
+  .rvp-progress-fill { height: 100%; width: 0; background: var(--accent); }
+  .rvp-body { display: flex; align-items: center; gap: 10px; padding: 8px 12px; }
+  .rvp-cover {
+    width: 38px; height: 38px; flex-shrink: 0; border-radius: 7px; overflow: hidden;
+    background: var(--accent); color: var(--bg);
+    display: flex; align-items: center; justify-content: center;
+  }
+  .rvp-cover img { width: 100%; height: 100%; object-fit: cover; }
+  .rvp-meta { flex: 1; min-width: 0; }
+  .rvp-title { font-size: 13.5px; font-weight: 600; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .rvp-artist { font-size: 11.5px; color: var(--text-dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .rvp-btn {
+    width: 34px; height: 34px; flex-shrink: 0; border: none; background: none; cursor: pointer;
+    color: var(--accent); display: flex; align-items: center; justify-content: center;
+  }
+  .rvp-close { color: var(--text-dim); font-size: 15px; }
 </style>
 <!-- 预加载推送图标进浏览器缓存：配合服务端强缓存，推送时图标直接命中缓存、不再实时抓取回退 Chrome -->
 <link rel="preload" as="image" href="push-icon-192.png">
@@ -865,6 +914,127 @@
 <script>
 marked.use({ breaks: true, gfm: true })
 
+/* ── 音乐：GD Studio 多音源 + 点歌卡片 + 底部迷你播放器 ────────── */
+const GD_API = 'https://music-api.gdstudio.xyz/api.php'
+const GD_SOURCES = ['netease', 'kuwo', 'joox', 'migu']
+let rvAudio = null
+
+async function gdSearch(keyword, source) {
+  try {
+    const r = await fetch(`${GD_API}?types=search&source=${source}&name=${encodeURIComponent(keyword)}&count=3`)
+    if (!r.ok) return []
+    const d = await r.json(); return Array.isArray(d) ? d : []
+  } catch { return [] }
+}
+async function gdUrl(source, id) {
+  try {
+    const r = await fetch(`${GD_API}?types=url&source=${source}&id=${id}&br=320`)
+    if (!r.ok) return ''
+    const d = await r.json(); return d.url || ''
+  } catch { return '' }
+}
+async function gdCover(source, picId) {
+  if (!picId) return ''
+  try {
+    const r = await fetch(`${GD_API}?types=pic&source=${source}&id=${encodeURIComponent(picId)}&size=300`)
+    if (!r.ok) return ''
+    const d = await r.json(); return d.url || ''
+  } catch { return '' }
+}
+async function rvResolve(name, artist) {
+  const keyword = artist ? `${name} ${artist}` : name
+  for (const src of GD_SOURCES) {
+    const list = await gdSearch(keyword, src)
+    if (!list.length) continue
+    const top = list[0]
+    const id = top.url_id || top.id
+    const url = await gdUrl(src, id)
+    if (url) {
+      const cover = await gdCover(src, top.pic_id)
+      return { url, name: top.name || name, artist: (Array.isArray(top.artist) ? top.artist.join(' / ') : top.artist) || artist, cover }
+    }
+  }
+  return null
+}
+
+function ensureRvPlayer() {
+  let p = document.getElementById('rv-player')
+  if (p) return p
+  p = document.createElement('div')
+  p.id = 'rv-player'
+  p.innerHTML = `
+    <div class="rvp-progress"><div class="rvp-progress-fill"></div></div>
+    <div class="rvp-body">
+      <div class="rvp-cover">♪</div>
+      <div class="rvp-meta"><div class="rvp-title"></div><div class="rvp-artist"></div></div>
+      <button class="rvp-btn rvp-toggle" aria-label="播放/暂停"></button>
+      <button class="rvp-btn rvp-close" aria-label="关闭">✕</button>
+    </div>`
+  document.body.appendChild(p)
+  p.querySelector('.rvp-toggle').onclick = () => { if (!rvAudio) return; rvAudio.paused ? rvAudio.play() : rvAudio.pause() }
+  p.querySelector('.rvp-close').onclick = () => { if (rvAudio) { rvAudio.pause(); rvAudio.currentTime = 0 } p.classList.remove('show') }
+  p.querySelector('.rvp-progress').onclick = (e) => {
+    if (!rvAudio || !rvAudio.duration) return
+    const rect = e.currentTarget.getBoundingClientRect()
+    rvAudio.currentTime = ((e.clientX - rect.left) / rect.width) * rvAudio.duration
+  }
+  return p
+}
+const PLAY_SVG = '<svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><polygon points="6,4 20,12 6,20"/></svg>'
+const PAUSE_SVG = '<svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>'
+
+async function rvPlay(name, artist, cardBtn) {
+  const p = ensureRvPlayer()
+  p.classList.add('show')
+  if (cardBtn) cardBtn.innerHTML = '…'
+  const t = await rvResolve(name, artist)
+  if (cardBtn) cardBtn.innerHTML = PLAY_SVG
+  if (!t) { p.querySelector('.rvp-title').textContent = '几个源都没找到能放的版本'; p.querySelector('.rvp-artist').textContent = name; return }
+  if (!rvAudio) {
+    rvAudio = new Audio()
+    rvAudio.addEventListener('timeupdate', () => {
+      const fill = p.querySelector('.rvp-progress-fill')
+      if (fill && rvAudio.duration) fill.style.width = (rvAudio.currentTime / rvAudio.duration * 100) + '%'
+    })
+    rvAudio.addEventListener('play', () => { p.querySelector('.rvp-toggle').innerHTML = PAUSE_SVG })
+    rvAudio.addEventListener('pause', () => { p.querySelector('.rvp-toggle').innerHTML = PLAY_SVG })
+  }
+  const cover = p.querySelector('.rvp-cover')
+  cover.innerHTML = t.cover ? `<img src="${t.cover}" alt="">` : '♪'
+  p.querySelector('.rvp-title').textContent = t.name
+  p.querySelector('.rvp-artist').textContent = t.artist || '涟言点的歌'
+  rvAudio.src = t.url
+  rvAudio.play().catch(() => {})
+}
+
+function escHtml(s) { return (s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;') }
+// 把渲染后 HTML 里的 [music:歌名|歌手|理由] 换成点歌卡片
+function renderMusicCards(html) {
+  return html.replace(/\[music:([^\]]+)\]/g, (_, inner) => {
+    const [name, artist, reason] = inner.split('|').map(s => s.trim())
+    if (!name) return ''
+    return `<div class="rv-music" data-name="${encodeURIComponent(name)}" data-artist="${encodeURIComponent(artist || '')}">
+      <div class="rv-music-cover">${MUSIC_NOTE_SVG}</div>
+      <div class="rv-music-main">
+        <div class="rv-music-title">${escHtml(name)}</div>
+        <div class="rv-music-artist">${escHtml(artist || '涟言点的歌')}</div>
+        ${reason ? `<div class="rv-music-reason">${escHtml(reason)}</div>` : ''}
+      </div>
+      <button class="rv-music-play" aria-label="播放">${PLAY_SVG}</button>
+    </div>`
+  })
+}
+const MUSIC_NOTE_SVG = '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>'
+
+// 点歌卡片播放按钮（事件委托）
+document.addEventListener('click', (e) => {
+  const btn = e.target.closest('.rv-music-play')
+  if (!btn) return
+  const card = btn.closest('.rv-music')
+  if (!card) return
+  rvPlay(decodeURIComponent(card.dataset.name || ''), decodeURIComponent(card.dataset.artist || ''), btn)
+})
+
 function enhanceCodeBlocks(container) {
   container.querySelectorAll('pre').forEach(pre => {
     const code = pre.querySelector('code')
@@ -999,7 +1169,7 @@ function appendMsg(text, role, save = true, ts = Date.now(), msgId = null) {
       const withImgs = text.replace(/^[ \t]*(https?:\/\/\S+\.(?:png|jpe?g|gif|webp))[ \t]*$/gim, '![]($1)')
       const withStickers = withImgs.replace(/\[sticker:([^\]]+)\]/g, (_, name) =>
         `<img src="/raven/stickers/${name}" style="max-width:220px;border-radius:8px;display:block;margin:4px 0;" alt="${name}">`)
-      body.innerHTML = marked.parse(withStickers)
+      body.innerHTML = renderMusicCards(marked.parse(withStickers))
       enhanceCodeBlocks(body)
     } else {
       if (/\[sticker:[^\]]+\]/.test(text)) {
