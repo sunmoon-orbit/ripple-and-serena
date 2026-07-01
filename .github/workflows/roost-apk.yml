@@ -36,6 +36,10 @@ jobs:
         working-directory: roost-app
         run: npx cap add android
 
+      - name: Generate app icons
+        working-directory: roost-app
+        run: npx capacitor-assets generate --android
+
       - name: Sync
         working-directory: roost-app
         run: npx cap sync android
