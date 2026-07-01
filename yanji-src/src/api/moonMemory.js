@@ -146,6 +146,41 @@ export async function saveBookmark(config, convId, messageId, updatedBy) {
   })
 }
 
+// ─── 共读书架：真正的书 + 句级划线批注 + 共享书签 ─────────────────────────
+export async function fetchBooks(config) {
+  const { baseUrl, apiToken } = config
+  return request(baseUrl, '/books', { headers: headers(apiToken) })
+}
+
+export async function fetchBook(config, id) {
+  const { baseUrl, apiToken } = config
+  return request(baseUrl, `/books/${id}`, { headers: headers(apiToken) })
+}
+
+export async function fetchBookChapter(config, bookId, idx) {
+  const { baseUrl, apiToken } = config
+  return request(baseUrl, `/books/${bookId}/chapters/${idx}`, { headers: headers(apiToken) })
+}
+
+export async function createBookAnnotation(config, bookId, body) {
+  const { baseUrl, apiToken } = config
+  return request(baseUrl, `/books/${bookId}/annotations`, {
+    method: 'POST', headers: headers(apiToken), body: JSON.stringify(body),
+  })
+}
+
+export async function deleteBookAnnotation(config, annoId) {
+  const { baseUrl, apiToken } = config
+  return request(baseUrl, `/books/annotations/${annoId}`, { method: 'DELETE', headers: headers(apiToken) })
+}
+
+export async function saveBookBookmark(config, bookId, chapterIdx, updatedBy) {
+  const { baseUrl, apiToken } = config
+  return request(baseUrl, `/books/${bookId}/bookmark`, {
+    method: 'PUT', headers: headers(apiToken), body: JSON.stringify({ chapter_idx: chapterIdx, updated_by: updatedBy }),
+  })
+}
+
 export async function fetchPushSchedule(config) {
   const { baseUrl, apiToken } = config
   return request(baseUrl, '/push/schedule', { headers: headers(apiToken) })

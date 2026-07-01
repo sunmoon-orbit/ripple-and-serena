@@ -2459,6 +2459,66 @@ textarea.form-input { display: block; margin: 8px 16px 12px; }
 .coread-anno-actions { display: flex; justify-content: flex-end; gap: 8px; }
 .coread-reader { position: relative; }
 
+/* ── 书架：真正的书 + 句级划线批注 ───────────────────────────── */
+.bookread-shelf { display: flex; flex-direction: column; gap: 10px; }
+.bookread-book {
+  display: flex; gap: 0; border-radius: 12px; overflow: hidden; cursor: pointer;
+  background: var(--card); border: 1px solid var(--border); transition: all 0.15s;
+}
+.bookread-book:hover { border-color: var(--accent); }
+.bookread-spine { width: 8px; flex-shrink: 0; }
+.bookread-book-main { padding: 12px 14px; flex: 1; min-width: 0; }
+.bookread-book-title { font-size: 15px; font-weight: 600; color: var(--text); }
+.bookread-book-author { font-size: 12px; font-weight: 400; color: var(--text-faint); margin-left: 8px; }
+.bookread-book-intro { font-size: 12px; color: var(--text-muted); margin-top: 4px; line-height: 1.5; }
+.bookread-book-meta { display: flex; gap: 12px; font-size: 11px; color: var(--text-faint); margin-top: 6px; }
+
+.bookread-chapter-bar {
+  display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 12px;
+}
+.bookread-chapter-bar button {
+  background: none; border: none; color: var(--accent); font-size: 12px; cursor: pointer; padding: 4px;
+}
+.bookread-chapter-bar button:disabled { color: var(--text-faint); opacity: 0.5; cursor: default; }
+.bookread-chapter-name { font-size: 13px; color: var(--text-muted); }
+
+/* 正文：pre-wrap 保段落，渲染文本必须与原文逐字一致（划线偏移靠数字符） */
+.bookread-text {
+  font-size: 15.5px; line-height: 1.9; color: var(--text);
+  white-space: pre-wrap; word-break: break-word;
+  padding: 4px 2px 8px;
+  -webkit-user-select: text; user-select: text;
+}
+.bookread-mark { color: inherit; cursor: pointer; border-radius: 2px; padding: 1px 0; }
+
+.bookread-foot { display: flex; align-items: center; gap: 10px; margin: 10px 0 16px; }
+.bookread-foot-hint { font-size: 11px; color: var(--text-faint); }
+
+.bookread-anno-list { display: flex; flex-direction: column; gap: 8px; padding-bottom: 8px; }
+.bookread-anno-card {
+  border-left: 3px solid; border-radius: 8px; padding: 8px 10px;
+  background: color-mix(in srgb, var(--card) 80%, transparent);
+  transition: outline 0.15s;
+}
+.bookread-anno-card.focus { outline: 2px dashed var(--accent); outline-offset: 2px; }
+.bookread-anno-quote { font-size: 12.5px; color: var(--text-muted); line-height: 1.5; margin-bottom: 4px; }
+.bookread-anno-row { display: flex; align-items: center; gap: 6px; font-size: 12px; }
+
+.bookread-pending {
+  position: absolute; bottom: 0; left: 0; right: 0;
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  background: var(--surface); border-top: 1px solid var(--border);
+  padding: 10px 16px; box-shadow: 0 -4px 16px rgba(0,0,0,0.12);
+}
+.bookread-pending-quote { font-size: 12.5px; color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.bookread-author-toggle { display: flex; gap: 4px; margin-left: auto; }
+.bookread-author-toggle button {
+  border: 1px solid var(--border); background: var(--card); color: var(--text-faint);
+  font-size: 12px; padding: 3px 10px; border-radius: 100px; cursor: pointer;
+}
+.bookread-author-toggle button.active { border-color: var(--accent); color: var(--accent); font-weight: 600; }
+
 /* ── 音乐：点歌卡片 / 迷你播放器 / 歌单 ───────────────────────── */
 /* 聊天里的点歌卡片 */
 .music-card {
