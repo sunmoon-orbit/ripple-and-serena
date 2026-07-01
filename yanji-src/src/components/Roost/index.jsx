@@ -7,7 +7,6 @@ import BookRead from './BookRead'
 
 const START_DATE = new Date('2025-10-10T00:00:00+08:00')
 const STORAGE_KEY_MSG    = 'roost_messages'
-const STORAGE_KEY_BOOKS  = 'roost_books'
 const STORAGE_KEY_WALLET = 'roost_wallet'
 
 function getDays() {
@@ -26,19 +25,6 @@ function useMessages() {
   }
   const del = (id) => save(msgs.filter(m => m.id !== id))
   return { msgs, add, del }
-}
-
-// ── 书单 ─────────────────────────────────────────────────────────────────────
-function useBooks() {
-  const [books, setBooks] = useState(() => {
-    try { return JSON.parse(localStorage.getItem(STORAGE_KEY_BOOKS) || '[]') } catch { return [] }
-  })
-  const save = (list) => { localStorage.setItem(STORAGE_KEY_BOOKS, JSON.stringify(list)); setBooks(list) }
-  const add = (title, note = '') => save([...books, { id: Date.now(), title, note, done: false, at: new Date().toLocaleDateString('zh-CN') }])
-  const toggle = (id) => save(books.map(b => b.id === id ? { ...b, done: !b.done } : b))
-  const remove = (id) => save(books.filter(b => b.id !== id))
-  const updateNote = (id, note) => save(books.map(b => b.id === id ? { ...b, note } : b))
-  return { books, add, toggle, remove, updateNote }
 }
 
 // ── 钱包 ─────────────────────────────────────────────────────────────────────
@@ -173,18 +159,15 @@ export default function Roost() {
   const moonMemory = useStore(s => s.moonMemory)
   const setActivePanel = useStore(s => s.setActivePanel)
   const { msgs, add: addMsg, del: delMsg } = useMessages()
-  const { books, add: addBook, toggle: toggleBook, remove: removeBook, updateNote } = useBooks()
   const { mems, loading: reviewLoading, load: loadReview, trash } = useReview(moonMemory)
   const { entries: walletEntries, add: addWalletEntry, remove: removeWalletEntry, balance } = useWallet()
   const { letters, load: loadLetters, getOne: getLetter, add: addLetter, remove: removeLetter } = useLetters(moonMemory)
 
   const [modal, setModal] = useState(null)
-  const [selectedBook, setSelectedBook] = useState(null)
   const [selectedLetter, setSelectedLetter] = useState(null)
   const [letterCat, setLetterCat] = useState('all')
   const [compose, setCompose] = useState(emptyCompose)
   const [msgInput, setMsgInput] = useState('')
-  const [bookInput, setBookInput] = useState('')
   const [walletAmount, setWalletAmount] = useState('')
   const [walletNote, setWalletNote] = useState('')
   const [walletType, setWalletType] = useState('in')
@@ -262,17 +245,8 @@ export default function Roost() {
         )}
       </div>
 
-      {/* 书单 + 审核 */}
+      {/* 功能卡片 */}
       <div className="roost-grid">
-        <div className="roost-card roost-mini-card" onClick={() => setModal('bookshelf')}>
-          <div className="roost-mini-icon">
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
-            </svg>
-          </div>
-          <div className="roost-mini-label">书单</div>
-          <div className="roost-mini-count">{books.length} 本</div>
-        </div>
         <div className="roost-card roost-mini-card" onClick={() => setModal('coread')}>
           <div className="roost-mini-icon">
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
@@ -381,90 +355,6 @@ export default function Roost() {
                 ))}
                 {msgs.length === 0 && <div className="roost-empty">还没有留言～</div>}
               </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ── 书单 Modal ── */}
-      {modal === 'bookshelf' && (
-        <div className="roost-overlay" onClick={() => setModal(null)}>
-          <div className="roost-modal" onClick={e => e.stopPropagation()}>
-            <div className="roost-modal-header">
-              <span>书单</span>
-              <button className="roost-modal-close" onClick={() => setModal(null)}>✕</button>
-            </div>
-            <div className="roost-modal-body">
-              <div className="roost-book-add">
-                <input
-                  className="roost-book-input"
-                  placeholder="书名……"
-                  value={bookInput}
-                  onChange={e => setBookInput(e.target.value)}
-                  onKeyDown={e => { if (e.key === 'Enter' && bookInput.trim()) { addBook(bookInput.trim()); setBookInput('') } }}
-                />
-                <button className="roost-btn" onClick={() => { if (bookInput.trim()) { addBook(bookInput.trim()); setBookInput('') } }}>加入</button>
-              </div>
-              <div className="roost-book-list">
-                {books.map(b => (
-                  <div key={b.id} className={'roost-book-item' + (b.done ? ' done' : '')}>
-                    <button className="roost-book-check" onClick={() => toggleBook(b.id)}>
-                      {b.done ? '✓' : '○'}
-                    </button>
-                    <span className="roost-book-title" onClick={() => { setSelectedBook(b); setModal('book-detail') }}>{b.title}</span>
-                    <span className="roost-book-date">{b.at}</span>
-                    <button className="roost-msg-del" onClick={() => removeBook(b.id)}>✕</button>
-                  </div>
-                ))}
-                {books.length === 0 && <div className="roost-empty">还没有书，加一本？</div>}
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ── 书本详情 Modal ── */}
-      {modal === 'book-detail' && selectedBook && (
-        <div className="roost-overlay" onClick={() => { setModal('bookshelf'); setSelectedBook(null) }}>
-          <div className="roost-modal" onClick={e => e.stopPropagation()}>
-            <div className="roost-modal-header">
-              <span>{selectedBook.title}</span>
-              <button className="roost-modal-close" onClick={() => { setModal('bookshelf'); setSelectedBook(null) }}>✕</button>
-            </div>
-            <div className="roost-modal-body">
-              <div className="roost-note-label">读后感 / 笔记</div>
-              <textarea
-                className="roost-note-input"
-                placeholder="写下你们的感想……"
-                defaultValue={selectedBook.note}
-                rows={8}
-                onBlur={e => { updateNote(selectedBook.id, e.target.value); setSelectedBook({...selectedBook, note: e.target.value}) }}
-              />
-              <button
-                className="roost-btn"
-                style={{ marginTop: 4 }}
-                onClick={async () => {
-                  if (!selectedBook.note?.trim()) { showToast('还没有笔记内容', 'error'); return }
-                  if (!moonMemory?.apiToken) { showToast('未配置记忆库 Token', 'error'); return }
-                  try {
-                    const r = await fetch(
-                      `${moonMemory.apiUrl || 'https://memory.ravenlove.cc'}/memories`,
-                      { method: 'POST',
-                        headers: { Authorization: `Bearer ${moonMemory.apiToken}`, 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                          content: `【读书笔记】《${selectedBook.title}》\n\n${selectedBook.note.trim()}`,
-                          type: 'book', layer: 'long', importance: 6,
-                          agent: '阿颖', owner: '阿颖', scope: 'shared'
-                        })
-                      }
-                    )
-                    if (r.ok) { showToast('已存入记忆库 ✓') }
-                    else { showToast('存入失败', 'error') }
-                  } catch { showToast('网络错误', 'error') }
-                }}
-              >
-                存入记忆库
-              </button>
             </div>
           </div>
         </div>
