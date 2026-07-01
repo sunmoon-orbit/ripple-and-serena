@@ -75,16 +75,32 @@ export default function Chat() {
 
     // Add user message. 注入模式：原文照常显示给阿颖，注入词只藏在 injected 字段里，
     // 发往模型时才拼到句尾——前端看不到，更美观。
-    const userMsg = addMessage(chat.id, {
-      role: 'user',
-      content: text,
-      images: images.length ? images : undefined,
-      quote: opts.quote || undefined,
-      injected: injectMode && injectPrompt ? injectPrompt : undefined,
-      // 语音消息：标记为语音条样式 + 时长（秒）
-      voice: opts.voice || undefined,
-      voiceDuration: opts.voice ? (opts.voiceDuration || 0) : undefined,
-    })
+    const inject = injectMode && injectPrompt ? injectPrompt : undefined
+    const segments = opts.segments && opts.segments.length > 1 ? opts.segments : null
+    if (segments) {
+      // 分段发送：每段一条气泡；图片挂最后一段，引用挂第一段，注入词只挂最后一段
+      segments.forEach((seg, i) => {
+        const last = i === segments.length - 1
+        addMessage(chat.id, {
+          role: 'user',
+          content: seg,
+          images: last && images.length ? images : undefined,
+          quote: i === 0 ? (opts.quote || undefined) : undefined,
+          injected: last ? inject : undefined,
+        })
+      })
+    } else {
+      addMessage(chat.id, {
+        role: 'user',
+        content: text,
+        images: images.length ? images : undefined,
+        quote: opts.quote || undefined,
+        injected: inject,
+        // 语音消息：标记为语音条样式 + 时长（秒）
+        voice: opts.voice || undefined,
+        voiceDuration: opts.voice ? (opts.voiceDuration || 0) : undefined,
+      })
+    }
     setPendingImages([])
 
     // Add placeholder assistant message
@@ -115,6 +131,19 @@ export default function Chat() {
           tool_calls: m.tool_calls || undefined,
         }
       }))
+
+      // 分段发送会产生连续多条 user 消息；合并同角色相邻轮次，
+      // 避免 Anthropic 等要求 user/assistant 严格交替的接口报错。
+      const merged = []
+      for (const m of limited) {
+        const last = merged[merged.length - 1]
+        if (last && last.role === m.role && !last.thinking && !m.thinking && !last.tool_calls && !m.tool_calls) {
+          last.content = [last.content, m.content].filter(Boolean).join('\n\n')
+          if (m.images) last.images = [...(last.images || []), ...m.images]
+        } else {
+          merged.push({ ...m })
+        }
+      }
 
       // system prompt 只放纯静态内容，缓存断点稳定，不因时间/记忆变化而失效
       const systemPrompt = buildSystemPrompt(globalInstruction, memoryItems)
@@ -160,7 +189,7 @@ export default function Chat() {
 
       const result = await sendMessage({
         connection: conn,
-        messages: limited,
+        messages: merged,
         systemPrompt,
         dynamicContext,
         model: chat.model || conn.defaultModel,

@@ -159,6 +159,11 @@ export default function ChatInput({ onSend, disabled, onImageAdd, images, onImag
     }
     const vopts = pendingVoiceRef.current ? { voice: true, voiceDuration: pendingVoiceRef.current.duration } : {}
     if (quoted) vopts.quote = quoted
+    // 分段发送：空行隔开的段落拆成多条气泡依次发出（语音/带附件时不拆）
+    if (!pendingVoiceRef.current && !attachedTexts.length) {
+      const segs = finalText.split(/\n[ \t]*\n/).map((s) => s.trim()).filter(Boolean)
+      if (segs.length > 1) vopts.segments = segs
+    }
     onSend(finalText, images || [], vopts)
     pendingVoiceRef.current = null
     onClearQuote?.()
