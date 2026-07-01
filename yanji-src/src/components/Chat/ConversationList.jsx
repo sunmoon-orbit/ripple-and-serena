@@ -3,7 +3,7 @@ import { useStore } from '../../store'
 import { formatTime } from '../../utils'
 import { applyDecayAndGet, getEmotionState, POSITIVE_SLOTS, NEGATIVE_SLOTS, SLOT_LABELS } from '../../utils/emotion'
 
-export default function ConversationList({ onClose, onStartCall, onOpenGames }) {
+export default function ConversationList({ onClose, onStartCall, onOpenGames, onOpenMusic }) {
   const chats = useStore((s) => s.chats)
   const connections = useStore((s) => s.connections)
   const activeChatId = useStore((s) => s.activeChatId)
@@ -198,6 +198,12 @@ export default function ConversationList({ onClose, onStartCall, onOpenGames }) 
                 <rect x="2" y="6" width="20" height="12" rx="4" />
               </svg>
               <span>游戏室</span>
+            </button>
+            <button className="sb-tool-item" onClick={() => { onClose?.(); onOpenMusic?.() }}>
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M9 18V5l12-2v13" /><circle cx="6" cy="18" r="3" /><circle cx="18" cy="16" r="3" />
+              </svg>
+              <span>涟言点的歌</span>
             </button>
           </div>
         )}

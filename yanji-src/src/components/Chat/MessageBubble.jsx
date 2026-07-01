@@ -1,9 +1,10 @@
-import { useMemo, useRef, useState, useCallback, useEffect } from 'react'
+import { useRef, useState, useCallback, useEffect } from 'react'
 import { marked } from 'marked'
 import hljs from 'highlight.js'
 import { formatTime } from '../../utils'
 import { useStore } from '../../store'
 import { synthesizeSpeech } from '../../api/moonMemory'
+import MusicCard from './MusicCard'
 
 marked.setOptions({
   breaks: true,
@@ -29,6 +30,33 @@ function parseMarkdown(text) {
 }
 
 const STICKER_BASE = 'https://memory.ravenlove.cc/raven/stickers/'
+const MUSIC_TAG_RE = /\[music:[^\]]+\]/
+
+// 助手正文：把 [music:歌名|歌手|理由] 标签渲染成点歌卡片，其余按 markdown 渲染
+function renderAssistantContent(content, isStreaming) {
+  if (!content) {
+    return <div className="bubble-markdown" dangerouslySetInnerHTML={{ __html: isStreaming ? '<span class="cursor-blink">▌</span>' : '' }} />
+  }
+  if (!MUSIC_TAG_RE.test(content)) {
+    return <div className="bubble-markdown" dangerouslySetInnerHTML={{ __html: parseMarkdown(content) }} />
+  }
+  const parts = content.split(/(\[music:[^\]]+\])/)
+  return (
+    <>
+      {parts.map((part, i) => {
+        const m = part.match(/^\[music:([^\]]+)\]$/)
+        if (m) {
+          const [name, artist, reason] = m[1].split('|').map((s) => s.trim())
+          if (!name) return null
+          return <MusicCard key={i} name={name} artist={artist} reason={reason} />
+        }
+        return part.trim()
+          ? <div key={i} className="bubble-markdown" dangerouslySetInnerHTML={{ __html: parseMarkdown(part) }} />
+          : null
+      })}
+    </>
+  )
+}
 
 function renderStickered(text) {
   if (!text || !/\[sticker:[^\]]+\]/.test(text)) {
@@ -134,6 +162,7 @@ export default function MessageBubble({ msg, onEdit }) {
       try {
         // 先把语音标签保护成无方括号的临时形式，清理完 markdown 后再还原
         const plainText = msg.content
+          .replace(/\[music:[^\]]+\]/g, '')          // 点歌标签不朗读
           .replace(VOICE_TAG_RE, '__VTAG__$1__')
           .replace(/!\[[^\]]*\]\([^)]*\)/g, '')   // 图片（贴图）整体去掉
           .replace(/\[([^\]]*)\]\([^)]*\)/g, '$1') // 链接只读文字
@@ -180,11 +209,6 @@ export default function MessageBubble({ msg, onEdit }) {
   const [voiceTextMode, setVoiceTextMode] = useState(false)
   // 有些模型/代理把 <think>/<next_thinking>/<reasoning> 等标签塞进思考文本里，展示时剥掉
   const thinkingText = (msg.thinking || '').replace(/<\/?[a-zA-Z_][\w:-]*>/g, '').trim()
-
-  const html = useMemo(() => {
-    if (isUser) return null
-    return parseMarkdown(msg.content)
-  }, [msg.content, isUser])
 
   return (
     <div className={`message-row ${isUser ? 'message-row-user' : 'message-row-assistant'}`}>
@@ -290,10 +314,7 @@ export default function MessageBubble({ msg, onEdit }) {
               <span className="vb-time">{ttsDuration ? fmtDur(ttsDuration) : '…'}</span>
             </div>
           ) : (
-            <div
-              className="bubble-markdown"
-              dangerouslySetInnerHTML={{ __html: html || (isStreaming ? '<span class="cursor-blink">▌</span>' : '') }}
-            />
+            renderAssistantContent(msg.content, isStreaming)
           )}
         </div>
         <div className="message-meta">

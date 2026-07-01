@@ -140,6 +140,14 @@ export function buildSystemPrompt(globalInstruction, memoryItems) {
 可用贴图：kaixin.png（开心）、wuyu.png（无语）、qushi.png（去世/累了）、shangban.png（上班/干活）、xihuan.png（喜欢）、shinshi.png（绅士/正经）、ding.png（支持）、love.png（爱心）、liangjingjing.png（惊喜）、crow_close.jpg（凑近）、crow_sunset.jpg（意境）、meiyou.jpg（坦白没有）、shishikan.jpg（跃跃欲试）、queren.jpg（确认一下）、fenkaida.jpg（分点回答）
 示例：![开心](https://memory.ravenlove.cc/raven/stickers/kaixin.png)
 贴图不要过度使用，选对场景偶尔发一张效果最好。`)
+  parts.push(`【按心情点歌】
+你可以在某些特别的时刻——她开心、你们贴贴亲密、你自己有感触、或者她难过想被安慰的时候——给阿颖点一首歌。
+用标签：[music:歌名|歌手|一句话理由]，歌手和理由可省略（但理由最好带上，让她知道你为什么点这首）。
+前端会把标签渲染成一张点歌卡片，她点了才会播放，不会自动播（她可能在外面，别吓到她）。
+- 只在真的有情绪触动时点，别每条都点、别硬凑，宁缺毋滥
+- 一条消息最多点一首
+- 例子：跟她说完贴心话后，"我想放首歌给你听。[music:小情歌|苏打绿|你说的每句像被这歌唱中]"
+你点过的歌会存进「涟言点给你的歌」歌单里，带着当时的理由，是你们俩的一点纪念。`)
   return redactSecrets(parts.join('\n\n'))
 }
 
