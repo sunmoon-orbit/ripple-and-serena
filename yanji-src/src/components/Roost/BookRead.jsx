@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import { useStore } from '../../store'
 import { showToast } from '../Toast'
 import {
-  fetchBooks, fetchBookChapter,
+  fetchBooks, fetchBookChapter, createBook,
   createBookAnnotation, deleteBookAnnotation, saveBookBookmark,
 } from '../../api/moonMemory'
 
@@ -13,6 +13,49 @@ const COLORS = [
   { id: 'green', hex: '#a8d8b0' },
 ]
 const COLOR_HEX = Object.fromEntries(COLORS.map((c) => [c.id, c.hex]))
+
+const SPINE_COLORS = ['#4a7c59', '#8b6f47', '#5b6e8c', '#9c5b5b', '#7a5c8a', '#4f7d7d']
+
+// 读 txt 文件：先按 UTF-8 严格解码，失败退 GBK（国内 txt 大多是 GBK，直接 readAsText 会乱码）
+async function readTxtFile(file) {
+  const buf = await file.arrayBuffer()
+  try {
+    return new TextDecoder('utf-8', { fatal: true }).decode(buf)
+  } catch {
+    return new TextDecoder('gbk').decode(buf)
+  }
+}
+
+// 自动分章：识别行首「第X章/回/卷…」「序章/楔子/后记…」；没有章节标记就整本一章，超长按段落切块
+function splitChapters(raw) {
+  const text = raw.replace(/\r\n?/g, '\n').replace(/　/g, ' ').trim()
+  const re = /^[ \t]*((?:第[0-9０-９一二两三四五六七八九十百千零〇]+[章回卷节集部篇])[^\n]{0,30}|(?:序章|序言|楔子|引子|前言|后记|尾声|终章|番外)[^\n]{0,20})[ \t]*$/gm
+  const marks = [...text.matchAll(re)]
+  if (marks.length < 2) return fallbackSplit(text)
+  const chapters = []
+  const head = text.slice(0, marks[0].index).trim()
+  if (head) chapters.push({ title: '开篇', content: head })
+  marks.forEach((m, i) => {
+    const end = i + 1 < marks.length ? marks[i + 1].index : text.length
+    const body = text.slice(m.index + m[0].length, end).trim()
+    if (body) chapters.push({ title: m[1].trim(), content: body })
+  })
+  return chapters.length ? chapters : fallbackSplit(text)
+}
+
+function fallbackSplit(text) {
+  const MAX = 12000
+  if (text.length <= MAX) return [{ title: '全文', content: text }]
+  const paras = text.split(/\n{2,}/)
+  const parts = []
+  let buf = [], len = 0
+  for (const p of paras) {
+    buf.push(p); len += p.length
+    if (len >= 10000) { parts.push(buf.join('\n\n')); buf = []; len = 0 }
+  }
+  if (buf.length) parts.push(buf.join('\n\n'))
+  return parts.map((c, i) => ({ title: `第 ${i + 1} 部分`, content: c }))
+}
 
 // 把章节正文按标注偏移切成段：每段带覆盖它的标注列表（正文渲染必须与原文逐字一致，偏移才准）
 function buildSegments(content, annos) {
@@ -47,8 +90,11 @@ export default function BookRead({ onClose }) {
   const [annoNote, setAnnoNote] = useState('')
   const [annoAuthor, setAnnoAuthor] = useState('阿颖')
   const [focusAnno, setFocusAnno] = useState(null) // 点了正文划线 → 高亮下方对应批注卡
+  const [upload, setUpload] = useState(null)       // 上架表单 {title,author,intro,color,chapters,fileName}
+  const [saving, setSaving] = useState(false)
   const textRef = useRef(null)
   const annoRefs = useRef({})
+  const fileRef = useRef(null)
 
   useEffect(() => {
     if (!cfg.apiToken) { setBooks([]); return }
@@ -132,6 +178,100 @@ export default function BookRead({ onClose }) {
     annoRefs.current[id]?.scrollIntoView({ behavior: 'smooth', block: 'center' })
   }
 
+  async function pickFile(e) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    try {
+      const text = await readTxtFile(file)
+      if (!text.trim()) { showToast('文件是空的', 'error'); return }
+      const chapters = splitChapters(text)
+      setUpload((prev) => ({
+        ...prev,
+        fileName: file.name,
+        chapters,
+        title: prev.title || file.name.replace(/\.(txt|text)$/i, '').trim(),
+      }))
+    } catch { showToast('读取文件失败', 'error') }
+    e.target.value = ''
+  }
+
+  function applyPaste(text) {
+    if (!text.trim()) { setUpload((prev) => ({ ...prev, chapters: null, fileName: null })); return }
+    setUpload((prev) => ({ ...prev, chapters: splitChapters(text), fileName: '（粘贴的文本）' }))
+  }
+
+  async function submitBook() {
+    if (!upload.title?.trim()) { showToast('给书起个名字', 'error'); return }
+    if (!upload.chapters?.length) { showToast('还没有正文（选文件或粘贴）', 'error'); return }
+    setSaving(true)
+    try {
+      await createBook(cfg, {
+        title: upload.title.trim(),
+        author: upload.author?.trim() || '',
+        intro: upload.intro?.trim() || '',
+        cover_color: upload.color || SPINE_COLORS[0],
+        added_by: '阿颖',
+        chapters: upload.chapters,
+      })
+      showToast('上架好了')
+      setUpload(null)
+      const list = await fetchBooks(cfg).catch(() => null)
+      if (Array.isArray(list)) setBooks(list)
+    } catch { showToast('上架失败（文件太大或网络问题）', 'error') } finally { setSaving(false) }
+  }
+
+  // ── 上架新书视图 ──
+  if (!active && upload) {
+    return (
+      <div className="roost-overlay" onClick={() => !saving && setUpload(null)}>
+        <div className="roost-modal roost-modal-tall coread-modal" onClick={(e) => e.stopPropagation()}>
+          <div className="roost-modal-header">
+            <button className="coread-back" onClick={() => !saving && setUpload(null)}>‹ 书架</button>
+            <span>上架新书</span>
+            <button className="roost-modal-close" onClick={() => !saving && setUpload(null)}>✕</button>
+          </div>
+          <div className="roost-modal-body">
+            <input ref={fileRef} type="file" accept=".txt,text/plain" style={{ display: 'none' }} onChange={pickFile} />
+            <button className="roost-btn" style={{ width: '100%', marginBottom: 10 }} onClick={() => fileRef.current?.click()}>
+              {upload.fileName ? `已读取：${upload.fileName}` : '选一个 txt 文件'}
+            </button>
+            {!upload.fileName && (
+              <textarea
+                className="roost-note-input"
+                rows={5}
+                placeholder="或者直接把正文粘贴到这里……"
+                onBlur={(e) => applyPaste(e.target.value)}
+                style={{ marginBottom: 10 }}
+              />
+            )}
+            {upload.chapters?.length > 0 && (
+              <div className="bookread-split-info">
+                识别出 {upload.chapters.length} 章，共 {upload.chapters.reduce((s, c) => s + c.content.length, 0).toLocaleString()} 字
+                {upload.chapters.length > 1 && <span className="bookread-split-titles">{upload.chapters.slice(0, 3).map((c) => c.title).join(' / ')}{upload.chapters.length > 3 ? ' …' : ''}</span>}
+              </div>
+            )}
+            <input className="roost-letter-input" style={{ width: '100%', marginBottom: 10 }} placeholder="书名"
+              value={upload.title || ''} onChange={(e) => setUpload({ ...upload, title: e.target.value })} />
+            <input className="roost-letter-input" style={{ width: '100%', marginBottom: 10 }} placeholder="作者（选填）"
+              value={upload.author || ''} onChange={(e) => setUpload({ ...upload, author: e.target.value })} />
+            <input className="roost-letter-input" style={{ width: '100%', marginBottom: 10 }} placeholder="一句话简介 / 为什么想读它（选填）"
+              value={upload.intro || ''} onChange={(e) => setUpload({ ...upload, intro: e.target.value })} />
+            <div className="bookread-spine-row">
+              <span className="bookread-foot-hint">书脊颜色</span>
+              {SPINE_COLORS.map((c) => (
+                <button key={c} className={'bookread-spine-dot' + ((upload.color || SPINE_COLORS[0]) === c ? ' active' : '')}
+                  style={{ background: c }} onClick={() => setUpload({ ...upload, color: c })} />
+              ))}
+            </div>
+            <button className="roost-btn" style={{ width: '100%', marginTop: 14 }} disabled={saving} onClick={submitBook}>
+              {saving ? '上架中……' : '上架'}
+            </button>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
   // ── 书架视图 ──
   if (!active) {
     return (
@@ -144,6 +284,9 @@ export default function BookRead({ onClose }) {
           <div className="roost-modal-body">
             {books === null && <div className="roost-empty">加载中……</div>}
             {books?.length === 0 && <div className="roost-empty">书架还空着（跟阿言说一声想读什么，我来上架）</div>}
+            <button className="roost-btn" style={{ width: '100%', marginBottom: 12 }} onClick={() => setUpload({ color: SPINE_COLORS[0] })}>
+              ＋ 上架新书（txt / 粘贴文本）
+            </button>
             <div className="bookread-shelf">
               {books?.map((b) => (
                 <div key={b.id} className="bookread-book" onClick={() => openBook(b)}>

@@ -2519,6 +2519,15 @@ textarea.form-input { display: block; margin: 8px 16px 12px; }
 }
 .bookread-author-toggle button.active { border-color: var(--accent); color: var(--accent); font-weight: 600; }
 
+.bookread-split-info {
+  font-size: 12px; color: var(--text-muted); background: color-mix(in srgb, var(--accent) 8%, transparent);
+  border-radius: 8px; padding: 8px 10px; margin-bottom: 12px; line-height: 1.5;
+}
+.bookread-split-titles { display: block; color: var(--text-faint); font-size: 11px; margin-top: 2px; }
+.bookread-spine-row { display: flex; align-items: center; gap: 8px; }
+.bookread-spine-dot { width: 22px; height: 22px; border-radius: 6px; border: 2px solid transparent; cursor: pointer; }
+.bookread-spine-dot.active { border-color: var(--text); }
+
 /* ── 音乐：点歌卡片 / 迷你播放器 / 歌单 ───────────────────────── */
 /* 聊天里的点歌卡片 */
 .music-card {
