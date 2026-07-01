@@ -1,11 +1,16 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
 import MessageBubble from './MessageBubble'
+import { useStore } from '../../store'
 
 export default function MessageList({ messages, status, onEdit, onQuote, activeChatId }) {
   const listRef = useRef(null)
   const bottomRef = useRef(null)
   const prevChatId = useRef(activeChatId)
   const [showBtn, setShowBtn] = useState(false)
+  const scrollAnchor = useStore((s) => s.scrollAnchor)
+  // 官端滚动模型用：记住最后一条用户消息 id，出现新的才触发置顶（undefined=首次挂载）
+  const lastUserIdRef = useRef(undefined)
+  const anchorChatRef = useRef(activeChatId)
 
   const getScroller = () => listRef.current?.parentElement || null
 
@@ -32,11 +37,40 @@ export default function MessageList({ messages, status, onEdit, onQuote, activeC
     }
   }, [activeChatId, scrollToBottom])
 
-  // 新消息：贴着底部就跟随滚动，否则不打扰（露出「回到底部」按钮）
+  // 新消息处理。两种滚动模型：
+  // - 跟随模式（旧）：贴着底部就跟随滚动，否则不打扰
+  // - 官端模式：发送后把自己的消息滚到视口顶端，回复在下方往下长，流式期间不跟随
   useEffect(() => {
+    let lastUser = null
+    for (let i = messages.length - 1; i >= 0; i--) {
+      if (messages[i].role === 'user') { lastUser = messages[i]; break }
+    }
+    // 首次挂载 / 切换会话：只记录，不触发置顶
+    if (lastUserIdRef.current === undefined || anchorChatRef.current !== activeChatId) {
+      anchorChatRef.current = activeChatId
+      lastUserIdRef.current = lastUser?.id ?? null
+      return
+    }
+    const isNewUserMsg = lastUser && lastUser.id !== lastUserIdRef.current
+    if (lastUser) lastUserIdRef.current = lastUser.id
+
+    if (scrollAnchor) {
+      if (isNewUserMsg) {
+        // 双 rAF 等新消息+占位回复完成布局，再把用户消息顶到视口顶端
+        requestAnimationFrame(() => requestAnimationFrame(() => {
+          const el = getScroller()
+          const rows = listRef.current?.querySelectorAll('.message-row-user')
+          const row = rows?.[rows.length - 1]
+          if (el && row) el.scrollTo({ top: row.offsetTop - 8, behavior: 'smooth' })
+        }))
+      } else if (!nearBottom()) {
+        setShowBtn(true)
+      }
+      return
+    }
     if (nearBottom()) scrollToBottom('smooth')
     else setShowBtn(true)
-  }, [messages, nearBottom, scrollToBottom])
+  }, [messages, activeChatId, scrollAnchor, nearBottom, scrollToBottom])
 
   // 滚动监听：离底部远就显示「回到底部」
   useEffect(() => {
@@ -62,9 +96,9 @@ export default function MessageList({ messages, status, onEdit, onQuote, activeC
 
   return (
     <>
-      <div className="messages-list" ref={listRef}>
-        {messages.map((msg) => (
-          <MessageBubble key={msg.id} msg={msg} onEdit={onEdit} onQuote={onQuote} />
+      <div className={'messages-list' + (scrollAnchor ? ' anchor-mode' : '')} ref={listRef}>
+        {messages.map((msg, i) => (
+          <MessageBubble key={msg.id} msg={msg} onEdit={onEdit} onQuote={onQuote} isLast={i === messages.length - 1} />
         ))}
         {status && (
           <div className="message-status">{status}</div>

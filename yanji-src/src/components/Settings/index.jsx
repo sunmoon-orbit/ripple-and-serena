@@ -166,11 +166,11 @@ function ConnectionCard({ conn, onSave, onDelete, onActivate, isActive }) {
 export default function Settings() {
   const store = useStore()
   const {
-    connections, activeConnectionId, tokenStats, moonMemory, theme, glassOpacity, avatarConfig,
+    connections, activeConnectionId, tokenStats, moonMemory, theme, glassOpacity, avatarConfig, scrollAnchor,
     globalInstruction, generationConfig, contextLimit, searchConfig, autoTools, injectMode, injectPrompt,
     addConnection, updateConnection, deleteConnection, setActiveConnection,
     setGlobalInstruction, setGenerationConfig, setContextLimit, setSearchConfig,
-    setAutoTools, setMoonMemory, setTheme, setGlassOpacity, setAvatarConfig,
+    setAutoTools, setMoonMemory, setTheme, setGlassOpacity, setAvatarConfig, setScrollAnchor,
     setInjectMode, setInjectPrompt,
     memoryItems, addMemoryItem, toggleMemoryItem, deleteMemoryItem,
   } = store
@@ -249,6 +249,7 @@ export default function Settings() {
     { id: 'xilan', name: '夕岚', color: '#deb7b8' },
     { id: 'claude', name: 'Claude', color: '#c8745a' },
     { id: 'glass', name: '烟水', color: '#7eb8c8' },
+    { id: 'guanduan', name: '官端', color: '#DA7756' },
   ]
 
   async function checkMoonHealth() {
@@ -662,6 +663,18 @@ export default function Settings() {
                     </div>
                   </div>
                 )}
+              </div>
+            </Section>
+            <Section title="滚动">
+              <div className="settings-card">
+                <div className="card-row">
+                  <span className="card-row-label">发送后消息置顶（官端滚动）</span>
+                  <label className="toggle">
+                    <input type="checkbox" checked={scrollAnchor !== false} onChange={(e) => setScrollAnchor(e.target.checked)} />
+                    <span className="toggle-track" />
+                  </label>
+                </div>
+                <p className="card-hint">开启后，发出的消息会滚到屏幕顶端，回复在下方展开（Claude 官方 App 的滚动方式）；关闭则保持跟随最新消息。</p>
               </div>
             </Section>
             <Section title="聊天头像">

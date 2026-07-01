@@ -116,6 +116,83 @@
   border-top-color: rgba(100,150,170,0.18);
 }
 
+/* ===== 官端主题（Claude 官方 App 提取的原版配色，来自 chatnest 的 design tokens） ===== */
+[data-theme="guanduan"] {
+  --bg: #F8F8F6;
+  --bg-sidebar: #F6F6F4;
+  --card: #FFFFFF;
+  --accent: #DA7756;
+  --accent-soft: #E8A88F;
+  --accent-dim: rgba(218,119,86,0.12);
+  --accent-grad: #C96846;
+  --text: #1F1E1D;
+  --text-mid: #6E6D66;
+  --text-muted: #A6A39A;
+  --text-faint: #C7C4BA;
+  --border: rgba(31,30,29,0.10);
+  --border-md: rgba(31,30,29,0.18);
+  --shadow-sm: 0 1px 3px rgba(31,30,29,0.05);
+  --shadow-md: 0 2px 12px rgba(31,30,29,0.08), 0 8px 24px rgba(31,30,29,0.06);
+}
+
+/* 官端手感：正文衬线字体、用户浅灰圆角气泡、AI 回复无气泡直接贴在底色上 */
+[data-theme="guanduan"] .message-bubble {
+  font-family: ui-serif, Georgia, "Noto Serif SC", "Songti SC", serif;
+  font-size: 15.5px; line-height: 1.7;
+}
+[data-theme="guanduan"] .bubble-user {
+  background: #EEEEEC;
+  color: var(--text);
+  border-radius: 22px;
+  box-shadow: none;
+  padding: 12px 18px;
+}
+[data-theme="guanduan"] .bubble-user pre {
+  background: rgba(31,30,29,0.06);
+  border-color: var(--border);
+}
+[data-theme="guanduan"] .bubble-assistant {
+  background: transparent;
+  border: none;
+  box-shadow: none;
+  padding: 4px 0;
+  border-radius: 0;
+}
+[data-theme="guanduan"] .bubble-assistant pre {
+  background: #E6E6E4;
+  border-color: var(--border);
+}
+
+/* ===== 流式尾随 logo：回复生成时缀在末尾旋转的小太阳（官端标志性细节） ===== */
+.trail-logo {
+  display: block;
+  width: 22px; height: 22px;
+  margin: 8px 0 2px;
+  color: var(--accent);
+  animation: trail-spin 1.8s linear infinite;
+}
+.trail-logo svg { width: 100%; height: 100%; display: block; }
+@keyframes trail-spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+
+/* ===== 官端滚动模型：发送后消息置顶，最后一条 AI 回复预留高度往下长 ===== */
+.messages-list.anchor-mode .message-row-assistant.msg-last { min-height: 42vh; }
+
+/* 设置卡片里的说明小字 */
+.card-hint { margin-top: 6px; font-size: 12px; line-height: 1.6; color: var(--text-muted); }
+
+/* ===== 完成彩蛋：回复结束后小概率右下角冒出一只像素小家伙 ===== */
+.completion-egg {
+  position: fixed; right: 18px; bottom: 96px; z-index: 1200;
+  width: 130px; height: 130px;
+  cursor: pointer;
+  animation: egg-in 320ms cubic-bezier(.2,.8,.2,1);
+  filter: drop-shadow(0 8px 18px rgba(0,0,0,0.18));
+}
+.completion-egg svg { width: 100%; height: 100%; display: block; image-rendering: pixelated; }
+.completion-egg.fade-out { animation: egg-out 600ms ease-in forwards; }
+@keyframes egg-in { from { opacity: 0; transform: translateY(20px) scale(0.7); } to { opacity: 1; transform: translateY(0) scale(1); } }
+@keyframes egg-out { to { opacity: 0; transform: translateY(8px) scale(0.92); } }
+
 /* ===== 重置 ===== */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 html, body, #root {

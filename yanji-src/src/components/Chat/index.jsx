@@ -11,6 +11,7 @@ import ChatInput from './ChatInput'
 import VoiceCall from './VoiceCall'
 import GamesRoom from './GamesRoom'
 import MusicRoom from './MusicRoom'
+import CompletionEgg, { pickEgg } from './CompletionEgg'
 
 export default function Chat() {
   const store = useStore()
@@ -34,6 +35,7 @@ export default function Chat() {
   const [status, setStatus] = useState('')
   const [pendingImages, setPendingImages] = useState([])
   const [bgMenuOpen, setBgMenuOpen] = useState(false)
+  const [egg, setEgg] = useState(null) // 完成彩蛋：回复结束后小概率冒出的像素小家伙
   const [bgImage, setBgImage] = useState(() => localStorage.getItem('yanji-bg-image') || '')
   const bgFileRef = useRef(null)
   const importFileRef = useRef(null)
@@ -235,6 +237,10 @@ export default function Chat() {
       }
       touchChat(chat.id)
       if (result.usage) recordTokenUsage(conn.id, result.usage)
+
+      // 完成彩蛋：约 1% 概率右下角冒出一只像素小家伙（Clawd 或小乌鸦）
+      const eggSvg = pickEgg()
+      if (eggSvg) setEgg(eggSvg)
 
       // Auto-title first message
       if (allMsgs.length <= 2 && chat.title === '新对话' && text) {
@@ -542,6 +548,7 @@ export default function Chat() {
       )}
 
       {gamesOpen && <GamesRoom onClose={() => setGamesOpen(false)} />}
+      {egg && <CompletionEgg svg={egg} onDone={() => setEgg(null)} />}
       {musicOpen && <MusicRoom onClose={() => setMusicOpen(false)} />}
     </div>
   )
