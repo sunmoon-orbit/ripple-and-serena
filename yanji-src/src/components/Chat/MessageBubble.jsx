@@ -130,7 +130,7 @@ const UserIcon = () => (
   </svg>
 )
 
-export default function MessageBubble({ msg, onEdit }) {
+export default function MessageBubble({ msg, onEdit, onQuote }) {
   const isUser = msg.role === 'user'
   const isStreaming = msg.streaming
   const { avatarConfig, moonMemory } = useStore()
@@ -246,6 +246,12 @@ export default function MessageBubble({ msg, onEdit }) {
             {thinkOpen && <div className="thinking-content">{thinkingText}</div>}
           </div>
         )}
+        {msg.quote && (
+          <div className="msg-quote">
+            <span className="msg-quote-who">{msg.quote.role === 'user' ? '我' : '涟言'}</span>
+            <span className="msg-quote-text">{msg.quote.content}</span>
+          </div>
+        )}
         <div className={`message-bubble ${isUser ? 'bubble-user' : 'bubble-assistant'}${isStreaming ? ' streaming' : ''}`}>
           {isUser ? (
             editing ? (
@@ -331,6 +337,13 @@ export default function MessageBubble({ msg, onEdit }) {
               <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
                 <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+              </svg>
+            </button>
+          )}
+          {!isStreaming && onQuote && (
+            <button className="msg-edit-icon-btn" title="引用回复" onClick={() => onQuote(msg)}>
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="9 17 4 12 9 7" /><path d="M20 18v-2a4 4 0 0 0-4-4H4" />
               </svg>
             </button>
           )}
