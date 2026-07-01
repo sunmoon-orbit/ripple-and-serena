@@ -1,9 +1,0 @@
-{
-  "appId": "cc.ravenlove.roost",
-  "appName": "归巢",
-  "webDir": "www",
-  "server": {
-    "url": "https://app.ravenlove.cc/raven/",
-    "cleartext": false
-  }
-}
