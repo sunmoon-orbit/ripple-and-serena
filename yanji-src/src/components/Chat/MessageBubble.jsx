@@ -130,7 +130,7 @@ const UserIcon = () => (
   </svg>
 )
 
-export default function MessageBubble({ msg, onEdit, onQuote }) {
+export default function MessageBubble({ msg, onEdit, onQuote, isLast }) {
   const isUser = msg.role === 'user'
   const isStreaming = msg.streaming
   const { avatarConfig, moonMemory } = useStore()
@@ -211,7 +211,7 @@ export default function MessageBubble({ msg, onEdit, onQuote }) {
   const thinkingText = (msg.thinking || '').replace(/<\/?[a-zA-Z_][\w:-]*>/g, '').trim()
 
   return (
-    <div className={`message-row ${isUser ? 'message-row-user' : 'message-row-assistant'}`}>
+    <div className={`message-row ${isUser ? 'message-row-user' : 'message-row-assistant'}${isLast ? ' msg-last' : ''}`}>
       {!isUser && (
         <div className="message-avatar" style={{ borderRadius: avatarRadius }}>
           {useImages && avatarConfig.assistantImage
@@ -323,6 +323,18 @@ export default function MessageBubble({ msg, onEdit, onQuote }) {
             renderAssistantContent(msg.content, isStreaming)
           )}
         </div>
+        {!isUser && isStreaming && (
+          // 流式尾随 logo：生成中缀在正文下方旋转的小太阳（官端标志性细节）
+          <span className="trail-logo" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round">
+              <circle cx="12" cy="12" r="2.4" fill="currentColor" stroke="none" />
+              <line x1="17.5" y1="12" x2="21.5" y2="12" /><line x1="2.5" y1="12" x2="6.5" y2="12" />
+              <line x1="12" y1="17.5" x2="12" y2="21.5" /><line x1="12" y1="2.5" x2="12" y2="6.5" />
+              <line x1="15.9" y1="15.9" x2="18.7" y2="18.7" /><line x1="5.3" y1="5.3" x2="8.1" y2="8.1" />
+              <line x1="15.9" y1="8.1" x2="18.7" y2="5.3" /><line x1="5.3" y1="18.7" x2="8.1" y2="15.9" />
+            </svg>
+          </span>
+        )}
         <div className="message-meta">
           <span className="message-time">{formatTime(msg.createdAt)}</span>
           {msg.tokenUsage && (
