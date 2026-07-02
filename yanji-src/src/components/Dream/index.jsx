@@ -26,6 +26,7 @@ export default function Dream() {
   const [savedId, setSavedId] = useState(null)
   const [filterLayer, setFilterLayer] = useState('short')
   const [filterScope, setFilterScope] = useState('')
+  const [filterType, setFilterType] = useState('memory') // 默认只整合聊天记忆，别把技术记录/宝藏/锚点搅进去
   const [saveScope, setSaveScope] = useState('shared')
   const [saveLayer, setSaveLayer] = useState('long')
   const [connId, setConnId] = useState(activeConnectionId || connections[0]?.id || '')
@@ -48,12 +49,15 @@ export default function Dream() {
       const fetched = await fetchMemories(cfg, {
         layer: filterLayer || undefined,
         scope: filterScope || undefined,
+        type: filterType || undefined,
+        resolved: 0, // 服务端过滤已了结的——客户端过滤会被 limit 卡住，老碎片永远轮不到
         limit: 50,
       })
-      // 跳过已了结的（上次整合过的来源），避免同一批碎片反复整合
-      const mems = fetched.filter((m) => !m.resolved)
+      // 钉住的记忆不参与整合：pinned 本来就是要单独保留的，别整合完给标了结
+      const mems = fetched.filter((m) => !m.resolved && !m.pinned)
       setFetchedCount(mems.length)
       setSourceIds(mems.map((m) => m.id))
+      if (fetched.length >= 50) showToast('本轮拉满 50 条，可能还有更多碎片，整合完可以再跑一轮', 'info')
 
       if (!mems.length) {
         showToast('没有找到符合条件的记忆（已了结的会自动跳过）', 'info')
@@ -103,10 +107,8 @@ export default function Dream() {
       setSavedId(m.id)
       // 把来源记忆标记为已了结（resolved），不删除、可在记忆库里找回，但不再参与下次整合
       if (markResolved && sourceIds.length) {
-        let ok = 0
-        for (const id of sourceIds) {
-          try { await traceMemory(cfg, id, { resolved: 1 }); ok++ } catch { /* 单条失败不阻塞 */ }
-        }
+        const results = await Promise.allSettled(sourceIds.map((id) => traceMemory(cfg, id, { resolved: 1 })))
+        const ok = results.filter((r) => r.status === 'fulfilled').length
         showToast(`已保存为记忆 #${m.id}，${ok}/${sourceIds.length} 条来源已标记为已了结`, 'success')
       } else {
         showToast(`已保存为记忆 #${m.id}`, 'success')
@@ -154,6 +156,16 @@ export default function Dream() {
             <option value="shared">共享</option>
             <option value="private_阿颖">私密（阿颖）</option>
             <option value="private_阿言">私密（阿言）</option>
+          </select>
+        </div>
+        <div className="card-row">
+          <span className="card-row-label">来源类型</span>
+          <select className="filter-select" value={filterType} onChange={(e) => setFilterType(e.target.value)}>
+            <option value="memory">聊天记忆（推荐）</option>
+            <option value="diary">日记</option>
+            <option value="handoff">交接</option>
+            <option value="window">窗口</option>
+            <option value="">全部类型（含技术/宝藏，慎用）</option>
           </select>
         </div>
         <div className="card-row">
