@@ -236,7 +236,17 @@ export default function Roost() {
   const [walletType, setWalletType] = useState('in')
 
   const days = getDays()
-  const latestMsg = msgs[0]
+
+  // 留言卡片轮播：最新几条在面板上轮着展示，不用点进去也能看到新留言
+  const ROTATE_COUNT = 8
+  const rotateMsgs = msgs.slice(0, ROTATE_COUNT)
+  const [msgIdx, setMsgIdx] = useState(0)
+  useEffect(() => {
+    if (rotateMsgs.length < 2) return
+    const t = setInterval(() => setMsgIdx(i => (i + 1) % rotateMsgs.length), 6000)
+    return () => clearInterval(t)
+  }, [rotateMsgs.length])
+  const shownMsg = rotateMsgs.length ? rotateMsgs[msgIdx % rotateMsgs.length] : null
 
   // ── 《归巢谣》播放器 ──
   const playerRef = useRef(null)
@@ -292,19 +302,24 @@ export default function Roost() {
         <div className="roost-since">since 2025 · 10 · 10</div>
       </div>
 
-      {/* 留言卡片 */}
+      {/* 留言卡片（最新几条轮播展示） */}
       <div className="roost-card roost-message-card" onClick={() => setModal('message')}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 8 }}>
           <div className="roost-card-label">留言</div>
-          {latestMsg && <span className="roost-msg-date" style={{ margin: 0 }}>{latestMsg.at}</span>}
+          {shownMsg && <span className="roost-msg-date" style={{ margin: 0 }}>{shownMsg.at}</span>}
         </div>
-        {latestMsg ? (
-          <>
-            <div className="roost-msg-from">{latestMsg.from === 'crow' ? '🐦‍⬛' : '🐦'}</div>
-            <div className="roost-msg-preview">{latestMsg.text}</div>
-          </>
+        {shownMsg ? (
+          <div key={shownMsg.id} className="roost-msg-rotate">
+            <div className="roost-msg-from">{shownMsg.from === 'crow' ? '🐦‍⬛' : '🐦'}</div>
+            <div className="roost-msg-preview">{shownMsg.text}</div>
+          </div>
         ) : (
           <div className="roost-msg-empty">还没有留言，来写一条？</div>
+        )}
+        {rotateMsgs.length > 1 && (
+          <div className="roost-msg-dots">
+            {rotateMsgs.map((m, i) => <span key={m.id} className={'roost-msg-dot' + (i === msgIdx % rotateMsgs.length ? ' on' : '')} />)}
+          </div>
         )}
       </div>
 
