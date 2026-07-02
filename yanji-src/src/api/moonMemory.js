@@ -25,6 +25,8 @@ export async function fetchMemories(config, params = {}) {
   if (params.agent) qs.set('agent', params.agent)
   if (params.scope) qs.set('scope', params.scope)
   if (params.layer) qs.set('layer', params.layer)
+  if (params.type) qs.set('type', params.type)
+  if (params.resolved !== undefined && params.resolved !== '') qs.set('resolved', String(params.resolved))
   if (params.limit) qs.set('limit', String(params.limit))
   const query = qs.toString()
   const path = query ? `/memories/filter?${query}` : '/memories'
