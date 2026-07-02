@@ -207,6 +207,7 @@ export default function MessageBubble({ msg, onEdit, onQuote, isLast }) {
         // 先把语音标签保护成无方括号的临时形式，清理完 markdown 后再还原
         const plainText = msg.content
           .replace(/\[music:[^\]]+\]/g, '')          // 点歌标签不朗读
+          .replace(/\[MSG\]/gi, ' ')                 // 漏拆的分段符不朗读（否则被念成英文 MSG）
           .replace(VOICE_TAG_RE, '__VTAG__$1__')
           .replace(/!\[[^\]]*\]\([^)]*\)/g, '')   // 图片（贴图）整体去掉
           .replace(/\[([^\]]*)\]\([^)]*\)/g, '$1') // 链接只读文字
