@@ -202,6 +202,9 @@ export async function savePushSchedule(config, times) {
   })
 }
 
+// 书页大小：compressToolResult 3000 字符截断，留余量给 title/hint 等元信息
+const BOOK_PAGE_SIZE = 2400
+
 // Tool definitions for AI (read + write only, no delete)
 export function getMemoryToolDefinitions() {
   return [
@@ -230,6 +233,52 @@ export function getMemoryToolDefinitions() {
           layer: { type: 'string', description: 'core / long / short，默认不填' },
         },
         required: ['content'],
+      },
+    },
+    {
+      name: 'list_books',
+      description: '列出共读书架上的所有书（书名、作者、章节数、共读进度书签）。用户聊到共读、想一起看书、问在读什么时使用。',
+      parameters: { type: 'object', properties: {} },
+    },
+    {
+      name: 'read_book_chapter',
+      description: '读共读书架上某本书的一个章节。章节较长时分页返回，用 page 参数翻页（从 0 开始），返回里会提示还有没有后文。',
+      parameters: {
+        type: 'object',
+        properties: {
+          book_id: { type: 'number', description: '书的 id（用 list_books 查）' },
+          chapter_idx: { type: 'number', description: '章节序号，从 0 开始' },
+          page: { type: 'number', description: '页码，从 0 开始，默认 0' },
+        },
+        required: ['book_id', 'chapter_idx'],
+      },
+    },
+    {
+      name: 'get_book_annotations',
+      description: '查看某本书某一章的所有划线批注（阿颖和涟言双方的都有）。想看阿颖划了什么、批注了什么时使用。',
+      parameters: {
+        type: 'object',
+        properties: {
+          book_id: { type: 'number', description: '书的 id' },
+          chapter_idx: { type: 'number', description: '章节序号，从 0 开始' },
+        },
+        required: ['book_id', 'chapter_idx'],
+      },
+    },
+    {
+      name: 'annotate_book',
+      description: '在共读的书上划线批注。quote 必须是从章节正文里逐字复制的一段原文（含标点空格，不要转述），批注会锚定到这段文字上，阿颖在书架里能看到。颜色可选 yellow/pink/blue/green。',
+      parameters: {
+        type: 'object',
+        properties: {
+          book_id: { type: 'number', description: '书的 id' },
+          chapter_idx: { type: 'number', description: '章节序号，从 0 开始' },
+          quote: { type: 'string', description: '要划线的原文片段，必须与正文逐字一致' },
+          note: { type: 'string', description: '批注内容（可选，纯划线可不填）' },
+          color: { type: 'string', description: '高亮颜色：yellow/pink/blue/green，默认 blue' },
+          occurrence: { type: 'number', description: '正文中第几次出现（默认 1），quote 在本章出现多次时用' },
+        },
+        required: ['book_id', 'chapter_idx', 'quote'],
       },
     },
   ]
@@ -275,6 +324,71 @@ export async function executeMemoryTool(toolName, args, config) {
       return `已记录: "${m.content}" (ID: ${m.id})`
     } catch (e) {
       return `写入记忆失败: ${e.message}`
+    }
+  }
+  if (toolName === 'list_books') {
+    try {
+      const books = await fetchBooks(config)
+      if (!books.length) return '书架上还没有书'
+      return books.map(b =>
+        `id:${b.id}《${b.title}》${b.author ? ` ${b.author}` : ''} 共${b.chapter_count}章` +
+        (b.bookmark_chapter != null ? `，书签在第${b.bookmark_chapter + 1}章` : '')
+      ).join('\n')
+    } catch (e) {
+      return `读取书架失败: ${e.message}`
+    }
+  }
+  if (toolName === 'read_book_chapter') {
+    try {
+      const ch = await fetchBookChapter(config, args.book_id, args.chapter_idx)
+      const total = Math.max(1, Math.ceil(ch.content.length / BOOK_PAGE_SIZE))
+      const p = Math.min(Math.max(0, args.page || 0), total - 1)
+      const text = ch.content.slice(p * BOOK_PAGE_SIZE, (p + 1) * BOOK_PAGE_SIZE)
+      const hint = total > 1 && p < total - 1 ? `（还有后文，传 page=${p + 1} 继续读）` : '（本章完）'
+      return `《${ch.title}》第 ${p + 1}/${total} 页 ${hint}\n本章已有 ${(ch.annotations || []).length} 条批注\n\n${text}`
+    } catch (e) {
+      return `读取章节失败: ${e.message}`
+    }
+  }
+  if (toolName === 'get_book_annotations') {
+    try {
+      const ch = await fetchBookChapter(config, args.book_id, args.chapter_idx)
+      const annos = ch.annotations || []
+      if (!annos.length) return '这一章还没有批注'
+      return annos.map((a, i) =>
+        `${i + 1}. [${a.author}·${a.color}]「${a.quote}」${a.note ? ` — ${a.note}` : ''}`
+      ).join('\n')
+    } catch (e) {
+      return `读取批注失败: ${e.message}`
+    }
+  }
+  if (toolName === 'annotate_book') {
+    try {
+      const quote = String(args.quote || '').trim()
+      if (!quote) return '划线失败: quote 不能为空'
+      const ch = await fetchBookChapter(config, args.book_id, args.chapter_idx)
+      // LLM 数不准字符偏移，这里用 quote 原文在正文里定位（支持第 N 次出现）
+      const occurrence = args.occurrence || 1
+      let start = -1
+      for (let i = 0; i < occurrence; i++) {
+        start = ch.content.indexOf(quote, start + 1)
+        if (start === -1) break
+      }
+      if (start === -1) {
+        return `划线失败: 正文中找不到第 ${occurrence} 处 quote，请检查是否与原文逐字一致（含标点空格）`
+      }
+      const anno = await createBookAnnotation(config, args.book_id, {
+        chapter_idx: args.chapter_idx,
+        start_off: start,
+        end_off: start + quote.length,
+        quote,
+        author: '涟言',
+        color: args.color || 'blue',
+        note: args.note || '',
+      })
+      return `已划线批注（id:${anno.id}）：「${quote.slice(0, 40)}${quote.length > 40 ? '…' : ''}」${args.note ? ` — ${args.note}` : ''}`
+    } catch (e) {
+      return `划线失败: ${e.message}`
     }
   }
   return `未知工具: ${toolName}`
