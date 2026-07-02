@@ -163,16 +163,21 @@
   border-color: var(--border);
 }
 
-/* ===== 流式尾随 logo：回复生成时缀在末尾旋转的小太阳（官端标志性细节） ===== */
+/* ===== 流式尾随 logo：回复生成时缀在末尾的小太阳（官端标志性细节） =====
+   原版是 1.8s 匀速旋转，阿颖觉得转圈不好看（2026-07-02），改成呼吸式明暗缩放——
+   更接近官方 App 的柔和质感，不晃眼 */
 .trail-logo {
   display: block;
   width: 22px; height: 22px;
   margin: 8px 0 2px;
   color: var(--accent);
-  animation: trail-spin 1.8s linear infinite;
+  animation: trail-breathe 1.6s ease-in-out infinite;
 }
 .trail-logo svg { width: 100%; height: 100%; display: block; }
-@keyframes trail-spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+@keyframes trail-breathe {
+  0%, 100% { opacity: 0.35; transform: scale(0.88); }
+  50% { opacity: 1; transform: scale(1); }
+}
 
 /* ===== 官端滚动模型：发送后消息置顶，最后一条 AI 回复预留高度往下长 ===== */
 .messages-list.anchor-mode .message-row-assistant.msg-last { min-height: 42vh; }
