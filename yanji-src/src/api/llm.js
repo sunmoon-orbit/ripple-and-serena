@@ -43,8 +43,26 @@ export function checkToolSupport(provider, model) {
 
 // ─── Tool definitions registry ─────────────────────────────────────────────
 
-function getAllTools(searchConfig, moonMemoryConfig) {
+function getAllTools(searchConfig, moonMemoryConfig, onFile) {
   const tools = []
+  if (onFile) {
+    // 做文件工具：产物通过 onFile 回调交给 UI 渲染成文件卡片（可下载，html 可预览）
+    tools.push({
+      name: 'make_file',
+      description:
+        '生成一个文件发给用户，用于：做网页(html)、写文档/改文档(md/txt)、导出数据(csv/json)等。' +
+        '用户会看到文件卡片，可以下载，html 文件还能直接预览。' +
+        '修改已有文档时，把改好的完整内容重新生成一次（不要只给片段）。',
+      parameters: {
+        type: 'object',
+        properties: {
+          filename: { type: 'string', description: '带扩展名的文件名，如 生日贺卡.html、笔记.md' },
+          content: { type: 'string', description: '文件的完整内容' },
+        },
+        required: ['filename', 'content'],
+      },
+    })
+  }
   if (searchConfig?.apiKey) {
     tools.push({
       name: 'web_search',
@@ -78,7 +96,17 @@ function compressToolResult(result) {
   return result.slice(0, TOOL_RESULT_MAX_LEN) + '\n…[内容过长已截断]'
 }
 
-async function executeTool(name, args, { searchConfig, moonMemoryConfig, onStatus }) {
+async function executeTool(name, args, { searchConfig, moonMemoryConfig, onStatus, onFile }) {
+  if (name === 'make_file') {
+    onStatus?.('生成文件...')
+    const { filename, content } = args || {}
+    if (!filename || typeof content !== 'string' || !content) return '文件生成失败：缺少 filename 或 content'
+    if (content.length > 400000) return '文件生成失败：内容超过 400KB 上限，请精简或拆成多个文件'
+    onFile?.({ filename, content })
+    const kb = (content.length / 1024).toFixed(1)
+    const canPreview = /\.html?$/i.test(filename)
+    return `文件「${filename}」（约 ${kb}KB）已生成并以卡片形式展示给用户，用户可以下载${canPreview ? '和在线预览' : ''}。不要在回复正文里重复文件内容，简单说明一下即可。`
+  }
   if (name === 'web_search') {
     onStatus?.('搜索中...')
     try {
@@ -167,19 +195,20 @@ export async function sendMessage({
   onThinking,
   onStatus,
   onToolCall,
+  onFile,
 }) {
   if (!connection) throw new Error('未选择连接')
   const provider = normalizeProvider(connection.provider)
   const usedModel = (model || connection.defaultModel || '').trim()
   if (!usedModel) throw new Error('未设置模型')
 
-  const tools = autoTools !== false ? getAllTools(searchConfig, moonMemoryConfig) : []
+  const tools = autoTools !== false ? getAllTools(searchConfig, moonMemoryConfig, onFile) : []
   const hasTools = tools.length > 0 && checkToolSupport(provider, usedModel)
 
   if (hasTools) {
     return await callWithTools({
       connection, messages, systemPrompt, dynamicContext, model: usedModel, generationConfig,
-      tools, provider, searchConfig, moonMemoryConfig, onChunk, onThinking, onStatus, onToolCall,
+      tools, provider, searchConfig, moonMemoryConfig, onChunk, onThinking, onStatus, onToolCall, onFile,
     })
   }
   return await callStream({
@@ -211,7 +240,7 @@ function stripFakeToolResult(text) {
 
 async function callWithTools({
   connection, messages, systemPrompt, dynamicContext, model, generationConfig,
-  tools, provider, searchConfig, moonMemoryConfig, onChunk, onThinking, onStatus, onToolCall,
+  tools, provider, searchConfig, moonMemoryConfig, onChunk, onThinking, onStatus, onToolCall, onFile,
 }) {
   const { temperature = 0.7, maxTokens = 4096 } = generationConfig || {}
   const safeTemp = provider === 'anthropic' ? Math.min(temperature, 1) : Math.min(temperature, 2)
@@ -248,7 +277,7 @@ async function callWithTools({
         convo.push(aMsg)
         for (const tc of msg.tool_calls) {
           const args = JSON.parse(tc.function.arguments || '{}')
-          const result = compressToolResult(await executeTool(tc.function.name, args, { searchConfig, moonMemoryConfig, onStatus }))
+          const result = compressToolResult(await executeTool(tc.function.name, args, { searchConfig, moonMemoryConfig, onStatus, onFile }))
           convo.push({ role: 'tool', tool_call_id: tc.id, content: result })
         }
         continue
@@ -260,7 +289,7 @@ async function callWithTools({
         if (textTc) {
           onToolCall?.([textTc.name])
           try {
-            const result = compressToolResult(await executeTool(textTc.name, textTc.args, { searchConfig, moonMemoryConfig, onStatus }))
+            const result = compressToolResult(await executeTool(textTc.name, textTc.args, { searchConfig, moonMemoryConfig, onStatus, onFile }))
             const cleanPrefix = stripFakeToolResult(textTc.remaining)
             finalText = cleanPrefix ? `${cleanPrefix}\n\n${result}` : result
           } catch (e) {
@@ -309,7 +338,7 @@ async function callWithTools({
         convo.push({ role: 'assistant', content: data.content })
         const results = []
         for (const tb of toolBlocks) {
-          const result = compressToolResult(await executeTool(tb.name, tb.input || {}, { searchConfig, moonMemoryConfig, onStatus }))
+          const result = compressToolResult(await executeTool(tb.name, tb.input || {}, { searchConfig, moonMemoryConfig, onStatus, onFile }))
           results.push({ type: 'tool_result', tool_use_id: tb.id, content: result })
         }
         convo.push({ role: 'user', content: results })
@@ -342,7 +371,7 @@ async function callWithTools({
         const fc = fcPart.functionCall
         onToolCall?.([fc.name])
         convo.push({ role: 'assistant', content: '', functionCall: fc })
-        const result = compressToolResult(await executeTool(fc.name, fc.args || {}, { searchConfig, moonMemoryConfig, onStatus }))
+        const result = compressToolResult(await executeTool(fc.name, fc.args || {}, { searchConfig, moonMemoryConfig, onStatus, onFile }))
         convo.push({ role: 'function', content: result, functionResponse: { name: fc.name, response: { result } } })
         continue
       }
