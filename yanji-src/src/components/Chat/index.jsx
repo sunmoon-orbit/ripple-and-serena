@@ -188,6 +188,7 @@ export default function Chat() {
 
       let fullText = ''
       let fullThinking = ''
+      const genFiles = [] // make_file 工具生成的文件，挂到助手消息上渲染成卡片
 
       const result = await sendMessage({
         connection: conn,
@@ -213,6 +214,10 @@ export default function Chat() {
           updateMessage(chat.id, assistantId, { toolCalls: toolNames })
           setStatus(`调用工具: ${toolNames.join(', ')}`)
         },
+        onFile: (f) => {
+          genFiles.push(f)
+          updateMessage(chat.id, assistantId, { files: [...genFiles] })
+        },
       })
 
       // 提取情绪更新标签，应用到情绪状态，从显示文本里剥离
@@ -225,6 +230,7 @@ export default function Chat() {
         streaming: false,
         tokenUsage: result.usage || null,
         toolCalls: undefined,
+        files: genFiles.length ? genFiles : undefined,
       })
       if (fullThinking) {
         summarizeThinking(fullThinking, conn, chat.model || conn.defaultModel)

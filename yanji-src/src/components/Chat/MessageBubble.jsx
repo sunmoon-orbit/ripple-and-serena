@@ -32,6 +32,50 @@ function parseMarkdown(text) {
 const STICKER_BASE = 'https://memory.ravenlove.cc/raven/stickers/'
 const MUSIC_TAG_RE = /\[music:[^\]]+\]/
 
+// ── make_file 工具生成的文件卡片 ────────────────────────────────────────────
+const FILE_MIME = {
+  html: 'text/html', htm: 'text/html', md: 'text/markdown', txt: 'text/plain',
+  csv: 'text/csv', json: 'application/json', js: 'text/javascript', css: 'text/css', svg: 'image/svg+xml',
+}
+function fileMime(name) {
+  const ext = (name || '').split('.').pop().toLowerCase()
+  return (FILE_MIME[ext] || 'text/plain') + ';charset=utf-8'
+}
+function fileBlobUrl(f) {
+  return URL.createObjectURL(new Blob([f.content], { type: fileMime(f.filename) }))
+}
+function downloadGenFile(f) {
+  const url = fileBlobUrl(f)
+  const a = document.createElement('a')
+  a.href = url; a.download = f.filename; a.click()
+  setTimeout(() => URL.revokeObjectURL(url), 3000)
+}
+function previewGenFile(f) {
+  // html 用 blob URL 新标签页打开，直接渲染
+  const url = fileBlobUrl(f)
+  window.open(url, '_blank')
+  setTimeout(() => URL.revokeObjectURL(url), 60000)
+}
+function GenFileCard({ file }) {
+  const isHtml = /\.html?$/i.test(file.filename)
+  return (
+    <div className="msg-file-card">
+      <span className="msg-file-icon">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+          <polyline points="14 2 14 8 20 8" />
+        </svg>
+      </span>
+      <div className="msg-file-info">
+        <span className="msg-file-name">{file.filename}</span>
+        <span className="msg-file-size">{(file.content.length / 1024).toFixed(1)} KB</span>
+      </div>
+      {isHtml && <button className="msg-file-btn" onClick={() => previewGenFile(file)}>预览</button>}
+      <button className="msg-file-btn" onClick={() => downloadGenFile(file)}>下载</button>
+    </div>
+  )
+}
+
 // 助手正文：把 [music:歌名|歌手|理由] 标签渲染成点歌卡片，其余按 markdown 渲染
 function renderAssistantContent(content, isStreaming) {
   if (!content) {
@@ -323,6 +367,11 @@ export default function MessageBubble({ msg, onEdit, onQuote, isLast }) {
             renderAssistantContent(msg.content, isStreaming)
           )}
         </div>
+        {!isUser && msg.files?.length > 0 && (
+          <div className="msg-files">
+            {msg.files.map((f, i) => <GenFileCard key={i} file={f} />)}
+          </div>
+        )}
         {!isUser && isStreaming && (
           // 流式尾随 logo：生成中缀在正文下方旋转的小太阳（官端标志性细节）
           <span className="trail-logo" aria-hidden="true">
