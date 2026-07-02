@@ -52,7 +52,8 @@ function getAllTools(searchConfig, moonMemoryConfig, onFile) {
       description:
         '生成一个文件发给用户，用于：做网页(html)、写文档/改文档(md/txt)、导出数据(csv/json)等。' +
         '用户会看到文件卡片，可以下载，html 文件还能直接预览。' +
-        '修改已有文档时，把改好的完整内容重新生成一次（不要只给片段）。',
+        '修改已有文档时，把改好的完整内容重新生成一次（不要只给片段）。' +
+        '注意：文件内容占用你的输出 token，请保持精炼，避免超出最大输出限制被截断；大工程可拆成多个文件分次生成。',
       parameters: {
         type: 'object',
         properties: {
@@ -276,7 +277,19 @@ async function callWithTools({
         if (msg.reasoning_content) aMsg.reasoning_content = msg.reasoning_content
         convo.push(aMsg)
         for (const tc of msg.tool_calls) {
-          const args = JSON.parse(tc.function.arguments || '{}')
+          // 参数 JSON 可能被 max_tokens 截断在字符串中间（make_file 长内容最容易撞），
+          // 直接 JSON.parse 会把 Unterminated string 炸给用户；改为回传错误让模型重试更短的内容
+          let args
+          try {
+            args = JSON.parse(tc.function.arguments || '{}')
+          } catch (e) {
+            const truncated = data.choices[0].finish_reason === 'length'
+            convo.push({
+              role: 'tool', tool_call_id: tc.id,
+              content: `工具参数 JSON 解析失败${truncated ? '（输出被 max_tokens 截断）' : ''}: ${e.message}。请把内容大幅精简后重试，或拆成多个更小的文件。`,
+            })
+            continue
+          }
           const result = compressToolResult(await executeTool(tc.function.name, args, { searchConfig, moonMemoryConfig, onStatus, onFile }))
           convo.push({ role: 'tool', tool_call_id: tc.id, content: result })
         }
