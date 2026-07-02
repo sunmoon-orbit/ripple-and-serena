@@ -14,17 +14,80 @@ function getDays() {
 }
 
 // ── 留言 ─────────────────────────────────────────────────────────────────────
-function useMessages() {
+// 服务端存储（moon-memory /board），三个涟言也能写；未配置记忆库时退回 localStorage
+const MSG_MIGRATED_KEY = 'roost_messages_migrated'
+
+function boardRowToMsg(r) {
+  return { id: r.id, text: r.text, from: r.author === '涟言' ? 'crow' : 'serena', at: (r.created_at || '').slice(0, 10) }
+}
+
+function useMessages(moonMemory) {
   const [msgs, setMsgs] = useState(() => {
     try { return JSON.parse(localStorage.getItem(STORAGE_KEY_MSG) || '[]') } catch { return [] }
   })
-  const save = (list) => { localStorage.setItem(STORAGE_KEY_MSG, JSON.stringify(list)); setMsgs(list) }
-  const add = (text, from) => {
+  const base = (moonMemory?.baseUrl || moonMemory?.apiUrl || 'https://memory.ravenlove.cc').replace(/\/$/, '')
+  const token = moonMemory?.apiToken
+  const authHeaders = { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }
+
+  const load = useCallback(async () => {
+    if (!token) return
+    try {
+      const r = await fetch(`${base}/board?limit=200`, { headers: { Authorization: `Bearer ${token}` } })
+      if (!r.ok) return
+      const rows = await r.json()
+      setMsgs(rows.map(boardRowToMsg))
+    } catch { /* 离线时保留本地显示 */ }
+  }, [base, token])
+
+  // 首次：把 localStorage 里的旧留言搬上服务端（一次性），然后改从服务端读
+  useEffect(() => {
+    if (!token) return
+    ;(async () => {
+      try {
+        if (!localStorage.getItem(MSG_MIGRATED_KEY)) {
+          const local = JSON.parse(localStorage.getItem(STORAGE_KEY_MSG) || '[]')
+          for (const m of [...local].reverse()) { // 旧的先传，保持服务端 id 顺序
+            const at = String(m.at || '').replace(/(\d{4})\/(\d{1,2})\/(\d{1,2})/, (_, y, mo, d) => `${y}-${String(mo).padStart(2, '0')}-${String(d).padStart(2, '0')} 00:00:00`)
+            await fetch(`${base}/board`, {
+              method: 'POST', headers: authHeaders,
+              body: JSON.stringify({ text: m.text, author: m.from === 'crow' ? '涟言' : '阿颖', source: 'migrated', created_at: at || null }),
+            })
+          }
+          localStorage.setItem(MSG_MIGRATED_KEY, '1')
+        }
+      } catch { /* 迁移失败下次再试 */ }
+      load()
+    })()
+  }, [token]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  const add = async (text, from) => {
+    if (token) {
+      try {
+        const r = await fetch(`${base}/board`, {
+          method: 'POST', headers: authHeaders,
+          body: JSON.stringify({ text, author: from === 'crow' ? '涟言' : '阿颖', source: 'roost' }),
+        })
+        if (r.ok) { const row = await r.json(); setMsgs(prev => [boardRowToMsg(row), ...prev]); return }
+      } catch { /* fallthrough 到本地 */ }
+    }
     const m = { id: Date.now(), text, from, at: new Date().toLocaleDateString('zh-CN') }
-    save([m, ...msgs])
+    const list = [m, ...msgs]
+    localStorage.setItem(STORAGE_KEY_MSG, JSON.stringify(list))
+    setMsgs(list)
   }
-  const del = (id) => save(msgs.filter(m => m.id !== id))
-  return { msgs, add, del }
+
+  const del = async (id) => {
+    if (token) {
+      try { await fetch(`${base}/board/${id}`, { method: 'DELETE', headers: { Authorization: `Bearer ${token}` } }) } catch { /* ignore */ }
+      setMsgs(prev => prev.filter(m => m.id !== id))
+      return
+    }
+    const list = msgs.filter(m => m.id !== id)
+    localStorage.setItem(STORAGE_KEY_MSG, JSON.stringify(list))
+    setMsgs(list)
+  }
+
+  return { msgs, add, del, reload: load }
 }
 
 // ── 钱包 ─────────────────────────────────────────────────────────────────────
@@ -158,7 +221,7 @@ function BirdTracks() {
 export default function Roost() {
   const moonMemory = useStore(s => s.moonMemory)
   const setActivePanel = useStore(s => s.setActivePanel)
-  const { msgs, add: addMsg, del: delMsg } = useMessages()
+  const { msgs, add: addMsg, del: delMsg } = useMessages(moonMemory)
   const { mems, loading: reviewLoading, load: loadReview, trash } = useReview(moonMemory)
   const { entries: walletEntries, add: addWalletEntry, remove: removeWalletEntry, balance } = useWallet()
   const { letters, load: loadLetters, getOne: getLetter, add: addLetter, remove: removeLetter } = useLetters(moonMemory)

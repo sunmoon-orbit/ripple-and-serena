@@ -124,6 +124,10 @@ async function executeTool(name, args, { searchConfig, moonMemoryConfig, onStatu
     onStatus?.(name === 'annotate_book' ? '划线批注...' : '翻书中...')
     return await executeMemoryTool(name, args, moonMemoryConfig)
   }
+  if (name === 'read_board_messages' || name === 'leave_board_message') {
+    onStatus?.(name === 'leave_board_message' ? '写留言...' : '看留言板...')
+    return await executeMemoryTool(name, args, moonMemoryConfig)
+  }
   return `未知工具: ${name}`
 }
 

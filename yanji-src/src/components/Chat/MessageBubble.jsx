@@ -204,15 +204,15 @@ export default function MessageBubble({ msg, onEdit, onQuote, isLast }) {
     if (!audioEl) {
       setTtsState('loading')
       try {
-        // 先把语音标签保护成无方括号的临时形式，清理完 markdown 后再还原
+        // 语音标签直接转成 MiniMax 认的圆括号形式（圆括号不在下面的符号清理名单里）。
+        // ⚠️别再用 __VTAG__ 哨兵保护——下面的清理会剥掉下划线，哨兵残骸 VTAGbreath 会被逐字朗读
         const plainText = msg.content
           .replace(/\[music:[^\]]+\]/g, '')          // 点歌标签不朗读
           .replace(/\[MSG\]/gi, ' ')                 // 漏拆的分段符不朗读（否则被念成英文 MSG）
-          .replace(VOICE_TAG_RE, '__VTAG__$1__')
+          .replace(VOICE_TAG_RE, (m, t) => (t.toLowerCase() === 'laughter' ? '(laughs)' : '(breath)'))
           .replace(/!\[[^\]]*\]\([^)]*\)/g, '')   // 图片（贴图）整体去掉
           .replace(/\[([^\]]*)\]\([^)]*\)/g, '$1') // 链接只读文字
           .replace(/[#*`>_~\[\]]/g, '')
-          .replace(/__VTAG__(breath|laughter)__/gi, '[$1]')  // 还原语音标签
           .slice(0, 500)
         const config = { baseUrl: moonMemory.baseUrl, apiToken: moonMemory.apiToken }
         const { audio } = await synthesizeSpeech(config, plainText)
