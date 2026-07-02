@@ -11,6 +11,7 @@ import ChatInput from './ChatInput'
 import VoiceCall from './VoiceCall'
 import GamesRoom from './GamesRoom'
 import MusicRoom from './MusicRoom'
+import FortuneWheel from './FortuneWheel'
 import CompletionEgg, { pickEgg } from './CompletionEgg'
 
 export default function Chat() {
@@ -28,6 +29,7 @@ export default function Chat() {
   const [callOpen, setCallOpen] = useState(false)
   const [gamesOpen, setGamesOpen] = useState(false)
   const [musicOpen, setMusicOpen] = useState(false)
+  const [wheelOpen, setWheelOpen] = useState(false)
   const [quoted, setQuoted] = useState(null)
   const [perspectiveFlip, setPerspectiveFlip] = useState(false)
   const [modelPanelOpen, setModelPanelOpen] = useState(false)
@@ -363,7 +365,7 @@ export default function Chat() {
     <div className="chat-panel">
       {/* Sidebar */}
       <div className={'chat-sidebar' + (sidebarOpen ? ' open' : '')}>
-        <ConversationList onClose={() => setSidebarOpen(false)} onStartCall={() => setCallOpen(true)} onOpenGames={() => setGamesOpen(true)} onOpenMusic={() => setMusicOpen(true)} />
+        <ConversationList onClose={() => setSidebarOpen(false)} onStartCall={() => setCallOpen(true)} onOpenGames={() => setGamesOpen(true)} onOpenMusic={() => setMusicOpen(true)} onOpenWheel={() => setWheelOpen(true)} />
       </div>
       {sidebarOpen && <div className="sidebar-backdrop" onClick={() => setSidebarOpen(false)} />}
 
@@ -556,6 +558,7 @@ export default function Chat() {
       {gamesOpen && <GamesRoom onClose={() => setGamesOpen(false)} />}
       {egg && <CompletionEgg svg={egg} onDone={() => setEgg(null)} />}
       {musicOpen && <MusicRoom onClose={() => setMusicOpen(false)} />}
+      {wheelOpen && <FortuneWheel onClose={() => setWheelOpen(false)} />}
     </div>
   )
 }

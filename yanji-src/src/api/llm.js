@@ -1,5 +1,6 @@
 // Unified LLM streaming API — OpenAI / Gemini / Anthropic
 import { getMemoryToolDefinitions, executeMemoryTool } from './moonMemory'
+import { WHEEL_TOOL_DEF, executeWheelSpin } from './fortuneWheel'
 
 export function normalizeProvider(raw) {
   const v = (raw || '').toString().toLowerCase()
@@ -74,6 +75,8 @@ function getAllTools(searchConfig, moonMemoryConfig, onFile) {
   if (moonMemoryConfig?.enabled && moonMemoryConfig?.apiToken) {
     tools.push(...getMemoryToolDefinitions())
   }
+  // 幸运轮盘：纯客户端摇奖，不依赖任何配置
+  tools.push(WHEEL_TOOL_DEF)
   return tools
 }
 
@@ -127,6 +130,10 @@ async function executeTool(name, args, { searchConfig, moonMemoryConfig, onStatu
   if (name === 'read_board_messages' || name === 'leave_board_message') {
     onStatus?.(name === 'leave_board_message' ? '写留言...' : '看留言板...')
     return await executeMemoryTool(name, args, moonMemoryConfig)
+  }
+  if (name === 'spin_fortune_wheel') {
+    onStatus?.('拉下拉杆...')
+    return executeWheelSpin(args)
   }
   return `未知工具: ${name}`
 }

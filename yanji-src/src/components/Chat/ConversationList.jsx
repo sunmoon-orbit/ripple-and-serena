@@ -3,7 +3,7 @@ import { useStore } from '../../store'
 import { formatTime } from '../../utils'
 import { applyDecayAndGet, getEmotionState, POSITIVE_SLOTS, NEGATIVE_SLOTS, SLOT_LABELS } from '../../utils/emotion'
 
-export default function ConversationList({ onClose, onStartCall, onOpenGames, onOpenMusic }) {
+export default function ConversationList({ onClose, onStartCall, onOpenGames, onOpenMusic, onOpenWheel }) {
   const chats = useStore((s) => s.chats)
   const connections = useStore((s) => s.connections)
   const activeChatId = useStore((s) => s.activeChatId)
@@ -204,6 +204,14 @@ export default function ConversationList({ onClose, onStartCall, onOpenGames, on
                 <path d="M9 18V5l12-2v13" /><circle cx="6" cy="18" r="3" /><circle cx="18" cy="16" r="3" />
               </svg>
               <span>涟言点的歌</span>
+            </button>
+            <button className="sb-tool-item" onClick={() => { onClose?.(); onOpenWheel?.() }}>
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="12" r="10" /><circle cx="12" cy="12" r="2.5" />
+                <line x1="12" y1="2" x2="12" y2="9.5" /><line x1="12" y1="14.5" x2="12" y2="22" />
+                <line x1="2" y1="12" x2="9.5" y2="12" /><line x1="14.5" y1="12" x2="22" y2="12" />
+              </svg>
+              <span>幸运轮盘</span>
             </button>
           </div>
         )}
