@@ -5,7 +5,9 @@ import { useStore } from '../../store'
 export default function MessageList({ messages, status, onEdit, onQuote, activeChatId }) {
   const listRef = useRef(null)
   const bottomRef = useRef(null)
-  const prevChatId = useRef(activeChatId)
+  // 初值用哨兵而不是 activeChatId：让「跳到底部」在首次挂载（刚打开页面）也触发，
+  // 否则打开聊天窗口会停在历史消息顶部要手动拉到底（阿颖 2026-07-02 反馈）
+  const prevChatId = useRef('__mount__')
   const [showBtn, setShowBtn] = useState(false)
   const scrollAnchor = useStore((s) => s.scrollAnchor)
   // 官端滚动模型用：记住最后一条用户消息 id，出现新的才触发置顶（undefined=首次挂载）
