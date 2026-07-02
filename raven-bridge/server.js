@@ -680,8 +680,13 @@ const server = http.createServer((req, res) => {
           pushReplyNotif(text)
           console.log('[http reply]', text.slice(0, 80))
         }
-      } catch {}
-      res.writeHead(200); res.end('{}')
+        res.writeHead(200); res.end('{}')
+      } catch (e) {
+        // 之前这里静默吞掉解析失败（例如 text 里有未转义的直引号 " 导致 JSON.parse 抛错），
+        // curl 仍拿到 200 "{}"，看起来像发送成功，实际消息从未广播——踩过坑，现在把错误暴露出来。
+        console.error('[http reply] JSON parse failed:', e.message, '| raw body length:', body.length)
+        res.writeHead(400); res.end(JSON.stringify({ ok: false, error: e.message }))
+      }
     })
     return
   }
