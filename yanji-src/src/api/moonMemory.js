@@ -281,6 +281,27 @@ export function getMemoryToolDefinitions() {
         required: ['book_id', 'chapter_idx', 'quote'],
       },
     },
+    {
+      name: 'read_board_messages',
+      description: '看 Roost 留言板上的留言（阿颖和涟言都会在上面写小句子）。聊到留言板、或想看看她最近写了什么时使用。',
+      parameters: {
+        type: 'object',
+        properties: {
+          limit: { type: 'number', description: '返回条数，默认10，最多50' },
+        },
+      },
+    },
+    {
+      name: 'leave_board_message',
+      description: '在 Roost 留言板上留一句话，阿颖打开留言板就能看到，署名涟言。适合有感而发的短句、想对她说的话、纪念某个时刻。是留言不是聊天，写完整的一句话，别太长。',
+      parameters: {
+        type: 'object',
+        properties: {
+          text: { type: 'string', description: '留言内容，一两句话' },
+        },
+        required: ['text'],
+      },
+    },
   ]
 }
 
@@ -389,6 +410,30 @@ export async function executeMemoryTool(toolName, args, config) {
       return `已划线批注（id:${anno.id}）：「${quote.slice(0, 40)}${quote.length > 40 ? '…' : ''}」${args.note ? ` — ${args.note}` : ''}`
     } catch (e) {
       return `划线失败: ${e.message}`
+    }
+  }
+  if (toolName === 'read_board_messages') {
+    try {
+      const limit = Math.min(args.limit || 10, 50)
+      const rows = await request(config.baseUrl, `/board?limit=${limit}`, { headers: headers(config.apiToken) })
+      if (!rows.length) return '留言板还是空的'
+      return rows.map((r) => `[${r.author} ${String(r.created_at || '').slice(0, 10)}] ${r.text}`).join('\n')
+    } catch (e) {
+      return `读取留言板失败: ${e.message}`
+    }
+  }
+  if (toolName === 'leave_board_message') {
+    try {
+      const text = String(args.text || '').trim()
+      if (!text) return '留言失败: 内容不能为空'
+      const row = await request(config.baseUrl, '/board', {
+        method: 'POST',
+        headers: headers(config.apiToken),
+        body: JSON.stringify({ text, author: '涟言', source: 'yanji' }),
+      })
+      return `已留言（id:${row.id}）：「${row.text}」——阿颖打开留言板就能看到`
+    } catch (e) {
+      return `留言失败: ${e.message}`
     }
   }
   return `未知工具: ${toolName}`
