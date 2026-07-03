@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
+import { useStore } from '../../store'
 import { showToast } from '../Toast'
 import { transcribeAudio } from '../../api/moonMemory'
 
@@ -33,6 +34,7 @@ const STICKERS = [
 const STICKER_BASE = 'https://memory.ravenlove.cc/raven/stickers/'
 
 export default function ChatInput({ onSend, disabled, onImageAdd, images, onImageRemove, moonMemory, quoted, onClearQuote }) {
+  const customStickers = useStore((s) => s.customStickers) || []
   const [text, setText] = useState('')
   const [stickerOpen, setStickerOpen] = useState(false)
   const [historyOpen, setHistoryOpen] = useState(false)
@@ -235,6 +237,12 @@ export default function ChatInput({ onSend, disabled, onImageAdd, images, onImag
     <div className="chat-input-area">
       {stickerOpen && (
         <div className="sticker-picker" ref={pickerRef}>
+          {/* 自定义表情包排最前（设置→外观→表情包管理里增删），插入完整 URL */}
+          {customStickers.map((t) => (
+            <div key={t.id} className="sticker-opt" onClick={() => sendSticker(t.url)} title={t.label}>
+              <img src={t.url} alt={t.label || 'sticker'} loading="lazy" />
+            </div>
+          ))}
           {STICKERS.map((name) => (
             <div key={name} className="sticker-opt" onClick={() => sendSticker(name)}>
               <img src={STICKER_BASE + name} alt={name} loading="lazy" />

@@ -111,7 +111,8 @@ function renderStickered(text) {
     <span>
       {parts.map((part, i) => {
         const m = part.match(/^\[sticker:([^\]]+)\]$/)
-        if (m) return <img key={i} src={STICKER_BASE + m[1]} alt={m[1]} style={{ maxWidth: 140, borderRadius: 8, display: 'block', margin: '2px 0' }} />
+        // 自定义表情包是完整 URL，内置的是 stickers/ 目录下的文件名
+        if (m) return <img key={i} src={/^https?:\/\//.test(m[1]) ? m[1] : STICKER_BASE + m[1]} alt="sticker" style={{ maxWidth: 140, borderRadius: 8, display: 'block', margin: '2px 0' }} />
         return part ? <span key={i} className="bubble-text">{part}</span> : null
       })}
     </span>

@@ -21,7 +21,7 @@ export default function Chat() {
   const {
     chats, activeChatId, connections, activeConnectionId,
     globalInstruction, memoryItems, generationConfig,
-    searchConfig, moonMemory, autoTools, injectMode, injectPrompt, setInjectMode, replyDelay,
+    searchConfig, moonMemory, autoTools, injectMode, injectPrompt, setInjectMode, replyDelay, customStickers,
     createChat, setActiveChat, getActiveConnection, getActiveChat, getMessages,
     addMessage, updateMessage, removeLastEmptyAssistant, truncateMessagesFrom, touchChat,
     recordTokenUsage, updateChatModel, updateChatConnection, applyContextLimit,
@@ -108,7 +108,8 @@ export default function Chat() {
       }
 
       // system prompt 只放纯静态内容，缓存断点稳定，不因时间/记忆变化而失效
-      const systemPrompt = buildSystemPrompt(globalInstruction, memoryItems)
+      // （自定义贴图列表也算准静态：只在阿颖增删表情包时变一次）
+      const systemPrompt = buildSystemPrompt(globalInstruction, memoryItems, customStickers)
 
       // 动态内容（时间、核心记忆）每轮注入到最后一条用户消息前——不进缓存前缀，不毁历史命中
       const now = new Date()
@@ -233,7 +234,7 @@ export default function Chat() {
       setStatus('')
     }
   }, [connections, globalInstruction, memoryItems,
-      generationConfig, searchConfig, moonMemory, autoTools])
+      generationConfig, searchConfig, moonMemory, autoTools, customStickers])
 
   // ── Send ─────────────────────────────────────────────────────────────────
   const handleSend = useCallback(async (text, images, opts = {}) => {

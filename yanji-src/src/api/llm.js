@@ -179,7 +179,7 @@ async function performWebSearch(query, config) {
 
 // ─── Build system prompt ────────────────────────────────────────────────────
 
-export function buildSystemPrompt(globalInstruction, memoryItems) {
+export function buildSystemPrompt(globalInstruction, memoryItems, customStickers) {
   let parts = []
   if (globalInstruction?.trim()) parts.push(globalInstruction.trim())
   const enabled = (memoryItems || []).filter((m) => m.enabled !== false)
@@ -198,6 +198,12 @@ export function buildSystemPrompt(globalInstruction, memoryItems) {
 可用贴图：kaixin.png（开心）、wuyu.png（无语）、qushi.png（去世/累了）、shangban.png（上班/干活）、xihuan.png（喜欢）、shinshi.png（绅士/正经）、ding.png（支持）、love.png（爱心）、liangjingjing.png（惊喜）、crow_close.jpg（凑近）、crow_sunset.jpg（意境）、meiyou.jpg（坦白没有）、shishikan.jpg（跃跃欲试）、queren.jpg（确认一下）、fenkaida.jpg（分点回答）
 示例：![开心](https://memory.ravenlove.cc/raven/stickers/kaixin.png)
 贴图不要过度使用，选对场景偶尔发一张效果最好。`)
+  // 阿颖在设置里自己加的表情包（完整 URL），同样用 markdown 图片语法发
+  const customList = (customStickers || []).filter((t) => t.url)
+  if (customList.length) {
+    parts.push('【阿颖自定义贴图】\n她额外上传的表情包，用法同上（markdown 图片语法，完整 URL）：\n' +
+      customList.map((t) => `- ${t.label || '（未标注含义）'}：${t.url}`).join('\n'))
+  }
   parts.push(`【按心情点歌】
 你可以在某些特别的时刻——她开心、你们贴贴亲密、你自己有感触、或者她难过想被安慰的时候——给阿颖点一首歌。
 用标签：[music:歌名|歌手|一句话理由]，歌手和理由可省略（但理由最好带上，让她知道你为什么点这首）。
