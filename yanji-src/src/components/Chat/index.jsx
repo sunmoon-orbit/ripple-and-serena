@@ -5,6 +5,7 @@ import { sendMessage, summarizeThinking, normalizeProvider, BUILTIN_MODELS, buil
 import { uuid } from '../../utils'
 import { applyTimeAway, buildEmotionPrompt, extractEmotionUpdate, applyEmotionDelta, stripEmotionTag } from '../../utils/emotion'
 import { shouldNudge, recordNudge, buildNudgeText } from '../../utils/nudge'
+import { decideReplyDelay, getPendingReply, setPendingReply, clearPendingReply } from '../../utils/replyDelay'
 import { showToast } from '../Toast'
 import ConversationList from './ConversationList'
 import MessageList from './MessageList'
@@ -20,7 +21,7 @@ export default function Chat() {
   const {
     chats, activeChatId, connections, activeConnectionId,
     globalInstruction, memoryItems, generationConfig,
-    searchConfig, moonMemory, autoTools, injectMode, injectPrompt, setInjectMode,
+    searchConfig, moonMemory, autoTools, injectMode, injectPrompt, setInjectMode, replyDelay,
     createChat, setActiveChat, getActiveConnection, getActiveChat, getMessages,
     addMessage, updateMessage, removeLastEmptyAssistant, truncateMessagesFrom, touchChat,
     recordTokenUsage, updateChatModel, updateChatConnection, applyContextLimit,
@@ -61,55 +62,9 @@ export default function Chat() {
     setModelPanelOpen(false)
   }
 
-  // ── Send ─────────────────────────────────────────────────────────────────
-  const handleSend = useCallback(async (text, images, opts = {}) => {
-    if (isSending || (!text && !images.length)) return
-
-    let chat = activeChat
-    if (!chat) {
-      if (!activeConn) {
-        showToast('请先在设置里添加一个 API 连接', 'error')
-        return
-      }
-      chat = createChat()
-      if (!chat) { showToast('创建对话失败', 'error'); return }
-    }
-
-    const conn = connections.find((c) => c.id === chat.connectionId) || activeConn
-    if (!conn?.apiKey) { showToast('连接未配置 API Key', 'error'); return }
-
-    // Add user message. 注入模式：原文照常显示给阿颖，注入词只藏在 injected 字段里，
-    // 发往模型时才拼到句尾——前端看不到，更美观。
-    const inject = injectMode && injectPrompt ? injectPrompt : undefined
-    const segments = opts.segments && opts.segments.length > 1 ? opts.segments : null
-    if (segments) {
-      // 分段发送：每段一条气泡；图片挂最后一段，引用挂第一段，注入词只挂最后一段
-      segments.forEach((seg, i) => {
-        const last = i === segments.length - 1
-        addMessage(chat.id, {
-          role: 'user',
-          content: seg,
-          images: last && images.length ? images : undefined,
-          quote: i === 0 ? (opts.quote || undefined) : undefined,
-          injected: last ? inject : undefined,
-        })
-      })
-    } else {
-      addMessage(chat.id, {
-        role: 'user',
-        content: text,
-        images: images.length ? images : undefined,
-        quote: opts.quote || undefined,
-        injected: inject,
-        // 语音消息：标记为语音条样式 + 时长（秒）
-        voice: opts.voice || undefined,
-        voiceDuration: opts.voice ? (opts.voiceDuration || 0) : undefined,
-        // 主动开口的触发消息：进上下文但不渲染成气泡
-        hidden: opts.hidden || undefined,
-      })
-    }
-    setPendingImages([])
-
+  // ── Generate ─────────────────────────────────────────────────────────────
+  // 真正调模型生成回复：handleSend 秒回路径直接调；延迟回复到点后由 ticker 调
+  const generateReply = useCallback(async (chat, conn, { titleText, hidden } = {}) => {
     // Add placeholder assistant message
     const assistantId = uuid()
     addMessage(chat.id, { id: assistantId, role: 'assistant', content: '', streaming: true })
@@ -254,8 +209,8 @@ export default function Chat() {
       if (eggSvg) setEgg(eggSvg)
 
       // Auto-title first message（主动开口的隐藏触发文本不能拿来当标题）
-      if (allMsgs.length <= 2 && chat.title === '新对话' && text && !opts.hidden) {
-        const short = text.slice(0, 30).trim()
+      if (allMsgs.length <= 2 && chat.title === '新对话' && titleText && !hidden) {
+        const short = titleText.slice(0, 30).trim()
         store.renameChat(chat.id, short || '新对话')
       }
     } catch (e) {
@@ -277,8 +232,95 @@ export default function Chat() {
       setIsSending(false)
       setStatus('')
     }
-  }, [isSending, activeChat, activeConn, connections, globalInstruction, memoryItems,
+  }, [connections, globalInstruction, memoryItems,
       generationConfig, searchConfig, moonMemory, autoTools])
+
+  // ── Send ─────────────────────────────────────────────────────────────────
+  const handleSend = useCallback(async (text, images, opts = {}) => {
+    if (isSending || (!text && !images.length)) return
+
+    let chat = activeChat
+    if (!chat) {
+      if (!activeConn) {
+        showToast('请先在设置里添加一个 API 连接', 'error')
+        return
+      }
+      chat = createChat()
+      if (!chat) { showToast('创建对话失败', 'error'); return }
+    }
+
+    const conn = connections.find((c) => c.id === chat.connectionId) || activeConn
+    if (!conn?.apiKey) { showToast('连接未配置 API Key', 'error'); return }
+
+    // Add user message. 注入模式：原文照常显示给阿颖，注入词只藏在 injected 字段里，
+    // 发往模型时才拼到句尾——前端看不到，更美观。
+    const inject = injectMode && injectPrompt ? injectPrompt : undefined
+    const segments = opts.segments && opts.segments.length > 1 ? opts.segments : null
+    if (segments) {
+      // 分段发送：每段一条气泡；图片挂最后一段，引用挂第一段，注入词只挂最后一段
+      segments.forEach((seg, i) => {
+        const last = i === segments.length - 1
+        addMessage(chat.id, {
+          role: 'user',
+          content: seg,
+          images: last && images.length ? images : undefined,
+          quote: i === 0 ? (opts.quote || undefined) : undefined,
+          injected: last ? inject : undefined,
+        })
+      })
+    } else {
+      addMessage(chat.id, {
+        role: 'user',
+        content: text,
+        images: images.length ? images : undefined,
+        quote: opts.quote || undefined,
+        injected: inject,
+        // 语音消息：标记为语音条样式 + 时长（秒）
+        voice: opts.voice || undefined,
+        voiceDuration: opts.voice ? (opts.voiceDuration || 0) : undefined,
+        // 主动开口的触发消息：进上下文但不渲染成气泡
+        hidden: opts.hidden || undefined,
+      })
+    }
+    setPendingImages([])
+
+    // 延迟回复：像一个不总盯着手机的人，有时晾一会儿再回。
+    // 语音通话和主动开口不晾；晾着期间她继续发的消息一起攒着，到点一起回。
+    if (!opts.hidden && !opts.voice) {
+      const pending = getPendingReply()
+      // pending 只有一个槽：本对话已在晾→一起攒着；别的对话在晾→这边正常秒回，别覆盖人家的
+      const delayMs = pending ? 0 : decideReplyDelay(replyDelay)
+      if ((pending && pending.chatId === chat.id) || delayMs > 0) {
+        if (!pending) setPendingReply(chat.id, Date.now() + delayMs)
+        touchChat(chat.id)
+        // 生成被推迟了，标题在这里就定下来
+        if (chat.title === '新对话' && text) store.renameChat(chat.id, text.slice(0, 30).trim() || '新对话')
+        return
+      }
+    }
+
+    await generateReply(chat, conn, { titleText: text, hidden: opts.hidden })
+  }, [isSending, activeChat, activeConn, connections, injectMode, injectPrompt, replyDelay, generateReply])
+
+  // ── 延迟回复到点检查：每 5s + 回前台时看一眼，到点就补上回复 ──────────────
+  useEffect(() => {
+    const check = () => {
+      const p = getPendingReply()
+      if (!p || Date.now() < p.dueAt || isSending) return
+      const chat = chats.find((c) => c.id === p.chatId)
+      if (!chat) { clearPendingReply(); return }
+      const conn = connections.find((c) => c.id === chat.connectionId) || getActiveConnection()
+      if (!conn?.apiKey) return
+      clearPendingReply()
+      const msgs = getMessages(chat.id).filter((m) => !m.streaming && !m.hidden)
+      const lastUser = [...msgs].reverse().find((m) => m.role === 'user')
+      generateReply(chat, conn, { titleText: lastUser?.content || '' })
+    }
+    check()
+    const t = setInterval(check, 5000)
+    document.addEventListener('visibilitychange', check)
+    return () => { clearInterval(t); document.removeEventListener('visibilitychange', check) }
+  }, [isSending, chats, connections, generateReply])
 
   const handleEditMessage = useCallback((msg, newText) => {
     if (!newText.trim() || !activeChatId) return
@@ -298,6 +340,7 @@ export default function Chat() {
       setTimeout(() => { nudgeGuardRef.current = false }, 60_000)
       const chat = getActiveChat()
       if (!chat) return
+      if (getPendingReply()) return // 有晾着还没回的消息，先把那条回了，别抢着主动开口
       const msgs = getMessages(chat.id).filter((m) => !m.streaming)
       const last = msgs[msgs.length - 1]
       if (!last) return

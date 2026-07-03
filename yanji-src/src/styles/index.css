@@ -2427,6 +2427,7 @@ textarea.form-input { display: block; margin: 8px 16px 12px; }
 }
 .games-badge-cc { background: color-mix(in srgb, #4a90a4 22%, transparent); color: #4a90a4; }
 .games-badge-chat { background: color-mix(in srgb, #b57ba6 22%, transparent); color: #b57ba6; }
+.games-badge-api { background: color-mix(in srgb, #7a9a5e 22%, transparent); color: #7a9a5e; }
 .games-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
 .games-dot-playing { background: #5bbf8a; }
 .games-dot-paused { background: #d9a441; }

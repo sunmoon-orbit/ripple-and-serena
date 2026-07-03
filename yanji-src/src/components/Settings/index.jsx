@@ -5,6 +5,7 @@ import { checkHealth, fetchPushSchedule, savePushSchedule } from '../../api/moon
 import { showToast } from '../Toast'
 import { uuid } from '../../utils'
 import { subscribePush, unsubscribePush, getSubscription } from '../../api/push'
+import { DELAY_MODES } from '../../utils/replyDelay'
 
 function Section({ title, children }) {
   return (
@@ -171,7 +172,7 @@ export default function Settings() {
     addConnection, updateConnection, deleteConnection, setActiveConnection,
     setGlobalInstruction, setGenerationConfig, setContextLimit, setSearchConfig,
     setAutoTools, setMoonMemory, setTheme, setGlassOpacity, setAvatarConfig, setScrollAnchor,
-    setInjectMode, setInjectPrompt,
+    setInjectMode, setInjectPrompt, replyDelay, setReplyDelay,
     memoryItems, addMemoryItem, toggleMemoryItem, deleteMemoryItem,
   } = store
 
@@ -578,6 +579,17 @@ export default function Settings() {
                     )}
                   </>
                 )}
+              </div>
+            </Section>
+            <Section title="延迟回复">
+              <div className="settings-card">
+                <div className="card-row">
+                  <span className="card-row-label">回复节奏</span>
+                  <select className="filter-select" value={replyDelay || 'off'} onChange={(e) => setReplyDelay(e.target.value)}>
+                    {DELAY_MODES.map((m) => <option key={m.id} value={m.id}>{m.label}</option>)}
+                  </select>
+                </div>
+                <p className="card-hint">开启后涟言有时不会秒回，像一个在忙别的事的人；晾着期间你继续发的消息会攒着一起回。到点时页面要开着（或重新打开）才会回。</p>
               </div>
             </Section>
             <Section title="注入提示词">
