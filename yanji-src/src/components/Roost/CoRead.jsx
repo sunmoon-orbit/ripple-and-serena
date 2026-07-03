@@ -34,6 +34,8 @@ export default function CoRead({ onClose }) {
   const [annoTarget, setAnnoTarget] = useState(null) // 正在标注的消息 id
   const [annoColor, setAnnoColor] = useState('yellow')
   const [annoNote, setAnnoNote] = useState('')
+  // 界面前的人是阿颖，署名默认她；之前写死'涟言'把她的批注全记在我头上（2026-07-03 修）
+  const [annoAuthor, setAnnoAuthor] = useState('阿颖')
   const [bookmark, setBookmark] = useState(null)
   const msgRefs = useRef({})
 
@@ -79,7 +81,7 @@ export default function CoRead({ onClose }) {
     if (!annoTarget) return
     try {
       const created = await createAnnotation(cfg, active.id, {
-        message_id: annoTarget, author: '涟言', color: annoColor, note: annoNote.trim(),
+        message_id: annoTarget, author: annoAuthor, color: annoColor, note: annoNote.trim(),
       })
       setAnnos((prev) => [...prev, created])
       setAnnoTarget(null); setAnnoNote(''); setAnnoColor('yellow')
@@ -95,8 +97,8 @@ export default function CoRead({ onClose }) {
 
   async function markBookmark(msgId) {
     try {
-      await saveBookmark(cfg, active.id, msgId, '涟言')
-      setBookmark({ message_id: msgId, updated_by: '涟言' })
+      await saveBookmark(cfg, active.id, msgId, '阿颖')
+      setBookmark({ message_id: msgId, updated_by: '阿颖' })
       showToast('书签已记在这里')
     } catch { showToast('书签保存失败', 'error') }
   }
@@ -163,7 +165,7 @@ export default function CoRead({ onClose }) {
                   <div key={a.id} className="coread-anno" style={{ borderLeftColor: COLOR_HEX[a.color] || '#f5d76e' }}>
                     <span className="coread-anno-author">{a.author}</span>
                     <span className="coread-anno-note">{a.note || '（高亮）'}</span>
-                    {a.author === '涟言' && <button className="coread-anno-del" onClick={() => removeAnno(a.id)}>✕</button>}
+                    <button className="coread-anno-del" onClick={() => removeAnno(a.id)}>✕</button>
                   </div>
                 ))}
                 <div className="coread-msg-tools">
@@ -187,6 +189,11 @@ export default function CoRead({ onClose }) {
                   onClick={() => setAnnoColor(c.id)}
                 />
               ))}
+              <div className="bookread-author-toggle">
+                {['阿颖', '涟言'].map((who) => (
+                  <button key={who} className={annoAuthor === who ? 'active' : ''} onClick={() => setAnnoAuthor(who)}>{who}</button>
+                ))}
+              </div>
             </div>
             <textarea
               className="coread-anno-input"
