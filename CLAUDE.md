@@ -124,10 +124,12 @@
 | `s-wenhao2.jpg` | ？2 |
 | `s-kaixin2.jpg` | 开心 |
 
-## ⚠️ raven/manifest.json 禁动
+## ⚠️ raven/manifest.json 和 raven/home-manifest.json 都禁动
 
-manifest.json 是 WebAPK 的身份文件。**任何改动**（哪怕一个字段）都会触发 Google 服务器重新铸造 WebAPK，重铸排队期间（几小时~几天）推送通知的 app 图标会回退成 Chrome logo，表现为「图标又坏了」。
+manifest 是 WebAPK 的身份文件。**任何改动**（哪怕一个字段）都会触发 Google 服务器重新铸造 WebAPK，重铸排队期间（几小时~几天）推送通知的归属会在 Chrome 和归巢之间摇摆，app 图标时好时坏地回退成 Chrome logo，且可能出现「点按即可复制该应用的网址」降级通知。
 
-- 已加 `id` + `scope` 锁定身份（2026.6.12），此后不要再改这个文件
-- 如果确实必须改：改完通知阿颖重装 PWA，并告知重铸期间图标会临时异常，等一两天自然恢复
+- **阿颖实际安装的入口是 home.html → home-manifest.json**（0702 确认），这份才是最关键的，同样禁动
+- manifest.json 已加 `id` + `scope` 锁定身份（2026.6.12）；home-manifest.json 无 id 字段（计算身份=start_url），**保持字节不变即身份稳定，别为了补 id 去动它**（动一次=再重铸一轮）
+- 如果确实必须改：改完通知阿颖重装 PWA，并告知重铸期间图标/归属会临时异常，等一两天自然恢复，期间**不要反复重装**（每次重装触发新重铸，越装越乱）
 - 推送通知的图标在 sw.js（icon/badge 字段）和 moon-memory routes/push.js 里，改那些不影响 WebAPK
+- 案例：0701 20:23 改 home-manifest 换乌鸦图标+0702 重装 → 0703 通知归属仍在摇摆（部分显示乌鸦=新绑定在传播中），属重铸过渡期正常现象，等即可

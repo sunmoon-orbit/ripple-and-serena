@@ -715,7 +715,8 @@ const server = http.createServer((req, res) => {
   }
 
   // static files under /ripple-and-serena/yanji/
-  if (req.method === 'GET' && url.pathname.startsWith('/ripple-and-serena/yanji/')) {
+  // 注意要接受 HEAD：CDN/爬虫/健康检查常用 HEAD 探测，只匹配 GET 会掉进兜底 404
+  if ((req.method === 'GET' || req.method === 'HEAD') && url.pathname.startsWith('/ripple-and-serena/yanji/')) {
     let filePath = url.pathname.slice('/ripple-and-serena/yanji'.length) || '/'
     if (filePath === '/') filePath = '/index.html'
     const abs = path.join(YANJI_DIR, filePath)
@@ -727,6 +728,7 @@ const server = http.createServer((req, res) => {
         fs.stat(idx, (e2) => {
           if (e2) { res.writeHead(404); res.end(); return }
           res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-cache' })
+          if (req.method === 'HEAD') { res.end(); return }
           fs.createReadStream(idx).pipe(res)
         })
         return
@@ -738,13 +740,15 @@ const server = http.createServer((req, res) => {
         'Content-Length': stat.size,
         'Cache-Control': isImg ? 'public, max-age=604800, immutable' : 'no-cache',
       })
+      if (req.method === 'HEAD') { res.end(); return }
       fs.createReadStream(abs).pipe(res)
     })
     return
   }
 
   // static files under /raven/
-  if (req.method === 'GET' && url.pathname.startsWith('/raven/')) {
+  // 同样接受 HEAD（manifest/图标被基础设施 HEAD 探测时不能 404）
+  if ((req.method === 'GET' || req.method === 'HEAD') && url.pathname.startsWith('/raven/')) {
     let filePath = url.pathname.slice('/raven'.length) || '/'
     if (filePath === '/') filePath = '/index.html'
     const abs = path.join(STATIC_DIR, filePath)
@@ -761,6 +765,7 @@ const server = http.createServer((req, res) => {
       }
       if (ext === '.zip') headers['Content-Disposition'] = `attachment; filename="${path.basename(abs)}"`
       res.writeHead(200, headers)
+      if (req.method === 'HEAD') { res.end(); return }
       fs.createReadStream(abs).pipe(res)
     })
     return
