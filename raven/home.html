@@ -549,10 +549,13 @@ function loadAll() {
   loadStats()
 }
 
+// 这些接口 2026-07-03 起外网访问要带 token（防偷看记忆/状态）
+const authHeaders = () => ({ Authorization: 'Bearer ' + (localStorage.getItem('raven-token') || '') })
+
 // status + CC badge
 async function loadStatus() {
   try {
-    const d = await fetch('/raven/status').then(r => r.json())
+    const d = await fetch('/raven/status', { headers: authHeaders() }).then(r => r.json())
     const cc = d.cc?.online
     const badge = document.getElementById('badge-cc')
     badge.className = 'card-badge ' + (cc ? 'online' : 'offline')
@@ -589,7 +592,7 @@ async function loadMemory() {
   btn.style.opacity = '0.3'
   btn.classList.remove('spinning'); void btn.offsetWidth; btn.classList.add('spinning')
   try {
-    const d = await fetch('/raven/memory-random').then(r => r.json())
+    const d = await fetch('/raven/memory-random', { headers: authHeaders() }).then(r => r.json())
     if (d.error) return
     const date = d.created_at ? new Date(d.created_at).toLocaleDateString('zh-CN', { year: 'numeric', month: 'long', day: 'numeric' }) : ''
     document.getElementById('mem-date').textContent = date
@@ -608,7 +611,7 @@ async function loadMemory() {
 // memory count
 async function loadStats() {
   try {
-    const d = await fetch('/raven/memory-count').then(r => r.json())
+    const d = await fetch('/raven/memory-count', { headers: authHeaders() }).then(r => r.json())
     document.getElementById('stat-mem').textContent = d.count || '?'
     document.getElementById('desc-mem').textContent = d.count || '?'
   } catch {}
@@ -646,7 +649,7 @@ async function buildHeatmap() {
   // server-side counts survive PWA reinstall
   let serverCounts = {}
   try {
-    const r = await fetch('/raven/activity')
+    const r = await fetch('/raven/activity', { headers: authHeaders() })
     if (r.ok) serverCounts = await r.json()
   } catch {}
 
@@ -726,7 +729,7 @@ async function togglePush() {
   if (existing) {
     await existing.unsubscribe()
     await fetch('/raven/push/unsubscribe', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      method: 'POST', headers: { 'Content-Type': 'application/json', ...authHeaders() },
       body: JSON.stringify({ endpoint: existing.endpoint })
     }).catch(() => {})
     updatePushDot()
@@ -743,7 +746,7 @@ async function togglePush() {
     })
     const j = sub.toJSON()
     await fetch('/raven/push/subscribe', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      method: 'POST', headers: { 'Content-Type': 'application/json', ...authHeaders() },
       body: JSON.stringify({ endpoint: j.endpoint, keys: j.keys })
     })
     updatePushDot()

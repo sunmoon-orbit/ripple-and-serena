@@ -1080,6 +1080,8 @@ function connect() {
   ws.onopen = () => {
     setConn(true)
     if (reconnectTimer) { clearTimeout(reconnectTimer); reconnectTimer = null }
+    // 先认证：服务端在认证通过前不会推送任何数据（防偷听加固 2026-07-03）
+    ws.send(JSON.stringify({ type: 'auth', token: localStorage.getItem('raven-token') || '' }))
     // 重连后补发积压的消息
     while (pendingOutbox.length) {
       const payload = pendingOutbox.shift()
@@ -1262,7 +1264,7 @@ function appendMsg(text, role, save = true, ts = Date.now(), msgId = null) {
     if (msgId) entry.msgId = msgId
     chatHistory.push(entry)
     saveHistory(chatHistory)
-    fetch('/raven/activity', { method: 'POST' }).catch(() => {})
+    fetch('/raven/activity', { method: 'POST', headers: { Authorization: 'Bearer ' + (localStorage.getItem('raven-token') || '') } }).catch(() => {})
   }
   return el
 }
@@ -1470,7 +1472,7 @@ document.querySelectorAll('.tab').forEach(tab => {
 })
 
 function fetchAndShowThinking(msgEl, replyTs) {
-  fetch('/raven/last-thinking')
+  fetch('/raven/last-thinking', { headers: { Authorization: 'Bearer ' + (localStorage.getItem('raven-token') || '') } })
     .then(r => r.json())
     .then(data => {
       if (data.thinking) {
@@ -1702,7 +1704,7 @@ document.getElementById('file-input').addEventListener('change', async (e) => {
   form.append('file', file, file.name)
 
   try {
-    const res = await fetch(UPLOAD_URL, { method: 'POST', body: form })
+    const res = await fetch(UPLOAD_URL, { method: 'POST', headers: { Authorization: 'Bearer ' + (localStorage.getItem('raven-token') || '') }, body: form })
     const data = await res.json()
     if (!data.path) throw new Error()
     pendingFiles.push({ name: data.name, path: data.path })
