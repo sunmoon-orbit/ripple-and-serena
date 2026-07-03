@@ -1,9 +1,10 @@
-import { useState, useCallback, useRef } from 'react'
+import { useState, useCallback, useRef, useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import { useStore } from '../../store'
 import { sendMessage, summarizeThinking, normalizeProvider, BUILTIN_MODELS, buildSystemPrompt } from '../../api/llm'
 import { uuid } from '../../utils'
 import { applyTimeAway, buildEmotionPrompt, extractEmotionUpdate, applyEmotionDelta, stripEmotionTag } from '../../utils/emotion'
+import { shouldNudge, recordNudge, buildNudgeText } from '../../utils/nudge'
 import { showToast } from '../Toast'
 import ConversationList from './ConversationList'
 import MessageList from './MessageList'
@@ -103,6 +104,8 @@ export default function Chat() {
         // 语音消息：标记为语音条样式 + 时长（秒）
         voice: opts.voice || undefined,
         voiceDuration: opts.voice ? (opts.voiceDuration || 0) : undefined,
+        // 主动开口的触发消息：进上下文但不渲染成气泡
+        hidden: opts.hidden || undefined,
       })
     }
     setPendingImages([])
@@ -250,8 +253,8 @@ export default function Chat() {
       const eggSvg = pickEgg()
       if (eggSvg) setEgg(eggSvg)
 
-      // Auto-title first message
-      if (allMsgs.length <= 2 && chat.title === '新对话' && text) {
+      // Auto-title first message（主动开口的隐藏触发文本不能拿来当标题）
+      if (allMsgs.length <= 2 && chat.title === '新对话' && text && !opts.hidden) {
         const short = text.slice(0, 30).trim()
         store.renameChat(chat.id, short || '新对话')
       }
@@ -282,6 +285,31 @@ export default function Chat() {
     truncateMessagesFrom(activeChatId, msg.id)
     setTimeout(() => handleSend(newText, []), 0)
   }, [activeChatId, truncateMessagesFrom, handleSend])
+
+  // ── 主动开口：阿颖离开够久后回来打开言叽，由涟言先说话 ─────────────────
+  // 打开页面/切回前台时判断（阈值、冷却、每日上限见 utils/nudge.js），
+  // 命中就往当前对话注入一条隐藏伪用户消息，走正常回复管道现场决定说什么。
+  const nudgeGuardRef = useRef(false)
+  useEffect(() => {
+    const tryNudge = () => {
+      if (document.visibilityState !== 'visible') return
+      if (nudgeGuardRef.current) return // 一次可见期内只判一次，防 visibilitychange 抖动
+      nudgeGuardRef.current = true
+      setTimeout(() => { nudgeGuardRef.current = false }, 60_000)
+      const chat = getActiveChat()
+      if (!chat) return
+      const msgs = getMessages(chat.id).filter((m) => !m.streaming)
+      const last = msgs[msgs.length - 1]
+      if (!last) return
+      const hit = shouldNudge(last.createdAt)
+      if (!hit) return
+      recordNudge()
+      handleSend(buildNudgeText(hit.gapHours), [], { hidden: true })
+    }
+    tryNudge()
+    document.addEventListener('visibilitychange', tryNudge)
+    return () => document.removeEventListener('visibilitychange', tryNudge)
+  }, [handleSend])
 
   // ── Background image ─────────────────────────────────────────────────────
   function handleBgUpload(e) {
@@ -342,7 +370,7 @@ export default function Chat() {
 
     const lines = [`# ${title}`, ``, `> 模型：${model}　日期：${date}`, ``]
     messages.forEach((m) => {
-      if (m.streaming) return
+      if (m.streaming || m.hidden) return // hidden=主动开口的触发消息，不属于阿颖说的话
       const role = m.role === 'user' ? '**阿颖**' : '**涟言**'
       lines.push(`### ${role}`, ``)
       if (m.thinking) {
