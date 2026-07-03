@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom'
 import { useStore } from '../../store'
 import { showToast } from '../Toast'
 
-const PLAYER_LABELS = { cc: '服务器·阿言', chat: '对话·阿言' }
+const PLAYER_LABELS = { cc: '服务器·阿言', chat: '对话·阿言', api: '言叽·阿言' }
 const STATUS_LABELS = { playing: '进行中', paused: '暂停', ended: '已结束' }
 const ICON_CHOICES = ['🎮', '🪷', '🎣', '🐟', '🌱', '🕹️', '🎲', '🏝️', '🐦', '🌾']
 
@@ -242,6 +242,7 @@ export default function GamesRoom({ onClose }) {
                   <select className="games-input" value={form.player} onChange={(e) => setForm((f) => ({ ...f, player: e.target.value }))}>
                     <option value="chat">对话·阿言</option>
                     <option value="cc">服务器·阿言</option>
+                    <option value="api">言叽·阿言</option>
                   </select>
                 </div>
                 <div>

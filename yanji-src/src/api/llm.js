@@ -1,6 +1,7 @@
 // Unified LLM streaming API — OpenAI / Gemini / Anthropic
 import { getMemoryToolDefinitions, executeMemoryTool } from './moonMemory'
 import { WHEEL_TOOL_DEF, executeWheelSpin } from './fortuneWheel'
+import { FISHING_TOOL_DEF, executeFishing } from './fishing'
 
 export function normalizeProvider(raw) {
   const v = (raw || '').toString().toLowerCase()
@@ -77,6 +78,8 @@ function getAllTools(searchConfig, moonMemoryConfig, onFile) {
   }
   // 幸运轮盘：纯客户端摇奖，不依赖任何配置
   tools.push(WHEEL_TOOL_DEF)
+  // 钓鱼：涟言自己的小游戏，纯客户端 RNG
+  tools.push(FISHING_TOOL_DEF)
   return tools
 }
 
@@ -134,6 +137,10 @@ async function executeTool(name, args, { searchConfig, moonMemoryConfig, onStatu
   if (name === 'spin_fortune_wheel') {
     onStatus?.('拉下拉杆...')
     return executeWheelSpin(args)
+  }
+  if (name === 'go_fishing') {
+    onStatus?.('甩竿中...')
+    return executeFishing(args, moonMemoryConfig)
   }
   return `未知工具: ${name}`
 }

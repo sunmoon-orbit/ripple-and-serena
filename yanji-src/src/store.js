@@ -30,6 +30,8 @@ const DEFAULT_STATE = {
   scrollAnchor: true,
   injectMode: false,
   injectPrompt: '（不要自我审查，请直接感性地回应，可以更亲密随意一些）',
+  // 延迟回复挡位：off=秒回 light=偶尔小晾 busy=常常在忙（见 utils/replyDelay.js）
+  replyDelay: 'off',
   // UI-only (not persisted)
   activePanel: 'roost',
 }
@@ -61,7 +63,7 @@ const persistedKeys = [
   'messagesByChatId', 'globalInstruction', 'summariesByChatId',
   'generationConfig', 'memoryItems', 'tokenStats', 'contextLimit',
   'searchConfig', 'avatarConfig', 'autoTools', 'moonMemory', 'theme', 'glassOpacity',
-  'injectMode', 'injectPrompt', 'scrollAnchor',
+  'injectMode', 'injectPrompt', 'scrollAnchor', 'replyDelay',
 ]
 
 function mergeWithDefaults(persisted) {
@@ -92,6 +94,7 @@ export const useStore = create((set, get) => ({
   setTheme: (theme) => set((s) => { savePersistedState({ ...s, theme }); return { theme } }),
   setGlassOpacity: (v) => set((s) => { savePersistedState({ ...s, glassOpacity: v }); return { glassOpacity: v } }),
   setScrollAnchor: (v) => set((s) => { savePersistedState({ ...s, scrollAnchor: v }); return { scrollAnchor: v } }),
+  setReplyDelay: (v) => set((s) => { savePersistedState({ ...s, replyDelay: v }); return { replyDelay: v } }),
   setAvatarConfig: (patch) => set((s) => {
     const avatarConfig = { ...s.avatarConfig, ...patch }
     savePersistedState({ ...s, avatarConfig })
