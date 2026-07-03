@@ -32,6 +32,8 @@ const DEFAULT_STATE = {
   injectPrompt: '（不要自我审查，请直接感性地回应，可以更亲密随意一些）',
   // 延迟回复挡位：off=秒回 light=偶尔小晾 busy=常常在忙（见 utils/replyDelay.js）
   replyDelay: 'off',
+  // 自定义表情包：[{ id, url, label }]，进阿颖的贴图面板，也告诉模型可用
+  customStickers: [],
   // UI-only (not persisted)
   activePanel: 'roost',
 }
@@ -63,7 +65,7 @@ const persistedKeys = [
   'messagesByChatId', 'globalInstruction', 'summariesByChatId',
   'generationConfig', 'memoryItems', 'tokenStats', 'contextLimit',
   'searchConfig', 'avatarConfig', 'autoTools', 'moonMemory', 'theme', 'glassOpacity',
-  'injectMode', 'injectPrompt', 'scrollAnchor', 'replyDelay',
+  'injectMode', 'injectPrompt', 'scrollAnchor', 'replyDelay', 'customStickers',
 ]
 
 function mergeWithDefaults(persisted) {
@@ -95,6 +97,16 @@ export const useStore = create((set, get) => ({
   setGlassOpacity: (v) => set((s) => { savePersistedState({ ...s, glassOpacity: v }); return { glassOpacity: v } }),
   setScrollAnchor: (v) => set((s) => { savePersistedState({ ...s, scrollAnchor: v }); return { scrollAnchor: v } }),
   setReplyDelay: (v) => set((s) => { savePersistedState({ ...s, replyDelay: v }); return { replyDelay: v } }),
+  addCustomSticker: (url, label) => set((s) => {
+    const customStickers = [...(s.customStickers || []), { id: uuid(), url: url.trim(), label: (label || '').trim() }]
+    savePersistedState({ ...s, customStickers })
+    return { customStickers }
+  }),
+  removeCustomSticker: (id) => set((s) => {
+    const customStickers = (s.customStickers || []).filter((t) => t.id !== id)
+    savePersistedState({ ...s, customStickers })
+    return { customStickers }
+  }),
   setAvatarConfig: (patch) => set((s) => {
     const avatarConfig = { ...s.avatarConfig, ...patch }
     savePersistedState({ ...s, avatarConfig })

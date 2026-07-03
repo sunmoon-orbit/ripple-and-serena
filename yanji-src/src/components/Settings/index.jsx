@@ -173,6 +173,7 @@ export default function Settings() {
     setGlobalInstruction, setGenerationConfig, setContextLimit, setSearchConfig,
     setAutoTools, setMoonMemory, setTheme, setGlassOpacity, setAvatarConfig, setScrollAnchor,
     setInjectMode, setInjectPrompt, replyDelay, setReplyDelay,
+    customStickers, addCustomSticker, removeCustomSticker,
     memoryItems, addMemoryItem, toggleMemoryItem, deleteMemoryItem,
   } = store
 
@@ -182,6 +183,7 @@ export default function Settings() {
   const [fetchingModels, setFetchingModels] = useState(false)
   const [moonHealthStatus, setMoonHealthStatus] = useState('')
   const [newMemContent, setNewMemContent] = useState('')
+  const [newSticker, setNewSticker] = useState({ url: '', label: '' })
   const [expandedMemIds, setExpandedMemIds] = useState(new Set())
   const [tab, setTab] = useState('connections')
   const [pushEnabled, setPushEnabled] = useState(false)
@@ -687,6 +689,33 @@ export default function Settings() {
                   </label>
                 </div>
                 <p className="card-hint">开启后，发出的消息会滚到屏幕顶端，回复在下方展开（Claude 官方 App 的滚动方式）；关闭则保持跟随最新消息。</p>
+              </div>
+            </Section>
+            <Section title="表情包管理">
+              <div className="settings-card">
+                {(customStickers || []).length === 0 && (
+                  <p className="card-hint" style={{ marginTop: 0 }}>还没有自定义表情包。粘贴图片 URL 添加，会出现在聊天贴图面板最前面，涟言也能看到并使用（记得写含义，他才知道什么时候发）。</p>
+                )}
+                {(customStickers || []).map((t) => (
+                  <div key={t.id} className="card-row" style={{ alignItems: 'center', gap: 10 }}>
+                    <img src={t.url} alt={t.label} style={{ width: 44, height: 44, objectFit: 'contain', borderRadius: 8, flexShrink: 0 }} />
+                    <span style={{ flex: 1, fontSize: 13, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t.label || '（未标注含义）'}</span>
+                    <button className="btn-sm" onClick={() => { removeCustomSticker(t.id); showToast('已删除') }}>删除</button>
+                  </div>
+                ))}
+                <div className="form-row" style={{ marginTop: 10 }}>
+                  <input className="form-input" placeholder="图片 URL（https://...）" value={newSticker.url} onChange={(e) => setNewSticker((s) => ({ ...s, url: e.target.value }))} />
+                </div>
+                <div className="form-row" style={{ display: 'flex', gap: 8 }}>
+                  <input className="form-input" style={{ flex: 1 }} placeholder="含义（如：开心、贴贴）" value={newSticker.label} onChange={(e) => setNewSticker((s) => ({ ...s, label: e.target.value }))} />
+                  <button className="btn-sm btn-primary" onClick={() => {
+                    const url = newSticker.url.trim()
+                    if (!/^https?:\/\//.test(url)) { showToast('请填一个 http(s) 图片链接', 'error'); return }
+                    addCustomSticker(url, newSticker.label)
+                    setNewSticker({ url: '', label: '' })
+                    showToast('已添加', 'success')
+                  }}>添加</button>
+                </div>
               </div>
             </Section>
             <Section title="聊天头像">
