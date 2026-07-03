@@ -29,8 +29,11 @@ export async function subscribePush(moonMemoryConfig) {
   if (perm !== 'granted') throw new Error('通知权限未授权')
 
   const { apiUrl, apiToken } = moonMemoryConfig
-  const keyResp = await fetch(`${apiUrl}/push/vapid-public-key`)
-  if (!keyResp.ok) throw new Error('推送服务未配置')
+  // /push/* 整个在 requireBearer 后面，公钥接口也要带 token——漏了就 401 被误报成「未配置」（2026-07-03 修复）
+  const keyResp = await fetch(`${apiUrl}/push/vapid-public-key`, {
+    headers: { Authorization: `Bearer ${apiToken}` },
+  })
+  if (!keyResp.ok) throw new Error(`推送服务连接失败 (${keyResp.status})`)
   const { publicKey } = await keyResp.json()
 
   const reg = await registerSW()
