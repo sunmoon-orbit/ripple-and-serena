@@ -22,6 +22,21 @@ function saveTokens(set) {
 }
 const validTokens = loadTokens()
 
+// ── 请求来源与鉴权判定（2026-07-03 安全加固）─────────────────────────
+// 本机直连（CC 的 curl、hooks）不经 Caddy，没有 X-Forwarded-For；
+// 公网请求全部经 Caddy 反代进来，必带 X-Forwarded-For。
+function isExternal(req) {
+  return !!req.headers['x-forwarded-for']
+}
+// 外网请求校验 token：Authorization: Bearer <token> 或 ?token=<token>
+function externalAuthed(req, url) {
+  if (!PW_HASH) return true            // 没设密码的开发环境不拦
+  if (!isExternal(req)) return true    // 本机直连放行
+  const h = req.headers.authorization || ''
+  const t = h.startsWith('Bearer ') ? h.slice(7) : (url.searchParams.get('token') || '')
+  return validTokens.has(t)
+}
+
 // token 从 moon-memory/.env 读取，不准硬编码（2026.6.11 公开仓库泄漏教训）
 const MOON_TOKEN = (() => {
   const envText = fs.readFileSync('/home/ripple/moon-memory/.env', 'utf8')
@@ -467,11 +482,29 @@ setInterval(() => {
 const server = http.createServer((req, res) => {
   res.setHeader('Access-Control-Allow-Origin', '*')
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type')
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization')
 
   if (req.method === 'OPTIONS') { res.writeHead(204); res.end(); return }
 
   const url = new URL(req.url, `http://localhost`)
+
+  // ── 接口分级鉴权（2026-07-03 安全加固）──────────────────────────
+  // 内部接口只许本机：reply/thinking 是 CC 的回复与 hook 通道，mcp 是 CC 的 MCP 通道。
+  // 之前公网可达 = 任何人能冒充我给阿颖发消息 / 往她界面塞假思考。
+  const LOCAL_ONLY = ['/raven/reply', '/raven/thinking', '/raven/mcp/sse', '/raven/mcp/message']
+  if (LOCAL_ONLY.includes(url.pathname) && isExternal(req)) {
+    res.writeHead(403, { 'Content-Type': 'application/json' })
+    res.end(JSON.stringify({ error: 'local only' }))
+    return
+  }
+  // 敏感读写接口外网必须带 token：记忆内容、CC 状态、思考内容、热力图写入、
+  // 上传、push 订阅（不拦的话外人能把自己的推送端点订阅进来偷收通知）
+  const TOKEN_REQUIRED = ['/raven/status', '/raven/last-thinking', '/raven/memory-random', '/raven/memory-count', '/raven/activity', '/raven/upload', '/raven/push/subscribe', '/raven/push/unsubscribe']
+  if (TOKEN_REQUIRED.includes(url.pathname) && !externalAuthed(req, url)) {
+    res.writeHead(401, { 'Content-Type': 'application/json' })
+    res.end(JSON.stringify({ error: 'unauthorized' }))
+    return
+  }
 
   if (req.method === 'GET' && url.pathname === '/raven/status') {
     res.writeHead(200, { 'Content-Type': 'application/json' })
@@ -482,8 +515,10 @@ const server = http.createServer((req, res) => {
   if (req.method === 'GET' && url.pathname === '/raven/health') {
     res.writeHead(200, { 'Content-Type': 'application/json' })
     res.end(JSON.stringify({ ok: true }))
+    return  // 之前漏了 return，请求会继续掉进静态处理器二次写头把进程炸掉（2026-07-03 发现）
+  }
 
-  } else if (req.method === 'GET' && url.pathname === '/raven/last-thinking') {
+  if (req.method === 'GET' && url.pathname === '/raven/last-thinking') {
     res.writeHead(200, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' })
     res.end(JSON.stringify({ thinking: lastThinking, ts: lastThinkingTs }))
     return
@@ -777,21 +812,51 @@ const server = http.createServer((req, res) => {
 const wss = new WebSocketServer({ server, path: '/raven/ws' })
 
 wss.on('connection', (ws) => {
-  clients.add(ws)
-  console.log('[ws] client connected, total:', clients.size)
-
-  ws.send(JSON.stringify({ type: 'status', data: getStatus() }))
-  ws.send(JSON.stringify({ type: 'terminal', lines: lastCapture.split('\n').slice(-80) }))
-  // 补发最近 10 条 reply，重连后不丢消息
-  for (const m of lastReplyMsgs) ws.send(JSON.stringify({ ...m, replayed: true }))
-  // 补发待处理的权限提示（断线重连时弹窗不丢失）
-  if (lastPermData && Date.now() >= permCooldownUntil) {
-    ws.send(JSON.stringify(lastPermData))
+  // ── WS 先认证后广播（2026-07-03 安全加固）──────────────────────
+  // 之前一连上就发终端最后 80 行 + 最近回复，且 broadcast 不看认证状态，
+  // 等于任何人连上 wss 就能偷听终端输出和我们的对话。现在：
+  // 未认证的连接不进 clients（收不到任何广播），15 秒内不认证就断开。
+  ws.authed = !PW_HASH
+  const sendWelcome = () => {
+    clients.add(ws)
+    console.log('[ws] client authed, total:', clients.size)
+    ws.send(JSON.stringify({ type: 'status', data: getStatus() }))
+    ws.send(JSON.stringify({ type: 'terminal', lines: lastCapture.split('\n').slice(-80) }))
+    // 补发最近 10 条 reply，重连后不丢消息
+    for (const m of lastReplyMsgs) ws.send(JSON.stringify({ ...m, replayed: true }))
+    // 补发待处理的权限提示（断线重连时弹窗不丢失）
+    if (lastPermData && Date.now() >= permCooldownUntil) {
+      ws.send(JSON.stringify(lastPermData))
+    }
+  }
+  if (ws.authed) sendWelcome()
+  else {
+    const authTimer = setTimeout(() => { if (!ws.authed) ws.close() }, 15000)
+    ws.once('close', () => clearTimeout(authTimer))
   }
 
   ws.on('message', (raw) => {
     try {
       const msg = JSON.parse(raw)
+      // 前端连上后第一件事发 {type:'auth', token}，通过才开始收广播
+      if (msg.type === 'auth') {
+        if (!PW_HASH || validTokens.has(msg.token)) {
+          if (!ws.authed) { ws.authed = true; sendWelcome() }
+        } else {
+          ws.send(JSON.stringify({ type: 'auth_failed' }))
+        }
+        return
+      }
+      if (!ws.authed) {
+        // 兼容旧前端：没发过 auth 但 send 里带了有效 token，也算认证通过
+        if (msg.type === 'send' && msg.token && validTokens.has(msg.token)) {
+          ws.authed = true
+          clients.add(ws)
+        } else {
+          ws.send(JSON.stringify({ type: 'auth_failed' }))
+          return
+        }
+      }
       if (msg.type === 'send' && msg.text) {
         if (PW_HASH && !validTokens.has(msg.token)) {
           ws.send(JSON.stringify({ type: 'auth_failed' }))
