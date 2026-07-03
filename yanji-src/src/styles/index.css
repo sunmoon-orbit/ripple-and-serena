@@ -41,6 +41,25 @@
   --shadow-md: 0 2px 12px rgba(180,140,140,0.10), 0 8px 24px rgba(180,140,140,0.08);
 }
 
+/* ===== 青梧主题（灰绿，梧桐叶；补齐主题网格第 6 格 2026-07-03）===== */
+[data-theme="qingwu"] {
+  --bg: #f6faf6;
+  --bg-sidebar: #e9f1e9;
+  --card: #ffffff;
+  --accent: #93b895;
+  --accent-soft: #b8d4b8;
+  --accent-dim: rgba(147,184,149,0.15);
+  --accent-grad: #a5c6a6;
+  --text: #202e1f;
+  --text-mid: #567355;
+  --text-muted: #86a085;
+  --text-faint: #b0c6b0;
+  --border: rgba(130,170,130,0.12);
+  --border-md: rgba(130,170,130,0.22);
+  --shadow-sm: 0 1px 3px rgba(130,170,130,0.07), 0 2px 8px rgba(130,170,130,0.05);
+  --shadow-md: 0 2px 12px rgba(130,170,130,0.10), 0 8px 24px rgba(130,170,130,0.08);
+}
+
 /* ===== Claude 主题 ===== */
 [data-theme="claude"] {
   --bg: #f7f4ef;
