@@ -52,7 +52,9 @@ export function applyDecayAndGet() {
   for (const [k, v] of Object.entries(state.slots)) {
     slots[k] = Math.max(0, Math.min(100, v - (DECAY_PER_24H[k] || 8) * hours / 24))
   }
-  const updated = { slots, lastUpdated: now }
+  // ⚠️ 必须展开 state 保留 lastSeen——曾因这里只存 {slots, lastUpdated} 把 lastSeen 抹掉，
+  // 导致 applyTimeAway 永远算出 0 小时、思念一直是 0（2026-07-03 修复）
+  const updated = { ...state, slots, lastUpdated: now }
   saveState(updated)
   return updated
 }
@@ -67,7 +69,7 @@ export function applyEmotionDelta(delta) {
       slots[slot] = Math.max(0, Math.min(100, (slots[slot] || 0) + val))
     }
   }
-  const updated = { slots, lastUpdated: Date.now() }
+  const updated = { ...state, slots, lastUpdated: Date.now() }
   saveState(updated)
   return updated
 }
