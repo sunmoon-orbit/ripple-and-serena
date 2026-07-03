@@ -231,6 +231,9 @@ export default function Roost() {
   const [letterCat, setLetterCat] = useState('all')
   const [compose, setCompose] = useState(emptyCompose)
   const [msgInput, setMsgInput] = useState('')
+  // 留言身份。旧版把「阿颖留言/乌鸦留言」两个按钮直接当提交键，看起来像切换标签，
+  // 阿颖找不到保存在哪（2026-07-03 反馈）——拆成 身份切换 + 明确的「留下」按钮
+  const [boardAuthor, setBoardAuthor] = useState('serena')
   const [walletAmount, setWalletAmount] = useState('')
   const [walletNote, setWalletNote] = useState('')
   const [walletType, setWalletType] = useState('in')
@@ -416,8 +419,11 @@ export default function Roost() {
                   rows={3}
                 />
                 <div className="roost-msg-actions">
-                  <button className="roost-btn roost-btn-sm" onClick={() => { if (msgInput.trim()) { addMsg(msgInput.trim(), 'serena'); setMsgInput('') } }}>🐦 阿颖留言</button>
-                  <button className="roost-btn roost-btn-sm roost-btn-ghost" onClick={() => { if (msgInput.trim()) { addMsg(msgInput.trim(), 'crow'); setMsgInput('') } }}>🐦‍⬛ 乌鸦留言</button>
+                  <div className="bookread-author-toggle">
+                    <button className={boardAuthor === 'serena' ? 'active' : ''} onClick={() => setBoardAuthor('serena')}>🐦 阿颖</button>
+                    <button className={boardAuthor === 'crow' ? 'active' : ''} onClick={() => setBoardAuthor('crow')}>🐦‍⬛ 乌鸦</button>
+                  </div>
+                  <button className="roost-btn roost-btn-sm" onClick={() => { if (msgInput.trim()) { addMsg(msgInput.trim(), boardAuthor); setMsgInput('') } }}>留下</button>
                 </div>
               </div>
               <div className="roost-msg-list">
