@@ -50,6 +50,13 @@ const IconChat = () => (
     <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
   </svg>
 )
+const IconImage = () => (
+  <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+    <rect x="3" y="3" width="18" height="18" rx="2.5"/>
+    <circle cx="8.5" cy="8.5" r="1.5"/>
+    <path d="M21 15l-5-5L5 21"/>
+  </svg>
+)
 
 function Avatar({ author }) {
   return (
@@ -285,7 +292,7 @@ export default function Moments() {
             onKeyDown={e => e.key === 'Enter' && handlePost()}
           />
           <input ref={fileRef} type="file" accept="image/*" onChange={pickImage} style={{ display: 'none' }} />
-          <button onClick={() => fileRef.current?.click()} title="配图" style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 18, flexShrink: 0, opacity: 0.7, padding: '0 4px' }}>🖼️</button>
+          <button onClick={() => fileRef.current?.click()} title="配图" style={{ background: 'none', border: 'none', cursor: 'pointer', flexShrink: 0, color: 'var(--text-muted)', display: 'flex', alignItems: 'center', padding: '0 4px' }}><IconImage /></button>
           <button onClick={handlePost} disabled={posting || (!input.trim() && !pendingImg)} style={{
             padding: '6px 14px', borderRadius: 16, border: 'none', cursor: 'pointer', flexShrink: 0,
             background: 'var(--accent)', color: '#fff', fontSize: 13, fontWeight: 600,
