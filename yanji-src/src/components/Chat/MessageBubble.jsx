@@ -5,6 +5,7 @@ import { formatTime } from '../../utils'
 import { useStore } from '../../store'
 import { synthesizeSpeech } from '../../api/moonMemory'
 import MusicCard from './MusicCard'
+import { applyInlineFx } from '../../utils/moodFx'
 
 marked.setOptions({
   breaks: true,
@@ -23,7 +24,8 @@ const VOICE_TAG_RE = /\[(breath|laughter)\]/gi
 function parseMarkdown(text) {
   if (!text) return ''
   try {
-    return marked.parse(text.replace(VOICE_TAG_RE, ''))
+    // 先把行内特效标签换成 span（marked 透传 inline HTML），再交给 marked
+    return marked.parse(applyInlineFx(text.replace(VOICE_TAG_RE, '')))
   } catch {
     return text
   }
