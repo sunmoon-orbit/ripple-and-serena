@@ -1,8 +1,14 @@
 import { useStore } from './store'
 
+const DEFAULT_BASE = 'https://memory.ravenlove.cc'
 function conn() {
   const s = useStore.getState()
-  return { baseUrl: (s.baseUrl || '').replace(/\/$/, ''), token: s.apiToken }
+  // 旧持久化里 baseUrl 可能是空（老版本遗留），空 baseUrl 会让 fetch 变成相对路径、
+  // 在 GitHub Pages 上打到 sunmoon-orbit.github.io 返回 404 HTML。空或缺协议一律回退默认绝对地址。
+  let b = (s.baseUrl || '').trim().replace(/\/$/, '')
+  if (!b) b = DEFAULT_BASE
+  else if (!/^https?:\/\//i.test(b)) b = 'https://' + b
+  return { baseUrl: b, token: s.apiToken }
 }
 
 async function req(path, options = {}) {
