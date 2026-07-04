@@ -37,14 +37,42 @@ function looksRunnableHtml(cls, raw) {
   if (/language-(html|xml|svg)/i.test(cls || '')) return true
   return /^\s*<(!doctype|html|svg|body|div|style|canvas|section|main)[\s>]/i.test(raw || '')
 }
+function langOf(cls) {
+  const m = /language-([a-z0-9]+)/i.exec(cls || '')
+  return m ? m[1].toLowerCase() : ''
+}
 function enhanceCodeBlocks(root) {
   if (!root) return
   root.querySelectorAll('pre > code').forEach((code) => {
     const pre = code.parentElement
-    if (pre.dataset.runEnhanced) return
+    if (pre.dataset.codeEnhanced) return
+    pre.dataset.codeEnhanced = '1'
     const raw = code.textContent || ''
+
+    // ① 头部：语言标签 + 复制按钮（所有代码块都有，阿颖想要的样式）
+    const head = document.createElement('div')
+    head.className = 'code-head'
+    const lang = document.createElement('span')
+    lang.className = 'code-lang'
+    lang.textContent = langOf(code.className) || 'code'
+    const copy = document.createElement('button')
+    copy.type = 'button'
+    copy.className = 'code-copy'
+    copy.textContent = '复制'
+    copy.addEventListener('click', async () => {
+      try {
+        await navigator.clipboard.writeText(raw)
+        copy.textContent = '已复制'
+        setTimeout(() => { copy.textContent = '复制' }, 1500)
+      } catch { copy.textContent = '复制失败' }
+    })
+    head.appendChild(lang)
+    head.appendChild(copy)
+    pre.parentNode.insertBefore(head, pre)
+    pre.classList.add('has-head')
+
+    // ② 运行按钮：只有 html 代码块才有
     if (raw.length < 12 || !looksRunnableHtml(code.className, raw)) return
-    pre.dataset.runEnhanced = '1'
     const bar = document.createElement('div')
     bar.className = 'code-run-bar'
     const btn = document.createElement('button')
