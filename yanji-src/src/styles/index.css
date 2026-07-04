@@ -1171,6 +1171,20 @@ textarea.form-input { display: block; margin: 8px 16px 12px; }
   border: 1px solid var(--border); font-size: 12.5px;
 }
 .bubble-markdown code { font-family: "SF Mono","Fira Code",monospace; font-size: 0.87em; }
+/* 代码块头部：语言标签 + 复制按钮 */
+.code-head {
+  display: flex; align-items: center; justify-content: space-between;
+  background: var(--accent-dim); border: 1px solid var(--border);
+  border-bottom: none; border-radius: var(--r-sm) var(--r-sm) 0 0;
+  padding: 5px 12px; margin: 8px 0 0;
+}
+.code-lang { font-size: 11.5px; color: var(--text-muted); font-family: "SF Mono","Fira Code",monospace; letter-spacing: 0.3px; }
+.code-copy {
+  background: none; border: none; color: var(--accent); cursor: pointer;
+  font-size: 12px; font-family: inherit; padding: 2px 6px; border-radius: 6px; transition: background 0.15s;
+}
+.code-copy:hover { background: var(--accent-soft); color: #fff; }
+.bubble-markdown pre.has-head { margin-top: 0; border-top-left-radius: 0; border-top-right-radius: 0; }
 /* 代码就地运行：html 代码块下的运行按钮 + 沙箱渲染框 */
 .code-run-bar { margin: -4px 0 8px; }
 .code-run-btn {
