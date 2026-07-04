@@ -137,6 +137,10 @@ async function executeTool(name, args, { searchConfig, moonMemoryConfig, onStatu
     onStatus?.(name === 'leave_board_message' ? '写留言...' : '看留言板...')
     return await executeMemoryTool(name, args, moonMemoryConfig)
   }
+  if (name === 'list_conversations' || name === 'read_conversation' || name === 'annotate_conversation') {
+    onStatus?.(name === 'annotate_conversation' ? '在旧对话上批注...' : '翻旧对话...')
+    return await executeMemoryTool(name, args, moonMemoryConfig)
+  }
   if (name === 'spin_fortune_wheel') {
     onStatus?.('拉下拉杆...')
     return executeWheelSpin(args)

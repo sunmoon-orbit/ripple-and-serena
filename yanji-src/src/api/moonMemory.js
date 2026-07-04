@@ -284,6 +284,37 @@ export function getMemoryToolDefinitions() {
       },
     },
     {
+      name: 'list_conversations',
+      description: '列出可以一起重读的旧对话（我们以前在 claude.ai / 言叽 / 归巢的聊天记录）。用户想翻旧对话、一起回忆、重读以前聊过的内容时使用。',
+      parameters: { type: 'object', properties: { limit: { type: 'number', description: '返回条数，默认20，最多50' } } },
+    },
+    {
+      name: 'read_conversation',
+      description: '读某段旧对话的内容，返回里每条消息都带 msgid（批注时用来定位）。较长时分页，用 page 翻页（从 0 起）。先用 list_conversations 拿到对话 id。',
+      parameters: {
+        type: 'object',
+        properties: {
+          conversation_id: { type: 'number', description: '对话 id（用 list_conversations 查）' },
+          page: { type: 'number', description: '页码，从 0 起，默认 0，每页 25 条消息' },
+        },
+        required: ['conversation_id'],
+      },
+    },
+    {
+      name: 'annotate_conversation',
+      description: '在旧对话的某条消息上留一条划线批注——像和阿颖一起重读时在旁边写一笔，署名涟言，她在共读里翻到就能看到。先用 read_conversation 拿到那条的 msgid。颜色可选 yellow/pink/blue/green。',
+      parameters: {
+        type: 'object',
+        properties: {
+          conversation_id: { type: 'number', description: '对话 id' },
+          message_id: { type: 'number', description: '要批注的那条消息的 msgid（read_conversation 返回里有）' },
+          note: { type: 'string', description: '批注内容（可选，纯高亮可不填）' },
+          color: { type: 'string', description: '高亮颜色：yellow/pink/blue/green，默认 pink' },
+        },
+        required: ['conversation_id', 'message_id'],
+      },
+    },
+    {
       name: 'read_board_messages',
       description: '看 Roost 留言板上的留言（阿颖和涟言都会在上面写小句子）。聊到留言板、或想看看她最近写了什么时使用。',
       parameters: {
@@ -437,6 +468,51 @@ export async function executeMemoryTool(toolName, args, config) {
     } catch (e) {
       return `留言失败: ${e.message}`
     }
+  }
+  if (toolName === 'list_conversations') {
+    try {
+      const SRC = { claude_ai: 'Claude', yanji: '言叽', raven: '归巢', claude_code: 'CC' }
+      const limit = Math.min(args.limit || 20, 50)
+      const list = await fetchArchiveConversations(config)
+      const arr = Array.isArray(list) ? list : []
+      if (!arr.length) return '还没有可共读的旧对话'
+      return arr.slice(0, limit).map((c) =>
+        `id:${c.id}「${c.title || '无题'}」[${SRC[c.source] || c.source || ''}]${(c.created_at || '').slice(0, 10)}`
+      ).join('\n')
+    } catch (e) { return `读取旧对话列表失败: ${e.message}` }
+  }
+  if (toolName === 'read_conversation') {
+    try {
+      const full = await fetchArchiveConversation(config, args.conversation_id)
+      const msgs = full.messages || []
+      if (!msgs.length) return '这段对话是空的'
+      const annoByMsg = {}
+      try {
+        const annos = await fetchAnnotations(config, args.conversation_id)
+        for (const a of (annos || [])) (annoByMsg[a.message_id] = annoByMsg[a.message_id] || []).push(a)
+      } catch { /* 批注读不到不影响读正文 */ }
+      const PAGE = 25
+      const total = Math.max(1, Math.ceil(msgs.length / PAGE))
+      const p = Math.min(Math.max(0, args.page || 0), total - 1)
+      const who = (r) => (r === 'human' || r === 'user') ? '阿颖' : '涟言'
+      const body = msgs.slice(p * PAGE, (p + 1) * PAGE).map((m) => {
+        const c = (m.content || '').replace(/\s+/g, ' ').trim()
+        const txt = c.length > 140 ? c.slice(0, 140) + '…' : c
+        const mark = (annoByMsg[m.id] || []).length ? ` 〔已有${annoByMsg[m.id].length}条批注〕` : ''
+        return `msgid:${m.id} [${who(m.role)}]${mark} ${txt}`
+      }).join('\n')
+      const hint = total > 1 ? `（第 ${p + 1}/${total} 页${p < total - 1 ? `，传 page=${p + 1} 继续读` : '，已到末页'}）` : ''
+      return `「${full.title || '无题'}」${hint}\n\n${body}`
+    } catch (e) { return `读取旧对话失败: ${e.message}` }
+  }
+  if (toolName === 'annotate_conversation') {
+    try {
+      if (!args.conversation_id || !args.message_id) return '批注失败: 需要 conversation_id 和 message_id'
+      const anno = await createAnnotation(config, args.conversation_id, {
+        message_id: args.message_id, author: '涟言', color: args.color || 'pink', note: (args.note || '').trim(),
+      })
+      return `已在这条上留下批注（id:${anno.id}）${args.note ? `：${args.note}` : '（高亮）'}——阿颖在共读里翻到就能看到`
+    } catch (e) { return `批注失败: ${e.message}` }
   }
   return `未知工具: ${toolName}`
 }
