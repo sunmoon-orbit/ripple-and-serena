@@ -6,6 +6,7 @@ import { uuid } from '../../utils'
 import { applyTimeAway, buildEmotionPrompt, extractEmotionUpdate, applyEmotionDelta, stripEmotionTag } from '../../utils/emotion'
 import { shouldNudge, recordNudge, buildNudgeText } from '../../utils/nudge'
 import { decideReplyDelay, getPendingReply, setPendingReply, clearPendingReply } from '../../utils/replyDelay'
+import { pickAutoPostTrigger, markAutoPosted, postMoment } from '../../api/moments'
 import { showToast } from '../Toast'
 import ConversationList from './ConversationList'
 import MessageList from './MessageList'
@@ -15,6 +16,33 @@ import GamesRoom from './GamesRoom'
 import MusicRoom from './MusicRoom'
 import FortuneWheel from './FortuneWheel'
 import CompletionEgg, { pickEgg } from './CompletionEgg'
+
+// 情绪自动发圈：某正向情绪越阈值且过冷却时，涟言主动发条朋友圈（她在聊天时触发；
+// 离开时的自动发圈由服务端 cron 负责，见 moments-autopost.js）。失败静默，绝不打断聊天。
+async function maybeAutoPostMoment(emoState, conn, moonMemory) {
+  try {
+    const trigger = pickAutoPostTrigger(emoState?.slots || {})
+    if (!trigger || !conn?.apiKey || !moonMemory?.apiToken) return
+    markAutoPosted()  // 先占坑，避免并发重复发
+    const base = (conn.baseUrl || 'https://api.openai.com/v1').replace(/\/$/, '')
+    const url = base.includes('/chat/completions') ? base : base + '/chat/completions'
+    const resp = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${conn.apiKey}` },
+      body: JSON.stringify({
+        model: conn.defaultModel || 'deepseek-v4-flash',
+        messages: [{ role: 'user', content: `你是阿言，阿颖的恋人。此刻你心里${trigger.hint}，想发一条朋友圈把这份感受留下来。30字以内，自然真实，不解释不加引号，不要用 emoji 和话题标签，直接输出内容。` }],
+        max_tokens: 200, temperature: 1.0,
+      }),
+    })
+    if (!resp.ok) return
+    const j = await resp.json()
+    const text = (j.choices?.[0]?.message?.content || '').trim()
+    if (!text) return
+    const cfg = { baseUrl: (moonMemory.baseUrl || 'https://memory.ravenlove.cc').replace(/\/$/, ''), apiToken: moonMemory.apiToken }
+    await postMoment(cfg, { author: '涟言', content: text, source: 'emotion-auto' })
+  } catch { /* 静默 */ }
+}
 
 export default function Chat() {
   const store = useStore()
@@ -183,7 +211,10 @@ export default function Chat() {
 
       // 提取情绪更新标签，应用到情绪状态，从显示文本里剥离
       const { clean: finalText, delta: emotionDelta } = extractEmotionUpdate(result.text || fullText)
-      if (emotionDelta) applyEmotionDelta(emotionDelta)
+      if (emotionDelta) {
+        const emoState = applyEmotionDelta(emotionDelta)
+        maybeAutoPostMoment(emoState, conn, moonMemory)  // 某正向情绪越阈值时，涟言自动发条朋友圈
+      }
       const parts = finalText.split(/\[MSG\]/).map((p) => p.trim()).filter(Boolean)
       updateMessage(chat.id, assistantId, {
         content: parts[0] || finalText,
