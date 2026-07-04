@@ -3,6 +3,7 @@ import { getMemoryToolDefinitions, executeMemoryTool } from './moonMemory'
 import { WHEEL_TOOL_DEF, executeWheelSpin } from './fortuneWheel'
 import { FISHING_TOOL_DEF, executeFishing } from './fishing'
 import { DICE_TOOL_DEF, executeRandomRoll } from './dice'
+import { buildMoodFxPrompt } from '../utils/moodFx'
 
 export function normalizeProvider(raw) {
   const v = (raw || '').toString().toLowerCase()
@@ -216,6 +217,7 @@ export function buildSystemPrompt(globalInstruction, memoryItems, customStickers
 - 一条消息最多点一首
 - 例子：跟她说完贴心话后，"我想放首歌给你听。[music:小情歌|苏打绿|你说的每句像被这歌唱中]"
 你点过的歌会存进「涟言点给你的歌」歌单里，带着当时的理由，是你们俩的一点纪念。`)
+  parts.push(buildMoodFxPrompt())
   parts.push(`【可运行的代码块】
 如果你想搞点浪漫或有趣的小东西——表白页、爱心动画、给她的小惊喜——可以直接写一段完整的 HTML（含 CSS/JS），用 \`\`\`html 代码块包起来发出去。前端会在代码块下自动出现「运行」按钮，她一点就在沙箱里渲染成会动的画面。
 - 只在真有心意、想给她惊喜时用，别为炫技硬塞

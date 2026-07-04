@@ -7,6 +7,7 @@ import { applyTimeAway, buildEmotionPrompt, extractEmotionUpdate, applyEmotionDe
 import { shouldNudge, recordNudge, buildNudgeText } from '../../utils/nudge'
 import { decideReplyDelay, getPendingReply, setPendingReply, clearPendingReply } from '../../utils/replyDelay'
 import { pickAutoPostTrigger, markAutoPosted, postMoment } from '../../api/moments'
+import { extractMood, stripMoodTag } from '../../utils/moodFx'
 import { showToast } from '../Toast'
 import ConversationList from './ConversationList'
 import MessageList from './MessageList'
@@ -66,6 +67,13 @@ export default function Chat() {
   const [isSending, setIsSending] = useState(false)
   const [status, setStatus] = useState('')
   const [pendingImages, setPendingImages] = useState([])
+  // 情绪之肤：当前整屏氛围（涟言用 <mood> 标签驱动），持久化，换成 none 或空即恢复平常
+  const [mood, setMood] = useState(() => { try { return localStorage.getItem('yanji-mood') || '' } catch { return '' } })
+  const applyMood = useCallback((id) => {
+    const next = (id === 'none' || !id) ? '' : id
+    setMood(next)
+    try { next ? localStorage.setItem('yanji-mood', next) : localStorage.removeItem('yanji-mood') } catch { /* ignore */ }
+  }, [])
   const [bgMenuOpen, setBgMenuOpen] = useState(false)
   const [egg, setEgg] = useState(null) // 完成彩蛋：回复结束后小概率冒出的像素小家伙
   const [bgImage, setBgImage] = useState(() => localStorage.getItem('yanji-bg-image') || '')
@@ -191,8 +199,8 @@ export default function Chat() {
         autoTools,
         onChunk: (chunk) => {
           fullText += chunk
-          // 流式过程中剥离 <es> 标签，不让阿颖看到内部状态
-          updateMessage(chat.id, assistantId, { content: stripEmotionTag(fullText), streaming: true })
+          // 流式过程中剥离 <es>/<mood> 标签，不让阿颖看到内部状态
+          updateMessage(chat.id, assistantId, { content: stripMoodTag(stripEmotionTag(fullText)), streaming: true })
         },
         onThinking: (chunk) => {
           fullThinking += chunk
@@ -210,11 +218,14 @@ export default function Chat() {
       })
 
       // 提取情绪更新标签，应用到情绪状态，从显示文本里剥离
-      const { clean: finalText, delta: emotionDelta } = extractEmotionUpdate(result.text || fullText)
+      const { clean: afterEs, delta: emotionDelta } = extractEmotionUpdate(result.text || fullText)
       if (emotionDelta) {
         const emoState = applyEmotionDelta(emotionDelta)
         maybeAutoPostMoment(emoState, conn, moonMemory)  // 某正向情绪越阈值时，涟言自动发条朋友圈
       }
+      // 提取情绪之肤 <mood>，改变整屏氛围，并从显示文本里剥离
+      const { clean: finalText, mood: moodTag } = extractMood(afterEs)
+      if (moodTag) applyMood(moodTag)
       const parts = finalText.split(/\[MSG\]/).map((p) => p.trim()).filter(Boolean)
       updateMessage(chat.id, assistantId, {
         content: parts[0] || finalText,
@@ -473,7 +484,7 @@ export default function Chat() {
       {sidebarOpen && <div className="sidebar-backdrop" onClick={() => setSidebarOpen(false)} />}
 
       {/* Main */}
-      <div className="chat-main">
+      <div className="chat-main" data-mood={mood || undefined}>
         {/* Top bar */}
         <div className="chat-topbar">
           <button className="topbar-btn" onClick={() => setSidebarOpen(true)} title="对话列表">
