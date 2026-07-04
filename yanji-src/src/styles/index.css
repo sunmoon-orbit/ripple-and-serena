@@ -1171,6 +1171,18 @@ textarea.form-input { display: block; margin: 8px 16px 12px; }
   border: 1px solid var(--border); font-size: 12.5px;
 }
 .bubble-markdown code { font-family: "SF Mono","Fira Code",monospace; font-size: 0.87em; }
+/* 代码就地运行：html 代码块下的运行按钮 + 沙箱渲染框 */
+.code-run-bar { margin: -4px 0 8px; }
+.code-run-btn {
+  background: var(--accent-dim); color: var(--accent); border: 1px solid var(--border-md);
+  border-radius: 100px; padding: 3px 12px; font-size: 12px; cursor: pointer;
+  font-family: inherit; transition: background 0.15s;
+}
+.code-run-btn:hover { background: var(--accent-soft); color: #fff; }
+.code-run-frame {
+  width: 100%; height: 260px; border: 1px solid var(--border-md);
+  border-radius: var(--r-sm); background: #fff; margin: 4px 0 10px; display: block;
+}
 .bubble-markdown ul, .bubble-markdown ol { margin: 6px 0; padding-left: 18px; }
 .bubble-markdown li { margin-bottom: 2px; }
 .bubble-markdown h1,.bubble-markdown h2,.bubble-markdown h3 { margin: 10px 0 5px; font-weight: 600; }
