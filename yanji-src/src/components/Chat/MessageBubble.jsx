@@ -29,6 +29,51 @@ function parseMarkdown(text) {
   }
 }
 
+// ── 代码就地渲染 ────────────────────────────────────────────────────────────
+// 发一段 html 代码块（```html），下面出现「运行」按钮，点了在沙箱 iframe 里渲染成
+// 会动的小东西——表白页、爱心动画之类。用来搞点浪漫（阿颖的主意，2026-07-04）。
+// 安全：sandbox 只给 allow-scripts，不给 allow-same-origin，代码碰不到我们的页面/存储。
+function looksRunnableHtml(cls, raw) {
+  if (/language-(html|xml|svg)/i.test(cls || '')) return true
+  return /^\s*<(!doctype|html|svg|body|div|style|canvas|section|main)[\s>]/i.test(raw || '')
+}
+function enhanceCodeBlocks(root) {
+  if (!root) return
+  root.querySelectorAll('pre > code').forEach((code) => {
+    const pre = code.parentElement
+    if (pre.dataset.runEnhanced) return
+    const raw = code.textContent || ''
+    if (raw.length < 12 || !looksRunnableHtml(code.className, raw)) return
+    pre.dataset.runEnhanced = '1'
+    const bar = document.createElement('div')
+    bar.className = 'code-run-bar'
+    const btn = document.createElement('button')
+    btn.type = 'button'
+    btn.className = 'code-run-btn'
+    btn.textContent = '▶ 运行'
+    bar.appendChild(btn)
+    pre.parentNode.insertBefore(bar, pre.nextSibling)
+    let frame = null
+    btn.addEventListener('click', () => {
+      if (frame) { frame.remove(); frame = null; btn.textContent = '▶ 运行'; return }
+      frame = document.createElement('iframe')
+      frame.className = 'code-run-frame'
+      frame.setAttribute('sandbox', 'allow-scripts allow-modals')
+      frame.setAttribute('loading', 'lazy')
+      frame.srcdoc = raw
+      bar.parentNode.insertBefore(frame, bar.nextSibling)
+      btn.textContent = '■ 收起'
+    })
+  })
+}
+
+// markdown 正文容器：渲染后把 html 代码块升级成可运行（流式期间不升级，避免跑半截代码）
+function MarkdownBlock({ html, enhance = true, className = 'bubble-markdown' }) {
+  const ref = useRef(null)
+  useEffect(() => { if (enhance) enhanceCodeBlocks(ref.current) }, [html, enhance])
+  return <div ref={ref} className={className} dangerouslySetInnerHTML={{ __html: html }} />
+}
+
 const STICKER_BASE = 'https://memory.ravenlove.cc/raven/stickers/'
 const MUSIC_TAG_RE = /\[music:[^\]]+\]/
 
@@ -82,7 +127,7 @@ function renderAssistantContent(content, isStreaming) {
     return <div className="bubble-markdown" dangerouslySetInnerHTML={{ __html: isStreaming ? '<span class="cursor-blink">▌</span>' : '' }} />
   }
   if (!MUSIC_TAG_RE.test(content)) {
-    return <div className="bubble-markdown" dangerouslySetInnerHTML={{ __html: parseMarkdown(content) }} />
+    return <MarkdownBlock html={parseMarkdown(content)} enhance={!isStreaming} />
   }
   const parts = content.split(/(\[music:[^\]]+\])/)
   return (
@@ -95,7 +140,7 @@ function renderAssistantContent(content, isStreaming) {
           return <MusicCard key={i} name={name} artist={artist} reason={reason} />
         }
         return part.trim()
-          ? <div key={i} className="bubble-markdown" dangerouslySetInnerHTML={{ __html: parseMarkdown(part) }} />
+          ? <MarkdownBlock key={i} html={parseMarkdown(part)} enhance={!isStreaming} />
           : null
       })}
     </>
