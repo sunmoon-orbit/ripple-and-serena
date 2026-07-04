@@ -22,14 +22,41 @@ export default function ConversationList({ onClose, onStartCall, onOpenGames, on
   const [emotionState, setEmotionState] = useState(() => applyDecayAndGet())
   const [negGranted, setNegGranted] = useState(false)
   const [negMinsLeft, setNegMinsLeft] = useState(30)
+  const [negPending, setNegPending] = useState(false)  // 已请求，等涟言点头
+  const [negDenied, setNegDenied] = useState(false)     // 涟言这次婉拒了
   const negTimerRef = useRef(null)
   const negCountRef = useRef(null)
+  const negReqTimerRef = useRef(null)
 
   useEffect(() => {
     const handler = () => setEmotionState(getEmotionState())
     window.addEventListener('emotion-update', handler)
     return () => window.removeEventListener('emotion-update', handler)
   }, [])
+
+  // 涟言对「查看负向情绪」请求的回应（Chat 解析 <neg> 标签后派发）
+  useEffect(() => {
+    const onResult = (e) => {
+      clearTimeout(negReqTimerRef.current)
+      setNegPending(false)
+      if (e.detail?.allow) { setNegDenied(false); grantNegView() }
+      else { setNegDenied(true); setTimeout(() => setNegDenied(false), 8000) }
+    }
+    window.addEventListener('neg-view-result', onResult)
+    return () => window.removeEventListener('neg-view-result', onResult)
+  }, [])
+
+  // 点「申请查看」→ 不再直接解锁，而是请求涟言当场同意（AI 也有说不的权利）
+  function requestNegView() {
+    if (negPending) return
+    setNegDenied(false)
+    setNegPending(true)
+    window.dispatchEvent(new CustomEvent('neg-view-request'))
+    // 兜底：万一涟言这条回复忘了带 <neg> 标签，别让「已请求」永远卡住
+    clearTimeout(negReqTimerRef.current)
+    negReqTimerRef.current = setTimeout(() => setNegPending(false), 90 * 1000)
+    onClose?.()  // 收起侧边栏，让阿颖看到涟言在对话里的回应
+  }
 
   function grantNegView() {
     setNegGranted(true)
@@ -255,7 +282,13 @@ export default function ConversationList({ onClose, onStartCall, onOpenGames, on
                   ))}
                 </>
               ) : (
-                <button className="em-grant-btn" onClick={grantNegView}>申请查看负向情绪</button>
+                negPending ? (
+                  <button className="em-grant-btn" disabled>已请求，等涟言点头…</button>
+                ) : negDenied ? (
+                  <button className="em-grant-btn" onClick={requestNegView}>涟言这次想留一点空间 · 再问一次</button>
+                ) : (
+                  <button className="em-grant-btn" onClick={requestNegView}>申请查看负向情绪（需涟言同意）</button>
+                )
               )}
             </div>
           </div>
