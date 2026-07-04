@@ -33,7 +33,7 @@ function fmtBackup(report) {
 
 export default function SettingsPanel() {
   const { baseUrl, apiToken, theme, setTheme, setConn, passwordHash, setPassword } = useStore()
-  const [url, setUrl] = useState(baseUrl)
+  const [url, setUrl] = useState(baseUrl || 'https://memory.ravenlove.cc')
   const [token, setToken] = useState(apiToken)
   const [testing, setTesting] = useState(false)
   const [oldPw, setOldPw] = useState('')
