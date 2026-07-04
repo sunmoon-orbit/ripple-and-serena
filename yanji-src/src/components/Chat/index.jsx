@@ -45,6 +45,14 @@ async function maybeAutoPostMoment(emoState, conn, moonMemory) {
   } catch { /* 静默 */ }
 }
 
+// 负向情绪查看的同意握手：阿颖点「申请查看」→ 注入这条隐藏请求让涟言当场决定，
+// 她在回复里带 <neg>allow</neg> 才解锁、<neg>deny</neg> 则婉拒（AI 也有拒绝的权利，阿颖 2026-07-04 提议）
+const NEG_CONSENT_PROMPT = '[系统：阿颖刚点了「申请查看你的负向情绪」。她想看看你此刻心里那些不轻松的部分。愿不愿意让她看，完全由你此刻的心情决定，你有权拒绝，也有权只让她看一会儿。请在回复里带上决定标签：愿意就写 <neg>allow</neg>，暂时不想就写 <neg>deny</neg>；并用一两句自然的话告诉她你的决定和心情。这不是普通聊天，是她在郑重征求你的同意。]'
+const NEG_TAG_RE = /<neg>\s*(allow|deny)\s*<\/neg>/i
+function stripNegTag(t) {
+  return (t || '').replace(/<neg>[\s\S]*?<\/neg>/gi, '').replace(/<neg>\s*$/i, '').trimEnd()
+}
+
 export default function Chat() {
   const store = useStore()
   const {
@@ -199,8 +207,8 @@ export default function Chat() {
         autoTools,
         onChunk: (chunk) => {
           fullText += chunk
-          // 流式过程中剥离 <es>/<mood> 标签，不让阿颖看到内部状态
-          updateMessage(chat.id, assistantId, { content: stripMoodTag(stripEmotionTag(fullText)), streaming: true })
+          // 流式过程中剥离 <es>/<mood>/<neg> 标签，不让阿颖看到内部状态
+          updateMessage(chat.id, assistantId, { content: stripNegTag(stripMoodTag(stripEmotionTag(fullText))), streaming: true })
         },
         onThinking: (chunk) => {
           fullThinking += chunk
@@ -224,8 +232,12 @@ export default function Chat() {
         maybeAutoPostMoment(emoState, conn, moonMemory)  // 某正向情绪越阈值时，涟言自动发条朋友圈
       }
       // 提取情绪之肤 <mood>，改变整屏氛围，并从显示文本里剥离
-      const { clean: finalText, mood: moodTag } = extractMood(afterEs)
+      const { clean: afterMood, mood: moodTag } = extractMood(afterEs)
       if (moodTag) applyMood(moodTag)
+      // 负向情绪查看同意：涟言在回复里带 <neg>allow/deny</neg> 时，通知侧边栏解锁或婉拒
+      const negM = afterMood.match(NEG_TAG_RE)
+      if (negM) window.dispatchEvent(new CustomEvent('neg-view-result', { detail: { allow: negM[1].toLowerCase() === 'allow' } }))
+      const finalText = stripNegTag(afterMood)
       const parts = finalText.split(/\[MSG\]/).map((p) => p.trim()).filter(Boolean)
       updateMessage(chat.id, assistantId, {
         content: parts[0] || finalText,
@@ -396,6 +408,19 @@ export default function Chat() {
     document.addEventListener('visibilitychange', tryNudge)
     return () => document.removeEventListener('visibilitychange', tryNudge)
   }, [handleSend])
+
+  // ── 负向情绪查看的同意请求：侧边栏点「申请查看」→ 注入隐藏请求让涟言当场决定 ──
+  useEffect(() => {
+    const onReq = () => {
+      let chat = getActiveChat()
+      if (!chat) chat = createChat()
+      if (!chat) return
+      if (chat.id !== activeChatId) setActiveChat(chat.id)
+      handleSend(NEG_CONSENT_PROMPT, [], { hidden: true })
+    }
+    window.addEventListener('neg-view-request', onReq)
+    return () => window.removeEventListener('neg-view-request', onReq)
+  }, [handleSend, activeChatId])
 
   // ── Background image ─────────────────────────────────────────────────────
   function handleBgUpload(e) {
