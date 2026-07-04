@@ -192,6 +192,15 @@ function renderStickered(text) {
   )
 }
 
+// 她自己发的消息里若含代码，也渲染成代码块+运行/复制（普通聊天文字仍走纯文本，
+// 不误伤：只有带 ``` 围栏、或整段就是 HTML 的才当代码）——2026-07-04 她反馈粘贴代码看不到运行按钮
+function renderUserBody(text) {
+  if (!text) return <span className="bubble-text">{text}</span>
+  if (/```/.test(text)) return <MarkdownBlock html={parseMarkdown(text)} />
+  if (looksRunnableHtml('', text.trim())) return <MarkdownBlock html={parseMarkdown('```html\n' + text.trim() + '\n```')} />
+  return renderStickered(text)
+}
+
 function AttachChip({ name, content }) {
   const [open, setOpen] = useState(false)
   return (
@@ -213,7 +222,7 @@ function renderUserContent(content) {
   // Strip [voice] prefix added by voice call mode (display only)
   const displayContent = content.startsWith('[voice] ') ? content.slice(8) : content
   const firstAttach = displayContent.indexOf('--- 文件：')
-  if (firstAttach === -1) return renderStickered(displayContent)
+  if (firstAttach === -1) return renderUserBody(displayContent)
   const mainText = displayContent.slice(0, firstAttach).replace(/\n\n$/, '').trim()
   const blocksPart = displayContent.slice(firstAttach)
   const attachBlocks = []
@@ -224,7 +233,7 @@ function renderUserContent(content) {
   }
   return (
     <>
-      {mainText && renderStickered(mainText)}
+      {mainText && renderUserBody(mainText)}
       {attachBlocks.map((b, i) => <AttachChip key={i} name={b.name} content={b.content} />)}
     </>
   )
