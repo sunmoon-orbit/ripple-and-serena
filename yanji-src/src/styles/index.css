@@ -1117,11 +1117,13 @@ textarea.form-input { display: block; margin: 8px 16px 12px; }
 .perspective-mode .message-row-user .message-content-wrap { align-items: flex-start; }
 .perspective-mode .message-row-assistant .message-content-wrap { align-items: flex-end; }
 .message-avatar {
-  width: 28px; height: 28px; border-radius: 50%;
+  width: var(--avatar-size, 28px); height: var(--avatar-size, 28px); border-radius: 50%;
   background: rgba(191,181,216,0.20); border: 1px solid var(--border);
   display: flex; align-items: center; justify-content: center;
   color: var(--accent); flex-shrink: 0; margin-top: 2px;
 }
+/* 图标随头像尺寸等比缩放（svg 属性宽高被 CSS 覆盖） */
+.message-avatar svg { width: 60%; height: 60%; }
 .message-avatar-user {
   background: rgba(191,181,216,0.35);
 }

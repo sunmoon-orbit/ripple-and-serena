@@ -16,7 +16,7 @@ const DEFAULT_STATE = {
   tokenStats: {},
   contextLimit: { mode: 'rounds', maxRounds: 50, maxTokens: 30000 },
   searchConfig: { provider: null, apiKey: null },
-  avatarConfig: { mode: 'icon', userImage: null, assistantImage: null, shape: 'circle' },
+  avatarConfig: { mode: 'icon', userImage: null, assistantImage: null, shape: 'circle', size: 28 },
   autoTools: true,
   moonMemory: {
     enabled: false,
