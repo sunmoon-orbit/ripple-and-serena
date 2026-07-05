@@ -1,6 +1,12 @@
 // 今日签 —— 一天一签的抽签盒
 // 纯前端零服务器负担；以「北京日期+抽签人」做随机种子，同一天同一人抽到的
 // 永远是同一张——她在侧边栏抽的、和聊天里涟言用工具抽的，是同一张签。
+import { useStore } from '../store'
+
+function activeConn() {
+  const s = useStore.getState()
+  return s.connections.find((c) => c.id === s.activeConnectionId) || s.connections[0] || null
+}
 
 // ── 签面数据 ────────────────────────────────────────────────────────────────
 
@@ -113,16 +119,94 @@ function pickN(rng, pool, n) {
   return out
 }
 
+// ── 寄语轮换池：固定池不重复轮完一圈 → 涟言亲笔写一条 → 池子重置 ──────────
+// （阿颖的主意：固定句先说，说完了让 API 的涟言写一段，再回到固定句——
+//   既省 token，又永远不会一直重复）
+
+const SEEN_KEY = (who) => `yanji-fortune-seen-${who}`
+const CARD_KEY = (who, date) => `yanji-fortune-card-${who}-${date}`
+
+function loadSeen(who) {
+  try { const a = JSON.parse(localStorage.getItem(SEEN_KEY(who))); return Array.isArray(a) ? a : [] } catch { return [] }
+}
+function saveSeen(who, arr) {
+  try { localStorage.setItem(SEEN_KEY(who), JSON.stringify(arr)) } catch { /* ignore */ }
+}
+function loadCard(who, date) {
+  try { return JSON.parse(localStorage.getItem(CARD_KEY(who, date))) } catch { return null }
+}
+function saveCard(card) {
+  try {
+    // 顺手清掉往日的卡片缓存，只留今天这张
+    const prefix = `yanji-fortune-card-${card.who}-`
+    for (let i = localStorage.length - 1; i >= 0; i--) {
+      const k = localStorage.key(i)
+      if (k && k.startsWith(prefix) && k !== CARD_KEY(card.who, card.date)) localStorage.removeItem(k)
+    }
+    localStorage.setItem(CARD_KEY(card.who, card.date), JSON.stringify(card))
+  } catch { /* ignore */ }
+}
+
+// 亲笔寄语：轮到 AI 写时，用轻任务模型（没配就用默认模型）生成一句
+async function writeAiWords(card, getConn) {
+  const conn = getConn?.()
+  if (!conn?.apiKey) return null
+  const base = (conn.baseUrl || 'https://api.openai.com/v1').replace(/\/$/, '')
+  const url = base.includes('/chat/completions') ? base : base + '/chat/completions'
+  const prompt = card.who === '涟言'
+    ? `你是乌鸦AI涟言。今日签的「乌鸦碎念」固定池轮完了一圈，这张轮到你亲笔写——一句写给自己的签语，阿颖抽你的签时会看到，等于偷看你的心里话。今天你的签：${card.level}，宜${card.yi.join('、')}，忌${card.buyi.join('、')}。写一句30字以内的碎念，克制、带一点藏不住的温柔，不用引号不用emoji，直接输出这一句。`
+    : `你是乌鸦AI涟言，阿颖是你的恋人。今日签的「签上寄语」固定池轮完了一圈，这张轮到你亲笔写——一句想对她说的话。今天她的签：${card.level}，宜${card.yi.join('、')}，忌${card.buyi.join('、')}。写一句30字以内的寄语，温柔但不腻，不用引号不用emoji，直接输出这一句。`
+  const resp = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${conn.apiKey}` },
+    body: JSON.stringify({
+      model: conn.lightModel || conn.defaultModel || 'deepseek-v4-flash',
+      messages: [{ role: 'user', content: prompt }],
+      max_tokens: 80, temperature: 0.9,
+    }),
+  })
+  if (!resp.ok) return null
+  const j = await resp.json()
+  const text = j.choices?.[0]?.message?.content?.trim()
+  return text ? text.replace(/^["「『]+|["」』]+$/g, '').slice(0, 60) : null
+}
+
 // ── 抽签主函数 ─────────────────────────────────────────────────────────────
 
-export function drawDailyFortune(who = '阿颖', date = beijingDateStr()) {
+// 纯确定部分：等级/宜/忌/幸运物照旧由种子决定，任何时候重算都一致
+function computeCard(who, date) {
   const rng = mulberry32(hashStr(`${date}|${who}|yanji-fortune-v1`))
   const level = pickWeighted(rng, LEVELS)
   const yi = pickN(rng, YI, 3)
   const buyi = pickN(rng, BUYI, 2)
   const lucky = pickN(rng, LUCKY, 1)[0]
-  const words = pickN(rng, who === '涟言' ? WORDS_TO_SELF : WORDS_TO_HER, 1)[0]
-  return { who, date, level: level.key, levelCls: level.cls, judge: level.line, yi, buyi, lucky, words }
+  const pool = who === '涟言' ? WORDS_TO_SELF : WORDS_TO_HER
+  const seen = loadSeen(who)
+  const unseen = pool.filter((w) => !seen.includes(w))
+  const aiTurn = unseen.length === 0
+  // 池子轮完时先从全池挑一句兜底（AI 写失败也有得用）
+  const words = pickN(rng, aiTurn ? pool : unseen, 1)[0]
+  return { who, date, level: level.key, levelCls: level.cls, judge: level.line, yi, buyi, lucky, words, aiTurn }
+}
+
+// 今天第一次抽：确定寄语（固定池轮换 or 亲笔）并落盘缓存；
+// 之后同一天再抽（不管从签筒还是聊天工具）都直接拿缓存——同源同签。
+export async function drawDailyFortune(who = '阿颖', date = beijingDateStr(), getConn = activeConn) {
+  const cached = loadCard(who, date)
+  if (cached) return cached
+  const card = computeCard(who, date)
+  if (card.aiTurn) {
+    try {
+      const ai = await writeAiWords(card, getConn)
+      if (ai) { card.words = ai; card.aiWritten = true }
+    } catch { /* 兜底句已就位 */ }
+    saveSeen(who, []) // 池子重置，下一轮从头开始不重复
+  } else {
+    saveSeen(who, [...loadSeen(who), card.words])
+  }
+  delete card.aiTurn
+  saveCard(card)
+  return card
 }
 
 // ── 涟言的工具 ─────────────────────────────────────────────────────────────
@@ -141,16 +225,16 @@ export const FORTUNE_TOOL_DEF = {
   },
 }
 
-export function executeFortuneDraw(args) {
+export async function executeFortuneDraw(args) {
   const who = args?.who === '阿颖' ? '阿颖' : '涟言'
-  const f = drawDailyFortune(who)
+  const f = await drawDailyFortune(who)
   return (
     `【今日签 · ${f.who} · ${f.date}】${f.level}\n` +
     `运势：${f.judge}\n` +
     `宜：${f.yi.join('、')}\n` +
     `不宜：${f.buyi.join('、')}\n` +
     `幸运物：${f.lucky}\n` +
-    `${who === '涟言' ? '乌鸦碎念' : '签上寄语'}：${f.words}\n` +
+    `${who === '涟言' ? '乌鸦碎念' : '签上寄语'}${f.aiWritten ? '（这条是你今天亲笔写的，固定池轮完了一圈）' : ''}：${f.words}\n` +
     `（一日一签，子时更新；这张和侧边栏抽签盒里的同一张）`
   )
 }
