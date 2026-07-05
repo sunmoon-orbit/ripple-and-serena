@@ -147,13 +147,33 @@ export default function Moments() {
   const [posting, setPosting] = useState(false)
   const [aiPosting, setAIPosting] = useState(false)
   const [showAll, setShowAll] = useState(false)
+  const [hasMore, setHasMore] = useState(false)     // 服务端还有更早的（本次拉满 PAGE_SIZE 条）
+  const [loadingMore, setLoadingMore] = useState(false)
   const fileRef = useRef(null)
   const SHOW_COUNT = 3
+  const PAGE_SIZE = 50
 
   const reload = useCallback(async () => {
-    try { setPosts(await fetchMoments(cfg, 50)) }
+    try {
+      const rows = await fetchMoments(cfg, PAGE_SIZE)
+      setPosts(rows)
+      setHasMore(rows.length >= PAGE_SIZE)
+    }
     catch (e) { setPosts([]); showToast('朋友圈加载失败：' + e.message, 'error') }
   }, [cfg.baseUrl, cfg.apiToken])
+
+  // 看更早的：拿当前最老一条的 id 当游标往前翻一页
+  const loadOlder = useCallback(async () => {
+    const oldest = (posts || [])[posts.length - 1]
+    if (!oldest || loadingMore) return
+    setLoadingMore(true)
+    try {
+      const older = await fetchMoments(cfg, PAGE_SIZE, oldest.id)
+      setPosts(prev => [...(prev || []), ...older])
+      setHasMore(older.length >= PAGE_SIZE)
+    } catch (e) { showToast('加载更早的失败：' + e.message, 'error') }
+    finally { setLoadingMore(false) }
+  }, [posts, loadingMore, cfg.baseUrl, cfg.apiToken])
 
   // 首次加载 + 一次性迁移旧的 localStorage feed 到服务端
   useEffect(() => {
@@ -179,6 +199,7 @@ export default function Moments() {
         } catch { /* 迁移失败不阻塞 */ }
       }
       setPosts(server)
+      setHasMore(server.length >= PAGE_SIZE)
     })()
   }, [cfg.apiToken])
 
@@ -323,7 +344,12 @@ export default function Moments() {
         <Post key={p.id} post={p} cfg={cfg} onLike={handleLike} onComment={handleComment} onAIComment={handleAIComment} onDelete={handleDelete} />
       ))}
       {list.length > SHOW_COUNT && !showAll && (
-        <button onClick={() => setShowAll(true)} style={{ width: '100%', padding: '8px 0', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-faint)', fontSize: 13 }}>查看更多 · 共 {list.length} 条 ↓</button>
+        <button onClick={() => setShowAll(true)} style={{ width: '100%', padding: '8px 0', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-faint)', fontSize: 13 }}>查看更多 · 共 {list.length}{hasMore ? '+' : ''} 条 ↓</button>
+      )}
+      {showAll && hasMore && (
+        <button onClick={loadOlder} disabled={loadingMore} style={{ width: '100%', padding: '10px 0', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-faint)', fontSize: 13 }}>
+          {loadingMore ? '翻着呢…' : '看更早的 ↓'}
+        </button>
       )}
     </div>
   )

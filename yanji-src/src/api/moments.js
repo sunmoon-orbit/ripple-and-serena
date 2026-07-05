@@ -15,8 +15,8 @@ async function req(cfg, path, options = {}) {
   return resp.json()
 }
 
-export function fetchMoments(cfg, limit = 50) {
-  return req(cfg, `/moments?limit=${limit}`, { headers: authHeaders(cfg.apiToken) })
+export function fetchMoments(cfg, limit = 50, before = 0) {
+  return req(cfg, `/moments?limit=${limit}${before ? `&before=${before}` : ''}`, { headers: authHeaders(cfg.apiToken) })
 }
 
 export function postMoment(cfg, body) {
