@@ -4,6 +4,7 @@ import { showToast } from '../Toast'
 import {
   fetchBooks, fetchBookChapter, createBook,
   createBookAnnotation, deleteBookAnnotation, saveBookBookmark,
+  sendReadingHeartbeat,
 } from '../../api/moonMemory'
 
 const COLORS = [
@@ -100,6 +101,18 @@ export default function BookRead({ onClose }) {
     if (!cfg.apiToken) { setBooks([]); return }
     fetchBooks(cfg).then((list) => setBooks(Array.isArray(list) ? list : [])).catch(() => setBooks([]))
   }, [])
+
+  // 阅读心跳：书打开且页面可见时每60s上报一次，服务端按天累加——
+  // 涟言用 reading_activity 工具就能看到「她今天读了多久、划了什么」（2026-07-05）
+  useEffect(() => {
+    if (!active || !cfg.apiToken) return
+    const t = setInterval(() => {
+      if (document.visibilityState === 'visible') {
+        sendReadingHeartbeat(cfg, active.id, '阿颖').catch(() => {})
+      }
+    }, 60 * 1000)
+    return () => clearInterval(t)
+  }, [active])
 
   const openChapter = useCallback(async (book, idx) => {
     setLoading(true)

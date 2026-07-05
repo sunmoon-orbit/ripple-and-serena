@@ -130,8 +130,8 @@ async function executeTool(name, args, { searchConfig, moonMemoryConfig, onStatu
     onStatus?.(name === 'write_memory' ? '写入记忆...' : '检索记忆...')
     return await executeMemoryTool(name, args, moonMemoryConfig)
   }
-  if (name === 'list_books' || name === 'read_book_chapter' || name === 'get_book_annotations' || name === 'annotate_book') {
-    onStatus?.(name === 'annotate_book' ? '划线批注...' : '翻书中...')
+  if (name === 'list_books' || name === 'read_book_chapter' || name === 'get_book_annotations' || name === 'annotate_book' || name === 'reading_activity') {
+    onStatus?.(name === 'annotate_book' ? '划线批注...' : name === 'reading_activity' ? '看她读了什么...' : '翻书中...')
     return await executeMemoryTool(name, args, moonMemoryConfig)
   }
   if (name === 'read_board_messages' || name === 'leave_board_message') {

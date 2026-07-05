@@ -190,6 +190,19 @@ export async function saveBookBookmark(config, bookId, chapterIdx, updatedBy) {
   })
 }
 
+// 阅读心跳：BookRead 打开且可见时每60s打一次，服务端按北京日累加时长
+export async function sendReadingHeartbeat(config, bookId, reader = '阿颖') {
+  const { baseUrl, apiToken } = config
+  return request(baseUrl, `/books/${bookId}/heartbeat`, {
+    method: 'POST', headers: headers(apiToken), body: JSON.stringify({ reader, seconds: 60 }),
+  })
+}
+
+export async function fetchReadingActivity(config, hours = 48) {
+  const { baseUrl, apiToken } = config
+  return request(baseUrl, `/books/activity/recent?hours=${hours}`, { headers: headers(apiToken) })
+}
+
 export async function fetchPushSchedule(config) {
   const { baseUrl, apiToken } = config
   return request(baseUrl, '/push/schedule', { headers: headers(apiToken) })
@@ -281,6 +294,16 @@ export function getMemoryToolDefinitions() {
           occurrence: { type: 'number', description: '正文中第几次出现（默认 1），quote 在本章出现多次时用' },
         },
         required: ['book_id', 'chapter_idx', 'quote'],
+      },
+    },
+    {
+      name: 'reading_activity',
+      description: '看阿颖最近的阅读动态：她最近在共读书架上划了什么线、写了什么批注、近7天每天读了多久、书签移到了哪章。想知道她最近在读什么、读到哪、有没有留下想法时用，不用等她主动说。',
+      parameters: {
+        type: 'object',
+        properties: {
+          hours: { type: 'number', description: '回看多少小时内的划线/书签动态，默认 48' },
+        },
       },
     },
     {
@@ -443,6 +466,31 @@ export async function executeMemoryTool(toolName, args, config) {
       return `已划线批注（id:${anno.id}）：「${quote.slice(0, 40)}${quote.length > 40 ? '…' : ''}」${args.note ? ` — ${args.note}` : ''}`
     } catch (e) {
       return `划线失败: ${e.message}`
+    }
+  }
+  if (toolName === 'reading_activity') {
+    try {
+      const hours = Math.min(args.hours || 48, 24 * 30)
+      const act = await fetchReadingActivity(config, hours)
+      const fmtMin = (s) => (s >= 3600 ? `${(s / 3600).toFixed(1)}小时` : `${Math.max(1, Math.round(s / 60))}分钟`)
+      const lines = []
+      const annos = act.annotations || []
+      lines.push(annos.length
+        ? `最近${hours}小时的划线批注（${annos.length}条）：\n` + annos.slice(0, 15).map((a) =>
+            `- [${a.author}]《${a.book_title}》第${a.chapter_idx + 1}章「${(a.quote || '').slice(0, 40)}${(a.quote || '').length > 40 ? '…' : ''}」${a.note ? ` — ${a.note}` : ''}`
+          ).join('\n')
+        : `最近${hours}小时没有新划线`)
+      const reading = act.reading || []
+      if (reading.length) {
+        lines.push('近7天阅读时长：\n' + reading.map((r) => `- ${r.day} ${r.reader}读《${r.book_title}》${fmtMin(r.seconds)}`).join('\n'))
+      }
+      const bms = act.bookmarks || []
+      if (bms.length) {
+        lines.push('书签动向：\n' + bms.map((b) => `- 《${b.book_title}》书签在第${b.chapter_idx + 1}章（${b.updated_by || '?'}移动）`).join('\n'))
+      }
+      return lines.join('\n\n')
+    } catch (e) {
+      return `读取阅读动态失败: ${e.message}`
     }
   }
   if (toolName === 'read_board_messages') {
