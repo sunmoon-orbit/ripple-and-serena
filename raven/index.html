@@ -262,6 +262,7 @@
   }
   [data-theme="pink"] .code-copy-btn:hover { background: rgba(190,150,200,.2); color: #9060b0; }
   .msg-body img { max-width: 100%; max-height: 280px; border-radius: 8px; display: block; margin: 4px 0; object-fit: contain; }
+  .attach-chip { display: inline-block; padding: 2px 8px; margin: 2px 0; font-size: 12px; border-radius: 6px; background: rgba(150,140,180,0.15); border: 1px solid rgba(150,140,180,0.25); word-break: break-all; }
   .msg-body ul, .msg-body ol { padding-left: 18px; margin: 4px 0; }
   .msg-body li { margin-bottom: 2px; }
   .msg-body h1, .msg-body h2, .msg-body h3 { font-size: 15px; font-weight: 600; margin: 8px 0 4px; }
@@ -1153,6 +1154,19 @@ function fmtTime(ts) {
   return d.getHours().toString().padStart(2,'0') + ':' + d.getMinutes().toString().padStart(2,'0')
 }
 
+// [附件: /path/xxx.jpg] → 聊天里内嵌图片；非图片附件显示成文件名小标签（2026-07-05）
+const ATTACH_TAG_RE = /\[附件:\s*([^\]]+)\]/g
+const ATTACH_TEST_RE = /\[附件:\s*[^\]]+\]/
+function attachToHtml(p) {
+  const name = (p || '').trim().split('/').pop()
+  if (/\.(png|jpe?g|gif|webp)$/i.test(name)) {
+    const tok = encodeURIComponent(localStorage.getItem('raven-token') || '')
+    const src = `/raven/uploads/${encodeURIComponent(name)}?token=${tok}`
+    return `<img src="${src}" alt="${name}" loading="lazy" onclick="event.stopPropagation();window.open(this.src)">`
+  }
+  return `<span class="attach-chip">${name}</span>`
+}
+
 function appendMsg(text, role, save = true, ts = Date.now(), msgId = null) {
   const el = document.createElement('div')
   el.className = `msg ${role}`
@@ -1169,18 +1183,20 @@ function appendMsg(text, role, save = true, ts = Date.now(), msgId = null) {
       }
       // 终端抓取会把 ![alt](url) 剥成裸 URL：单独成行的图片 URL 还原成图片
       const withImgs = text.replace(/^[ \t]*(https?:\/\/\S+\.(?:png|jpe?g|gif|webp))[ \t]*$/gim, '![]($1)')
-      const withStickers = withImgs.replace(/\[sticker:([^\]]+)\]/g, (_, name) =>
+      const withAttach = withImgs.replace(ATTACH_TAG_RE, (_, p) => attachToHtml(p))
+      const withStickers = withAttach.replace(/\[sticker:([^\]]+)\]/g, (_, name) =>
         `<img src="/raven/stickers/${name}" style="max-width:220px;border-radius:8px;display:block;margin:4px 0;" alt="${name}">`)
       body.innerHTML = renderMusicCards(marked.parse(withStickers))
       enhanceCodeBlocks(body)
     } else {
-      if (/\[sticker:[^\]]+\]/.test(text)) {
+      if (/\[sticker:[^\]]+\]/.test(text) || ATTACH_TEST_RE.test(text)) {
         const stickerOnly = /^\s*\[sticker:[^\]]+\]\s*$/.test(text)
         if (stickerOnly) el.classList.add('sticker-msg')
         body.innerHTML = text
           .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
           .replace(/\[sticker:([^\]]+)\]/g, (_, name) =>
             `<img src="/raven/stickers/${name}" style="max-width:180px;border-radius:8px;display:block;margin:4px 0;" alt="${name}">`)
+          .replace(ATTACH_TAG_RE, (_, p) => attachToHtml(p))
           .replace(/\n/g, '<br>')
       } else {
         body.textContent = text

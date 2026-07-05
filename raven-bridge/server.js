@@ -77,7 +77,9 @@ function moonPost(pathname, body) {
 
 const STATIC_DIR = path.join(__dirname, '..', 'raven')
 const YANJI_DIR = path.join(__dirname, '..', 'yanji')
-const UPLOAD_DIR = '/tmp/raven-uploads'
+// 上传目录改持久位置：/tmp 重启即清空，聊天记录里的图片会全部变裂图（2026-07-05）
+const UPLOAD_DIR = '/home/ripple/raven-uploads'
+const LEGACY_UPLOAD_DIR = '/tmp/raven-uploads'  // 老消息里的附件回看兜底
 const MIME = {
   '.html': 'text/html; charset=utf-8',
   '.js':   'application/javascript',
@@ -85,6 +87,8 @@ const MIME = {
   '.json': 'application/json',
   '.png':  'image/png',
   '.jpg':  'image/jpeg',
+  '.jpeg': 'image/jpeg',
+  '.gif':  'image/gif',
   '.ico':  'image/x-icon',
   '.svg':  'image/svg+xml',
   '.webp': 'image/webp',
@@ -586,6 +590,28 @@ const server = http.createServer((req, res) => {
         res.writeHead(500); res.end(JSON.stringify({ error: e.message }))
       }
     })
+    return
+  }
+
+  // 已上传文件回看：聊天里内嵌显示图片（外网必须带 token，<img> 走 ?token=）
+  if (req.method === 'GET' && url.pathname.startsWith('/raven/uploads/')) {
+    if (!externalAuthed(req, url)) {
+      res.writeHead(401, { 'Content-Type': 'application/json' })
+      res.end(JSON.stringify({ error: 'unauthorized' }))
+      return
+    }
+    // basename 掐掉一切路径穿越
+    const name = path.basename(decodeURIComponent(url.pathname.slice('/raven/uploads/'.length)))
+    let file = path.join(UPLOAD_DIR, name)
+    if (!name) { res.writeHead(404); res.end(); return }
+    if (!fs.existsSync(file)) file = path.join(LEGACY_UPLOAD_DIR, name)  // 老 /tmp 附件兜底
+    if (!fs.existsSync(file)) { res.writeHead(404); res.end(); return }
+    const ext = path.extname(name).toLowerCase()
+    res.writeHead(200, {
+      'Content-Type': MIME[ext] || 'application/octet-stream',
+      'Cache-Control': 'private, max-age=31536000, immutable',  // 文件名带时间戳，内容不会变
+    })
+    fs.createReadStream(file).pipe(res)
     return
   }
 
