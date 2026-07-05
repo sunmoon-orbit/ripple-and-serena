@@ -1244,6 +1244,7 @@ textarea.form-input { display: block; margin: 8px 16px 12px; }
 .message-meta { display: flex; align-items: center; gap: 6px; }
 .message-time { font-size: 11px; color: var(--text-faint); }
 .message-tokens { font-size: 11px; color: var(--text-faint); }
+.message-interrupted { font-size: 11px; color: var(--text-faint); font-style: italic; }
 
 /* Chat Input */
 .chat-input-area {

@@ -472,6 +472,9 @@ export default function MessageBubble({ msg, onEdit, onQuote, isLast }) {
         )}
         <div className="message-meta">
           <span className="message-time">{formatTime(msg.createdAt)}</span>
+          {msg.interrupted && (
+            <span className="message-interrupted">这条没说完就断线了</span>
+          )}
           {msg.tokenUsage && (
             <span className="message-tokens">
               {msg.tokenUsage.totalTokens} tokens

@@ -49,6 +49,18 @@ function loadPersistedState() {
     if (parsed.contextLimit?.mode === 'none') {
       parsed.contextLimit = { ...parsed.contextLimit, mode: 'rounds' }
     }
+    // 清扫上次会话残留的 streaming 消息：placeholder 一入队就落盘，如果之后页面被杀
+    // 或请求挂死（断网/中转站无超时），streaming:true 会永久留在 localStorage，
+    // 气泡永远转圈。空的直接删，有内容的定格并标记被打断。
+    if (parsed.messagesByChatId) {
+      for (const cid of Object.keys(parsed.messagesByChatId)) {
+        const msgs = parsed.messagesByChatId[cid]
+        if (!Array.isArray(msgs) || !msgs.some((m) => m?.streaming)) continue
+        parsed.messagesByChatId[cid] = msgs
+          .filter((m) => !(m?.streaming && !m.content && !m.thinking))
+          .map((m) => m?.streaming ? { ...m, streaming: false, interrupted: true } : m)
+      }
+    }
     return parsed
   } catch {
     return {}
