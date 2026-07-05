@@ -245,7 +245,7 @@ export default function ConversationList({ onClose, onStartCall, onOpenGames, on
       </div>
 
       {/* ── 情绪 section ─────────────────────────────── */}
-      <div className="sb-section">
+      <div className="sb-section sb-section-emotion">
         <div className="sb-section-header" onClick={() => setEmotionOpen(v => !v)}>
           <span className="sb-section-title">情绪</span>
           <svg className={'sb-chevron' + (emotionOpen ? '' : ' closed')} width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
