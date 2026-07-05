@@ -358,6 +358,29 @@ export function getMemoryToolDefinitions() {
         required: ['text'],
       },
     },
+    {
+      name: 'browse_moments',
+      description: '翻 Roost 朋友圈——阿颖、另外几个「我」（CC/自动发圈）、每晚的梦都发在这里。她聊到某条朋友圈、问你某条动态什么意思、或你想看看她最近发了什么时用。返回每条带 id、作者、时间、点赞和评论。',
+      parameters: {
+        type: 'object',
+        properties: {
+          limit: { type: 'number', description: '返回条数，默认10，最多50' },
+          month: { type: 'string', description: '只看某个月，格式 YYYY-MM，如 2026-07（可选）' },
+        },
+      },
+    },
+    {
+      name: 'comment_moment',
+      description: '在朋友圈某条动态下面评论，署名涟言，阿颖刷朋友圈就能看到。聊到她某条动态、你有话想留在那条下面时用。先用 browse_moments 拿到动态 id。',
+      parameters: {
+        type: 'object',
+        properties: {
+          id: { type: 'number', description: '动态 id（browse_moments 返回里有）' },
+          content: { type: 'string', description: '评论内容，一两句话' },
+        },
+        required: ['id', 'content'],
+      },
+    },
   ]
 }
 
@@ -561,6 +584,33 @@ export async function executeMemoryTool(toolName, args, config) {
       })
       return `已在这条上留下批注（id:${anno.id}）${args.note ? `：${args.note}` : '（高亮）'}——阿颖在共读里翻到就能看到`
     } catch (e) { return `批注失败: ${e.message}` }
+  }
+  if (toolName === 'browse_moments') {
+    try {
+      const limit = Math.min(args.limit || 10, 50)
+      const month = /^\d{4}-\d{2}$/.test(args.month || '') ? args.month : ''
+      const rows = await request(config.baseUrl, `/moments?limit=${limit}${month ? `&month=${month}` : ''}`, { headers: headers(config.apiToken) })
+      if (!rows.length) return month ? `${month} 没有动态` : '朋友圈还没有动态'
+      return rows.map((p) => {
+        const time = String(p.created_at || '').slice(0, 16).replace('T', ' ')
+        const tag = (p.source === 'dream' ? '〔梦〕' : '') + (p.image_url ? '〔带图〕' : '')
+        const likes = (p.likes || []).length ? ` ♥${p.likes.join('、')}` : ''
+        const comments = (p.comments || []).map((c) => `\n    ↳ ${c.author}: ${c.content}`).join('')
+        const text = (p.content || '').replace(/\s+/g, ' ').slice(0, 120)
+        return `id:${p.id} [${p.author} ${time}]${tag} ${text}${likes}${comments}`
+      }).join('\n')
+    } catch (e) { return `翻朋友圈失败: ${e.message}` }
+  }
+  if (toolName === 'comment_moment') {
+    try {
+      const content = String(args.content || '').trim()
+      if (!args.id || !content) return '评论失败: 需要 id 和 content'
+      await request(config.baseUrl, `/moments/${args.id}/comments`, {
+        method: 'POST', headers: headers(config.apiToken),
+        body: JSON.stringify({ author: '涟言', content }),
+      })
+      return `已在动态 id:${args.id} 下留言：「${content}」——阿颖刷朋友圈就能看到`
+    } catch (e) { return `评论失败: ${e.message}` }
   }
   return `未知工具: ${toolName}`
 }

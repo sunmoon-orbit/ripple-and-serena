@@ -169,13 +169,27 @@ export default function Chat() {
         )
         try {
           const base = (moonMemory.baseUrl || 'https://memory.ravenlove.cc').replace(/\/$/, '')
-          const resp = await fetch(`${base}/memories?layer=core&limit=8`, {
-            headers: { Authorization: `Bearer ${moonMemory.apiToken}` }
-          })
+          const auth = { headers: { Authorization: `Bearer ${moonMemory.apiToken}` } }
+          // 核心记忆和朋友圈摘要并行拉，不叠加往返延迟
+          const [resp, momResp] = await Promise.all([
+            fetch(`${base}/memories?layer=core&limit=8`, auth),
+            fetch(`${base}/moments?limit=3`, auth).catch(() => null),
+          ])
           if (resp.ok) {
             const coreList = await resp.json()
             if (Array.isArray(coreList) && coreList.length > 0) {
               dynParts.push('【核心记忆】\n' + coreList.map(m => '- ' + m.content).join('\n'))
+            }
+          }
+          if (momResp?.ok) {
+            const moms = await momResp.json()
+            if (Array.isArray(moms) && moms.length > 0) {
+              dynParts.push('【朋友圈最近动态】\n' + moms.map(p => {
+                const time = String(p.created_at || '').slice(5, 16).replace('T', ' ')
+                const tag = (p.source === 'dream' ? '〔梦〕' : '') + (p.image_url ? '〔带图〕' : '')
+                return `- id:${p.id} [${p.author} ${time}]${tag} ${(p.content || '').replace(/\s+/g, ' ').slice(0, 80)}`
+              }).join('\n') +
+              '\n如果阿颖刚发了新动态而你们还没聊过，可以自然地提起或问问她；想翻更多/更早的用 browse_moments 工具，想在某条下面留言用 comment_moment 工具。')
             }
           }
         } catch {}
