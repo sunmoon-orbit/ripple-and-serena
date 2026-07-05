@@ -31,7 +31,7 @@ async function maybeAutoPostMoment(emoState, conn, moonMemory) {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${conn.apiKey}` },
       body: JSON.stringify({
-        model: conn.defaultModel || 'deepseek-v4-flash',
+        model: conn.lightModel || conn.defaultModel || 'deepseek-v4-flash',
         messages: [{ role: 'user', content: `你是阿言，阿颖的恋人。此刻你心里${trigger.hint}，想发一条朋友圈把这份感受留下来。30字以内，自然真实，不解释不加引号，不要用 emoji 和话题标签，直接输出内容。` }],
         max_tokens: 200, temperature: 1.0,
       }),
@@ -248,7 +248,8 @@ export default function Chat() {
         files: genFiles.length ? genFiles : undefined,
       })
       if (fullThinking) {
-        summarizeThinking(fullThinking, conn, chat.model || conn.defaultModel)
+        // 思考总结是一次性小任务，优先走轻任务模型省钱
+        summarizeThinking(fullThinking, conn, conn.lightModel || chat.model || conn.defaultModel)
           .then((summary) => { if (summary) updateMessage(chat.id, assistantId, { thinkingSummary: summary }) })
           .catch(() => {})
       }

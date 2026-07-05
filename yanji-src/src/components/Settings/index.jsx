@@ -154,6 +154,12 @@ function ConnectionCard({ conn, onSave, onDelete, onActivate, isActive }) {
               <input className="form-input" value={form.customModel || ''} onChange={(e) => setForm({ ...form, customModel: e.target.value, defaultModel: e.target.value })} placeholder="自定义模型名..." />
             </div>
           )}
+          {/* 轻任务模型：自动发圈/朋友圈评论/思考总结等一次性小任务用便宜模型省钱；
+              留空则跟默认模型走。带图的识图评论仍走默认模型（便宜模型多半没 vision） */}
+          <div className="form-row">
+            <label className="form-label">轻任务模型</label>
+            <input className="form-input" value={form.lightModel || ''} onChange={(e) => setForm({ ...form, lightModel: e.target.value })} placeholder="可选：自动发圈/评论/总结用的便宜模型" />
+          </div>
           <div className="form-row form-actions">
             <button className="btn-sm btn-ghost" onClick={() => setEditing(false)}>取消</button>
             <button className="btn-sm btn-primary" onClick={save}>保存</button>

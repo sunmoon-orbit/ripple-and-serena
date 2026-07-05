@@ -26,11 +26,13 @@ async function callAI(conn, prompt, imageUrl) {
   const content = imageUrl
     ? [{ type: 'text', text: prompt }, { type: 'image_url', image_url: { url: imageUrl } }]
     : prompt
+  // 纯文字评论走轻任务模型省钱；带图识图仍走默认模型（便宜模型多半没 vision）
+  const model = (imageUrl ? null : conn.lightModel) || conn.defaultModel || 'deepseek-v4-flash'
   const resp = await fetch(url, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${conn.apiKey}` },
     body: JSON.stringify({
-      model: conn.defaultModel || 'deepseek-v4-flash',
+      model,
       messages: [{ role: 'user', content }],
       max_tokens: 300, temperature: 0.9,
     }),
