@@ -36,6 +36,8 @@ const DEFAULT_STATE = {
   customStickers: [],
   // 语音通话页样式：crow=像素乌鸦 soft=浅色头像（用聊天头像里的助手头像）
   voiceCallStyle: 'crow',
+  // 进入页样式：minimal=小鸟极简（时间+第N天） couple=双头像纪念卡
+  homeStyle: 'minimal',
   // UI-only (not persisted)
   activePanel: 'roost',
 }
@@ -80,7 +82,7 @@ const persistedKeys = [
   'generationConfig', 'memoryItems', 'tokenStats', 'contextLimit',
   'searchConfig', 'avatarConfig', 'autoTools', 'moonMemory', 'theme', 'glassOpacity',
   'injectMode', 'injectPrompt', 'scrollAnchor', 'replyDelay', 'customStickers',
-  'voiceCallStyle',
+  'voiceCallStyle', 'homeStyle',
 ]
 
 function mergeWithDefaults(persisted) {
@@ -113,6 +115,7 @@ export const useStore = create((set, get) => ({
   setScrollAnchor: (v) => set((s) => { savePersistedState({ ...s, scrollAnchor: v }); return { scrollAnchor: v } }),
   setReplyDelay: (v) => set((s) => { savePersistedState({ ...s, replyDelay: v }); return { replyDelay: v } }),
   setVoiceCallStyle: (v) => set((s) => { savePersistedState({ ...s, voiceCallStyle: v }); return { voiceCallStyle: v } }),
+  setHomeStyle: (v) => set((s) => { savePersistedState({ ...s, homeStyle: v }); return { homeStyle: v } }),
   addCustomSticker: (url, label) => set((s) => {
     const customStickers = [...(s.customStickers || []), { id: uuid(), url: url.trim(), label: (label || '').trim() }]
     savePersistedState({ ...s, customStickers })

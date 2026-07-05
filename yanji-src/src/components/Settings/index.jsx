@@ -180,6 +180,7 @@ export default function Settings() {
     setAutoTools, setMoonMemory, setTheme, setGlassOpacity, setAvatarConfig, setScrollAnchor,
     setInjectMode, setInjectPrompt, replyDelay, setReplyDelay,
     voiceCallStyle, setVoiceCallStyle,
+    homeStyle, setHomeStyle,
     customStickers, addCustomSticker, removeCustomSticker,
     memoryItems, addMemoryItem, toggleMemoryItem, deleteMemoryItem,
   } = store
@@ -802,6 +803,24 @@ export default function Settings() {
                     />
                   </>
                 )}
+              </div>
+            </Section>
+            <Section title="进入页样式">
+              <div className="settings-card">
+                <div className="card-row">
+                  <span className="card-row-label">打开言叽时的画面</span>
+                  <div className="avatar-mode-toggle">
+                    <button
+                      className={'avatar-mode-btn' + ((homeStyle || 'minimal') === 'minimal' ? ' active' : '')}
+                      onClick={() => setHomeStyle('minimal')}
+                    >小鸟极简</button>
+                    <button
+                      className={'avatar-mode-btn' + (homeStyle === 'couple' ? ' active' : '')}
+                      onClick={() => setHomeStyle('couple')}
+                    >双头像纪念卡</button>
+                  </div>
+                </div>
+                <p className="card-hint">纪念卡显示两个人的头像（用「聊天头像」里设置的图片，没设时是小乌鸦和小蜂鸟）、在一起的天数、聊过的消息数，还有距离下一个纪念日的倒数。</p>
               </div>
             </Section>
             <Section title="语音通话样式">
