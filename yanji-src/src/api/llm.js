@@ -163,7 +163,7 @@ async function executeTool(name, args, { searchConfig, moonMemoryConfig, onStatu
   }
   if (name === 'draw_daily_fortune') {
     onStatus?.('摇签中...')
-    return executeFortuneDraw(args)
+    return await executeFortuneDraw(args)
   }
   return `未知工具: ${name}`
 }

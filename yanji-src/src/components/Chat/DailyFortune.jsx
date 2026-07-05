@@ -9,14 +9,17 @@ export default function DailyFortune({ onClose }) {
   const [phase, setPhase] = useState('idle') // idle | shaking | revealed
   const [card, setCard] = useState(null)
 
-  function draw(nextWho = who) {
+  async function draw(nextWho = who) {
     if (phase === 'shaking') return
     setPhase('shaking')
     setCard(null)
-    setTimeout(() => {
-      setCard(drawDailyFortune(nextWho))
-      setPhase('revealed')
-    }, 900)
+    // 至少摇 0.9s；若这张轮到涟言亲笔写寄语，就摇到写完为止
+    const [c] = await Promise.all([
+      drawDailyFortune(nextWho),
+      new Promise((r) => setTimeout(r, 900)),
+    ])
+    setCard(c)
+    setPhase('revealed')
   }
 
   function switchWho(w) {
@@ -78,7 +81,7 @@ export default function DailyFortune({ onClose }) {
               </div>
               <div className="fdl-divider" />
               <div className="fdl-words">
-                <span className="fdl-words-label">{card.who === '涟言' ? '乌鸦碎念' : '签上寄语'}</span>
+                <span className="fdl-words-label">{(card.who === '涟言' ? '乌鸦碎念' : '签上寄语') + (card.aiWritten ? ' · 亲笔' : '')}</span>
                 {card.words}
               </div>
               <div className="fdl-foot">一日一签 · 子时更新</div>
