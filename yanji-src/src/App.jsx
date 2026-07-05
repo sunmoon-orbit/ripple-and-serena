@@ -37,6 +37,7 @@ export default function App() {
   const activePanel = useStore((s) => s.activePanel)
   const theme = useStore((s) => s.theme)
   const glassOpacity = useStore((s) => s.glassOpacity ?? 0.3)
+  const avatarSize = useStore((s) => s.avatarConfig?.size || 28)
   const [showSplash, setShowSplash] = useState(true)
   const [showHome, setShowHome] = useState(false)
 
@@ -52,6 +53,10 @@ export default function App() {
       document.documentElement.style.removeProperty('--bubble-asst-bg')
     }
   }, [theme, glassOpacity])
+
+  useEffect(() => {
+    document.documentElement.style.setProperty('--avatar-size', `${avatarSize}px`)
+  }, [avatarSize])
 
   return (
     <>

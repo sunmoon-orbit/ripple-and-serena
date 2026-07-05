@@ -754,6 +754,38 @@ export default function Settings() {
                     >方形</button>
                   </div>
                 </div>
+                <div className="card-row">
+                  <span className="card-row-label">头像大小</span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                    {/* 实时预览：滑到多大就显示多大，不用凭空想象尺寸 */}
+                    <span style={{
+                      width: avatarConfig?.size || 28, height: avatarConfig?.size || 28,
+                      borderRadius: avatarConfig?.shape === 'square' ? '6px' : '50%',
+                      background: 'rgba(191,181,216,0.20)', border: '1px solid var(--border)',
+                      display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                      overflow: 'hidden', flexShrink: 0,
+                    }}>
+                      {avatarConfig?.mode === 'image' && avatarConfig.assistantImage
+                        ? <img src={avatarConfig.assistantImage} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                        : <svg width="60%" height="60%" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M4 8 C4 8 7 4 12 5 C16 6 18 9 17 13 C16 17 12 19 8 17" />
+                            <path d="M17 13 L21 11 L18 15" />
+                            <path d="M8 17 L6 21" /><path d="M10 17 L10 21" />
+                            <circle cx="13" cy="8" r="1" fill="var(--accent)" stroke="none" />
+                            <path d="M4 8 L1 7" />
+                          </svg>}
+                    </span>
+                    <input
+                      type="range" min="24" max="44" step="2"
+                      value={avatarConfig?.size || 28}
+                      onChange={(e) => setAvatarConfig({ size: Number(e.target.value) })}
+                      style={{ width: 100, accentColor: 'var(--accent)' }}
+                    />
+                    <span style={{ fontSize: 12, color: 'var(--text-muted)', minWidth: 34 }}>
+                      {avatarConfig?.size || 28}px
+                    </span>
+                  </div>
+                </div>
                 {avatarConfig?.mode === 'image' && (
                   <>
                     <AvatarUpload
