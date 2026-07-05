@@ -179,6 +179,7 @@ export default function Settings() {
     setGlobalInstruction, setGenerationConfig, setContextLimit, setSearchConfig,
     setAutoTools, setMoonMemory, setTheme, setGlassOpacity, setAvatarConfig, setScrollAnchor,
     setInjectMode, setInjectPrompt, replyDelay, setReplyDelay,
+    voiceCallStyle, setVoiceCallStyle,
     customStickers, addCustomSticker, removeCustomSticker,
     memoryItems, addMemoryItem, toggleMemoryItem, deleteMemoryItem,
   } = store
@@ -769,6 +770,24 @@ export default function Settings() {
                     />
                   </>
                 )}
+              </div>
+            </Section>
+            <Section title="语音通话样式">
+              <div className="settings-card">
+                <div className="card-row">
+                  <span className="card-row-label">通话页样式</span>
+                  <div className="avatar-mode-toggle">
+                    <button
+                      className={'avatar-mode-btn' + ((voiceCallStyle || 'crow') === 'crow' ? ' active' : '')}
+                      onClick={() => setVoiceCallStyle('crow')}
+                    >像素乌鸦</button>
+                    <button
+                      className={'avatar-mode-btn' + (voiceCallStyle === 'soft' ? ' active' : '')}
+                      onClick={() => setVoiceCallStyle('soft')}
+                    >浅色头像</button>
+                  </div>
+                </div>
+                <p className="card-hint">浅色头像样式用的是上面「聊天头像 - 助手头像」里的图片，换头像通话页会跟着换；没设置图片时圆框里还是小乌鸦。</p>
               </div>
             </Section>
           </>

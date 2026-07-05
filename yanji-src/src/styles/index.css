@@ -1627,6 +1627,106 @@ textarea.form-input { display: block; margin: 8px 16px 12px; }
 .vc-ai-text { font-size: 15px; color: rgba(255,255,255,0.92); line-height: 1.6; margin: 0; transition: opacity 0.5s; }
 .vc-ai-text.done { opacity: 0.55; }
 
+/* ═══ 浅色头像样式（vc-soft）═══ */
+.vc-overlay.vc-soft {
+  background: linear-gradient(168deg, #eff2f8 0%, #e9edf5 45%, #e2e8f1 100%);
+}
+.vc-soft .vc-blob { opacity: 0.55; }
+.vc-soft .vc-blob.b1 { background: #ccd8ec; }
+.vc-soft .vc-blob.b2 { background: #ded5ea; }
+.vc-soft .vc-timer { color: rgba(90, 100, 122, 0.5); }
+
+/* 头像 + 两侧频谱 */
+.vcs-head { display: flex; align-items: center; gap: 12px; margin: 12px 0 2px; }
+.vcs-strip { display: flex; align-items: center; gap: 3px; height: 34px; flex-shrink: 0; }
+.vc-soft .vc-bar { width: 2.5px; background: rgba(120, 130, 155, 0.4); max-height: 30px; }
+.vc-soft .vcs-head.listening .vc-bar { background: color-mix(in srgb, var(--accent) 75%, #6a7490); }
+.vc-soft .vcs-head.speaking .vc-bar { background: rgba(105, 115, 140, 0.65); }
+.vc-soft .vcs-head.idle .vc-bar { animation: vc-bar-idle 2.8s ease-in-out infinite alternate; }
+.vc-soft .vcs-head.thinking .vc-bar { animation: vc-bar-think 0.9s ease-in-out infinite alternate; }
+
+.vcs-avatar-wrap {
+  position: relative; width: 136px; height: 136px; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+}
+.vcs-ring {
+  position: absolute; inset: -10px; border-radius: 50%;
+  background: radial-gradient(circle, rgba(255,255,255,0.95), rgba(255,255,255,0) 70%);
+  animation: vc-orb-breathe 4.2s ease-in-out infinite;
+  transition: transform 0.12s ease-out;
+}
+.vcs-head.speaking .vcs-ring, .vcs-head.listening .vcs-ring {
+  animation: none;
+  transform: scale(calc(1 + var(--vc-level, 0) * 0.3));
+}
+.vcs-avatar {
+  position: relative; width: 136px; height: 136px; border-radius: 50%;
+  overflow: hidden; background: #fff;
+  box-shadow: 0 10px 32px rgba(120, 130, 160, 0.28), 0 0 0 4px rgba(255,255,255,0.85);
+  display: flex; align-items: center; justify-content: center;
+  transition: transform 0.12s ease-out;
+}
+.vcs-head.speaking .vcs-avatar { transform: scale(calc(1 + var(--vc-level, 0) * 0.05)); }
+.vcs-avatar img { width: 100%; height: 100%; object-fit: cover; }
+.vcs-avatar .vc-crow { width: 88px; height: 64px; }
+/* 兜底小乌鸦在浅色样式里也会听/想/说 */
+.vcs-head.speaking .vcw-body { animation: vcw-bob 0.85s ease-in-out infinite; }
+.vcs-head.thinking .vcw-body { animation: vcw-sway 1.6s ease-in-out infinite; }
+.vcs-head.speaking .vcw-beak { animation: vcw-chirp 0.26s ease-in-out infinite alternate; }
+.vcs-head.speaking .vcw-wl { animation: vcw-flap-l 0.7s infinite alternate ease-in-out; }
+.vcs-head.speaking .vcw-wr { animation: vcw-flap-r 0.7s infinite alternate ease-in-out; }
+.vcs-head.listening .vcs-avatar .vc-crow { transform: rotate(-7deg); }
+
+.vcs-name { font-size: 25px; color: #3c4557; letter-spacing: 0.28em; padding-left: 0.28em; font-weight: 500; margin-top: 6px; }
+.vcs-status { font-size: 13px; color: #8a93a8; letter-spacing: 0.1em; min-height: 18px; }
+.vcs-status::before { content: '· '; color: #b4bdcf; }
+.vcs-status::after { content: ' ·'; color: #b4bdcf; }
+
+/* 大字幕：涟言说的话，带装饰引号 */
+.vcs-quote {
+  position: relative; width: 100%;
+  font-size: 18px; color: #4a5468; line-height: 1.75; text-align: center;
+  padding: 20px 28px 22px; margin-top: 4px;
+  min-height: 46px; max-height: 24vh; overflow-y: auto;
+  transition: opacity 0.5s;
+}
+.vcs-quote::before {
+  content: '\201C'; position: absolute; left: 4px; top: -4px;
+  font-size: 36px; line-height: 1; color: #b9c2d4; font-family: Georgia, 'Times New Roman', serif;
+}
+.vcs-quote::after {
+  content: '\201D'; position: absolute; right: 4px; bottom: -2px;
+  font-size: 36px; line-height: 1; color: #b9c2d4; font-family: Georgia, 'Times New Roman', serif;
+}
+.vcs-quote.done { opacity: 0.6; }
+.vcs-quote-empty { color: #b4bdcf; }
+
+.vcs-caption-label {
+  display: flex; align-items: center; gap: 6px;
+  font-size: 12px; color: #98a1b5; letter-spacing: 0.06em; margin-top: 2px;
+}
+/* 她说的话：白色圆角药丸卡片 */
+.vcs-pill {
+  width: 100%; background: rgba(255,255,255,0.78);
+  border-radius: 22px; padding: 13px 18px;
+  font-size: 14px; color: #4a5468; text-align: center; line-height: 1.6;
+  box-shadow: 0 4px 16px rgba(130, 140, 165, 0.14);
+  backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
+  max-height: 16vh; overflow-y: auto;
+}
+.vcs-pill:empty { display: none; }
+
+/* 浅色样式的按钮 */
+.vc-soft .vc-mic {
+  background: #fff; color: #5a6478;
+  box-shadow: 0 6px 20px rgba(130, 140, 165, 0.28);
+}
+.vc-soft .vc-mic.recording { background: #e0556a; color: #fff; }
+.vc-soft .vc-hangup {
+  background: #cf8f92; box-shadow: 0 4px 18px rgba(207, 143, 146, 0.45);
+}
+.vc-soft .vc-hangup:hover { background: #c07e82; }
+
 .vc-hangup {
   width: 64px; height: 64px; border-radius: 50%; border: none;
   background: #e05050; color: #fff;

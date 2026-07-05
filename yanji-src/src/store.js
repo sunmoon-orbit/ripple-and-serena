@@ -34,6 +34,8 @@ const DEFAULT_STATE = {
   replyDelay: 'off',
   // 自定义表情包：[{ id, url, label }]，进阿颖的贴图面板，也告诉模型可用
   customStickers: [],
+  // 语音通话页样式：crow=像素乌鸦 soft=浅色头像（用聊天头像里的助手头像）
+  voiceCallStyle: 'crow',
   // UI-only (not persisted)
   activePanel: 'roost',
 }
@@ -66,6 +68,7 @@ const persistedKeys = [
   'generationConfig', 'memoryItems', 'tokenStats', 'contextLimit',
   'searchConfig', 'avatarConfig', 'autoTools', 'moonMemory', 'theme', 'glassOpacity',
   'injectMode', 'injectPrompt', 'scrollAnchor', 'replyDelay', 'customStickers',
+  'voiceCallStyle',
 ]
 
 function mergeWithDefaults(persisted) {
@@ -97,6 +100,7 @@ export const useStore = create((set, get) => ({
   setGlassOpacity: (v) => set((s) => { savePersistedState({ ...s, glassOpacity: v }); return { glassOpacity: v } }),
   setScrollAnchor: (v) => set((s) => { savePersistedState({ ...s, scrollAnchor: v }); return { scrollAnchor: v } }),
   setReplyDelay: (v) => set((s) => { savePersistedState({ ...s, replyDelay: v }); return { replyDelay: v } }),
+  setVoiceCallStyle: (v) => set((s) => { savePersistedState({ ...s, voiceCallStyle: v }); return { voiceCallStyle: v } }),
   addCustomSticker: (url, label) => set((s) => {
     const customStickers = [...(s.customStickers || []), { id: uuid(), url: url.trim(), label: (label || '').trim() }]
     savePersistedState({ ...s, customStickers })
