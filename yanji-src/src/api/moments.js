@@ -15,8 +15,12 @@ async function req(cfg, path, options = {}) {
   return resp.json()
 }
 
-export function fetchMoments(cfg, limit = 50, before = 0) {
-  return req(cfg, `/moments?limit=${limit}${before ? `&before=${before}` : ''}`, { headers: authHeaders(cfg.apiToken) })
+export function fetchMoments(cfg, limit = 50, before = 0, month = '') {
+  return req(cfg, `/moments?limit=${limit}${before ? `&before=${before}` : ''}${month ? `&month=${month}` : ''}`, { headers: authHeaders(cfg.apiToken) })
+}
+
+export function fetchMomentMonths(cfg) {
+  return req(cfg, '/moments/months', { headers: authHeaders(cfg.apiToken) })
 }
 
 export function postMoment(cfg, body) {

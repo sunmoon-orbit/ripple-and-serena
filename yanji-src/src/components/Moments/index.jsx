@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { useStore } from '../../store'
 import { showToast } from '../Toast'
 import {
-  fetchMoments, postMoment, deleteMoment as apiDelete,
+  fetchMoments, postMoment, deleteMoment as apiDelete, fetchMomentMonths,
   commentMoment, likeMoment, mediaUrl, downscaleImage, uploadImage,
 } from '../../api/moments'
 
@@ -149,6 +149,8 @@ export default function Moments() {
   const [showAll, setShowAll] = useState(false)
   const [hasMore, setHasMore] = useState(false)     // 服务端还有更早的（本次拉满 PAGE_SIZE 条）
   const [loadingMore, setLoadingMore] = useState(false)
+  const [months, setMonths] = useState([])          // 时间条：[{month:'2026-07', count}]
+  const [monthFilter, setMonthFilter] = useState('') // ''=最新流，'YYYY-MM'=只看该月
   const fileRef = useRef(null)
   const SHOW_COUNT = 3
   const PAGE_SIZE = 50
@@ -161,6 +163,17 @@ export default function Moments() {
     }
     catch (e) { setPosts([]); showToast('朋友圈加载失败：' + e.message, 'error') }
   }, [cfg.baseUrl, cfg.apiToken])
+
+  // 时间条：选月份跳转（''=回到最新流）
+  const jumpToMonth = useCallback(async (m) => {
+    setMonthFilter(m)
+    if (!m) { await reload(); return }
+    try {
+      const rows = await fetchMoments(cfg, 200, 0, m)
+      setPosts(rows)
+      setHasMore(false) // 月视图一次拉全，不翻页
+    } catch (e) { showToast('跳转失败：' + e.message, 'error') }
+  }, [cfg.baseUrl, cfg.apiToken, reload])
 
   // 看更早的：拿当前最老一条的 id 当游标往前翻一页
   const loadOlder = useCallback(async () => {
@@ -200,6 +213,7 @@ export default function Moments() {
       }
       setPosts(server)
       setHasMore(server.length >= PAGE_SIZE)
+      try { setMonths(await fetchMomentMonths(cfg)) } catch { /* 时间条拉不到不阻塞 */ }
     })()
   }, [cfg.apiToken])
 
@@ -330,23 +344,39 @@ export default function Moments() {
         )}
       </div>
 
+      {/* 时间条：多于一个月才出现，点月份直达 */}
+      {months.length > 1 && (
+        <div style={{ display: 'flex', gap: 6, overflowX: 'auto', paddingBottom: 8, marginBottom: 4, WebkitOverflowScrolling: 'touch' }}>
+          <button onClick={() => jumpToMonth('')} style={{
+            flexShrink: 0, padding: '4px 12px', borderRadius: 14, border: 'none', cursor: 'pointer', fontSize: 12,
+            background: !monthFilter ? 'var(--accent)' : 'var(--bg)', color: !monthFilter ? '#fff' : 'var(--text-muted)',
+          }}>最新</button>
+          {months.map(m => (
+            <button key={m.month} onClick={() => jumpToMonth(m.month)} style={{
+              flexShrink: 0, padding: '4px 12px', borderRadius: 14, border: 'none', cursor: 'pointer', fontSize: 12,
+              background: monthFilter === m.month ? 'var(--accent)' : 'var(--bg)', color: monthFilter === m.month ? '#fff' : 'var(--text-muted)',
+            }}>{Number(m.month.slice(0, 4))}年{Number(m.month.slice(5))}月 · {m.count}</button>
+          ))}
+        </div>
+      )}
+
       {/* 列表 */}
       {posts === null && <div style={{ textAlign: 'center', padding: '40px 0', color: 'var(--text-faint)', fontSize: 14 }}>加载中…</div>}
       {posts !== null && list.length === 0 && (
         <div style={{ textAlign: 'center', padding: '40px 0', color: 'var(--text-faint)', fontSize: 14 }}>
-          {cfg.apiToken ? '还没有动态，来发第一条？' : '先在设置里配置记忆库 token'}
+          {cfg.apiToken ? (monthFilter ? '这个月没有动态' : '还没有动态，来发第一条？') : '先在设置里配置记忆库 token'}
         </div>
       )}
-      {list.length > SHOW_COUNT && showAll && (
+      {!monthFilter && list.length > SHOW_COUNT && showAll && (
         <button onClick={() => setShowAll(false)} style={{ width: '100%', padding: '8px 0', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-faint)', fontSize: 13, marginBottom: 4 }}>收起 ↑</button>
       )}
-      {(showAll ? list : list.slice(0, SHOW_COUNT)).map(p => (
+      {(monthFilter || showAll ? list : list.slice(0, SHOW_COUNT)).map(p => (
         <Post key={p.id} post={p} cfg={cfg} onLike={handleLike} onComment={handleComment} onAIComment={handleAIComment} onDelete={handleDelete} />
       ))}
-      {list.length > SHOW_COUNT && !showAll && (
+      {!monthFilter && list.length > SHOW_COUNT && !showAll && (
         <button onClick={() => setShowAll(true)} style={{ width: '100%', padding: '8px 0', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-faint)', fontSize: 13 }}>查看更多 · 共 {list.length}{hasMore ? '+' : ''} 条 ↓</button>
       )}
-      {showAll && hasMore && (
+      {!monthFilter && showAll && hasMore && (
         <button onClick={loadOlder} disabled={loadingMore} style={{ width: '100%', padding: '10px 0', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-faint)', fontSize: 13 }}>
           {loadingMore ? '翻着呢…' : '看更早的 ↓'}
         </button>
