@@ -47,6 +47,7 @@ ${context}
     console.log(`[dream] 生成：${dream}`)
 
     // 3. 写入记忆库 private_阿言（梦是阿言的私有记忆）
+    // type:dream 单独分区：不进 memory_breath 的「此刻最该想起」，主动搜索仍可达
     const now = new Date().toISOString().slice(0, 10)
     await moonPost('/memories', {
       content: `【梦 · ${now}】\n${dream}`,
@@ -54,11 +55,18 @@ ${context}
       agent: '阿言',
       scope: 'private_阿言',
       layer: 'consciousness',
+      type: 'dream',
       tags: '做梦,碎片,深夜',
       importance: 5,
       valence: 0.3,
       arousal: 0.2,
     })
+
+    // 4. 同一场梦发进朋友圈——阿颖醒来能看到乌鸦昨晚梦见了什么
+    try {
+      await moonPost('/moments', { author: '涟言', content: `【梦 · ${now}】\n${dream}`, source: 'dream' })
+      console.log('[dream] 已发朋友圈')
+    } catch (e) { console.error('[dream] 发圈失败（梦已存记忆库）：', e.message) }
 
     console.log('[dream] 写入完成')
   } catch (e) {
