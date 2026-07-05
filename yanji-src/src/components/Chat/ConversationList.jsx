@@ -3,7 +3,7 @@ import { useStore } from '../../store'
 import { formatTime } from '../../utils'
 import { applyDecayAndGet, getEmotionState, POSITIVE_SLOTS, NEGATIVE_SLOTS, SLOT_LABELS } from '../../utils/emotion'
 
-export default function ConversationList({ onClose, onStartCall, onOpenGames, onOpenMusic, onOpenWheel }) {
+export default function ConversationList({ onClose, onStartCall, onOpenGames, onOpenMusic, onOpenWheel, onOpenFortune }) {
   const chats = useStore((s) => s.chats)
   const connections = useStore((s) => s.connections)
   const activeChatId = useStore((s) => s.activeChatId)
@@ -239,6 +239,15 @@ export default function ConversationList({ onClose, onStartCall, onOpenGames, on
                 <line x1="2" y1="12" x2="9.5" y2="12" /><line x1="14.5" y1="12" x2="22" y2="12" />
               </svg>
               <span>幸运轮盘</span>
+            </button>
+            <button className="sb-tool-item" onClick={() => { onClose?.(); onOpenFortune?.() }}>
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M7 8 L17 8 L16 21 Q12 22.5 8 21 Z" />
+                <line x1="10" y1="7" x2="9" y2="2.5" />
+                <line x1="12" y1="7" x2="12" y2="1.5" />
+                <line x1="14" y1="7" x2="15.5" y2="3" />
+              </svg>
+              <span>今日签</span>
             </button>
           </div>
         )}

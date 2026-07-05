@@ -3,6 +3,7 @@ import { getMemoryToolDefinitions, executeMemoryTool } from './moonMemory'
 import { WHEEL_TOOL_DEF, executeWheelSpin } from './fortuneWheel'
 import { FISHING_TOOL_DEF, executeFishing } from './fishing'
 import { DICE_TOOL_DEF, executeRandomRoll } from './dice'
+import { FORTUNE_TOOL_DEF, executeFortuneDraw } from './fortune'
 import { buildMoodFxPrompt } from '../utils/moodFx'
 
 export function normalizeProvider(raw) {
@@ -84,6 +85,8 @@ function getAllTools(searchConfig, moonMemoryConfig, onFile) {
   tools.push(FISHING_TOOL_DEF)
   // 真骰子：规则书类游戏的诚实随机源
   tools.push(DICE_TOOL_DEF)
+  // 今日签：一天一签，和侧边栏抽签盒同源同签
+  tools.push(FORTUNE_TOOL_DEF)
   return tools
 }
 
@@ -157,6 +160,10 @@ async function executeTool(name, args, { searchConfig, moonMemoryConfig, onStatu
   if (name === 'roll_random') {
     onStatus?.('掷骰子...')
     return executeRandomRoll(args)
+  }
+  if (name === 'draw_daily_fortune') {
+    onStatus?.('摇签中...')
+    return executeFortuneDraw(args)
   }
   return `未知工具: ${name}`
 }
