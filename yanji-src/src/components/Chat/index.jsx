@@ -16,6 +16,7 @@ import VoiceCall from './VoiceCall'
 import GamesRoom from './GamesRoom'
 import MusicRoom from './MusicRoom'
 import FortuneWheel from './FortuneWheel'
+import DailyFortune from './DailyFortune'
 import CompletionEgg, { pickEgg } from './CompletionEgg'
 
 // 情绪自动发圈：某正向情绪越阈值且过冷却时，涟言主动发条朋友圈（她在聊天时触发；
@@ -69,6 +70,7 @@ export default function Chat() {
   const [gamesOpen, setGamesOpen] = useState(false)
   const [musicOpen, setMusicOpen] = useState(false)
   const [wheelOpen, setWheelOpen] = useState(false)
+  const [fortuneOpen, setFortuneOpen] = useState(false)
   const [quoted, setQuoted] = useState(null)
   const [perspectiveFlip, setPerspectiveFlip] = useState(false)
   const [modelPanelOpen, setModelPanelOpen] = useState(false)
@@ -519,7 +521,7 @@ export default function Chat() {
     <div className="chat-panel">
       {/* Sidebar */}
       <div className={'chat-sidebar' + (sidebarOpen ? ' open' : '')}>
-        <ConversationList onClose={() => setSidebarOpen(false)} onStartCall={() => setCallOpen(true)} onOpenGames={() => setGamesOpen(true)} onOpenMusic={() => setMusicOpen(true)} onOpenWheel={() => setWheelOpen(true)} />
+        <ConversationList onClose={() => setSidebarOpen(false)} onStartCall={() => setCallOpen(true)} onOpenGames={() => setGamesOpen(true)} onOpenMusic={() => setMusicOpen(true)} onOpenWheel={() => setWheelOpen(true)} onOpenFortune={() => setFortuneOpen(true)} />
       </div>
       {sidebarOpen && <div className="sidebar-backdrop" onClick={() => setSidebarOpen(false)} />}
 
@@ -713,6 +715,7 @@ export default function Chat() {
       {egg && <CompletionEgg svg={egg} onDone={() => setEgg(null)} />}
       {musicOpen && <MusicRoom onClose={() => setMusicOpen(false)} />}
       {wheelOpen && <FortuneWheel onClose={() => setWheelOpen(false)} />}
+      {fortuneOpen && <DailyFortune onClose={() => setFortuneOpen(false)} />}
     </div>
   )
 }

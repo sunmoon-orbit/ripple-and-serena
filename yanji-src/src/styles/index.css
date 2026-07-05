@@ -3100,3 +3100,81 @@ body.mp-active .scroll-bottom-btn { bottom: 139px; }
   font-size: 12px; color: var(--text-mid);
 }
 .fw-custom-tag button { border: none; background: none; cursor: pointer; color: var(--text-muted); padding: 0 2px; }
+
+/* ===== 今日签 ===== */
+.fdl-modal { max-width: 380px; }
+.fdl-body { display: flex; flex-direction: column; align-items: center; gap: 14px; padding-bottom: 22px; }
+.fdl-who-toggle { display: flex; gap: 6px; }
+.fdl-who-btn {
+  padding: 5px 16px; border-radius: 999px; font-size: 13px; cursor: pointer;
+  border: 1px solid var(--border); background: var(--bg); color: var(--text-muted);
+  font-family: inherit;
+}
+.fdl-who-btn.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+
+/* 签筒 */
+.fdl-tube-wrap {
+  display: flex; flex-direction: column; align-items: center; gap: 10px;
+  padding: 26px 40px 18px; cursor: pointer; user-select: none;
+}
+.fdl-tube-wrap.shaking .fdl-tube { animation: fdlShake 0.18s ease-in-out infinite; }
+.fdl-tube { transform-origin: 50% 90%; }
+.fdl-tube-hint { font-size: 12px; color: var(--text-faint); letter-spacing: 0.1em; }
+@keyframes fdlShake {
+  0%, 100% { transform: rotate(-7deg); }
+  50% { transform: rotate(7deg); }
+}
+
+/* 签面卡片：竖排签纸质感，衬线字 */
+.fdl-card {
+  width: 100%; max-width: 300px;
+  padding: 20px 22px 14px; border-radius: 14px;
+  border: 1.5px solid var(--fdl-tint, var(--accent));
+  background:
+    linear-gradient(color-mix(in srgb, var(--fdl-tint, var(--accent)) 5%, transparent),
+                    color-mix(in srgb, var(--fdl-tint, var(--accent)) 5%, transparent)),
+    var(--panel, var(--bg));
+  box-shadow: 0 6px 24px rgba(0,0,0,0.08);
+  font-family: 'Kaiti SC', 'STKaiti', KaiTi, 'Noto Serif SC', serif;
+  animation: fdlFlipIn 0.55s cubic-bezier(0.2, 0.9, 0.3, 1.1);
+  display: flex; flex-direction: column; align-items: center; gap: 8px;
+}
+@keyframes fdlFlipIn {
+  from { transform: rotateY(90deg) scale(0.92); opacity: 0; }
+  to   { transform: rotateY(0deg) scale(1); opacity: 1; }
+}
+.fdl-daji    { --fdl-tint: #c0564a; }
+.fdl-zhongji { --fdl-tint: #c98f3d; }
+.fdl-xiaoji  { --fdl-tint: #7d9d6a; }
+.fdl-ping    { --fdl-tint: #7a8ba0; }
+.fdl-moji    { --fdl-tint: #8d7ba5; }
+.fdl-card-top {
+  width: 100%; display: flex; justify-content: space-between;
+  font-size: 11px; color: var(--text-faint); letter-spacing: 0.1em;
+}
+.fdl-level {
+  font-size: 44px; line-height: 1.15; color: var(--fdl-tint);
+  letter-spacing: 0.14em; text-indent: 0.14em; font-weight: 600;
+}
+.fdl-judge { font-size: 13px; color: var(--text); text-align: center; line-height: 1.6; }
+.fdl-divider {
+  width: 60%; height: 1px; margin: 3px 0;
+  background: color-mix(in srgb, var(--fdl-tint) 35%, transparent);
+}
+.fdl-row { width: 100%; display: flex; align-items: baseline; gap: 10px; }
+.fdl-row-label {
+  flex-shrink: 0; width: 22px; height: 22px; border-radius: 5px;
+  display: inline-flex; align-items: center; justify-content: center;
+  font-size: 13px; color: #fff;
+}
+.fdl-yi    { background: #7d9d6a; }
+.fdl-buyi  { background: #b0766a; }
+.fdl-lucky { background: #c98f3d; }
+.fdl-row-text { font-size: 13px; color: var(--text); line-height: 1.7; }
+.fdl-words {
+  font-size: 13px; color: var(--text); text-align: center; line-height: 1.8;
+  display: flex; flex-direction: column; gap: 2px;
+}
+.fdl-words-label { font-size: 10px; color: var(--text-faint); letter-spacing: 0.25em; }
+.fdl-foot { font-size: 10px; color: var(--text-faint); letter-spacing: 0.2em; margin-top: 4px; }
+.fdl-note { font-size: 11px; color: var(--text-faint); }
