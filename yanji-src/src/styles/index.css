@@ -1532,44 +1532,100 @@ textarea.form-input { display: block; margin: 8px 16px 12px; }
 /* ===== Voice Call Overlay ===== */
 .vc-overlay {
   position: fixed; inset: 0; z-index: 9999;
-  background: rgba(10, 6, 18, 0.92);
+  background: radial-gradient(130% 100% at 50% 0%, rgba(36, 27, 56, 0.97), rgba(10, 6, 18, 0.98));
   display: flex; align-items: center; justify-content: center;
   backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+  overflow: hidden;
 }
-.vc-container {
-  display: flex; flex-direction: column; align-items: center;
-  gap: 16px; padding: 40px 24px; max-width: 320px; width: 100%;
+/* 缓慢漂移的柔光，跟随主题色 */
+.vc-blob {
+  position: absolute; border-radius: 50%; pointer-events: none;
+  filter: blur(70px); opacity: 0.3; will-change: transform;
 }
-.vc-timer { font-size: 13px; color: rgba(255,255,255,0.45); letter-spacing: 0.08em; font-variant-numeric: tabular-nums; }
-.vc-status { font-size: 15px; color: rgba(255,255,255,0.75); font-weight: 400; }
+.vc-blob.b1 { width: 300px; height: 300px; left: -90px; top: 6%; background: var(--accent); animation: vc-drift1 18s ease-in-out infinite alternate; }
+.vc-blob.b2 { width: 260px; height: 260px; right: -80px; bottom: 8%; background: #56719e; animation: vc-drift2 22s ease-in-out infinite alternate; }
+@keyframes vc-drift1 { from { transform: translate(0, 0) scale(1); } to { transform: translate(60px, 45px) scale(1.15); } }
+@keyframes vc-drift2 { from { transform: translate(0, 0) scale(1.1); } to { transform: translate(-50px, -50px) scale(0.95); } }
 
-/* Waveform */
-.vc-wave { display: flex; align-items: center; gap: 4px; height: 48px; }
+.vc-container {
+  position: relative;
+  display: flex; flex-direction: column; align-items: center;
+  gap: 12px; padding: 36px 24px; max-width: 340px; width: 100%;
+}
+.vc-name { font-size: 20px; color: rgba(255,255,255,0.92); letter-spacing: 0.16em; font-weight: 500; }
+.vc-timer { font-size: 12px; color: rgba(255,255,255,0.4); letter-spacing: 0.08em; font-variant-numeric: tabular-nums; }
+.vc-status { font-size: 14px; color: rgba(255,255,255,0.65); min-height: 20px; transition: color 0.3s; }
+
+/* ── 舞台：呼吸光圈 + 像素乌鸦 ── */
+.vc-stage {
+  position: relative; width: 168px; height: 168px;
+  display: flex; align-items: center; justify-content: center;
+  margin: 4px 0 0;
+}
+.vc-orb {
+  position: absolute; inset: 0; border-radius: 50%;
+  background:
+    radial-gradient(circle at 38% 30%, rgba(255,255,255,0.14), rgba(255,255,255,0) 42%),
+    radial-gradient(circle, color-mix(in srgb, var(--accent) 50%, transparent) 0%, rgba(120,100,190,0.1) 60%, transparent 72%);
+  animation: vc-orb-breathe 4.2s ease-in-out infinite;
+  transition: transform 0.12s ease-out;
+}
+/* 有声音时光圈跟随音量呼吸（JS 写 --vc-level） */
+.vc-stage.speaking .vc-orb, .vc-stage.listening .vc-orb {
+  animation: none;
+  transform: scale(calc(1 + var(--vc-level, 0) * 0.22));
+}
+.vc-stage.listening .vc-orb {
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 30%, transparent);
+}
+@keyframes vc-orb-breathe {
+  0%, 100% { transform: scale(1); opacity: 0.8; }
+  50% { transform: scale(1.05); opacity: 1; }
+}
+
+.vc-crow { position: relative; width: 104px; height: 76px; overflow: visible; transition: transform 0.35s ease; }
+.vc-stage.listening .vc-crow { transform: rotate(-7deg) translateY(2px); }
+.vcw-body { transform-origin: 7.5px 13px; animation: vcw-breath 3.2s ease-in-out infinite; }
+.vc-stage.speaking .vcw-body { animation: vcw-bob 0.85s ease-in-out infinite; }
+.vc-stage.thinking .vcw-body { animation: vcw-sway 1.6s ease-in-out infinite; }
+.vcw-eye { transform-origin: 7.5px 9px; animation: vcw-blink 3.4s infinite; }
+.vcw-beak { transform-origin: 7.5px 10.6px; }
+.vc-stage.speaking .vcw-beak { animation: vcw-chirp 0.26s ease-in-out infinite alternate; }
+.vcw-wl { transform-origin: 2px 10px; }
+.vcw-wr { transform-origin: 13px 10px; }
+.vc-stage.speaking .vcw-wl { animation: vcw-flap-l 0.7s infinite alternate ease-in-out; }
+.vc-stage.speaking .vcw-wr { animation: vcw-flap-r 0.7s infinite alternate ease-in-out; }
+@keyframes vcw-breath { 0%, 100% { transform: scaleY(1) translateY(0); } 50% { transform: scaleY(0.96) translateY(0.4px); } }
+@keyframes vcw-bob { 0%, 100% { transform: rotate(-2.5deg) translateY(0); } 50% { transform: rotate(2.5deg) translateY(-1px); } }
+@keyframes vcw-sway { 0%, 100% { transform: rotate(-2deg); } 50% { transform: rotate(2deg); } }
+@keyframes vcw-blink { 0%, 46%, 54%, 100% { transform: scaleY(1); } 50% { transform: scaleY(0.1); } }
+@keyframes vcw-chirp { from { transform: scaleY(0.55); } to { transform: scaleY(1.25); } }
+@keyframes vcw-flap-l { from { transform: rotate(0); } to { transform: rotate(20deg); } }
+@keyframes vcw-flap-r { from { transform: rotate(0); } to { transform: rotate(-20deg); } }
+
+/* ── 波形：speaking/listening 由 JS 写真实频谱高度 ── */
+.vc-wave { display: flex; align-items: center; justify-content: center; gap: 3px; height: 48px; }
 .vc-bar {
   width: 3px; border-radius: 2px;
-  background: rgba(255,255,255,0.2);
-  height: 8px; transition: height 0.15s;
+  background: rgba(255,255,255,0.25);
+  height: 5px; transition: height 0.09s linear;
 }
-.vc-wave.listening .vc-bar {
-  animation: vc-listen 1.4s ease-in-out infinite alternate;
-  background: var(--accent);
-}
-.vc-wave.playing .vc-bar {
-  animation: vc-play 0.6s ease-in-out infinite alternate;
-  background: rgba(255,255,255,0.7);
-}
-@keyframes vc-listen {
-  0%   { height: 6px; opacity: 0.5; }
-  100% { height: 28px; opacity: 1; }
-}
-@keyframes vc-play {
-  0%   { height: 8px; }
-  100% { height: 38px; }
-}
+.vc-wave.idle .vc-bar { animation: vc-bar-idle 2.8s ease-in-out infinite alternate; }
+.vc-wave.thinking .vc-bar { animation: vc-bar-think 0.9s ease-in-out infinite alternate; background: rgba(255,255,255,0.4); }
+.vc-wave.listening .vc-bar { background: var(--accent); }
+.vc-wave.speaking .vc-bar { background: rgba(255,255,255,0.75); }
+@keyframes vc-bar-idle { from { opacity: 0.35; height: 4px; } to { opacity: 0.7; height: 8px; } }
+@keyframes vc-bar-think { from { height: 5px; opacity: 0.4; } to { height: 16px; opacity: 0.85; } }
 
-.vc-text-area { min-height: 52px; width: 100%; text-align: center; }
-.vc-ai-text { font-size: 15px; color: rgba(255,255,255,0.9); line-height: 1.6; margin: 0; }
-.vc-transcript { font-size: 14px; color: rgba(255,255,255,0.5); line-height: 1.6; margin: 0; font-style: italic; }
+/* ── 字幕区 ── */
+.vc-text-area {
+  min-height: 56px; max-height: 26vh; width: 100%;
+  text-align: center; overflow-y: auto;
+  display: flex; flex-direction: column; gap: 6px;
+}
+.vc-user-text { font-size: 13px; color: rgba(255,255,255,0.42); line-height: 1.55; margin: 0; }
+.vc-ai-text { font-size: 15px; color: rgba(255,255,255,0.92); line-height: 1.6; margin: 0; transition: opacity 0.5s; }
+.vc-ai-text.done { opacity: 0.55; }
 
 .vc-hangup {
   width: 64px; height: 64px; border-radius: 50%; border: none;

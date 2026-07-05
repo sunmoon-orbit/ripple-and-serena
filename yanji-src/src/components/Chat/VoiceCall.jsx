@@ -5,6 +5,7 @@ import { synthesizeSpeech, transcribeAudio } from '../../api/moonMemory'
 import { showToast } from '../Toast'
 
 const VOICE_TAG_RE = /\[(breath|laughter)\]/gi
+const NUM_BARS = 24
 
 function stripForTts(text) {
   return text
@@ -25,6 +26,7 @@ export default function VoiceCall({ onClose, onSend }) {
   const [recording, setRecording] = useState(false)
   const [transcribing, setTranscribing] = useState(false)
   const [aiText, setAiText] = useState('')
+  const [userText, setUserText] = useState('')
   const [duration, setDuration] = useState(0)
 
   const recRef = useRef(null)
@@ -34,6 +36,13 @@ export default function VoiceCall({ onClose, onSend }) {
   const speakQueue = useRef([])
   const speakBusy = useRef(false)
   const mounted = useRef(true)
+
+  // 音频可视化：一个 analyser 两用（录音时接麦克风、播放时串在 TTS 链路上）
+  const analyserRef = useRef(null)
+  const micSrcRef = useRef(null)
+  const rafRef = useRef(0)
+  const barsRef = useRef([])
+  const stageRef = useRef(null)
 
   // Unlock AudioContext in the call-open gesture
   useEffect(() => {
@@ -48,6 +57,7 @@ export default function VoiceCall({ onClose, onSend }) {
 
     return () => {
       mounted.current = false
+      cancelAnimationFrame(rafRef.current)
       try { recRef.current?.stop() } catch {}
       try { ttsCtxRef.current?.close() } catch {}
     }
@@ -78,6 +88,50 @@ export default function VoiceCall({ onClose, onSend }) {
     }
   }, [messages])
 
+  // ── 可视化 ──
+  function getAnalyser() {
+    const ctx = ttsCtxRef.current
+    if (!ctx) return null
+    if (!analyserRef.current || analyserRef.current.context !== ctx) {
+      const an = ctx.createAnalyser()
+      an.fftSize = 128
+      an.smoothingTimeConstant = 0.72
+      analyserRef.current = an
+    }
+    return analyserRef.current
+  }
+
+  function startViz() {
+    cancelAnimationFrame(rafRef.current)
+    const an = analyserRef.current
+    if (!an) return
+    const data = new Uint8Array(an.frequencyBinCount)
+    const half = (NUM_BARS - 1) / 2
+    const loop = () => {
+      an.getByteFrequencyData(data)
+      let sum = 0
+      for (let i = 0; i < NUM_BARS; i++) {
+        // 频谱镜像铺开：低频在中间、高频往两边，看起来像呼吸开花
+        const t = Math.abs(i - half) / half
+        const bin = Math.min(data.length - 1, Math.floor(2 + t * data.length * 0.72))
+        const v = data[bin] / 255
+        sum += v
+        const el = barsRef.current[i]
+        if (el) el.style.height = `${5 + Math.round(v * 40)}px`
+      }
+      stageRef.current?.style.setProperty('--vc-level', (sum / NUM_BARS).toFixed(3))
+      rafRef.current = requestAnimationFrame(loop)
+    }
+    rafRef.current = requestAnimationFrame(loop)
+  }
+
+  function stopViz() {
+    cancelAnimationFrame(rafRef.current)
+    rafRef.current = 0
+    barsRef.current.forEach((el) => { if (el) el.style.height = '' })
+    stageRef.current?.style.setProperty('--vc-level', '0')
+  }
+
   // ── 录音转写（push-to-talk）：点一下开始，再点一下结束并发送 ──
   async function toggleRecord() {
     if (transcribing) return
@@ -102,6 +156,9 @@ export default function VoiceCall({ onClose, onSend }) {
     mr.ondataavailable = (e) => { if (e.data && e.data.size) recChunks.current.push(e.data) }
     mr.onstop = async () => {
       stream.getTracks().forEach((t) => t.stop())
+      try { micSrcRef.current?.disconnect() } catch {}
+      micSrcRef.current = null
+      stopViz()
       setRecording(false)
       const dur = Math.round((Date.now() - recStart) / 1000)
       const blob = new Blob(recChunks.current, { type: mr.mimeType || 'audio/webm' })
@@ -109,8 +166,10 @@ export default function VoiceCall({ onClose, onSend }) {
       setTranscribing(true)
       try {
         const text = await transcribeAudio({ baseUrl: moonMemory.baseUrl, apiToken: moonMemory.apiToken }, blob)
-        if (text && mounted.current) onSend(text, [], { voice: true, voiceDuration: dur })
-        else if (!text) showToast('没识别到内容，再说一次', 'info')
+        if (text && mounted.current) {
+          setUserText(text)
+          onSend(text, [], { voice: true, voiceDuration: dur })
+        } else if (!text) showToast('没识别到内容，再说一次', 'info')
       } catch (e) {
         showToast(e.message || '转写失败', 'error', 5000)
       } finally {
@@ -120,6 +179,15 @@ export default function VoiceCall({ onClose, onSend }) {
     recRef.current = mr
     mr.start()
     setRecording(true)
+    // 麦克风接进 analyser（不接 destination，不会自听回声）
+    const an = getAnalyser()
+    if (an && ttsCtxRef.current) {
+      try {
+        micSrcRef.current = ttsCtxRef.current.createMediaStreamSource(stream)
+        micSrcRef.current.connect(an)
+        startViz()
+      } catch {}
+    }
   }
 
   async function drainQueue() {
@@ -129,7 +197,8 @@ export default function VoiceCall({ onClose, onSend }) {
       if (mounted.current) { setAiText(text); setTtsState('loading') }
       try { await speakOne(text) } catch {}
     }
-    if (mounted.current) { setAiText(''); setTtsState('idle') }
+    // 说完保留字幕（淡显），只把状态归位
+    if (mounted.current) setTtsState('idle')
     speakBusy.current = false
   }
 
@@ -156,10 +225,21 @@ export default function VoiceCall({ onClose, onSend }) {
     return new Promise((resolve) => {
       const source = ctx.createBufferSource()
       source.buffer = audioBuf
-      source.connect(ctx.destination)
+      const an = getAnalyser()
+      if (an) {
+        try { source.connect(an); an.connect(ctx.destination); startViz() }
+        catch { source.connect(ctx.destination) }
+      } else {
+        source.connect(ctx.destination)
+      }
+      const finish = () => {
+        try { an?.disconnect() } catch {}
+        stopViz()
+        resolve()
+      }
       source.start(0)
-      const safety = setTimeout(resolve, audioBuf.duration * 1000 + 2000)
-      source.onended = () => { clearTimeout(safety); resolve() }
+      const safety = setTimeout(finish, audioBuf.duration * 1000 + 2000)
+      source.onended = () => { clearTimeout(safety); finish() }
     })
   }
 
@@ -170,31 +250,69 @@ export default function VoiceCall({ onClose, onSend }) {
 
   const fmtDur = (s) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`
 
-  const statusLabel = transcribing ? '识别中…'
-    : recording ? '录音中…说完点一下发送'
-    : ttsState === 'loading' ? '合成中…'
-    : ttsState === 'playing' ? '对方说话中'
-    : '点麦克风说话'
+  const statusLabel = transcribing ? '在听清你说的话…'
+    : recording ? '我听着呢，说完点一下'
+    : ttsState === 'loading' ? '正想着怎么开口…'
+    : ttsState === 'playing' ? '在跟你说话'
+    : '点麦克风，说给我听'
 
-  const isPlaying = ttsState === 'playing'
+  const mode = ttsState === 'playing' ? 'speaking'
+    : recording ? 'listening'
+    : (transcribing || ttsState === 'loading') ? 'thinking'
+    : 'idle'
 
   return createPortal(
     <div className="vc-overlay">
+      <span className="vc-blob b1" />
+      <span className="vc-blob b2" />
       <div className="vc-container">
 
+        <div className="vc-name">涟言</div>
         <div className="vc-timer">{fmtDur(duration)}</div>
+
+        {/* 像素乌鸦 + 呼吸光圈 */}
+        <div className={`vc-stage ${mode}`} ref={stageRef}>
+          <div className="vc-orb" />
+          <svg className="vc-crow" viewBox="-2.5 2.5 20 14.5" aria-hidden="true">
+            <g className="vcw-body">
+              <rect x="2" y="6" width="11" height="7" fill="#2E2B29" />
+              <rect x="5.5" y="5" width="4" height="1" fill="#2E2B29" />
+              <rect x="6.5" y="4.2" width="1" height="1" fill="#2E2B29" />
+              <g className="vcw-wl"><rect x="0" y="9" width="2" height="2.4" fill="#211F1D" /></g>
+              <g className="vcw-wr"><rect x="13" y="9" width="2" height="2.4" fill="#211F1D" /></g>
+              <g className="vcw-eye" fill="#F5F0E8">
+                <rect x="4" y="8" width="1.2" height="1.8" />
+                <rect x="9.8" y="8" width="1.2" height="1.8" />
+              </g>
+              <g className="vcw-beak"><path d="M6.7 10.6 L8.3 10.6 L7.5 12 Z" fill="#DA7756" /></g>
+              <g fill="#DA7756">
+                <rect x="4.5" y="13" width="1" height="2" />
+                <rect x="9.5" y="13" width="1" height="2" />
+              </g>
+            </g>
+          </svg>
+        </div>
+
         <div className="vc-status">{statusLabel}</div>
 
-        {/* Waveform animation */}
-        <div className={`vc-wave${isPlaying ? ' playing' : recording ? ' listening' : ''}`}>
-          {Array.from({ length: 10 }).map((_, i) => (
-            <div key={i} className="vc-bar" style={{ animationDelay: `${i * 0.07}s` }} />
+        {/* 真·音频波形（录音=麦克风频谱，播放=TTS频谱） */}
+        <div className={`vc-wave ${mode}`}>
+          {Array.from({ length: NUM_BARS }).map((_, i) => (
+            <div
+              key={i}
+              className="vc-bar"
+              ref={(el) => { barsRef.current[i] = el }}
+              style={{ animationDelay: `${(i % 6) * 0.18}s` }}
+            />
           ))}
         </div>
 
-        {/* Text display */}
+        {/* 字幕区：她说的 + 我说的 */}
         <div className="vc-text-area">
-          {aiText ? <p className="vc-ai-text">{aiText}</p> : null}
+          {userText ? <p className="vc-user-text">「{userText}」</p> : null}
+          {aiText ? (
+            <p className={'vc-ai-text' + (mode === 'speaking' || ttsState === 'loading' ? '' : ' done')}>{aiText}</p>
+          ) : null}
         </div>
 
         {/* Push-to-talk + hang up */}
