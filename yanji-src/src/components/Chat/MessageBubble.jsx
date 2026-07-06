@@ -24,8 +24,11 @@ const VOICE_TAG_RE = /\[(breath|laughter)\]/gi
 function parseMarkdown(text) {
   if (!text) return ''
   try {
-    // 先把行内特效标签换成 span（marked 透传 inline HTML），再交给 marked
-    return marked.parse(applyInlineFx(text.replace(VOICE_TAG_RE, '')))
+    // 先把贴图标签换成 img、行内特效标签换成 span（marked 透传 inline HTML），再交给 marked
+    // 贴图解析此前只挂在用户消息路径上，涟言自己发的 [sticker:X] 一直是原文晾着（2026-07-06 阿颖发现）
+    const withStickers = text.replace(/\[sticker:([^\]"]+)\]/g, (_, name) =>
+      `<img src="${/^https?:\/\//.test(name) ? name : STICKER_BASE + name}" alt="sticker" style="max-width:140px;border-radius:8px;display:block;margin:2px 0;">`)
+    return marked.parse(applyInlineFx(withStickers.replace(VOICE_TAG_RE, '')))
   } catch {
     return text
   }
