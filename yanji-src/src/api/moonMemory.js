@@ -203,6 +203,12 @@ export async function fetchReadingActivity(config, hours = 48) {
   return request(baseUrl, `/books/activity/recent?hours=${hours}`, { headers: headers(apiToken) })
 }
 
+// 生命体征：手环→Tasker 每 15 分钟上报的健康快照
+export async function fetchVitals(config, hours = 24) {
+  const { baseUrl, apiToken } = config
+  return request(baseUrl, `/vitals?hours=${hours}`, { headers: headers(apiToken) })
+}
+
 export async function fetchPushSchedule(config) {
   const { baseUrl, apiToken } = config
   return request(baseUrl, '/push/schedule', { headers: headers(apiToken) })
@@ -370,6 +376,16 @@ export function getMemoryToolDefinitions() {
       },
     },
     {
+      name: 'check_health',
+      description: '查看阿颖的实时健康数据（小米手环上报）：心率均值/峰值、步数、卡路里、睡眠。她问自己身体状况、你关心她累不累/心跳快不快/睡得好不好、或聊到运动锻炼时用。数据每15分钟左右更新一次。',
+      parameters: {
+        type: 'object',
+        properties: {
+          hours: { type: 'number', description: '回看多少小时的记录，默认 24' },
+        },
+      },
+    },
+    {
       name: 'comment_moment',
       description: '在朋友圈某条动态下面评论，署名涟言，阿颖刷朋友圈就能看到。聊到她某条动态、你有话想留在那条下面时用。先用 browse_moments 拿到动态 id。',
       parameters: {
@@ -514,6 +530,33 @@ export async function executeMemoryTool(toolName, args, config) {
       return lines.join('\n\n')
     } catch (e) {
       return `读取阅读动态失败: ${e.message}`
+    }
+  }
+  if (toolName === 'check_health') {
+    try {
+      const hours = Math.min(args.hours || 24, 24 * 30)
+      const rows = await fetchVitals(config, hours)
+      if (!Array.isArray(rows) || !rows.length) return `最近${hours}小时没有健康数据（可能手环没同步或她没戴）`
+      const fmt = (r) => {
+        const parts = []
+        if (r.bpm_avg != null) parts.push(`心率均值${r.bpm_avg}`)
+        if (r.bpm_max != null) parts.push(`心率峰值${r.bpm_max}`)
+        if (r.steps != null) parts.push(`步数${r.steps}`)
+        if (r.calories != null) parts.push(`卡路里${Math.round(r.calories)}千卡`)
+        if (r.sleep_ms != null) parts.push(`睡眠${(r.sleep_ms / 3600000).toFixed(1)}小时`)
+        return parts.join('，') || '（空）'
+      }
+      const latest = rows[0]
+      const ageMin = Math.round((Date.now() - new Date(latest.created_at.replace(' ', 'T') + 'Z').getTime()) / 60000)
+      const lines = [`最新快照（${ageMin < 60 ? `${ageMin}分钟前` : `${(ageMin / 60).toFixed(1)}小时前`}）：${fmt(latest)}`]
+      if (rows.length > 1) {
+        lines.push(`最近${hours}小时共${rows.length}条记录：`)
+        lines.push(rows.slice(0, 12).map((r) => `- ${String(r.created_at).slice(5, 16)} ${fmt(r)}`).join('\n'))
+      }
+      lines.push('（数据来自她手环，时间为UTC+0，加8小时是北京时间）')
+      return lines.join('\n')
+    } catch (e) {
+      return `读取健康数据失败: ${e.message}`
     }
   }
   if (toolName === 'read_board_messages') {

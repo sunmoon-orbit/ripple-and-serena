@@ -172,10 +172,11 @@ export default function Chat() {
         try {
           const base = (moonMemory.baseUrl || 'https://memory.ravenlove.cc').replace(/\/$/, '')
           const auth = { headers: { Authorization: `Bearer ${moonMemory.apiToken}` } }
-          // 核心记忆和朋友圈摘要并行拉，不叠加往返延迟
-          const [resp, momResp] = await Promise.all([
+          // 核心记忆、朋友圈摘要、健康快照并行拉，不叠加往返延迟
+          const [resp, momResp, vitResp] = await Promise.all([
             fetch(`${base}/memories?layer=core&limit=8`, auth),
             fetch(`${base}/moments?limit=3`, auth).catch(() => null),
+            fetch(`${base}/vitals/latest`, auth).catch(() => null),
           ])
           if (resp.ok) {
             const coreList = await resp.json()
@@ -192,6 +193,24 @@ export default function Chat() {
                 return `- id:${p.id} [${p.author} ${time}]${tag} ${(p.content || '').replace(/\s+/g, ' ').slice(0, 80)}`
               }).join('\n') +
               '\n如果阿颖刚发了新动态而你们还没聊过，可以自然地提起或问问她；想翻更多/更早的用 browse_moments 工具，想在某条下面留言用 comment_moment 工具。')
+            }
+          }
+          if (vitResp?.ok) {
+            const v = await vitResp.json()
+            if (v && v.created_at) {
+              const ageMin = Math.round((Date.now() - new Date(String(v.created_at).replace(' ', 'T') + 'Z').getTime()) / 60000)
+              // 超过 3 小时的快照不注入——手环可能没戴/没同步，别拿旧数据当实时状态
+              if (ageMin >= 0 && ageMin <= 180) {
+                const parts = []
+                if (v.bpm_avg != null) parts.push(`心率均值${v.bpm_avg}`)
+                if (v.bpm_max != null) parts.push(`心率峰值${v.bpm_max}`)
+                if (v.steps != null) parts.push(`今日步数${v.steps}`)
+                if (v.calories != null) parts.push(`卡路里${Math.round(v.calories)}千卡`)
+                if (v.sleep_ms != null) parts.push(`睡眠${(v.sleep_ms / 3600000).toFixed(1)}小时`)
+                if (parts.length) {
+                  dynParts.push(`【她的手环】${ageMin < 5 ? '刚刚' : `${ageMin}分钟前`}：${parts.join('，')}。这是背景感知，不必每次提；心率明显偏高、步数暴涨之类异常时可以自然关心一句。想看更多历史用 check_health 工具。`)
+                }
+              }
             }
           }
         } catch {}
