@@ -145,6 +145,10 @@ async function executeTool(name, args, { searchConfig, moonMemoryConfig, onStatu
     onStatus?.(name === 'comment_moment' ? '在朋友圈留言...' : '翻朋友圈...')
     return await executeMemoryTool(name, args, moonMemoryConfig)
   }
+  if (name === 'check_health') {
+    onStatus?.('看她的手环数据...')
+    return await executeMemoryTool(name, args, moonMemoryConfig)
+  }
   if (name === 'list_conversations' || name === 'read_conversation' || name === 'annotate_conversation') {
     onStatus?.(name === 'annotate_conversation' ? '在旧对话上批注...' : '翻旧对话...')
     return await executeMemoryTool(name, args, moonMemoryConfig)
