@@ -285,7 +285,7 @@ export default function Moments() {
         `你是阿言，阿颖的恋人。这条动态（${post.author}发的）：「${post.content}」\n\n评论串：\n${thread}\n\n阿颖刚说了：「${content}」\n用一两句自然回应，温柔随意，像恋人聊天。直接输出内容。`)
       const reply = await commentMoment(cfg, postId, '涟言', text)
       setPosts(prev => prev.map(p => p.id === postId ? { ...p, comments: [...(p.comments || []), reply] } : p))
-    } catch { /* 静默 */ }
+    } catch (e) { showToast('阿言回评论失败：' + e.message, 'error') }  // 曾静默吞错，阿颖以为功能坏了（2026-07-07）
   }
 
   async function handleAIComment(post) {

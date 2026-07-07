@@ -158,7 +158,7 @@ function ConnectionCard({ conn, onSave, onDelete, onActivate, isActive }) {
               留空则跟默认模型走。带图的识图评论仍走默认模型（便宜模型多半没 vision） */}
           <div className="form-row">
             <label className="form-label">轻任务模型</label>
-            <input className="form-input" value={form.lightModel || ''} onChange={(e) => setForm({ ...form, lightModel: e.target.value })} placeholder="可选：自动发圈/评论/总结用的便宜模型" />
+            <input className="form-input" value={form.lightModel || ''} onChange={(e) => setForm({ ...form, lightModel: e.target.value })} placeholder="可选：填模型名，如 deepseek-chat（发圈/评论/总结用它省钱）" />
           </div>
           <div className="form-row form-actions">
             <button className="btn-sm btn-ghost" onClick={() => setEditing(false)}>取消</button>
