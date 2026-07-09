@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom'
 import { useStore } from '../../store'
 import { synthesizeSpeech, transcribeAudio } from '../../api/moonMemory'
 import { showToast } from '../Toast'
+import { stripInlineFx } from '../../utils/moodFx'
 
 const VOICE_TAG_RE = /\[(breath|laughter)\]/gi
 const NUM_BARS = 24       // 乌鸦样式：一排镜像频谱
@@ -33,8 +34,10 @@ function CrowSvg({ className }) {
 }
 
 function stripForTts(text) {
-  return text
+  return stripInlineFx(text)                        // 情绪特效标签只留正文（否则 glow/shake 被念成英文）
     .replace(VOICE_TAG_RE, '')
+    .replace(/\[music:[^\]]+\]/g, '')
+    .replace(/\[sticker:[^\]]+\]/g, '')
     .replace(/!\[[^\]]*\]\([^)]*\)/g, '')
     .replace(/\[([^\]]*)\]\([^)]*\)/g, '$1')
     .replace(/[#*`>_~\[\]]/g, '')

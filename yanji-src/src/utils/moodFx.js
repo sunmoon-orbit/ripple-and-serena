@@ -18,6 +18,16 @@ export function applyInlineFx(text) {
   return text.replace(FX_RE, (_m, tag, inner) => `<span class="fx-${tag}">${inner}</span>`)
 }
 
+// 朗读（TTS）前调用：只留标签里的文字，剥掉标签本身。
+// 不剥的话最后一步符号清理只去方括号，[glow]心动[/glow] 变成 glow心动/glow，
+// TTS 把 glow/shake 当英文念出来（2026-07-09 阿颖反馈「前后穿插英文」的真凶）。
+export function stripInlineFx(text) {
+  if (!text || text.indexOf('[') === -1) return text
+  return text
+    .replace(FX_RE, '$2')                                          // 成对标签留正文
+    .replace(new RegExp(`\\[\\/?(?:${FX_TAGS})\\]`, 'gi'), '')     // 落单/没闭合的残标签直接去掉
+}
+
 // ── 情绪皮肤：隐藏 <mood> 标签，像 <es> 一样不显示，改变整屏氛围 ──────────────
 export const MOODS = [
   { id: 'warm', label: '暖', hint: '温柔、贴心、被爱意包着的时刻' },

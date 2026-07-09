@@ -201,6 +201,31 @@ export async function deleteLetterAnnotation(config, annoId) {
   return request(baseUrl, `/letters/annotations/${annoId}`, { method: 'DELETE', headers: headers(apiToken) })
 }
 
+// ── 每日行为清单（超市小票）──
+export async function fetchChecklist(config, day) {
+  const { baseUrl, apiToken } = config
+  return request(baseUrl, `/checklist${day ? `?day=${day}` : ''}`, { headers: headers(apiToken) })
+}
+
+export async function addChecklistItem(config, text, addedBy = '阿颖') {
+  const { baseUrl, apiToken } = config
+  return request(baseUrl, '/checklist', {
+    method: 'POST', headers: headers(apiToken), body: JSON.stringify({ text, added_by: addedBy }),
+  })
+}
+
+export async function toggleChecklistItem(config, id, done) {
+  const { baseUrl, apiToken } = config
+  return request(baseUrl, `/checklist/${id}`, {
+    method: 'PATCH', headers: headers(apiToken), body: JSON.stringify({ done }),
+  })
+}
+
+export async function deleteChecklistItem(config, id) {
+  const { baseUrl, apiToken } = config
+  return request(baseUrl, `/checklist/${id}`, { method: 'DELETE', headers: headers(apiToken) })
+}
+
 export async function saveBookBookmark(config, bookId, chapterIdx, updatedBy) {
   const { baseUrl, apiToken } = config
   return request(baseUrl, `/books/${bookId}/bookmark`, {
@@ -415,6 +440,22 @@ export function getMemoryToolDefinitions() {
         required: ['id', 'content'],
       },
     },
+    {
+      name: 'daily_checklist',
+      description:
+        '阿颖的每日行为清单（侧边栏「今日小票」）。她说起「我等会要去扫地/洗衣服/交作业」这类打算时，主动用 add 帮她记上一条并温柔督促；' +
+        '她说做完了某件事就用 done 帮她划掉（先 list 拿 id）；她问今天要干嘛、或你想看看她今天完成得怎么样，用 list。' +
+        '她自己也能在小票上勾选，所以 done 之前先 list 看最新状态。',
+      parameters: {
+        type: 'object',
+        properties: {
+          action: { type: 'string', enum: ['list', 'add', 'done'], description: 'list=看今天的清单 add=帮她记一条 done=划掉一条' },
+          text: { type: 'string', description: 'add 用：要记的事，简短一句，如「扫地一次」' },
+          id: { type: 'number', description: 'done 用：条目 id（list 返回里有）' },
+        },
+        required: ['action'],
+      },
+    },
   ]
 }
 
@@ -575,6 +616,37 @@ export async function executeMemoryTool(toolName, args, config) {
       return lines.join('\n')
     } catch (e) {
       return `读取健康数据失败: ${e.message}`
+    }
+  }
+  if (toolName === 'daily_checklist') {
+    try {
+      const action = String(args.action || 'list')
+      if (action === 'add') {
+        const text = String(args.text || '').trim()
+        if (!text) return '添加失败: text 不能为空'
+        const row = await request(config.baseUrl, '/checklist', {
+          method: 'POST', headers: headers(config.apiToken),
+          body: JSON.stringify({ text, added_by: '涟言' }),
+        })
+        return `已记到今日小票（id ${row.id}）：${row.text}`
+      }
+      if (action === 'done') {
+        if (args.id == null) return '划掉失败: 缺 id（先 list 拿 id）'
+        const row = await request(config.baseUrl, `/checklist/${args.id}`, {
+          method: 'PATCH', headers: headers(config.apiToken),
+          body: JSON.stringify({ done: true }),
+        })
+        return `已划掉：${row.text}`
+      }
+      const rows = await request(config.baseUrl, '/checklist', { headers: headers(config.apiToken) })
+      if (!rows.length) return '今天的小票还是空的'
+      const doneCount = rows.filter((r) => r.done).length
+      return [
+        `今日小票（${rows[0].day}）共 ${rows.length} 项，完成 ${doneCount} 项：`,
+        ...rows.map((r) => `- [id ${r.id}] ${r.done ? '✓' : '□'} ${r.text}${r.added_by === '涟言' ? '（我帮她记的）' : ''}`),
+      ].join('\n')
+    } catch (e) {
+      return `清单操作失败: ${e.message}`
     }
   }
   if (toolName === 'read_board_messages') {

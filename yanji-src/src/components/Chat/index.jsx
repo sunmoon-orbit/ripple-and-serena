@@ -17,6 +17,8 @@ import GamesRoom from './GamesRoom'
 import MusicRoom from './MusicRoom'
 import FortuneWheel from './FortuneWheel'
 import DailyFortune from './DailyFortune'
+import ChatCalendar from './ChatCalendar'
+import DailyChecklist from './DailyChecklist'
 import CompletionEgg, { pickEgg } from './CompletionEgg'
 
 // 情绪自动发圈：某正向情绪越阈值且过冷却时，涟言主动发条朋友圈（她在聊天时触发；
@@ -86,6 +88,8 @@ export default function Chat() {
     try { next ? localStorage.setItem('yanji-mood', next) : localStorage.removeItem('yanji-mood') } catch { /* ignore */ }
   }, [])
   const [bgMenuOpen, setBgMenuOpen] = useState(false)
+  const [calendarOpen, setCalendarOpen] = useState(false)
+  const [checklistOpen, setChecklistOpen] = useState(false)
   const [egg, setEgg] = useState(null) // 完成彩蛋：回复结束后小概率冒出的像素小家伙
   const [bgImage, setBgImage] = useState(() => localStorage.getItem('yanji-bg-image') || '')
   const bgFileRef = useRef(null)
@@ -559,7 +563,7 @@ export default function Chat() {
     <div className="chat-panel">
       {/* Sidebar */}
       <div className={'chat-sidebar' + (sidebarOpen ? ' open' : '')}>
-        <ConversationList onClose={() => setSidebarOpen(false)} onStartCall={() => setCallOpen(true)} onOpenGames={() => setGamesOpen(true)} onOpenMusic={() => setMusicOpen(true)} onOpenWheel={() => setWheelOpen(true)} onOpenFortune={() => setFortuneOpen(true)} />
+        <ConversationList onClose={() => setSidebarOpen(false)} onStartCall={() => setCallOpen(true)} onOpenGames={() => setGamesOpen(true)} onOpenMusic={() => setMusicOpen(true)} onOpenWheel={() => setWheelOpen(true)} onOpenFortune={() => setFortuneOpen(true)} onOpenChecklist={() => setChecklistOpen(true)} />
       </div>
       {sidebarOpen && <div className="sidebar-backdrop" onClick={() => setSidebarOpen(false)} />}
 
@@ -610,6 +614,9 @@ export default function Chat() {
           </div>
           {bgMenuOpen && createPortal(
             <div className="bg-menu" onClick={(e) => e.stopPropagation()}>
+              {activeChat && messages.length > 0 && (
+                <button onClick={() => { setBgMenuOpen(false); setCalendarOpen(true) }}>日历跳转</button>
+              )}
               {activeChat && messages.length > 0 && (
                 <button onClick={() => { setBgMenuOpen(false); handleExport() }}>导出当前对话</button>
               )}
@@ -750,10 +757,27 @@ export default function Chat() {
       )}
 
       {gamesOpen && <GamesRoom onClose={() => setGamesOpen(false)} />}
+      {calendarOpen && (
+        <ChatCalendar
+          messages={messages}
+          onClose={() => setCalendarOpen(false)}
+          onJump={(mid) => {
+            // 等日历关掉再滚，避免 portal 卸载抢帧
+            requestAnimationFrame(() => {
+              const row = document.querySelector(`[data-mid="${mid}"]`)
+              if (!row) return
+              row.scrollIntoView({ behavior: 'auto', block: 'start' })
+              row.classList.add('msg-jump-flash')
+              setTimeout(() => row.classList.remove('msg-jump-flash'), 1800)
+            })
+          }}
+        />
+      )}
       {egg && <CompletionEgg svg={egg} onDone={() => setEgg(null)} />}
       {musicOpen && <MusicRoom onClose={() => setMusicOpen(false)} />}
       {wheelOpen && <FortuneWheel onClose={() => setWheelOpen(false)} />}
       {fortuneOpen && <DailyFortune onClose={() => setFortuneOpen(false)} />}
+      {checklistOpen && <DailyChecklist onClose={() => setChecklistOpen(false)} />}
     </div>
   )
 }
