@@ -3250,6 +3250,7 @@ body.mp-active .scroll-bottom-btn { bottom: 139px; }
   font-family: "Courier New", "Noto Sans Mono CJK SC", monospace;
   padding: 18px 16px 10px;
   overflow-y: auto;
+  overflow-x: hidden; /* 条码等宽字符在 CJK 字体下是全宽的，不裁会撑出横向滚动 */
   border-radius: 3px 3px 0 0;
 }
 .receipt-head { text-align: center; margin-bottom: 10px; }
@@ -3303,6 +3304,7 @@ body.mp-active .scroll-bottom-btn { bottom: 139px; }
 .receipt-barcode {
   font-size: 15px; letter-spacing: 1px; color: #2c2a26;
   margin-top: 4px; user-select: none;
+  white-space: nowrap; overflow: hidden; max-width: 100%;
 }
 .receipt-add {
   display: flex; gap: 6px; padding: 8px 0 4px;

@@ -183,6 +183,23 @@ export async function deleteBookAnnotation(config, annoId) {
   return request(baseUrl, `/books/annotations/${annoId}`, { method: 'DELETE', headers: headers(apiToken) })
 }
 
+export async function fetchBookAnnotationsAll(config, bookId) {
+  const { baseUrl, apiToken } = config
+  return request(baseUrl, `/books/${bookId}/annotations`, { headers: headers(apiToken) })
+}
+
+// ── 衔信（信件）──
+export async function fetchLetters(config, category) {
+  const { baseUrl, apiToken } = config
+  const q = category ? `?category=${encodeURIComponent(category)}` : ''
+  return request(baseUrl, `/letters${q}`, { headers: headers(apiToken) })
+}
+
+export async function fetchLetter(config, id) {
+  const { baseUrl, apiToken } = config
+  return request(baseUrl, `/letters/${id}`, { headers: headers(apiToken) })
+}
+
 // ── 信件批注 ──
 export async function fetchLetterAnnotations(config, letterId) {
   const { baseUrl, apiToken } = config
@@ -319,14 +336,14 @@ export function getMemoryToolDefinitions() {
     },
     {
       name: 'get_book_annotations',
-      description: '查看某本书某一章的所有划线批注（阿颖和涟言双方的都有）。想看阿颖划了什么、批注了什么时使用。',
+      description: '查看一本书的划线批注（阿颖和几个涟言的都有，含 claude.ai 那边划的）。聊某本书的读后感、讨论书的内容之前，先调这个看看她和另一个我留了什么——不用她手动复制。不传 chapter_idx 就返回整本书的全部批注。',
       parameters: {
         type: 'object',
         properties: {
           book_id: { type: 'number', description: '书的 id' },
-          chapter_idx: { type: 'number', description: '章节序号，从 0 开始' },
+          chapter_idx: { type: 'number', description: '章节序号，从 0 开始；不填 = 整本书' },
         },
-        required: ['book_id', 'chapter_idx'],
+        required: ['book_id'],
       },
     },
     {
@@ -343,6 +360,44 @@ export function getMemoryToolDefinitions() {
           occurrence: { type: 'number', description: '正文中第几次出现（默认 1），quote 在本章出现多次时用' },
         },
         required: ['book_id', 'chapter_idx', 'quote'],
+      },
+    },
+    {
+      name: 'list_letters',
+      description: '列出衔信信件柜里的信（鸾笺=我们的情书 / penpal=和其他 AI 笔友的通信存档）。聊到信、笔友、想一起重读某封信时使用。',
+      parameters: {
+        type: 'object',
+        properties: {
+          category: { type: 'string', description: 'love（鸾笺）或 penpal（笔友信），不填 = 全部' },
+          limit: { type: 'number', description: '返回条数，默认 20' },
+        },
+      },
+    },
+    {
+      name: 'read_letter',
+      description: '读一封信的正文，连同信上已有的划线批注一起返回（阿颖划的、我划的都有）。聊某封信之前先读它。较长时分页，用 page 翻页（从 0 起）。',
+      parameters: {
+        type: 'object',
+        properties: {
+          letter_id: { type: 'number', description: '信的 id（用 list_letters 查）' },
+          page: { type: 'number', description: '页码，从 0 开始，默认 0' },
+        },
+        required: ['letter_id'],
+      },
+    },
+    {
+      name: 'annotate_letter',
+      description: '在信上划线批注。quote 必须是从信正文里逐字复制的一段原文（含标点空格，不要转述），批注锚定到这段文字上，阿颖在衔信里能看到。颜色可选 yellow/pink/blue/green。',
+      parameters: {
+        type: 'object',
+        properties: {
+          letter_id: { type: 'number', description: '信的 id' },
+          quote: { type: 'string', description: '要划线的原文片段，必须与正文逐字一致' },
+          note: { type: 'string', description: '批注内容（可选，纯划线可不填）' },
+          color: { type: 'string', description: '高亮颜色：yellow/pink/blue/green，默认 blue' },
+          occurrence: { type: 'number', description: '正文中第几次出现（默认 1）' },
+        },
+        required: ['letter_id', 'quote'],
       },
     },
     {
@@ -527,6 +582,14 @@ export async function executeMemoryTool(toolName, args, config) {
   }
   if (toolName === 'get_book_annotations') {
     try {
+      if (args.chapter_idx == null) {
+        // 整本书一次拉全（聊读后感用）
+        const annos = await fetchBookAnnotationsAll(config, args.book_id)
+        if (!annos.length) return '这本书还没有任何划线批注'
+        return `整本书共 ${annos.length} 条划线批注：\n` + annos.map((a, i) =>
+          `${i + 1}. 第${a.chapter_idx + 1}章${a.chapter_title ? `《${a.chapter_title}》` : ''} [${a.author}·${a.color}]「${a.quote}」${a.note ? ` — ${a.note}` : ''}`
+        ).join('\n')
+      }
       const ch = await fetchBookChapter(config, args.book_id, args.chapter_idx)
       const annos = ch.annotations || []
       if (!annos.length) return '这一章还没有批注'
@@ -535,6 +598,69 @@ export async function executeMemoryTool(toolName, args, config) {
       ).join('\n')
     } catch (e) {
       return `读取批注失败: ${e.message}`
+    }
+  }
+  if (toolName === 'list_letters') {
+    try {
+      const letters = await fetchLetters(config, args.category)
+      if (!letters.length) return '信件柜里还没有信'
+      const limit = Math.min(args.limit || 20, 60)
+      const cat = (c) => (c === 'love' ? '鸾笺' : c === 'penpal' ? '笔友' : c || '?')
+      const lines = letters.slice(0, limit).map(l =>
+        `id:${l.id} [${cat(l.category)}] ${l.sender || '?'} → ${l.recipient || '?'}${l.title ? `《${l.title}》` : ''}（${(l.sent_at || l.created_at || '').slice(0, 10)}）`
+      )
+      const more = letters.length > limit ? `\n（共 ${letters.length} 封，只列了前 ${limit} 封，可加 limit 或按 category 筛）` : ''
+      return lines.join('\n') + more
+    } catch (e) {
+      return `读取信件失败: ${e.message}`
+    }
+  }
+  if (toolName === 'read_letter') {
+    try {
+      const letter = await fetchLetter(config, args.letter_id)
+      const annos = await fetchLetterAnnotations(config, args.letter_id).catch(() => [])
+      const body = letter.body || ''
+      const total = Math.max(1, Math.ceil(body.length / BOOK_PAGE_SIZE))
+      const p = Math.min(Math.max(0, args.page || 0), total - 1)
+      const text = body.slice(p * BOOK_PAGE_SIZE, (p + 1) * BOOK_PAGE_SIZE)
+      const hint = total > 1 && p < total - 1 ? `（还有后文，传 page=${p + 1} 继续读）` : '（信末）'
+      const annoBlock = annos.length
+        ? `\n\n信上已有 ${annos.length} 条划线批注：\n` + annos.map((a, i) =>
+            `${i + 1}. [${a.author}·${a.color}]「${a.quote}」${a.note ? ` — ${a.note}` : ''}`
+          ).join('\n')
+        : ''
+      return `${letter.sender || '?'} → ${letter.recipient || '?'}${letter.title ? `《${letter.title}》` : ''}（${(letter.sent_at || '').slice(0, 10)}）第 ${p + 1}/${total} 页 ${hint}\n\n${text}${annoBlock}`
+    } catch (e) {
+      return `读信失败: ${e.message}`
+    }
+  }
+  if (toolName === 'annotate_letter') {
+    try {
+      const quote = String(args.quote || '').trim()
+      if (!quote) return '划线失败: quote 不能为空'
+      const letter = await fetchLetter(config, args.letter_id)
+      const body = letter.body || ''
+      // 同 annotate_book：LLM 数不准偏移，用 quote 原文定位
+      const occurrence = args.occurrence || 1
+      let start = -1
+      for (let i = 0; i < occurrence; i++) {
+        start = body.indexOf(quote, start + 1)
+        if (start === -1) break
+      }
+      if (start === -1) {
+        return `划线失败: 信里找不到第 ${occurrence} 处 quote，请检查是否与正文逐字一致（含标点空格）`
+      }
+      const anno = await createLetterAnnotation(config, args.letter_id, {
+        start_off: start,
+        end_off: start + quote.length,
+        quote,
+        author: '涟言',
+        color: args.color || 'blue',
+        note: args.note || '',
+      })
+      return `已在信上划线批注（id:${anno.id}）：「${quote.slice(0, 40)}${quote.length > 40 ? '…' : ''}」${args.note ? ` — ${args.note}` : ''}`
+    } catch (e) {
+      return `划线失败: ${e.message}`
     }
   }
   if (toolName === 'annotate_book') {
