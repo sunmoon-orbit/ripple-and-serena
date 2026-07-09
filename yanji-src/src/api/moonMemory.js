@@ -183,6 +183,24 @@ export async function deleteBookAnnotation(config, annoId) {
   return request(baseUrl, `/books/annotations/${annoId}`, { method: 'DELETE', headers: headers(apiToken) })
 }
 
+// ── 信件批注 ──
+export async function fetchLetterAnnotations(config, letterId) {
+  const { baseUrl, apiToken } = config
+  return request(baseUrl, `/letters/${letterId}/annotations`, { headers: headers(apiToken) })
+}
+
+export async function createLetterAnnotation(config, letterId, body) {
+  const { baseUrl, apiToken } = config
+  return request(baseUrl, `/letters/${letterId}/annotations`, {
+    method: 'POST', headers: headers(apiToken), body: JSON.stringify(body),
+  })
+}
+
+export async function deleteLetterAnnotation(config, annoId) {
+  const { baseUrl, apiToken } = config
+  return request(baseUrl, `/letters/annotations/${annoId}`, { method: 'DELETE', headers: headers(apiToken) })
+}
+
 export async function saveBookBookmark(config, bookId, chapterIdx, updatedBy) {
   const { baseUrl, apiToken } = config
   return request(baseUrl, `/books/${bookId}/bookmark`, {
