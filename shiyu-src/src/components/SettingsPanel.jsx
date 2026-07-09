@@ -7,7 +7,7 @@ import { Plug, KeyRound, Palette, Activity, RefreshCw, CheckCircle2, AlertTriang
 const THEMES = [
   { id: 'light',    label: 'Light',    dot: '#5A7A98' },
   { id: 'blossom',  label: 'Blossom',  dot: '#C07888' },
-  { id: 'midnight', label: 'Midnight', dot: '#5888C8' },
+  { id: 'midnight', label: 'Midnight', dot: '#6494D4' },
   { id: 'dawn',     label: 'Dawn',     dot: '#C07840' },
 ]
 

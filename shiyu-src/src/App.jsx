@@ -24,7 +24,7 @@ export default function App() {
   const [unlocked, setUnlocked] = useState(false)
 
   useEffect(() => {
-    const bg = { light: '#ECEEF4', blossom: '#F9F0F3', midnight: '#080C14', dawn: '#F7F2EA' }
+    const bg = { light: '#ECEEF4', blossom: '#F9F0F3', midnight: '#151B29', dawn: '#F7F2EA' }
     const color = bg[theme] || bg.light
     document.documentElement.setAttribute('data-theme', theme)
     document.documentElement.style.background = color

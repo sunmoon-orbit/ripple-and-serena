@@ -57,24 +57,26 @@
   --shadow-lg:0 4px 16px rgba(160,90,110,0.12), 0 12px 36px rgba(160,90,110,0.16);
 }
 
-/* ── Midnight：深靛夜 ── */
+/* ── Midnight：深靛夜（月夜版，2026-07-09 重调）──
+   旧版底色近纯黑(#080C14)+浓黑阴影，和安静的蓝对撞得太沉闷，
+   阿颖反馈「心头一沉」。思路：黑抬成有月光的蓝灰夜，蓝保留。 */
 [data-theme="midnight"] {
-  --bg:          #080C14;
-  --bg-soft:     #0E1420;
-  --surface:     #131A28;
-  --line:        rgba(120,150,200,0.10);
-  --line-soft:   rgba(120,150,200,0.06);
-  --ink:         #C8D4E8;
-  --ink-soft:    #6878A0;
-  --ink-faint:   #2A3050;
-  --olive-active: #5888C8;
-  --olive-mid:    #4068A8;
-  --olive-light:  #182040;
-  --accent:   #9878C0;
-  --raven:    #020408;
-  --danger:   #A04060;
-  --shadow:   0 1px 3px rgba(0,0,0,0.40), 0 3px 12px rgba(0,0,0,0.60);
-  --shadow-lg:0 4px 16px rgba(0,0,0,0.55), 0 12px 36px rgba(0,0,0,0.70);
+  --bg:          #151B29;
+  --bg-soft:     #1B2334;
+  --surface:     #212B40;
+  --line:        rgba(150,180,225,0.13);
+  --line-soft:   rgba(150,180,225,0.07);
+  --ink:         #D6E0F2;
+  --ink-soft:    #8B9BC2;
+  --ink-faint:   #4E5C7E;
+  --olive-active: #6494D4;
+  --olive-mid:    #4A74B4;
+  --olive-light:  #283654;
+  --accent:   #A88CCE;
+  --raven:    #0C111C;
+  --danger:   #B25870;
+  --shadow:   0 1px 3px rgba(6,10,20,0.22), 0 3px 12px rgba(6,10,20,0.32);
+  --shadow-lg:0 4px 16px rgba(6,10,20,0.30), 0 12px 36px rgba(6,10,20,0.42);
 }
 
 /* ── Dawn：晨曦暖白 ── */

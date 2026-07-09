@@ -20,7 +20,7 @@
   <!-- 在 React 加载前立即读取主题，避免白色闪烁和地址栏颜色错误 -->
   <script>
     (function () {
-      var bg = { light: '#ECEEF4', blossom: '#F9F0F3', midnight: '#080C14', dawn: '#F7F2EA' };
+      var bg = { light: '#ECEEF4', blossom: '#F9F0F3', midnight: '#151B29', dawn: '#F7F2EA' };
       try {
         var s = JSON.parse(localStorage.getItem('shiyu-store') || '{}');
         var t = (s.state && s.state.theme) || 'light';
