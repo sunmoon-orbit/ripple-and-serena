@@ -406,11 +406,7 @@ let lastBroadcastReply = ''
 let isThinking = false
 let replyExtractionEnabled = false
 let lastMcpReplyTs = 0
-// 阿颖最近一次发消息的时间，用于「久未回复」兜底提取；
-// 同时持久化到文件供 nudge.sh（主动消息定时器）读取
-const LAST_USER_MSG_FILE = path.join(__dirname, '.last-user-msg')
 let lastUserMsgTs = 0
-try { lastUserMsgTs = parseInt(fs.readFileSync(LAST_USER_MSG_FILE, 'utf8'), 10) || 0 } catch {}
 let pendingThinking = ''
 let lastPermCapture = ''  // dedupe permission prompts
 let lastPermData = null   // 最近一次权限提示数据，重连时补发
@@ -889,7 +885,6 @@ wss.on('connection', (ws) => {
           return
         }
         lastUserMsgTs = Date.now()
-        try { fs.writeFileSync(LAST_USER_MSG_FILE, String(lastUserMsgTs)) } catch {}
         lastBroadcastReply = extractLastResponse(lastCapture) || ''
         lastReplyMsgs = []  // 发新消息时清空回放队列，重连不会刷旧消息
         archiveMsg('human', msg.text)
