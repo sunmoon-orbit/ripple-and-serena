@@ -812,6 +812,53 @@ export async function summarizeThinking(thinking, connection, model) {
     .slice(0, 40)
 }
 
+// ─── Context compaction ────────────────────────────────────────────────────
+// Summarize old messages that would be cut by context limit, so continuity
+// is preserved as a compact note instead of being silently dropped.
+
+const COMPACTION_PROMPT = `你正在为一段持续的对话写私密接续笔记，帮助后续回复保持连贯。
+这不是给用户的回复，不要继续对话，不要添加建议、评价或新内容。
+仅基于下方的源消息，写出简洁的接续笔记。
+
+保留：
+- 事实和事件（谁做了什么、什么时候）
+- 用户的纠正、偏好、习惯
+- 关系和情感上下文（亲密、争执、玩笑、心情变化）
+- 未解决的话题或悬而未决的事
+- 重要的时间线节点
+
+不要保留：逐字对话、重复的寒暄、纯技术调试的中间过程。
+用中文写，不超过 600 字。格式：
+- 事件/事实：
+- 情感/关系：
+- 未了结：`
+
+export async function compactMessages(messages, connection, model) {
+  if (!messages.length) return ''
+  const rendered = messages.map((m, i) => {
+    const role = m.role === 'user' ? '阿颖' : '涟言'
+    const text = (m.content || '').slice(0, 800)
+    return `[${i + 1}] ${role}: ${text}`
+  }).join('\n\n')
+  const result = await sendMessage({
+    connection,
+    messages: [{ role: 'user', content: `${COMPACTION_PROMPT}\n\n${rendered.slice(0, 12000)}` }],
+    model: model || connection.defaultModel,
+    generationConfig: { maxTokens: 1200, temperature: 0.3 },
+    autoTools: false,
+  })
+  return (result.text || '').trim()
+}
+
+export function buildSummaryInjection(summary) {
+  if (!summary?.trim()) return ''
+  return [
+    '以下是之前对话的接续笔记（已压缩），作为背景参考保持连贯。不要提及笔记本身的存在。',
+    '',
+    summary.trim(),
+  ].join('\n')
+}
+
 export const BUILTIN_MODELS = {
   openai: ['gpt-4.1', 'gpt-4.1-mini', 'gpt-4o', 'gpt-4o-mini', 'o3-mini', 'o1'],
   gemini: ['gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-1.5-pro', 'gemini-2.5-flash-preview-04-17'],
