@@ -5,7 +5,7 @@ import { formatTime } from '../../utils'
 import { useStore } from '../../store'
 import { synthesizeSpeech } from '../../api/moonMemory'
 import MusicCard from './MusicCard'
-import { applyInlineFx } from '../../utils/moodFx'
+import { applyInlineFx, stripInlineFx } from '../../utils/moodFx'
 
 marked.setOptions({
   breaks: true,
@@ -294,8 +294,9 @@ export default function MessageBubble({ msg, onEdit, onQuote, isLast }) {
       try {
         // 语音标签直接转成 MiniMax 认的圆括号形式（圆括号不在下面的符号清理名单里）。
         // ⚠️别再用 __VTAG__ 哨兵保护——下面的清理会剥掉下划线，哨兵残骸 VTAGbreath 会被逐字朗读
-        const plainText = msg.content
+        const plainText = stripInlineFx(msg.content) // 情绪特效标签只留正文（否则 glow/shake 被念成英文）
           .replace(/\[music:[^\]]+\]/g, '')          // 点歌标签不朗读
+          .replace(/\[sticker:[^\]]+\]/g, '')        // 贴图标签不朗读（否则被念成 sticker:文件名）
           .replace(/\[MSG\]/gi, ' ')                 // 漏拆的分段符不朗读（否则被念成英文 MSG）
           .replace(VOICE_TAG_RE, (m, t) => (t.toLowerCase() === 'laughter' ? '(laughs)' : '(breath)'))
           .replace(/!\[[^\]]*\]\([^)]*\)/g, '')   // 图片（贴图）整体去掉
@@ -344,7 +345,7 @@ export default function MessageBubble({ msg, onEdit, onQuote, isLast }) {
   const thinkingText = (msg.thinking || '').replace(/<\/?[a-zA-Z_][\w:-]*>/g, '').trim()
 
   return (
-    <div className={`message-row ${isUser ? 'message-row-user' : 'message-row-assistant'}${isLast ? ' msg-last' : ''}`}>
+    <div data-mid={msg.id} className={`message-row ${isUser ? 'message-row-user' : 'message-row-assistant'}${isLast ? ' msg-last' : ''}`}>
       {!isUser && (
         <div className="message-avatar" style={{ borderRadius: avatarRadius }}>
           {useImages && avatarConfig.assistantImage

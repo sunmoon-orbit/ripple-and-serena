@@ -142,8 +142,9 @@ const CROW_SLEEP = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="-15 -25 45 
 
 const EGG_POOL = [CLAWD_COFFEE, CLAWD_MUSIC, CROW_HEART, CROW_SLEEP]
 
-// 每次回复完成后调用：约 1% 概率返回一只小家伙，其余时候 null
-export function pickEgg(prob = 0.01) {
+// 每次回复完成后调用：约 4% 概率返回一只小家伙，其余时候 null
+// （原 1%+4.9s 停留，阿颖聊了一周从没见过——期望太低，0709 调成 4%+8s）
+export function pickEgg(prob = 0.04) {
   if (Math.random() >= prob) return null
   return EGG_POOL[Math.floor(Math.random() * EGG_POOL.length)]
 }
@@ -151,8 +152,8 @@ export function pickEgg(prob = 0.01) {
 export default function CompletionEgg({ svg, onDone }) {
   const [fading, setFading] = useState(false)
   useEffect(() => {
-    const t1 = setTimeout(() => setFading(true), 4200)
-    const t2 = setTimeout(() => onDone?.(), 4900)
+    const t1 = setTimeout(() => setFading(true), 7300)
+    const t2 = setTimeout(() => onDone?.(), 8000)
     return () => { clearTimeout(t1); clearTimeout(t2) }
   }, [onDone])
   return (

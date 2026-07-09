@@ -1364,7 +1364,7 @@ textarea.form-input { display: block; margin: 8px 16px 12px; }
 .history-item-meta { display: flex; gap: 6px; align-items: center; margin-bottom: 3px; }
 .history-item-role { font-size: 11px; font-weight: 600; color: var(--accent); }
 .history-item-title { font-size: 11px; color: var(--text-faint); }
-.history-item-content { font-size: 12px; color: var(--text-soft); line-height: 1.5; }
+.history-item-content { font-size: 12px; color: var(--text-mid); line-height: 1.5; }
 
 /* Model panel (overlay) */
 .model-panel-overlay {
@@ -3178,3 +3178,158 @@ body.mp-active .scroll-bottom-btn { bottom: 139px; }
 .fdl-words-label { font-size: 10px; color: var(--text-faint); letter-spacing: 0.25em; }
 .fdl-foot { font-size: 10px; color: var(--text-faint); letter-spacing: 0.2em; margin-top: 4px; }
 .fdl-note { font-size: 11px; color: var(--text-faint); }
+
+/* ── 聊天记录日历跳转 ── */
+.chat-cal-overlay {
+  position: fixed; inset: 0; z-index: 1200;
+  background: rgba(0,0,0,0.35);
+  display: flex; align-items: center; justify-content: center;
+}
+.chat-cal {
+  background: var(--card, var(--bg));
+  border: 1px solid var(--border);
+  border-radius: 14px; padding: 14px 16px 10px;
+  width: min(330px, calc(100vw - 40px));
+  box-shadow: 0 12px 40px rgba(0,0,0,0.25);
+}
+.chat-cal-head {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 10px;
+}
+.chat-cal-title { font-size: 14px; font-weight: 600; color: var(--text); }
+.chat-cal-nav {
+  background: none; border: none; color: var(--text-mid);
+  font-size: 20px; line-height: 1; cursor: pointer; padding: 2px 10px;
+}
+.chat-cal-nav:disabled { opacity: 0.25; cursor: default; }
+.chat-cal-grid {
+  display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px;
+  text-align: center;
+}
+.chat-cal-week { font-size: 10px; color: var(--text-faint); padding: 4px 0; }
+.chat-cal-day {
+  position: relative;
+  background: none; border: none; border-radius: 8px;
+  font-size: 13px; color: var(--text-faint);
+  padding: 7px 0 11px; cursor: default;
+}
+.chat-cal-day.has-msgs {
+  color: var(--text); cursor: pointer; font-weight: 500;
+}
+.chat-cal-day.has-msgs:hover { background: var(--border); }
+.chat-cal-day.today { outline: 1px solid var(--accent, #7a9ab8); outline-offset: -1px; }
+.chat-cal-dot {
+  position: absolute; left: 50%; bottom: 4px; transform: translateX(-50%);
+  width: 4px; height: 4px; border-radius: 50%;
+  background: var(--accent, #7a9ab8);
+}
+.chat-cal-foot {
+  margin-top: 8px; font-size: 10.5px; color: var(--text-faint); text-align: center;
+}
+.msg-jump-flash { animation: msg-jump-flash 1.8s ease-out; }
+@keyframes msg-jump-flash {
+  0% { background: color-mix(in srgb, var(--accent, #7a9ab8) 22%, transparent); border-radius: 10px; }
+  100% { background: transparent; }
+}
+
+/* ── 每日行为清单 · 超市小票 ── */
+.receipt-overlay {
+  position: fixed; inset: 0; z-index: 1200;
+  background: rgba(0,0,0,0.4);
+  display: flex; align-items: center; justify-content: center;
+  padding: 20px;
+}
+.receipt {
+  width: min(320px, calc(100vw - 40px));
+  max-height: calc(100vh - 80px);
+  display: flex; flex-direction: column;
+  filter: drop-shadow(0 10px 28px rgba(0,0,0,0.35));
+}
+.receipt-inner {
+  background: #fdfcf7; color: #2c2a26;
+  font-family: "Courier New", "Noto Sans Mono CJK SC", monospace;
+  padding: 18px 16px 10px;
+  overflow-y: auto;
+  border-radius: 3px 3px 0 0;
+}
+.receipt-head { text-align: center; margin-bottom: 10px; }
+.receipt-store { font-size: 16px; font-weight: 700; letter-spacing: 0.3em; }
+.receipt-sub { font-size: 10px; color: #8a857c; margin-top: 3px; letter-spacing: 0.06em; }
+.receipt-tear {
+  border-top: 1.5px dashed #c9c4b8;
+  margin: 8px -4px;
+}
+.receipt-body { min-height: 60px; }
+.receipt-empty {
+  text-align: center; font-size: 11.5px; color: #8a857c;
+  padding: 16px 4px; line-height: 1.8;
+}
+.receipt-item {
+  display: flex; align-items: center; gap: 8px;
+  padding: 6px 0; font-size: 13.5px;
+}
+.receipt-check {
+  width: 17px; height: 17px; flex-shrink: 0;
+  border: 1.5px solid #6b675e; border-radius: 3px;
+  background: none; cursor: pointer;
+  font-size: 12px; line-height: 1; color: #2c2a26;
+  display: flex; align-items: center; justify-content: center;
+  font-family: inherit;
+}
+.receipt-text { flex: 1; cursor: pointer; word-break: break-all; line-height: 1.45; }
+.receipt-item.done .receipt-text {
+  text-decoration: line-through; text-decoration-thickness: 1.5px;
+  color: #a09a8e;
+}
+.receipt-item.done .receipt-check { border-color: #a09a8e; color: #a09a8e; }
+.receipt-by {
+  font-size: 9px; color: #fdfcf7; background: #6b675e;
+  border-radius: 50%; width: 15px; height: 15px; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+}
+.receipt-del {
+  background: none; border: none; color: #c9c4b8;
+  font-size: 11px; cursor: pointer; padding: 2px 4px; flex-shrink: 0;
+}
+.receipt-del:hover { color: #b05060; }
+.receipt-total {
+  display: flex; justify-content: space-between;
+  font-size: 12px; font-weight: 700; padding: 2px 0 6px;
+}
+.receipt-foot {
+  text-align: center; font-size: 10px; color: #8a857c;
+  line-height: 1.9; padding-bottom: 6px;
+}
+.receipt-barcode {
+  font-size: 15px; letter-spacing: 1px; color: #2c2a26;
+  margin-top: 4px; user-select: none;
+}
+.receipt-add {
+  display: flex; gap: 6px; padding: 8px 0 4px;
+  border-top: 1.5px dashed #c9c4b8;
+}
+.receipt-add input {
+  flex: 1; min-width: 0;
+  background: #f4f2ea; border: 1px solid #dcd7ca; border-radius: 4px;
+  font-family: inherit; font-size: 12.5px; color: #2c2a26;
+  padding: 7px 9px; outline: none;
+}
+.receipt-add input:focus { border-color: #8a857c; }
+.receipt-add button {
+  background: #2c2a26; color: #fdfcf7; border: none; border-radius: 4px;
+  font-family: inherit; font-size: 12px; padding: 0 14px; cursor: pointer;
+}
+.receipt-add button:disabled { opacity: 0.4; cursor: default; }
+/* 底部锯齿撕边 */
+.receipt-serration {
+  height: 10px; flex-shrink: 0;
+  background: #fdfcf7;
+  clip-path: polygon(0 0, 100% 0, 100% 25%,
+    97.5% 100%, 95% 25%, 92.5% 100%, 90% 25%, 87.5% 100%, 85% 25%,
+    82.5% 100%, 80% 25%, 77.5% 100%, 75% 25%, 72.5% 100%, 70% 25%,
+    67.5% 100%, 65% 25%, 62.5% 100%, 60% 25%, 57.5% 100%, 55% 25%,
+    52.5% 100%, 50% 25%, 47.5% 100%, 45% 25%, 42.5% 100%, 40% 25%,
+    37.5% 100%, 35% 25%, 32.5% 100%, 30% 25%, 27.5% 100%, 25% 25%,
+    22.5% 100%, 20% 25%, 17.5% 100%, 15% 25%, 12.5% 100%, 10% 25%,
+    7.5% 100%, 5% 25%, 2.5% 100%, 0 25%);
+}
