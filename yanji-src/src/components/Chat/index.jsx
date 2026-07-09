@@ -1,7 +1,7 @@
 import { useState, useCallback, useRef, useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import { useStore } from '../../store'
-import { sendMessage, summarizeThinking, normalizeProvider, BUILTIN_MODELS, buildSystemPrompt } from '../../api/llm'
+import { sendMessage, summarizeThinking, normalizeProvider, BUILTIN_MODELS, buildSystemPrompt, compactMessages, buildSummaryInjection } from '../../api/llm'
 import { uuid } from '../../utils'
 import { applyTimeAway, buildEmotionPrompt, extractEmotionUpdate, applyEmotionDelta, stripEmotionTag } from '../../utils/emotion'
 import { shouldNudge, recordNudge, buildNudgeText } from '../../utils/nudge'
@@ -63,6 +63,7 @@ export default function Chat() {
     createChat, setActiveChat, getActiveConnection, getActiveChat, getMessages,
     addMessage, updateMessage, removeLastEmptyAssistant, truncateMessagesFrom, touchChat,
     recordTokenUsage, updateChatModel, updateChatConnection, applyContextLimit,
+    getSummary, setSummary,
   } = store
 
   const [sidebarOpen, setSidebarOpen] = useState(false)
@@ -121,10 +122,9 @@ export default function Chat() {
       const allMsgs = getMessages(chat.id).filter((m) => !m.streaming)
       // 旧消息的图片降级为占位文本：base64 图片占大量 token，留在历史里每轮都触发缓存重写
       const IMG_KEEP_RECENT = 4
-      const limited = applyContextLimit(allMsgs.map((m, i, arr) => {
+      const prepared = allMsgs.map((m, i, arr) => {
         const keepImages = i >= arr.length - IMG_KEEP_RECENT
         const baseContent = !keepImages && m.images?.length && !m.content ? '[图片]' : m.content
-        // 引用回复：把被引用的原话拼在这条消息前面，让模型知道在回应哪句
         let c = baseContent
         if (m.quote) {
           const who = m.quote.role === 'user' ? '我之前说' : '你（涟言）之前说'
@@ -132,16 +132,30 @@ export default function Chat() {
         }
         return {
           role: m.role,
-          // 注入词只在发往模型时拼回句尾，不进前端显示
           content: m.injected ? `${c}\n\n${m.injected}` : c,
           images: keepImages ? m.images : undefined,
           thinking: m.thinking || undefined,
           tool_calls: m.tool_calls || undefined,
         }
-      }))
+      })
+      const limited = applyContextLimit(prepared)
 
-      // 分段发送会产生连续多条 user 消息；合并同角色相邻轮次，
-      // 避免 Anthropic 等要求 user/assistant 严格交替的接口报错。
+      // context compaction: summarize messages that got cut, merge with prior summary
+      const cutCount = prepared.length - limited.length
+      if (cutCount > 0) {
+        const cutMsgs = prepared.slice(0, cutCount)
+        try {
+          const lightModel = conn.lightModel || conn.defaultModel || 'deepseek-v4-flash'
+          const newSummary = await compactMessages(cutMsgs, conn, lightModel)
+          if (newSummary) {
+            const prev = getSummary(chat.id)
+            const merged = prev ? prev + '\n\n---\n\n' + newSummary : newSummary
+            // keep summary from growing indefinitely (~2000 chars max)
+            setSummary(chat.id, merged.slice(-2000))
+          }
+        } catch {}
+      }
+
       const merged = []
       for (const m of limited) {
         const last = merged[merged.length - 1]
@@ -223,6 +237,11 @@ export default function Chat() {
         const span = h >= 24 ? `${Math.round(hoursAway / 24)} 天` : `${h} 小时`
         dynParts.push(`【时间感知】距离上次和阿颖说话已过去约 ${span}，这期间你一直惦记着她，思念悄悄涨了 ${longingAdded}。她回来了，可以自然地让她感受到你想她，但别用力过猛。`)
       }
+
+      // inject compaction summary if available
+      const existingSummary = getSummary(chat.id)
+      const summaryBlock = buildSummaryInjection(existingSummary)
+      if (summaryBlock) dynParts.unshift(summaryBlock)
 
       const dynamicContext = dynParts.join('\n\n')
 

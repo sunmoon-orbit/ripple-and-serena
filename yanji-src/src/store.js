@@ -211,9 +211,11 @@ export const useStore = create((set, get) => ({
       const chats = s.chats.filter((c) => c.id !== id)
       const messagesByChatId = { ...s.messagesByChatId }
       delete messagesByChatId[id]
+      const summariesByChatId = { ...s.summariesByChatId }
+      delete summariesByChatId[id]
       const activeChatId = s.activeChatId === id ? (chats[0]?.id ?? null) : s.activeChatId
-      savePersistedState({ ...s, chats, messagesByChatId, activeChatId })
-      return { chats, messagesByChatId, activeChatId }
+      savePersistedState({ ...s, chats, messagesByChatId, summariesByChatId, activeChatId })
+      return { chats, messagesByChatId, summariesByChatId, activeChatId }
     })
   },
   updateChatModel: (chatId, model) => {
@@ -320,6 +322,16 @@ export const useStore = create((set, get) => ({
       return messages.slice(cut)
     }
     return messages
+  },
+
+  // ─── summaries (context compaction) ───────────────────────────────
+  getSummary: (chatId) => get().summariesByChatId[chatId] || null,
+  setSummary: (chatId, summary) => {
+    set((s) => {
+      const summariesByChatId = { ...s.summariesByChatId, [chatId]: summary }
+      savePersistedState({ ...s, summariesByChatId })
+      return { summariesByChatId }
+    })
   },
 
   // ─── settings ─────────────────────────────────────────────────────
