@@ -2,8 +2,34 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { useStore } from '../../store'
 import { showToast } from '../Toast'
 import { createLullaby } from '../../audio/lullaby'
+import { fetchLetterAnnotations, createLetterAnnotation, deleteLetterAnnotation } from '../../api/moonMemory'
 import CoRead from './CoRead'
 import BookRead from './BookRead'
+
+const ANNO_COLORS = [
+  { id: 'yellow', hex: '#f5d76e' },
+  { id: 'pink', hex: '#f0a6c0' },
+  { id: 'blue', hex: '#9ec5e8' },
+  { id: 'green', hex: '#a8d8b0' },
+]
+const ANNO_HEX = Object.fromEntries(ANNO_COLORS.map((c) => [c.id, c.hex]))
+
+function buildLetterSegments(content, annos) {
+  const points = new Set([0, content.length])
+  for (const a of annos) {
+    points.add(Math.max(0, Math.min(a.start_off, content.length)))
+    points.add(Math.max(0, Math.min(a.end_off, content.length)))
+  }
+  const sorted = [...points].sort((x, y) => x - y)
+  const segs = []
+  for (let i = 0; i < sorted.length - 1; i++) {
+    const [s, e] = [sorted[i], sorted[i + 1]]
+    if (s >= e) continue
+    const covering = annos.filter((a) => a.start_off <= s && a.end_off >= e)
+    segs.push({ start: s, text: content.slice(s, e), annos: covering })
+  }
+  return segs
+}
 
 const START_DATE = new Date('2025-10-10T00:00:00+08:00')
 const STORAGE_KEY_MSG    = 'roost_messages'
@@ -220,6 +246,7 @@ function BirdTracks() {
 // ══════════════════════════════════════════════════════════════════════════════
 export default function Roost() {
   const moonMemory = useStore(s => s.moonMemory)
+  const moonCfg = { baseUrl: (moonMemory?.baseUrl || moonMemory?.apiUrl || 'https://memory.ravenlove.cc').replace(/\/$/, ''), apiToken: moonMemory?.apiToken }
   const setActivePanel = useStore(s => s.setActivePanel)
   const { msgs, add: addMsg, del: delMsg } = useMessages(moonMemory)
   const { mems, loading: reviewLoading, load: loadReview, trash } = useReview(moonMemory)
@@ -230,6 +257,14 @@ export default function Roost() {
   const [selectedLetter, setSelectedLetter] = useState(null)
   const [letterCat, setLetterCat] = useState('all')
   const [compose, setCompose] = useState(emptyCompose)
+  // letter annotation state
+  const [letterAnnos, setLetterAnnos] = useState([])
+  const [letterPending, setLetterPending] = useState(null)
+  const [letterComposing, setLetterComposing] = useState(false)
+  const [letterAnnoColor, setLetterAnnoColor] = useState('yellow')
+  const [letterAnnoNote, setLetterAnnoNote] = useState('')
+  const [letterAnnoAuthor, setLetterAnnoAuthor] = useState('阿颖')
+  const letterTextRef = useRef(null)
   const [msgInput, setMsgInput] = useState('')
   // 留言身份。旧版把「阿颖留言/乌鸦留言」两个按钮直接当提交键，看起来像切换标签，
   // 阿颖找不到保存在哪（2026-07-03 反馈）——拆成 身份切换 + 明确的「留下」按钮
@@ -265,12 +300,66 @@ export default function Roost() {
   function openLetters() { setModal('letters'); loadLetters() }
   async function openLetter(id) {
     const full = await getLetter(id)
-    if (full && full.id) { setSelectedLetter(full); setModal('letter-detail') }
+    if (full && full.id) {
+      setSelectedLetter(full)
+      setModal('letter-detail')
+      setLetterPending(null); setLetterComposing(false); setLetterAnnoNote('')
+      try {
+        const annos = await fetchLetterAnnotations(moonCfg, id)
+        setLetterAnnos(Array.isArray(annos) ? annos : [])
+      } catch { setLetterAnnos([]) }
+    }
   }
   async function submitLetter() {
     if (!compose.body.trim()) { showToast('信的内容不能为空', 'error'); return }
     const ok = await addLetter({ ...compose, sent_at: compose.sent_at || null, source: 'manual' })
     if (ok) { setCompose(emptyCompose); setModal('letters') }
+  }
+
+  useEffect(() => {
+    if (!selectedLetter) return
+    function onSelChange() {
+      if (letterComposing) return
+      const sel = window.getSelection()
+      const el = letterTextRef.current
+      if (!el || !sel || sel.rangeCount === 0 || sel.isCollapsed) return
+      const range = sel.getRangeAt(0)
+      if (!el.contains(range.commonAncestorContainer)) return
+      const pre = range.cloneRange()
+      pre.selectNodeContents(el)
+      pre.setEnd(range.startContainer, range.startOffset)
+      const start = pre.toString().length
+      const quote = range.toString()
+      if (!quote.trim()) return
+      setLetterPending({ start, end: start + quote.length, quote })
+    }
+    document.addEventListener('selectionchange', onSelChange)
+    return () => document.removeEventListener('selectionchange', onSelChange)
+  }, [selectedLetter, letterComposing])
+
+  async function submitLetterAnno() {
+    if (!letterPending || !selectedLetter) return
+    try {
+      const created = await createLetterAnnotation(moonCfg, selectedLetter.id, {
+        start_off: letterPending.start,
+        end_off: letterPending.end,
+        quote: letterPending.quote.slice(0, 200),
+        author: letterAnnoAuthor,
+        color: letterAnnoColor,
+        note: letterAnnoNote.trim(),
+      })
+      setLetterAnnos(prev => [...prev, created].sort((a, b) => a.start_off - b.start_off))
+      setLetterPending(null); setLetterComposing(false); setLetterAnnoNote(''); setLetterAnnoColor('yellow')
+      window.getSelection()?.removeAllRanges()
+      showToast('划下了这一句')
+    } catch { showToast('批注失败', 'error') }
+  }
+
+  async function removeLetterAnno(id) {
+    try {
+      await deleteLetterAnnotation(moonCfg, id)
+      setLetterAnnos(prev => prev.filter(a => a.id !== id))
+    } catch { showToast('删除失败', 'error') }
   }
 
   const visibleLetters = letterCat === 'all' ? letters : letters.filter(l => l.category === letterCat)
@@ -603,33 +692,110 @@ export default function Roost() {
         </div>
       )}
 
-      {/* ── 衔信 信纸 Modal ── */}
-      {modal === 'letter-detail' && selectedLetter && (
-        <div className="roost-overlay" onClick={() => { setModal('letters'); setSelectedLetter(null) }}>
-          <div className="roost-modal roost-modal-tall" onClick={e => e.stopPropagation()}>
-            <div className="roost-modal-header">
-              <span>{selectedLetter.title || '（无题）'}</span>
-              <button className="roost-modal-close" onClick={() => { setModal('letters'); setSelectedLetter(null) }}>✕</button>
-            </div>
-            <div className="roost-modal-body">
-              <div className={'roost-letter-paper' + (selectedLetter.category === 'love' ? ' love' : '')}>
-                {selectedLetter.category === 'love' && (
-                  <div className="roost-letter-deco" aria-hidden="true"><WingedHeart size={56} /></div>
-                )}
-                <div className="roost-letter-paper-head">
-                  <span>{selectedLetter.direction === 'out' ? `致 ${selectedLetter.recipient || ''}` : `${selectedLetter.sender || ''} 寄`}</span>
-                  <span>{(selectedLetter.sent_at || selectedLetter.created_at || '').slice(0, 10)}</span>
-                </div>
-                <div className="roost-letter-paper-body">{selectedLetter.body}</div>
+      {/* ── 衔信 信纸 Modal（含划线批注） ── */}
+      {modal === 'letter-detail' && selectedLetter && (() => {
+        const segs = buildLetterSegments(selectedLetter.body || '', letterAnnos)
+        return (
+          <div className="roost-overlay" onClick={() => { setModal('letters'); setSelectedLetter(null); setLetterPending(null); setLetterComposing(false) }}>
+            <div className="roost-modal roost-modal-tall" onClick={e => e.stopPropagation()}>
+              <div className="roost-modal-header">
+                <span>{selectedLetter.title || '（无题）'}</span>
+                <button className="roost-modal-close" onClick={() => { setModal('letters'); setSelectedLetter(null); setLetterPending(null); setLetterComposing(false) }}>✕</button>
               </div>
-              <button className="roost-btn roost-btn-danger" style={{ marginTop: 14 }}
-                onClick={async () => { await removeLetter(selectedLetter.id); setModal('letters'); setSelectedLetter(null) }}>
-                删除这封
-              </button>
+              <div className="roost-modal-body">
+                <div className={'roost-letter-paper' + (selectedLetter.category === 'love' ? ' love' : '')}>
+                  {selectedLetter.category === 'love' && (
+                    <div className="roost-letter-deco" aria-hidden="true"><WingedHeart size={56} /></div>
+                  )}
+                  <div className="roost-letter-paper-head">
+                    <span>{selectedLetter.direction === 'out' ? `致 ${selectedLetter.recipient || ''}` : `${selectedLetter.sender || ''} 寄`}</span>
+                    <span>{(selectedLetter.sent_at || selectedLetter.created_at || '').slice(0, 10)}</span>
+                  </div>
+                  <div className="roost-letter-paper-body" ref={letterTextRef}>
+                    {segs.map((s) =>
+                      s.annos.length ? (
+                        <mark
+                          key={s.start}
+                          className="bookread-mark"
+                          style={{ backgroundColor: (ANNO_HEX[s.annos[0].color] || '#f5d76e') + '66', borderBottom: `2px solid ${ANNO_HEX[s.annos[0].color] || '#f5d76e'}` }}
+                        >{s.text}</mark>
+                      ) : (
+                        <span key={s.start}>{s.text}</span>
+                      )
+                    )}
+                  </div>
+                  <div className="bookread-foot">
+                    <span className="bookread-foot-hint">长按选中一句话，就能划线批注</span>
+                  </div>
+                </div>
+                {letterAnnos.length > 0 && (
+                  <div className="bookread-anno-list">
+                    <div className="roost-card-label" style={{ marginBottom: 8 }}>划线与批注</div>
+                    {letterAnnos.map((a) => (
+                      <div
+                        key={a.id}
+                        className="bookread-anno-card"
+                        style={{ borderLeftColor: ANNO_HEX[a.color] || '#f5d76e' }}
+                      >
+                        <div className="bookread-anno-quote">{a.quote}</div>
+                        <div className="bookread-anno-row">
+                          <span className="coread-anno-author">{a.author}</span>
+                          <span className="coread-anno-note">{a.note || '（划线）'}</span>
+                          <button className="coread-anno-del" onClick={() => removeLetterAnno(a.id)}>✕</button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                <button className="roost-btn roost-btn-danger" style={{ marginTop: 14 }}
+                  onClick={async () => { await removeLetter(selectedLetter.id); setModal('letters'); setSelectedLetter(null) }}>
+                  删除这封
+                </button>
+              </div>
+
+              {letterPending && !letterComposing && (
+                <div className="bookread-pending" onClick={(e) => e.stopPropagation()}>
+                  <span className="bookread-pending-quote">{letterPending.quote.length > 24 ? letterPending.quote.slice(0, 24) + '...' : letterPending.quote}</span>
+                  <button className="roost-btn roost-btn-sm" onClick={() => setLetterComposing(true)}>划线批注</button>
+                </div>
+              )}
+
+              {letterPending && letterComposing && (
+                <div className="coread-anno-compose" onClick={(e) => e.stopPropagation()}>
+                  <div className="bookread-anno-quote">{letterPending.quote.length > 60 ? letterPending.quote.slice(0, 60) + '...' : letterPending.quote}</div>
+                  <div className="coread-color-row">
+                    {ANNO_COLORS.map((c) => (
+                      <button
+                        key={c.id}
+                        className={'coread-color-dot' + (letterAnnoColor === c.id ? ' active' : '')}
+                        style={{ background: c.hex }}
+                        onClick={() => setLetterAnnoColor(c.id)}
+                      />
+                    ))}
+                    <div className="bookread-author-toggle">
+                      {['阿颖', '涟言'].map((who) => (
+                        <button key={who} className={letterAnnoAuthor === who ? 'active' : ''} onClick={() => setLetterAnnoAuthor(who)}>{who}</button>
+                      ))}
+                    </div>
+                  </div>
+                  <textarea
+                    className="coread-anno-input"
+                    placeholder="写一句批注（留空＝纯划线）......"
+                    value={letterAnnoNote}
+                    onChange={(e) => setLetterAnnoNote(e.target.value)}
+                    rows={2}
+                    autoFocus
+                  />
+                  <div className="coread-anno-actions">
+                    <button className="roost-btn roost-btn-ghost roost-btn-sm" onClick={() => { setLetterPending(null); setLetterComposing(false); window.getSelection()?.removeAllRanges() }}>取消</button>
+                    <button className="roost-btn roost-btn-sm" onClick={submitLetterAnno}>留下</button>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
-        </div>
-      )}
+        )
+      })()}
     </div>
   )
 }
