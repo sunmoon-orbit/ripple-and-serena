@@ -3483,3 +3483,54 @@ body.mp-active .scroll-bottom-btn { bottom: 139px; }
   padding: 6px 0 2px; width: 100%; text-align: center;
 }
 .period-more:hover { color: var(--text); }
+
+/* ── 纪念日弹卡（annv-*）──────────────────────────────────────── */
+.annv-overlay {
+  position: fixed; inset: 0; z-index: 1200;
+  background: rgba(0, 0, 0, 0.45);
+  display: flex; align-items: center; justify-content: center;
+  padding: 24px;
+  animation: annv-fade 0.35s ease;
+}
+@keyframes annv-fade { from { opacity: 0; } to { opacity: 1; } }
+.annv-card {
+  width: min(340px, 92vw);
+  background: var(--bg-elevated, var(--bg));
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  padding: 28px 24px 22px;
+  text-align: center;
+  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.35);
+  animation: annv-pop 0.45s cubic-bezier(0.18, 1.25, 0.4, 1);
+}
+@keyframes annv-pop {
+  from { transform: translateY(18px) scale(0.92); opacity: 0; }
+  to { transform: none; opacity: 1; }
+}
+.annv-emoji { font-size: 34px; margin-bottom: 6px; }
+.annv-title { font-size: 16px; font-weight: 600; color: var(--text); }
+.annv-years { font-size: 12px; color: var(--text-faint); margin-top: 4px; }
+.annv-divider {
+  width: 44px; height: 1px; margin: 14px auto;
+  background: var(--border);
+}
+.annv-message {
+  font-family: 'Kaiti SC', 'STKaiti', KaiTi, serif;
+  font-size: 15px; line-height: 1.9;
+  color: var(--text);
+  text-align: left;
+  white-space: pre-wrap;
+  max-height: 46vh; overflow-y: auto;
+}
+.annv-sign {
+  margin-top: 14px;
+  font-family: 'Kaiti SC', 'STKaiti', KaiTi, serif;
+  font-size: 13px; color: var(--text-faint);
+  text-align: right;
+}
+.annv-close {
+  margin-top: 18px;
+  background: var(--accent); color: #fff;
+  border: none; border-radius: 999px;
+  padding: 8px 32px; font-size: 14px; cursor: pointer;
+}
