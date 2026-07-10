@@ -269,6 +269,17 @@ export async function fetchVitals(config, hours = 24, limit = 200) {
   return request(baseUrl, `/vitals?hours=${hours}&limit=${limit}`, { headers: headers(apiToken) })
 }
 
+// ── 纪念日卡片：纪念日当天弹一张涟言亲笔的小卡片（阿颖的主意，2026-07-10）──
+export async function fetchAnniversaryToday(config) {
+  const { baseUrl, apiToken } = config
+  return request(baseUrl, '/anniversaries/today', { headers: headers(apiToken) })
+}
+
+export async function fetchAnniversaryCards(config, annId) {
+  const { baseUrl, apiToken } = config
+  return request(baseUrl, `/anniversaries/${annId}/cards`, { headers: headers(apiToken) })
+}
+
 // ── 月经周期（小月历）──
 export async function fetchPeriod(config) {
   const { baseUrl, apiToken } = config
