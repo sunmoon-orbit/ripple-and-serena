@@ -3,7 +3,7 @@ import { useStore } from '../../store'
 import { formatTime } from '../../utils'
 import { applyDecayAndGet, getEmotionState, POSITIVE_SLOTS, NEGATIVE_SLOTS, SLOT_LABELS } from '../../utils/emotion'
 
-export default function ConversationList({ onClose, onStartCall, onOpenGames, onOpenMusic, onOpenWheel, onOpenFortune, onOpenChecklist }) {
+export default function ConversationList({ onClose, onStartCall, onOpenGames, onOpenMusic, onOpenWheel, onOpenFortune, onOpenChecklist, onOpenHealth }) {
   const chats = useStore((s) => s.chats)
   const connections = useStore((s) => s.connections)
   const activeChatId = useStore((s) => s.activeChatId)
@@ -257,6 +257,13 @@ export default function ConversationList({ onClose, onStartCall, onOpenGames, on
                 <line x1="9" y1="15" x2="13" y2="15" />
               </svg>
               <span>今日小票</span>
+            </button>
+            <button className="sb-tool-item" onClick={() => { onClose?.(); onOpenHealth?.() }}>
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78L12 21.23l8.84-8.84a5.5 5.5 0 0 0 0-7.78z" />
+                <polyline points="4 12 8 12 10 9 13 15 15 12 20 12" />
+              </svg>
+              <span>身体气象站</span>
             </button>
           </div>
         )}
