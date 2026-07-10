@@ -764,7 +764,8 @@ export async function executeMemoryTool(toolName, args, config) {
         data = await logPeriodStart(config, args.date, args.note, '涟言')
       } else if (args.action === 'end') {
         const cur = await fetchPeriod(config)
-        const ongoing = cur.logs?.[0] && !cur.logs[0].end_date ? cur.logs[0] : null
+        // 乱序补记时进行中的未必是最新一条，找任何一条没结束的
+        const ongoing = (cur.logs || []).find((l) => !l.end_date) || null
         if (!ongoing) return '没有进行中的记录，不用记结束'
         data = await logPeriodEnd(config, ongoing.id, args.date)
       } else {
