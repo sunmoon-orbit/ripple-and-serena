@@ -3477,3 +3477,9 @@ body.mp-active .scroll-bottom-btn { bottom: 139px; }
   font-size: 11px; padding: 3px 8px; white-space: nowrap;
 }
 .period-row-end:disabled { opacity: 0.5; }
+.period-more {
+  background: none; border: none; cursor: pointer;
+  color: var(--text-faint); font-size: 11px;
+  padding: 6px 0 2px; width: 100%; text-align: center;
+}
+.period-more:hover { color: var(--text); }
