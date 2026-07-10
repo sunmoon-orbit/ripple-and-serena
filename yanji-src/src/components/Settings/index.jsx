@@ -311,7 +311,23 @@ export default function Settings() {
     totalTokens: acc.totalTokens + (s.totalTokens || 0),
     promptTokens: acc.promptTokens + (s.promptTokens || 0),
     completionTokens: acc.completionTokens + (s.completionTokens || 0),
-  }), { calls: 0, totalTokens: 0, promptTokens: 0, completionTokens: 0 })
+    cachedTokens: acc.cachedTokens + (s.cachedTokens || 0),
+    cacheWriteTokens: acc.cacheWriteTokens + (s.cacheWriteTokens || 0),
+  }), { calls: 0, totalTokens: 0, promptTokens: 0, completionTokens: 0, cachedTokens: 0, cacheWriteTokens: 0 })
+  // 缓存命中率 = 命中 / 总输入（只有 Claude/DeepSeek 会报缓存字段，其余连接不计入不影响）
+  const hitRate = totalStats.promptTokens > 0 ? totalStats.cachedTokens / totalStats.promptTokens : 0
+  const todayKey = new Date().toLocaleDateString('sv')
+  const todayStats = Object.values(tokenStats).reduce((acc, s) => {
+    const d = s.days?.[todayKey]
+    if (!d) return acc
+    return {
+      calls: acc.calls + (d.calls || 0),
+      promptTokens: acc.promptTokens + (d.promptTokens || 0),
+      completionTokens: acc.completionTokens + (d.completionTokens || 0),
+      cachedTokens: acc.cachedTokens + (d.cachedTokens || 0),
+    }
+  }, { calls: 0, promptTokens: 0, completionTokens: 0, cachedTokens: 0 })
+  const todayHitRate = todayStats.promptTokens > 0 ? todayStats.cachedTokens / todayStats.promptTokens : 0
 
   return (
     <div className="panel-shell settings-panel">
@@ -866,17 +882,61 @@ export default function Settings() {
                 <span className="monitor-value">{totalStats.completionTokens.toLocaleString()}</span>
               </div>
             </div>
+
+            {/* 缓存命中：命中的输入按 1 折计费，命中率高 = 省钱 */}
+            <div className="settings-card">
+              <div className="settings-card-title">Prompt 缓存</div>
+              <div className="card-row">
+                <span className="card-row-label">缓存命中</span>
+                <span className="monitor-value">{totalStats.cachedTokens.toLocaleString()}</span>
+              </div>
+              <div className="card-row">
+                <span className="card-row-label">缓存写入</span>
+                <span className="monitor-value">{totalStats.cacheWriteTokens.toLocaleString()}</span>
+              </div>
+              <div className="card-row">
+                <span className="card-row-label">未命中（全价输入）</span>
+                <span className="monitor-value">{Math.max(0, totalStats.promptTokens - totalStats.cachedTokens - totalStats.cacheWriteTokens).toLocaleString()}</span>
+              </div>
+              <div className="card-row">
+                <span className="card-row-label">累计命中率</span>
+                <span className="monitor-value">{(hitRate * 100).toFixed(1)}%</span>
+              </div>
+              <div className="cache-rate-track">
+                <div className={'cache-rate-fill' + (hitRate >= 0.6 ? ' good' : hitRate >= 0.3 ? ' mid' : '')} style={{ width: `${Math.min(100, hitRate * 100)}%` }} />
+              </div>
+              <p className="card-hint">命中的输入只按约一折计费。命中率 60% 以上算健康；换模型、改系统提示词、隔太久（超过缓存有效期）再聊都会导致一次未命中，属正常。</p>
+            </div>
+
+            <div className="settings-card">
+              <div className="settings-card-title">今日（{todayKey.slice(5)}）</div>
+              <div className="card-row">
+                <span className="card-row-label">调用次数</span>
+                <span className="monitor-value">{todayStats.calls}</span>
+              </div>
+              <div className="card-row">
+                <span className="card-row-label">输入 / 输出</span>
+                <span className="monitor-value">{todayStats.promptTokens.toLocaleString()} / {todayStats.completionTokens.toLocaleString()}</span>
+              </div>
+              <div className="card-row">
+                <span className="card-row-label">今日命中率</span>
+                <span className="monitor-value">{todayStats.calls ? `${(todayHitRate * 100).toFixed(1)}%` : '—'}</span>
+              </div>
+              <p className="card-hint">今日数据从本次更新起才开始按天记，昨天以前的只在累计里。</p>
+            </div>
+
             {connections.length > 0 && (
               <div className="settings-card">
                 <div className="settings-card-title">按连接统计</div>
                 {connections.map((conn) => {
                   const s = tokenStats[conn.id]
                   if (!s) return null
+                  const r = s.promptTokens > 0 && s.cachedTokens ? ` · 命中 ${((s.cachedTokens / s.promptTokens) * 100).toFixed(0)}%` : ''
                   return (
                     <div key={conn.id} className="monitor-conn-row">
                       <div className="monitor-conn-name">{conn.name}</div>
                       <div className="monitor-conn-stats">
-                        {s.calls} 次 · {(s.totalTokens || 0).toLocaleString()} tokens
+                        {s.calls} 次 · {(s.totalTokens || 0).toLocaleString()} tokens{r}
                       </div>
                     </div>
                   )

@@ -3350,3 +3350,18 @@ body.mp-active .scroll-bottom-btn { bottom: 139px; }
   padding: 6px 0 8px;
   user-select: none;
 }
+
+/* ── API 用量监控：缓存命中率条 ─────────────────── */
+.cache-rate-track {
+  height: 6px; border-radius: 3px;
+  background: var(--border);
+  margin: 8px 2px 4px;
+  overflow: hidden;
+}
+.cache-rate-fill {
+  height: 100%; border-radius: 3px;
+  background: #c47a6a; /* 低命中偏暖红 */
+  transition: width 0.4s ease;
+}
+.cache-rate-fill.mid { background: #c9a86a; }
+.cache-rate-fill.good { background: #7aa87a; }
