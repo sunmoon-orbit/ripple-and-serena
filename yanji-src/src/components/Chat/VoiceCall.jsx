@@ -197,10 +197,11 @@ export default function VoiceCall({ onClose, onSend }) {
       if (blob.size < 1200) { showToast('录音太短了，再说一次', 'info'); return }
       setTranscribing(true)
       try {
-        const text = await transcribeAudio({ baseUrl: moonMemory.baseUrl, apiToken: moonMemory.apiToken }, blob)
+        const r = await transcribeAudio({ baseUrl: moonMemory.baseUrl, apiToken: moonMemory.apiToken }, blob)
+        const text = r?.text || ''
         if (text && mounted.current) {
           setUserText(text)
-          onSend(text, [], { voice: true, voiceDuration: dur })
+          onSend(text, [], { voice: true, voiceDuration: dur, voiceTone: r.tone || undefined })
         } else if (!text) showToast('没识别到内容，再说一次', 'info')
       } catch (e) {
         showToast(e.message || '转写失败', 'error', 5000)

@@ -126,10 +126,12 @@ export default function ChatInput({ onSend, disabled, onImageAdd, images, onImag
       if (blob.size < 1200) { showToast('录音太短了，再说一次', 'info'); return }
       setTranscribing(true)
       try {
-        const t = await transcribeAudio({ baseUrl: moonMemory.baseUrl, apiToken: moonMemory.apiToken }, blob)
+        const r = await transcribeAudio({ baseUrl: moonMemory.baseUrl, apiToken: moonMemory.apiToken }, blob)
+        const t = r?.text || ''
         if (t) {
           setText((prev) => prev ? prev + t : t)
-          pendingVoiceRef.current = { duration: dur } // 标记这条来自语音，发送时做成语音条
+          // 标记这条来自语音，发送时做成语音条；tone=SenseVoice 听出的语气，随消息给模型
+          pendingVoiceRef.current = { duration: dur, tone: r.tone || null }
           textareaRef.current?.focus()
         }
         else showToast('没识别到内容，再说一次', 'info')
@@ -162,7 +164,7 @@ export default function ChatInput({ onSend, disabled, onImageAdd, images, onImag
       const blocks = attachedTexts.map((f) => `--- 文件：${f.name} ---\n${f.content}`).join('\n\n')
       finalText = finalText ? `${finalText}\n\n${blocks}` : blocks
     }
-    const vopts = pendingVoiceRef.current ? { voice: true, voiceDuration: pendingVoiceRef.current.duration } : {}
+    const vopts = pendingVoiceRef.current ? { voice: true, voiceDuration: pendingVoiceRef.current.duration, voiceTone: pendingVoiceRef.current.tone || undefined } : {}
     if (quoted) vopts.quote = quoted
     // 分段发送：空行隔开的段落拆成多条气泡依次发出（语音/带附件时不拆）
     if (!pendingVoiceRef.current && !attachedTexts.length) {
