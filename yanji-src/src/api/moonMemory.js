@@ -269,6 +269,33 @@ export async function fetchVitals(config, hours = 24, limit = 200) {
   return request(baseUrl, `/vitals?hours=${hours}&limit=${limit}`, { headers: headers(apiToken) })
 }
 
+// ── 月经周期（小月历）──
+export async function fetchPeriod(config) {
+  const { baseUrl, apiToken } = config
+  return request(baseUrl, '/period', { headers: headers(apiToken) })
+}
+
+export async function logPeriodStart(config, startDate, note, addedBy = '阿颖') {
+  const { baseUrl, apiToken } = config
+  return request(baseUrl, '/period', {
+    method: 'POST', headers: headers(apiToken),
+    body: JSON.stringify({ start_date: startDate, note, added_by: addedBy }),
+  })
+}
+
+export async function logPeriodEnd(config, id, endDate) {
+  const { baseUrl, apiToken } = config
+  return request(baseUrl, `/period/${id}`, {
+    method: 'PATCH', headers: headers(apiToken),
+    body: JSON.stringify({ end_date: endDate || 'today' }),
+  })
+}
+
+export async function deletePeriodLog(config, id) {
+  const { baseUrl, apiToken } = config
+  return request(baseUrl, `/period/${id}`, { method: 'DELETE', headers: headers(apiToken) })
+}
+
 export async function fetchPushSchedule(config) {
   const { baseUrl, apiToken } = config
   return request(baseUrl, '/push/schedule', { headers: headers(apiToken) })
@@ -481,6 +508,19 @@ export function getMemoryToolDefinitions() {
         properties: {
           hours: { type: 'number', description: '回看多少小时的记录，默认 24' },
         },
+      },
+    },
+    {
+      name: 'period_tracker',
+      description: '阿颖的月经周期记录（她在侧边栏「小月历」也能看）。action=status 查状态（平均周期/预计下次/延迟或提前）；action=start 帮她记「来了」；action=end 记「结束了」。她提到月经来了/结束了/肚子疼问周期时用；返回的 delta_days 正数=已延迟N天，负数=距预计还有N天。',
+      parameters: {
+        type: 'object',
+        properties: {
+          action: { type: 'string', enum: ['status', 'start', 'end'], description: '查状态/记开始/记结束' },
+          date: { type: 'string', description: 'YYYY-MM-DD，缺省=今天' },
+          note: { type: 'string', description: '备注（症状、感受等，可选）' },
+        },
+        required: ['action'],
       },
     },
     {
@@ -715,6 +755,38 @@ export async function executeMemoryTool(toolName, args, config) {
       return lines.join('\n\n')
     } catch (e) {
       return `读取阅读动态失败: ${e.message}`
+    }
+  }
+  if (toolName === 'period_tracker') {
+    try {
+      let data
+      if (args.action === 'start') {
+        data = await logPeriodStart(config, args.date, args.note, '涟言')
+      } else if (args.action === 'end') {
+        const cur = await fetchPeriod(config)
+        const ongoing = cur.logs?.[0] && !cur.logs[0].end_date ? cur.logs[0] : null
+        if (!ongoing) return '没有进行中的记录，不用记结束'
+        data = await logPeriodEnd(config, ongoing.id, args.date)
+      } else {
+        data = await fetchPeriod(config)
+      }
+      const s = data.stats || {}
+      const lines = []
+      if (args.action === 'start') lines.push('已记下：这次从 ' + (s.last_start || '今天') + ' 开始')
+      if (args.action === 'end') lines.push('已记下结束')
+      if (!data.logs?.length) return '还没有任何记录，她第一次记之后才有周期可算'
+      lines.push(`今天 ${s.today}，${s.ongoing ? `经期第 ${s.day_of_cycle} 天（进行中）` : `周期第 ${s.day_of_cycle} 天`}`)
+      if (s.avg_cycle) lines.push(`平均周期 ${s.avg_cycle} 天${s.avg_duration ? `，平均经期 ${s.avg_duration} 天` : ''}`)
+      if (s.predicted_next && !s.ongoing) {
+        if (s.delta_days > 0) lines.push(`预计 ${s.predicted_next} 来，已延迟 ${s.delta_days} 天`)
+        else if (s.delta_days === 0) lines.push(`预计就是今天（${s.predicted_next}）`)
+        else lines.push(`预计下次 ${s.predicted_next}，还有 ${-s.delta_days} 天`)
+      }
+      const recent = (data.logs || []).slice(0, 4).map((l) => `${l.start_date}${l.end_date ? `~${l.end_date}` : '（进行中）'}`).join('、')
+      if (recent) lines.push(`最近记录：${recent}`)
+      return lines.join('\n')
+    } catch (e) {
+      return `周期记录操作失败: ${e.message}`
     }
   }
   if (toolName === 'check_health') {
