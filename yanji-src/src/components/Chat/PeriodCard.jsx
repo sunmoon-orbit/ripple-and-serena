@@ -21,6 +21,7 @@ export default function PeriodCard({ onClose }) {
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
   const [pickDate, setPickDate] = useState(todayStr())
+  const [histOpen, setHistOpen] = useState(false)
 
   const load = useCallback(async () => {
     try { setData(await fetchPeriod(cfg)) } catch (e) { setError(e.message || '拉取失败') }
@@ -133,7 +134,7 @@ export default function PeriodCard({ onClose }) {
               <>
                 <div className="health-section-title">历史记录</div>
                 <div className="period-list">
-                  {logs.map((l, i) => {
+                  {(histOpen ? logs : logs.slice(0, 3)).map((l, i) => {
                     const next = logs[i + 1]
                     const cycleLen = next ? Math.round((new Date(l.start_date) - new Date(next.start_date)) / 86400e3) : null
                     const dev = cycleLen && s.avg_cycle ? cycleLen - s.avg_cycle : null
@@ -155,6 +156,11 @@ export default function PeriodCard({ onClose }) {
                     )
                   })}
                 </div>
+                {logs.length > 3 && (
+                  <button className="period-more" onClick={() => setHistOpen((v) => !v)}>
+                    {histOpen ? '收起' : `展开全部（${logs.length} 条）`}
+                  </button>
+                )}
               </>
             )}
             {logs.length === 0 && <div className="health-loading">还没有记录<br />第一次来的时候点上面的按钮</div>}
