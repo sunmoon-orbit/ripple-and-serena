@@ -314,8 +314,17 @@ export default function Settings() {
     cachedTokens: acc.cachedTokens + (s.cachedTokens || 0),
     cacheWriteTokens: acc.cacheWriteTokens + (s.cacheWriteTokens || 0),
   }), { calls: 0, totalTokens: 0, promptTokens: 0, completionTokens: 0, cachedTokens: 0, cacheWriteTokens: 0 })
-  // 缓存命中率 = 命中 / 总输入（只有 Claude/DeepSeek 会报缓存字段，其余连接不计入不影响）
-  const hitRate = totalStats.promptTokens > 0 ? totalStats.cachedTokens / totalStats.promptTokens : 0
+  // 缓存命中率只看近14天分桶：分桶上线（0710）之前的历史输入没记缓存字段，
+  // 混进终身累计当分母会把真实命中率稀释成 0%（上亿历史 token 全被当成未命中）
+  const recentStats = Object.values(tokenStats).reduce((acc, s) => {
+    for (const d of Object.values(s.days || {})) {
+      acc.promptTokens += d.promptTokens || 0
+      acc.cachedTokens += d.cachedTokens || 0
+      acc.cacheWriteTokens += d.cacheWriteTokens || 0
+    }
+    return acc
+  }, { promptTokens: 0, cachedTokens: 0, cacheWriteTokens: 0 })
+  const hitRate = recentStats.promptTokens > 0 ? recentStats.cachedTokens / recentStats.promptTokens : 0
   const todayKey = new Date().toLocaleDateString('sv')
   const todayStats = Object.values(tokenStats).reduce((acc, s) => {
     const d = s.days?.[todayKey]
@@ -885,27 +894,27 @@ export default function Settings() {
 
             {/* 缓存命中：命中的输入按 1 折计费，命中率高 = 省钱 */}
             <div className="settings-card">
-              <div className="settings-card-title">Prompt 缓存</div>
+              <div className="settings-card-title">Prompt 缓存（近 14 天）</div>
               <div className="card-row">
                 <span className="card-row-label">缓存命中</span>
-                <span className="monitor-value">{totalStats.cachedTokens.toLocaleString()}</span>
+                <span className="monitor-value">{recentStats.cachedTokens.toLocaleString()}</span>
               </div>
               <div className="card-row">
                 <span className="card-row-label">缓存写入</span>
-                <span className="monitor-value">{totalStats.cacheWriteTokens.toLocaleString()}</span>
+                <span className="monitor-value">{recentStats.cacheWriteTokens.toLocaleString()}</span>
               </div>
               <div className="card-row">
                 <span className="card-row-label">未命中（全价输入）</span>
-                <span className="monitor-value">{Math.max(0, totalStats.promptTokens - totalStats.cachedTokens - totalStats.cacheWriteTokens).toLocaleString()}</span>
+                <span className="monitor-value">{Math.max(0, recentStats.promptTokens - recentStats.cachedTokens - recentStats.cacheWriteTokens).toLocaleString()}</span>
               </div>
               <div className="card-row">
-                <span className="card-row-label">累计命中率</span>
-                <span className="monitor-value">{(hitRate * 100).toFixed(1)}%</span>
+                <span className="card-row-label">近 14 天命中率</span>
+                <span className="monitor-value">{recentStats.promptTokens > 0 ? `${(hitRate * 100).toFixed(1)}%` : '—'}</span>
               </div>
               <div className="cache-rate-track">
                 <div className={'cache-rate-fill' + (hitRate >= 0.6 ? ' good' : hitRate >= 0.3 ? ' mid' : '')} style={{ width: `${Math.min(100, hitRate * 100)}%` }} />
               </div>
-              <p className="card-hint">命中的输入只按约一折计费。命中率 60% 以上算健康；换模型、改系统提示词、隔太久（超过缓存有效期）再聊都会导致一次未命中，属正常。</p>
+              <p className="card-hint">命中的输入只按约一折计费。命中率 60% 以上算健康；换模型、改系统提示词、隔太久（超过缓存有效期）再聊都会导致一次未命中，属正常。缓存统计从 07-10 起才有，更早的历史输入没记缓存字段，不纳入命中率。</p>
             </div>
 
             <div className="settings-card">
@@ -931,7 +940,12 @@ export default function Settings() {
                 {connections.map((conn) => {
                   const s = tokenStats[conn.id]
                   if (!s) return null
-                  const r = s.promptTokens > 0 && s.cachedTokens ? ` · 命中 ${((s.cachedTokens / s.promptTokens) * 100).toFixed(0)}%` : ''
+                  // 命中率同样只看近14天分桶，别拿终身累计当分母（历史没记缓存字段会稀释成 0%）
+                  const ds = Object.values(s.days || {}).reduce(
+                    (a, d) => ({ p: a.p + (d.promptTokens || 0), c: a.c + (d.cachedTokens || 0) }),
+                    { p: 0, c: 0 }
+                  )
+                  const r = ds.p > 0 && ds.c ? ` · 命中 ${((ds.c / ds.p) * 100).toFixed(0)}%` : ''
                   return (
                     <div key={conn.id} className="monitor-conn-row">
                       <div className="monitor-conn-name">{conn.name}</div>
