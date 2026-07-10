@@ -399,14 +399,29 @@ export const useStore = create((set, get) => ({
     if (!usage || !connId) return
     set((s) => {
       const prev = s.tokenStats[connId] || { promptTokens: 0, completionTokens: 0, totalTokens: 0, calls: 0 }
+      // 按天分桶（本地日期=北京时间），只留最近 14 天，供「今日用量」展示
+      const dayKey = new Date().toLocaleDateString('sv')
+      const days = { ...(prev.days || {}) }
+      const d = days[dayKey] || { promptTokens: 0, completionTokens: 0, cachedTokens: 0, cacheWriteTokens: 0, calls: 0 }
+      days[dayKey] = {
+        promptTokens: d.promptTokens + (usage.promptTokens || 0),
+        completionTokens: d.completionTokens + (usage.completionTokens || 0),
+        cachedTokens: d.cachedTokens + (usage.cachedTokens || 0),
+        cacheWriteTokens: d.cacheWriteTokens + (usage.cacheWriteTokens || 0),
+        calls: d.calls + 1,
+      }
+      for (const k of Object.keys(days).sort().slice(0, -14)) delete days[k]
       const tokenStats = {
         ...s.tokenStats,
         [connId]: {
           promptTokens: prev.promptTokens + (usage.promptTokens || 0),
           completionTokens: prev.completionTokens + (usage.completionTokens || 0),
           totalTokens: prev.totalTokens + (usage.totalTokens || 0),
+          cachedTokens: (prev.cachedTokens || 0) + (usage.cachedTokens || 0),
+          cacheWriteTokens: (prev.cacheWriteTokens || 0) + (usage.cacheWriteTokens || 0),
           calls: prev.calls + 1,
           lastUsed: Date.now(),
+          days,
         },
       }
       savePersistedState({ ...s, tokenStats })
