@@ -415,7 +415,23 @@ export default function MessageBubble({ msg, onEdit, onQuote, isLast }) {
                     {msg.images.map((src, i) => <img key={i} src={src} alt="" className="bubble-img" />)}
                   </div>
                 )}
-                {msg.voice ? (
+                {msg.call ? (
+                  // 通话记录条（微信同款）：通话中/已取消/通话时长 mm:ss
+                  <div className="call-bubble">
+                    <span>
+                      {msg.call.status === 'ongoing' ? '语音通话中…'
+                        : msg.call.status === 'cancelled' ? '已取消'
+                        : msg.call.duration != null
+                          ? `通话时长 ${String(Math.floor(msg.call.duration / 60)).padStart(2, '0')}:${String(msg.call.duration % 60).padStart(2, '0')}`
+                          : '语音通话'}
+                    </span>
+                    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M3 12 C3 12 7 7 12 7 C17 7 21 12 21 12" />
+                      <path d="M3 12 L3 15 L6 15 L6 12.5" />
+                      <path d="M21 12 L21 15 L18 15 L18 12.5" />
+                    </svg>
+                  </div>
+                ) : msg.voice ? (
                   voiceTextMode ? (
                     // 文字视图：点一下切回语音条
                     <div className="user-voice-text" onClick={() => setVoiceTextMode(false)} title="点击切回语音条">

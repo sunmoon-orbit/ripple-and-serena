@@ -3335,3 +3335,18 @@ body.mp-active .scroll-bottom-btn { bottom: 139px; }
     22.5% 100%, 20% 25%, 17.5% 100%, 15% 25%, 12.5% 100%, 10% 25%,
     7.5% 100%, 5% 25%, 2.5% 100%, 0 25%);
 }
+
+/* ── 通话记录条（微信同款）+ 通话结束小字 ─────────────────── */
+.call-bubble {
+  display: flex; align-items: center; gap: 7px;
+  font-size: 14.5px; padding: 1px 0;
+  user-select: none;
+}
+.call-bubble svg { flex-shrink: 0; opacity: 0.85; }
+.msg-sys-line {
+  text-align: center;
+  font-size: 11.5px;
+  color: var(--text-faint, var(--text-muted));
+  padding: 6px 0 8px;
+  user-select: none;
+}

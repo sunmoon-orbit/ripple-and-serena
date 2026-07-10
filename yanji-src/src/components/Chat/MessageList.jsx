@@ -100,7 +100,9 @@ export default function MessageList({ messages, status, onEdit, onQuote, activeC
     <>
       <div className={'messages-list' + (scrollAnchor ? ' anchor-mode' : '')} ref={listRef}>
         {messages.filter((m) => !m.hidden).map((msg, i, arr) => (
-          <MessageBubble key={msg.id} msg={msg} onEdit={onEdit} onQuote={onQuote} isLast={i === arr.length - 1} />
+          msg.sys
+            ? <div key={msg.id} className="msg-sys-line">{msg.content}</div>
+            : <MessageBubble key={msg.id} msg={msg} onEdit={onEdit} onQuote={onQuote} isLast={i === arr.length - 1} />
         ))}
         {status && (
           <div className="message-status">{status}</div>
