@@ -3,7 +3,7 @@ import { useStore } from '../../store'
 import { formatTime } from '../../utils'
 import { applyDecayAndGet, getEmotionState, POSITIVE_SLOTS, NEGATIVE_SLOTS, SLOT_LABELS } from '../../utils/emotion'
 
-export default function ConversationList({ onClose, onStartCall, onOpenGames, onOpenMusic, onOpenWheel, onOpenFortune, onOpenChecklist, onOpenHealth }) {
+export default function ConversationList({ onClose, onStartCall, onOpenGames, onOpenMusic, onOpenWheel, onOpenFortune, onOpenChecklist, onOpenHealth, onOpenPeriod }) {
   const chats = useStore((s) => s.chats)
   const connections = useStore((s) => s.connections)
   const activeChatId = useStore((s) => s.activeChatId)
@@ -264,6 +264,12 @@ export default function ConversationList({ onClose, onStartCall, onOpenGames, on
                 <polyline points="4 12 8 12 10 9 13 15 15 12 20 12" />
               </svg>
               <span>身体气象站</span>
+            </button>
+            <button className="sb-tool-item" onClick={() => { onClose?.(); onOpenPeriod?.() }}>
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
+              </svg>
+              <span>小月历</span>
             </button>
           </div>
         )}

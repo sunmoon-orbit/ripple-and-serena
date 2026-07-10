@@ -3427,3 +3427,47 @@ body.mp-active .scroll-bottom-btn { bottom: 139px; }
   font-size: 10.5px; color: var(--text-faint);
   text-align: center; line-height: 1.6;
 }
+
+/* ── 小月历（月经周期）——复用 health-card 底子 ─────────── */
+.period-status {
+  border-radius: 10px;
+  padding: 10px 12px;
+  margin-bottom: 10px;
+  font-size: 13px; font-weight: 600;
+  color: var(--text);
+  background: var(--accent-dim);
+  text-align: center;
+}
+.period-status.now { background: rgba(222,140,150,0.16); }
+.period-status.late { background: rgba(196,122,106,0.18); }
+.period-status.soon { background: rgba(201,168,106,0.16); }
+.period-actions { display: flex; gap: 8px; margin: 10px 0 4px; }
+.period-actions input[type="date"] {
+  flex: 1; min-width: 0;
+  border: 1px solid var(--border); border-radius: 9px;
+  padding: 7px 10px; font-size: 12.5px;
+  background: var(--card); color: var(--text);
+}
+.period-btn {
+  border: none; border-radius: 9px;
+  padding: 7px 14px; font-size: 12.5px; font-weight: 600;
+  background: var(--accent); color: #fff;
+  cursor: pointer; white-space: nowrap;
+}
+.period-btn.end { background: var(--accent-soft); color: var(--text); }
+.period-btn:disabled { opacity: 0.5; }
+.period-hint { font-size: 10.5px; color: var(--text-faint); margin-bottom: 8px; line-height: 1.6; }
+.period-list { display: flex; flex-direction: column; gap: 2px; }
+.period-row {
+  display: flex; align-items: center; gap: 8px;
+  padding: 7px 2px;
+  border-bottom: 1px dashed var(--border);
+  font-size: 12px;
+}
+.period-row:last-child { border-bottom: none; }
+.period-row-date { color: var(--text); }
+.period-row-meta { flex: 1; color: var(--text-faint); font-size: 11px; }
+.period-row-del {
+  background: none; border: none; cursor: pointer;
+  color: var(--text-faint); font-size: 11px; padding: 2px 4px;
+}
