@@ -143,6 +143,8 @@ export default function Chat() {
           const who = m.quote.role === 'user' ? '我之前说' : '你（涟言）之前说'
           c = `> 引用${who}：「${m.quote.content}」\n\n${c}`
         }
+        // 语音消息带上机器听出的语气线索（SenseVoice），只给模型看，气泡里不显示
+        if (m.voice && m.voiceTone) c = `${c}\n（这条是语音，语气听起来：${m.voiceTone}）`
         return {
           role: m.role,
           content: m.injected ? `${c}\n\n${m.injected}` : c,
@@ -398,9 +400,10 @@ export default function Chat() {
         images: images.length ? images : undefined,
         quote: opts.quote || undefined,
         injected: inject,
-        // 语音消息：标记为语音条样式 + 时长（秒）
+        // 语音消息：标记为语音条样式 + 时长（秒）+ SenseVoice 听出的语气
         voice: opts.voice || undefined,
         voiceDuration: opts.voice ? (opts.voiceDuration || 0) : undefined,
+        voiceTone: opts.voice ? (opts.voiceTone || undefined) : undefined,
         // 主动开口的触发消息：进上下文但不渲染成气泡
         hidden: opts.hidden || undefined,
       })

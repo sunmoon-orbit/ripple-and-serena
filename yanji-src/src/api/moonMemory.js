@@ -96,7 +96,8 @@ export async function transcribeAudio(config, blob) {
     throw new Error(`转写失败 ${resp.status}: ${t.slice(0, 120)}`)
   }
   const data = await resp.json()
-  return (data.text || '').trim()
+  // tone：服务端从 SenseVoice 转写里拆出来的语气（开心/低落/带笑声…），可能为 null
+  return { text: (data.text || '').trim(), tone: data.tone || null }
 }
 
 export async function synthesizeSpeech(config, text, voiceId) {
