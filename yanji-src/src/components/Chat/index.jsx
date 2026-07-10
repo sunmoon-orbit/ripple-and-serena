@@ -19,6 +19,7 @@ import FortuneWheel from './FortuneWheel'
 import DailyFortune from './DailyFortune'
 import ChatCalendar from './ChatCalendar'
 import DailyChecklist from './DailyChecklist'
+import HealthCard from './HealthCard'
 import CompletionEgg, { pickEgg } from './CompletionEgg'
 
 // 情绪自动发圈：某正向情绪越阈值且过冷却时，涟言主动发条朋友圈（她在聊天时触发；
@@ -92,6 +93,7 @@ export default function Chat() {
   const [bgMenuOpen, setBgMenuOpen] = useState(false)
   const [calendarOpen, setCalendarOpen] = useState(false)
   const [checklistOpen, setChecklistOpen] = useState(false)
+  const [healthOpen, setHealthOpen] = useState(false)
   const [egg, setEgg] = useState(null) // 完成彩蛋：回复结束后小概率冒出的像素小家伙
   const [bgImage, setBgImage] = useState(() => localStorage.getItem('yanji-bg-image') || '')
   const bgFileRef = useRef(null)
@@ -592,7 +594,7 @@ export default function Chat() {
     <div className="chat-panel">
       {/* Sidebar */}
       <div className={'chat-sidebar' + (sidebarOpen ? ' open' : '')}>
-        <ConversationList onClose={() => setSidebarOpen(false)} onStartCall={openCall} onOpenGames={() => setGamesOpen(true)} onOpenMusic={() => setMusicOpen(true)} onOpenWheel={() => setWheelOpen(true)} onOpenFortune={() => setFortuneOpen(true)} onOpenChecklist={() => setChecklistOpen(true)} />
+        <ConversationList onClose={() => setSidebarOpen(false)} onStartCall={openCall} onOpenGames={() => setGamesOpen(true)} onOpenMusic={() => setMusicOpen(true)} onOpenWheel={() => setWheelOpen(true)} onOpenFortune={() => setFortuneOpen(true)} onOpenChecklist={() => setChecklistOpen(true)} onOpenHealth={() => setHealthOpen(true)} />
       </div>
       {sidebarOpen && <div className="sidebar-backdrop" onClick={() => setSidebarOpen(false)} />}
 
@@ -807,6 +809,7 @@ export default function Chat() {
       {wheelOpen && <FortuneWheel onClose={() => setWheelOpen(false)} />}
       {fortuneOpen && <DailyFortune onClose={() => setFortuneOpen(false)} />}
       {checklistOpen && <DailyChecklist onClose={() => setChecklistOpen(false)} />}
+      {healthOpen && <HealthCard onClose={() => setHealthOpen(false)} />}
     </div>
   )
 }

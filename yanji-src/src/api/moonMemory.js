@@ -264,9 +264,9 @@ export async function fetchReadingActivity(config, hours = 48) {
 }
 
 // 生命体征：手环→Tasker 每 15 分钟上报的健康快照
-export async function fetchVitals(config, hours = 24) {
+export async function fetchVitals(config, hours = 24, limit = 200) {
   const { baseUrl, apiToken } = config
-  return request(baseUrl, `/vitals?hours=${hours}`, { headers: headers(apiToken) })
+  return request(baseUrl, `/vitals?hours=${hours}&limit=${limit}`, { headers: headers(apiToken) })
 }
 
 export async function fetchPushSchedule(config) {
