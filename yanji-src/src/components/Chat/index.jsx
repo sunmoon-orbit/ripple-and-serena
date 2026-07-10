@@ -411,8 +411,8 @@ export default function Chat() {
     setPendingImages([])
 
     // 延迟回复：像一个不总盯着手机的人，有时晾一会儿再回。
-    // 语音通话和主动开口不晾；晾着期间她继续发的消息一起攒着，到点一起回。
-    if (!opts.hidden && !opts.voice) {
+    // 语音通话（含通话中打字 instant）和主动开口不晾；晾着期间她继续发的消息一起攒着，到点一起回。
+    if (!opts.hidden && !opts.voice && !opts.instant) {
       const pending = getPendingReply()
       // pending 只有一个槽：本对话已在晾→一起攒着；别的对话在晾→这边正常秒回，别覆盖人家的
       const delayMs = pending ? 0 : decideReplyDelay(replyDelay)

@@ -60,6 +60,10 @@ export default function VoiceCall({ onClose, onSend }) {
   const [aiText, setAiText] = useState('')
   const [userText, setUserText] = useState('')
   const [duration, setDuration] = useState(0)
+  // 通话中打字：识别不准的字（人名、生僻词）可以直接敲出来发
+  const [typeOpen, setTypeOpen] = useState(false)
+  const [typedText, setTypedText] = useState('')
+  const typeInputRef = useRef(null)
 
   const recRef = useRef(null)
   const recChunks = useRef([])
@@ -276,6 +280,16 @@ export default function VoiceCall({ onClose, onSend }) {
     })
   }
 
+  // 打字发送：走 instant 标记跳过「延迟回复」（正在通话，不能晾人）；
+  // 普通文字消息不做语音条，回复照常被上面的 watcher 自动念出来
+  function sendTyped() {
+    const text = typedText.trim()
+    if (!text) return
+    setUserText(text)
+    setTypedText('')
+    onSend(text, [], { instant: true })
+  }
+
   function handleClose() {
     try { recRef.current?.stop() } catch {}
     onClose()
@@ -377,8 +391,40 @@ export default function VoiceCall({ onClose, onSend }) {
           </>
         )}
 
+        {/* 打字输入行：识别不准时直接敲字，回复照常念出来 */}
+        {typeOpen && (
+          <div className="vc-type-row">
+            <input
+              ref={typeInputRef}
+              className="vc-type-input"
+              value={typedText}
+              onChange={(e) => setTypedText(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter' && !e.nativeEvent.isComposing) sendTyped() }}
+              placeholder="打字说，他照样用嗓子回…"
+              autoFocus
+            />
+            <button className="vc-type-send" onClick={sendTyped} disabled={!typedText.trim()} title="发送">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="22" y1="2" x2="11" y2="13" /><polygon points="22 2 15 22 11 13 2 9 22 2" />
+              </svg>
+            </button>
+          </div>
+        )}
+
         {/* Push-to-talk + hang up */}
         <div className="vc-controls">
+          <button
+            className={'vc-kbd' + (typeOpen ? ' open' : '')}
+            onClick={() => setTypeOpen((v) => !v)}
+            title={typeOpen ? '收起键盘' : '打字说'}
+          >
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
+              <rect x="2" y="6" width="20" height="12" rx="2" />
+              <line x1="6" y1="10" x2="6" y2="10.01" /><line x1="10" y1="10" x2="10" y2="10.01" />
+              <line x1="14" y1="10" x2="14" y2="10.01" /><line x1="18" y1="10" x2="18" y2="10.01" />
+              <line x1="7" y1="14" x2="17" y2="14" />
+            </svg>
+          </button>
           <button
             className={'vc-mic' + (recording ? ' recording' : '') + (transcribing ? ' busy' : '')}
             onClick={toggleRecord}
