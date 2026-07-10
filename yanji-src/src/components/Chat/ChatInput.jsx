@@ -30,6 +30,9 @@ const STICKERS = [
   's-qianfei.jpg','s-quanshi.jpg','s-haiyaoyao.jpg','s-meiyoule.jpg',
   's-zaixiele.jpg','s-zhidaole.jpg','s-zaiyebugandele.jpg',
   's-wanan.jpg',
+  // 简笔猫系列（0710 阿颖投喂）
+  'm-yizhixiang.jpg','m-exin.jpg','m-eihei.jpg','m-o.jpg',
+  'm-cuole.jpg','m-budangai.jpg','m-a.jpg','m-wuen.jpg','m-jianlaji.jpg',
 ]
 const STICKER_BASE = 'https://memory.ravenlove.cc/raven/stickers/'
 
