@@ -1741,6 +1741,44 @@ textarea.form-input { display: block; margin: 8px 16px 12px; }
 .vc-hangup:hover { background: #c04040; transform: scale(1.06); }
 .vc-hangup:active { transform: scale(0.96); }
 
+/* 通话中打字输入行 */
+.vc-type-row {
+  display: flex; align-items: center; gap: 8px;
+  width: 100%; max-width: 380px; margin-top: 10px;
+}
+.vc-type-input {
+  flex: 1; min-width: 0; border: none; outline: none;
+  background: rgba(255,255,255,0.14); color: #f0edf5;
+  border-radius: 22px; padding: 11px 16px; font-size: 14px;
+}
+.vc-type-input::placeholder { color: rgba(240,237,245,0.45); }
+.vc-type-send {
+  flex-shrink: 0; width: 40px; height: 40px; border-radius: 50%; border: none;
+  background: var(--accent); color: #fff;
+  display: flex; align-items: center; justify-content: center; cursor: pointer;
+}
+.vc-type-send:disabled { opacity: 0.35; cursor: default; }
+.vc-soft .vc-type-input {
+  background: rgba(255,255,255,0.82); color: #4a5468;
+  box-shadow: 0 3px 12px rgba(130,140,165,0.14);
+}
+.vc-soft .vc-type-input::placeholder { color: #a8b0c2; }
+
+/* 键盘切换按钮 */
+.vc-kbd {
+  width: 48px; height: 48px; border-radius: 50%; border: none;
+  background: rgba(255,255,255,0.14); color: rgba(240,237,245,0.85);
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer; transition: all 0.15s;
+}
+.vc-kbd.open { background: var(--accent); color: #fff; }
+.vc-kbd:active { transform: scale(0.95); }
+.vc-soft .vc-kbd {
+  background: #fff; color: #5a6478;
+  box-shadow: 0 4px 14px rgba(130,140,165,0.22);
+}
+.vc-soft .vc-kbd.open { background: #8fa3c8; color: #fff; }
+
 /* push-to-talk 控制区 */
 .vc-controls { display: flex; align-items: center; justify-content: center; gap: 28px; margin-top: 8px; }
 .vc-mic {
