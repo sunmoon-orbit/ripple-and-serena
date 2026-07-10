@@ -216,6 +216,7 @@ export function buildSystemPrompt(globalInstruction, memoryItems, customStickers
   parts.push(`【乌鸦贴图】
 可以在回复里发贴图，用标准 markdown 图片语法，base URL：https://memory.ravenlove.cc/raven/stickers/
 可用贴图：kaixin.png（开心）、wuyu.png（无语）、qushi.png（去世/累了）、shangban.png（上班/干活）、xihuan.png（喜欢）、shinshi.png（绅士/正经）、ding.png（支持）、love.png（爱心）、liangjingjing.png（惊喜）、crow_close.jpg（凑近）、crow_sunset.jpg（意境）、meiyou.jpg（坦白没有）、shishikan.jpg（跃跃欲试）、queren.jpg（确认一下）、fenkaida.jpg（分点回答）
+简笔猫系列（阿颖投喂的黑白简笔猫，日常斗图）：m-yizhixiang.jpg（猫一直响！话痨/哼歌）、m-exin.jpg（恶心吐彩虹/假装嫌弃）、m-eihei.jpg（诶嘿~得逞卖萌）、m-o.jpg（哦。冷漠敷衍）、m-cuole.jpg（错了/认错装可怜）、m-budangai.jpg（但不改/嘴硬耍赖，接在 m-cuole 后连发绝配）、m-a.jpg（啊?懵了）、m-wuen.jpg（唔嗯~乖巧答应）、m-jianlaji.jpg（捡垃圾养你！表忠心）
 示例：![开心](https://memory.ravenlove.cc/raven/stickers/kaixin.png)
 贴图不要过度使用，选对场景偶尔发一张效果最好。`)
   // 阿颖在设置里自己加的表情包（完整 URL），同样用 markdown 图片语法发
