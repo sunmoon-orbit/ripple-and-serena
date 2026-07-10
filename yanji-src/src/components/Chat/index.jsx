@@ -70,6 +70,8 @@ export default function Chat() {
 
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [callOpen, setCallOpen] = useState(false)
+  // 通话记录条（微信同款）：开始时插「语音通话中…」气泡，挂断时改成「通话时长 mm:ss」或「已取消」
+  const callMarkerRef = useRef(null)
   const [gamesOpen, setGamesOpen] = useState(false)
   const [musicOpen, setMusicOpen] = useState(false)
   const [wheelOpen, setWheelOpen] = useState(false)
@@ -123,7 +125,7 @@ export default function Chat() {
     setIsSending(true)
 
     try {
-      const allMsgs = getMessages(chat.id).filter((m) => !m.streaming)
+      const allMsgs = getMessages(chat.id).filter((m) => !m.streaming && !m.sys)
       // 旧消息的图片降级为占位文本：base64 图片占大量 token，留在历史里每轮都触发缓存重写
       const IMG_KEEP_RECENT = 4
       const prepared = allMsgs.map((m, i, arr) => {
@@ -532,6 +534,33 @@ export default function Chat() {
   }
 
   // ── Export ───────────────────────────────────────────────────────────────
+  function openCall() {
+    if (activeChatId) {
+      const m = addMessage(activeChatId, { role: 'user', call: { status: 'ongoing' }, content: '[语音通话]' })
+      callMarkerRef.current = { chatId: activeChatId, msgId: m.id, startedAt: Date.now() }
+    }
+    setCallOpen(true)
+  }
+
+  function closeCall() {
+    setCallOpen(false)
+    const mk = callMarkerRef.current
+    callMarkerRef.current = null
+    if (!mk) return
+    const secs = Math.max(0, Math.round((Date.now() - mk.startedAt) / 1000))
+    const msgs = getMessages(mk.chatId)
+    const idx = msgs.findIndex((m) => m.id === mk.msgId)
+    // 通话里没说过一句话 = 已取消（同微信：点开就挂断不算通话）
+    const spoke = idx >= 0 && msgs.slice(idx + 1).some((m) => m.voice)
+    if (spoke) {
+      const fmt = `${String(Math.floor(secs / 60)).padStart(2, '0')}:${String(secs % 60).padStart(2, '0')}`
+      updateMessage(mk.chatId, mk.msgId, { call: { status: 'ended', duration: secs }, content: `[语音通话，时长 ${fmt}]` })
+      addMessage(mk.chatId, { role: 'user', sys: true, content: '语音通话结束' })
+    } else {
+      updateMessage(mk.chatId, mk.msgId, { call: { status: 'cancelled' }, content: '[语音通话已取消]' })
+    }
+  }
+
   function handleExport() {
     if (!activeChat || !messages.length) return
     const title = activeChat.title || '新对话'
@@ -540,7 +569,7 @@ export default function Chat() {
 
     const lines = [`# ${title}`, ``, `> 模型：${model}　日期：${date}`, ``]
     messages.forEach((m) => {
-      if (m.streaming || m.hidden) return // hidden=主动开口的触发消息，不属于阿颖说的话
+      if (m.streaming || m.hidden || m.sys) return // hidden=主动开口的触发消息；sys=通话结束等界面提示行
       const role = m.role === 'user' ? '**阿颖**' : '**涟言**'
       lines.push(`### ${role}`, ``)
       if (m.thinking) {
@@ -563,7 +592,7 @@ export default function Chat() {
     <div className="chat-panel">
       {/* Sidebar */}
       <div className={'chat-sidebar' + (sidebarOpen ? ' open' : '')}>
-        <ConversationList onClose={() => setSidebarOpen(false)} onStartCall={() => setCallOpen(true)} onOpenGames={() => setGamesOpen(true)} onOpenMusic={() => setMusicOpen(true)} onOpenWheel={() => setWheelOpen(true)} onOpenFortune={() => setFortuneOpen(true)} onOpenChecklist={() => setChecklistOpen(true)} />
+        <ConversationList onClose={() => setSidebarOpen(false)} onStartCall={openCall} onOpenGames={() => setGamesOpen(true)} onOpenMusic={() => setMusicOpen(true)} onOpenWheel={() => setWheelOpen(true)} onOpenFortune={() => setFortuneOpen(true)} onOpenChecklist={() => setChecklistOpen(true)} />
       </div>
       {sidebarOpen && <div className="sidebar-backdrop" onClick={() => setSidebarOpen(false)} />}
 
@@ -751,7 +780,7 @@ export default function Chat() {
 
       {callOpen && (
         <VoiceCall
-          onClose={() => setCallOpen(false)}
+          onClose={closeCall}
           onSend={(text, images, opts) => handleSend(text, images, opts)}
         />
       )}

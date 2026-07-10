@@ -57,10 +57,12 @@ function loadPersistedState() {
     if (parsed.messagesByChatId) {
       for (const cid of Object.keys(parsed.messagesByChatId)) {
         const msgs = parsed.messagesByChatId[cid]
-        if (!Array.isArray(msgs) || !msgs.some((m) => m?.streaming)) continue
+        if (!Array.isArray(msgs) || !msgs.some((m) => m?.streaming || m?.call?.status === 'ongoing')) continue
         parsed.messagesByChatId[cid] = msgs
           .filter((m) => !(m?.streaming && !m.content && !m.thinking))
           .map((m) => m?.streaming ? { ...m, streaming: false, interrupted: true } : m)
+          // 通话中页面被杀：ongoing 标记会永远显示「通话中…」，定格成无时长的通话记录
+          .map((m) => m?.call?.status === 'ongoing' ? { ...m, call: { status: 'ended', duration: null }, content: '[语音通话]' } : m)
       }
     }
     return parsed
