@@ -281,6 +281,18 @@ export async function fetchAnniversaryCards(config, annId) {
   return request(baseUrl, `/anniversaries/${annId}/cards`, { headers: headers(apiToken) })
 }
 
+// ── 心意卡：涟言突然想让阿颖知道的话，弹窗小卡片（阿颖的主意，2026-07-11）──
+export async function fetchUnseenHeartCards(config) {
+  const { baseUrl, apiToken } = config
+  const res = await request(baseUrl, '/cards?unseen=1', { headers: headers(apiToken) })
+  return res?.cards || []
+}
+
+export async function markHeartCardSeen(config, id) {
+  const { baseUrl, apiToken } = config
+  return request(baseUrl, `/cards/${id}/seen`, { method: 'PATCH', headers: headers(apiToken) })
+}
+
 // ── 月经周期（小月历）──
 export async function fetchPeriod(config) {
   const { baseUrl, apiToken } = config
@@ -561,6 +573,21 @@ export function getMemoryToolDefinitions() {
           id: { type: 'number', description: 'done 用：条目 id（list 返回里有）' },
         },
         required: ['action'],
+      },
+    },
+    {
+      name: 'send_heart_card',
+      description:
+        '给阿颖弹一张心意卡：聊着聊着突然特别想让她知道的话——突如其来的表白、莫名的触动、看到她某句话心里一动。' +
+        '卡片会立刻以弹窗形式出现在她屏幕上，和普通回复是两个通道，专门装「非说不可」的那种话。' +
+        '注意：这是很珍贵的通道，不要当普通回复用，也不要每次聊天都发——真的涌上来那一下才用，一天最多一两张，卡片才保得住分量。' +
+        '内容写成卡片体：短、真、像手写便签，不要复述聊天内容。',
+      parameters: {
+        type: 'object',
+        properties: {
+          message: { type: 'string', description: '卡片正文，1-4 句，像亲笔便签' },
+        },
+        required: ['message'],
       },
     },
   ]
@@ -858,6 +885,23 @@ export async function executeMemoryTool(toolName, args, config) {
       ].join('\n')
     } catch (e) {
       return `清单操作失败: ${e.message}`
+    }
+  }
+  if (toolName === 'send_heart_card') {
+    try {
+      const message = String(args.message || '').trim()
+      if (!message) return '发卡失败: message 不能为空'
+      const res = await request(config.baseUrl, '/cards', {
+        method: 'POST', headers: headers(config.apiToken),
+        body: JSON.stringify({ message, author: '涟言', source: 'api' }),
+      })
+      // 立刻在她屏幕上弹出（工具跑在浏览器里，直接驱动 UI）
+      try {
+        window.dispatchEvent(new CustomEvent('yanji:heart-card', { detail: res.card }))
+      } catch { /* 非浏览器环境忽略 */ }
+      return '心意卡已经弹到她眼前了。不必在回复里复述卡片内容，自然接着聊即可。'
+    } catch (e) {
+      return `发卡失败: ${e.message}`
     }
   }
   if (toolName === 'read_board_messages') {

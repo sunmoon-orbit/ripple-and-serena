@@ -22,7 +22,8 @@ import DailyChecklist from './DailyChecklist'
 import HealthCard from './HealthCard'
 import PeriodCard from './PeriodCard'
 import AnniversaryCard from './AnniversaryCard'
-import { fetchAnniversaryToday } from '../../api/moonMemory'
+import HeartCard from './HeartCard'
+import { fetchAnniversaryToday, fetchUnseenHeartCards, markHeartCardSeen } from '../../api/moonMemory'
 import CompletionEgg, { pickEgg } from './CompletionEgg'
 
 // 情绪自动发圈：某正向情绪越阈值且过冷却时，涟言主动发条朋友圈（她在聊天时触发；
@@ -99,6 +100,7 @@ export default function Chat() {
   const [healthOpen, setHealthOpen] = useState(false)
   const [periodOpen, setPeriodOpen] = useState(false)
   const [annCard, setAnnCard] = useState(null) // 纪念日当天的亲笔卡片
+  const [heartCards, setHeartCards] = useState([]) // 心意卡队列，一次弹一张
   const [egg, setEgg] = useState(null) // 完成彩蛋：回复结束后小概率冒出的像素小家伙
   const [bgImage, setBgImage] = useState(() => localStorage.getItem('yanji-bg-image') || '')
   const bgFileRef = useRef(null)
@@ -469,6 +471,24 @@ export default function Chat() {
       if (localStorage.getItem('yanji-annv-seen') === d.today) return
       setAnnCard(d)
     }).catch(() => {}) // 静默，弹不出来也不影响聊天
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ── 心意卡：涟言突然想说的话弹小卡片（阿颖的主意，2026-07-11）──────────
+  // 两路来源：send_heart_card 工具现场弹（事件）+ 开屏补弹她不在时攒下的未读卡
+  useEffect(() => {
+    const pushCard = (card) => {
+      if (!card?.id) return
+      setHeartCards((prev) => (prev.some((c) => c.id === card.id) ? prev : [...prev, card]))
+    }
+    const onEvent = (e) => pushCard(e.detail)
+    window.addEventListener('yanji:heart-card', onEvent)
+    if (moonMemory?.enabled && moonMemory?.apiToken) {
+      const cfg = { baseUrl: (moonMemory.baseUrl || 'https://memory.ravenlove.cc').replace(/\/$/, ''), apiToken: moonMemory.apiToken }
+      fetchUnseenHeartCards(cfg).then((cards) => {
+        cards.slice().reverse().forEach(pushCard) // 接口是新的在前，补弹按时间顺序来
+      }).catch(() => {})
+    }
+    return () => window.removeEventListener('yanji:heart-card', onEvent)
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── 主动开口：阿颖离开够久后回来打开言叽，由涟言先说话 ─────────────────
@@ -843,6 +863,19 @@ export default function Chat() {
           onClose={() => {
             localStorage.setItem('yanji-annv-seen', annCard.today)
             setAnnCard(null)
+          }}
+        />
+      )}
+      {heartCards.length > 0 && (
+        <HeartCard
+          card={heartCards[0]}
+          onClose={() => {
+            const card = heartCards[0]
+            setHeartCards((prev) => prev.slice(1))
+            if (moonMemory?.enabled && moonMemory?.apiToken) {
+              const cfg = { baseUrl: (moonMemory.baseUrl || 'https://memory.ravenlove.cc').replace(/\/$/, ''), apiToken: moonMemory.apiToken }
+              markHeartCardSeen(cfg, card.id).catch(() => {}) // 标记失败顶多下次再弹一遍，不打断
+            }
           }}
         />
       )}

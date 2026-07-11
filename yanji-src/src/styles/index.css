@@ -3572,3 +3572,9 @@ body.mp-active .scroll-bottom-btn { bottom: 139px; }
   border: none; border-radius: 999px;
   padding: 8px 32px; font-size: 14px; cursor: pointer;
 }
+
+/* 心意卡变体：比纪念日卡更像随手递来的便签 */
+.heart-card { border-radius: 14px; }
+.heart-card .annv-emoji { font-size: 28px; }
+.heart-card .annv-title { font-size: 15px; }
+.heart-card .annv-message { font-size: 15.5px; }
