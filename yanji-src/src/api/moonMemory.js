@@ -293,6 +293,12 @@ export async function markHeartCardSeen(config, id) {
   return request(baseUrl, `/cards/${id}/seen`, { method: 'PATCH', headers: headers(apiToken) })
 }
 
+export async function fetchHeartCards(config, limit = 100) {
+  const { baseUrl, apiToken } = config
+  const res = await request(baseUrl, `/cards?limit=${limit}`, { headers: headers(apiToken) })
+  return res?.cards || []
+}
+
 // ── 月经周期（小月历）──
 export async function fetchPeriod(config) {
   const { baseUrl, apiToken } = config

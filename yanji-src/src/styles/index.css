@@ -3578,3 +3578,29 @@ body.mp-active .scroll-bottom-btn { bottom: 139px; }
 .heart-card .annv-emoji { font-size: 28px; }
 .heart-card .annv-title { font-size: 15px; }
 .heart-card .annv-message { font-size: 15.5px; }
+
+/* 卡册：收下的心意卡列表 */
+.heart-album { max-height: 78vh; display: flex; flex-direction: column; }
+.heart-album-list {
+  flex: 1; min-height: 0; overflow-y: auto;
+  display: flex; flex-direction: column; gap: 12px;
+  padding: 4px 2px 8px;
+}
+.heart-album-item {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 14px 14px 10px;
+  background: var(--bg-elevated, var(--bg));
+}
+.heart-album-msg {
+  font-family: 'Kaiti SC', 'STKaiti', KaiTi, serif;
+  font-size: 14.5px; line-height: 1.8;
+  color: var(--text);
+  white-space: pre-wrap;
+}
+.heart-album-meta {
+  margin-top: 8px;
+  display: flex; justify-content: space-between; align-items: baseline;
+  font-family: 'Kaiti SC', 'STKaiti', KaiTi, serif;
+  font-size: 12px; color: var(--text-faint);
+}
