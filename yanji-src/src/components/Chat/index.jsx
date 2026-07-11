@@ -23,6 +23,7 @@ import HealthCard from './HealthCard'
 import PeriodCard from './PeriodCard'
 import AnniversaryCard from './AnniversaryCard'
 import HeartCard from './HeartCard'
+import HeartCardAlbum from './HeartCardAlbum'
 import { fetchAnniversaryToday, fetchUnseenHeartCards, markHeartCardSeen } from '../../api/moonMemory'
 import CompletionEgg, { pickEgg } from './CompletionEgg'
 
@@ -101,6 +102,7 @@ export default function Chat() {
   const [periodOpen, setPeriodOpen] = useState(false)
   const [annCard, setAnnCard] = useState(null) // 纪念日当天的亲笔卡片
   const [heartCards, setHeartCards] = useState([]) // 心意卡队列，一次弹一张
+  const [albumOpen, setAlbumOpen] = useState(false) // 卡册：翻收下的心意卡
   const [egg, setEgg] = useState(null) // 完成彩蛋：回复结束后小概率冒出的像素小家伙
   const [bgImage, setBgImage] = useState(() => localStorage.getItem('yanji-bg-image') || '')
   const bgFileRef = useRef(null)
@@ -639,7 +641,7 @@ export default function Chat() {
     <div className="chat-panel">
       {/* Sidebar */}
       <div className={'chat-sidebar' + (sidebarOpen ? ' open' : '')}>
-        <ConversationList onClose={() => setSidebarOpen(false)} onStartCall={openCall} onOpenGames={() => setGamesOpen(true)} onOpenMusic={() => setMusicOpen(true)} onOpenWheel={() => setWheelOpen(true)} onOpenFortune={() => setFortuneOpen(true)} onOpenChecklist={() => setChecklistOpen(true)} onOpenHealth={() => setHealthOpen(true)} onOpenPeriod={() => setPeriodOpen(true)} />
+        <ConversationList onClose={() => setSidebarOpen(false)} onStartCall={openCall} onOpenGames={() => setGamesOpen(true)} onOpenMusic={() => setMusicOpen(true)} onOpenWheel={() => setWheelOpen(true)} onOpenFortune={() => setFortuneOpen(true)} onOpenChecklist={() => setChecklistOpen(true)} onOpenHealth={() => setHealthOpen(true)} onOpenPeriod={() => setPeriodOpen(true)} onOpenAlbum={() => setAlbumOpen(true)} />
       </div>
       {sidebarOpen && <div className="sidebar-backdrop" onClick={() => setSidebarOpen(false)} />}
 
@@ -857,6 +859,7 @@ export default function Chat() {
       {checklistOpen && <DailyChecklist onClose={() => setChecklistOpen(false)} />}
       {healthOpen && <HealthCard onClose={() => setHealthOpen(false)} />}
       {periodOpen && <PeriodCard onClose={() => setPeriodOpen(false)} />}
+      {albumOpen && <HeartCardAlbum onClose={() => setAlbumOpen(false)} />}
       {annCard && (
         <AnniversaryCard
           data={annCard}
