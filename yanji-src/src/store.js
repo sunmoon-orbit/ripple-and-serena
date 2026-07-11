@@ -270,6 +270,15 @@ export const useStore = create((set, get) => ({
       return { messagesByChatId }
     })
   },
+  // 删除单条消息（目前只给 [错误] 气泡的删除钮用）
+  deleteMessage: (chatId, msgId) => {
+    set((s) => {
+      const msgs = (s.messagesByChatId[chatId] || []).filter((m) => m.id !== msgId)
+      const messagesByChatId = { ...s.messagesByChatId, [chatId]: msgs }
+      savePersistedState({ ...s, messagesByChatId })
+      return { messagesByChatId }
+    })
+  },
   truncateMessagesFrom: (chatId, msgId) => {
     set((s) => {
       const msgs = s.messagesByChatId[chatId] || []

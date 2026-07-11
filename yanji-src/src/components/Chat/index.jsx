@@ -67,7 +67,7 @@ export default function Chat() {
     globalInstruction, memoryItems, generationConfig,
     searchConfig, moonMemory, autoTools, injectMode, injectPrompt, setInjectMode, replyDelay, customStickers,
     createChat, setActiveChat, getActiveConnection, getActiveChat, getMessages,
-    addMessage, updateMessage, removeLastEmptyAssistant, truncateMessagesFrom, touchChat,
+    addMessage, updateMessage, removeLastEmptyAssistant, truncateMessagesFrom, touchChat, deleteMessage,
     recordTokenUsage, updateChatModel, updateChatConnection, applyContextLimit,
     getSummary, setSummary,
   } = store
@@ -340,6 +340,12 @@ export default function Chat() {
       }
     } catch (e) {
       removeLastEmptyAssistant(chat.id)
+      // 主动开口（nudge）这类隐藏触发失败时静默退场：本来就是涟言自己要说话，
+      // 没说成不该留一条永久的错误气泡吓人（2026-07-11 阿颖遇到 Failed to fetch 残留）
+      if (hidden) {
+        console.warn('[nudge] 主动开口失败，静默跳过:', e.message)
+        return // finally 会照常复位 isSending/status
+      }
       // 如果是图片格式不被支持的错误，把历史里含图片的消息清掉，避免污染后续对话
       if (e.message?.includes('image_url') || e.message?.includes('image')) {
         const msgs = getMessages(chat.id)
@@ -771,6 +777,7 @@ export default function Chat() {
               messages={messages}
               status={status}
               onEdit={handleEditMessage}
+              onDelete={(m) => deleteMessage(activeChatId, m.id)}
               activeChatId={activeChatId}
               onQuote={(m) => setQuoted({
                 role: m.role,
