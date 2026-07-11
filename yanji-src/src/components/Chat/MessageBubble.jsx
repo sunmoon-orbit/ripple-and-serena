@@ -262,9 +262,11 @@ const UserIcon = () => (
   </svg>
 )
 
-export default function MessageBubble({ msg, onEdit, onQuote, isLast }) {
+export default function MessageBubble({ msg, onEdit, onQuote, onDelete, isLast }) {
   const isUser = msg.role === 'user'
   const isStreaming = msg.streaming
+  // [错误] 气泡（请求失败落盘的）：给一个删除钮，能从记录里刷掉
+  const isErrorMsg = !isUser && typeof msg.content === 'string' && msg.content.startsWith('[错误]')
   const { avatarConfig, moonMemory } = useStore()
   const useImages = avatarConfig?.mode === 'image'
   const avatarRadius = avatarConfig?.shape === 'square' ? '6px' : '50%'
@@ -514,6 +516,13 @@ export default function MessageBubble({ msg, onEdit, onQuote, isLast }) {
             <button className="msg-edit-icon-btn" title="引用回复" onClick={() => onQuote(msg)}>
               <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <polyline points="9 17 4 12 9 7" /><path d="M20 18v-2a4 4 0 0 0-4-4H4" />
+              </svg>
+            </button>
+          )}
+          {isErrorMsg && !isStreaming && onDelete && (
+            <button className="msg-edit-icon-btn" title="删除这条报错" onClick={() => onDelete(msg)}>
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
               </svg>
             </button>
           )}
