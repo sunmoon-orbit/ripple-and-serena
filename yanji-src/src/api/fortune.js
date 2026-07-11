@@ -1,6 +1,8 @@
 // 今日签 —— 一天一签的抽签盒
 // 纯前端零服务器负担；以「北京日期+抽签人」做随机种子，同一天同一人抽到的
 // 永远是同一张——她在侧边栏抽的、和聊天里涟言用工具抽的，是同一张签。
+// ⚠️ 确定部分（LEVELS/YI/BUYI/LUCKY+算法）在 moon-memory/routes/widget.js
+// 有一份逐字拷贝（桌面小组件同源同签）——改签池必须两边同步！
 import { useStore } from '../store'
 
 function activeConn() {
