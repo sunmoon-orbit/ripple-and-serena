@@ -3498,6 +3498,69 @@ body.mp-active .scroll-bottom-btn { bottom: 139px; }
   text-align: center; line-height: 1.6;
 }
 
+/* ── 独处手账：独处时间醒来日志时间线 ─────────── */
+.idlej-overlay {
+  position: fixed; inset: 0; z-index: 1200;
+  background: rgba(0,0,0,0.4);
+  display: flex; align-items: center; justify-content: center;
+  padding: 20px;
+}
+.idlej-card {
+  width: min(360px, calc(100vw - 40px));
+  max-height: calc(100vh - 80px);
+  display: flex; flex-direction: column;
+  background: var(--card);
+  border-radius: 16px;
+  padding: 18px 16px 14px;
+  box-shadow: 0 12px 40px rgba(0,0,0,0.18);
+}
+.idlej-head { position: relative; margin-bottom: 10px; flex-shrink: 0; }
+.idlej-title { font-size: 16px; font-weight: 700; color: var(--text); }
+.idlej-sub { font-size: 11px; color: var(--text-faint); margin-top: 3px; }
+.idlej-close {
+  position: absolute; top: -2px; right: -2px;
+  background: none; border: none; cursor: pointer;
+  color: var(--text-faint); font-size: 14px; padding: 4px;
+}
+.idlej-body { min-height: 0; overflow-y: auto; }
+.idlej-empty { text-align: center; color: var(--text-faint); font-size: 12.5px; padding: 24px 0; line-height: 1.8; }
+.idlej-day { margin-bottom: 4px; }
+.idlej-day-header {
+  font-size: 11px; color: var(--text-faint);
+  letter-spacing: 1px;
+  margin: 10px 2px 6px;
+  padding-bottom: 4px;
+  border-bottom: 1px dashed var(--border);
+}
+.idlej-entry {
+  display: flex; align-items: flex-start; gap: 8px;
+  padding: 6px 2px;
+}
+.idlej-time {
+  flex-shrink: 0; width: 36px;
+  font-size: 11px; color: var(--text-faint);
+  font-variant-numeric: tabular-nums;
+  padding-top: 1px;
+}
+.idlej-dot { flex-shrink: 0; font-size: 12px; line-height: 1.4; }
+.idlej-content { min-width: 0; flex: 1; }
+.idlej-action { font-size: 12.5px; color: var(--text); font-weight: 600; }
+.idlej-hint { font-size: 11px; color: var(--text-faint); font-weight: 400; }
+.idlej-summary {
+  font-size: 12px; color: var(--text-soft, var(--text-faint));
+  line-height: 1.6; margin-top: 2px;
+  background: var(--accent-dim);
+  border-radius: 8px;
+  padding: 6px 9px;
+}
+.idlej-foot {
+  margin-top: 12px; padding-top: 10px;
+  border-top: 1px dashed var(--border);
+  font-size: 10.5px; color: var(--text-faint);
+  text-align: center; line-height: 1.6;
+  flex-shrink: 0;
+}
+
 /* ── 小月历（月经周期）——复用 health-card 底子 ─────────── */
 .period-status {
   border-radius: 10px;

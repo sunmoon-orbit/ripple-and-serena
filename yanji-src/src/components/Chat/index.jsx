@@ -21,6 +21,7 @@ import ChatCalendar from './ChatCalendar'
 import DailyChecklist from './DailyChecklist'
 import HealthCard from './HealthCard'
 import PeriodCard from './PeriodCard'
+import IdleJournal from './IdleJournal'
 import AnniversaryCard from './AnniversaryCard'
 import HeartCard from './HeartCard'
 import HeartCardAlbum from './HeartCardAlbum'
@@ -103,6 +104,7 @@ export default function Chat() {
   const [annCard, setAnnCard] = useState(null) // 纪念日当天的亲笔卡片
   const [heartCards, setHeartCards] = useState([]) // 心意卡队列，一次弹一张
   const [albumOpen, setAlbumOpen] = useState(false) // 卡册：翻收下的心意卡
+  const [idleJournalOpen, setIdleJournalOpen] = useState(false) // 独处手账：独处时间醒来日志
   const [egg, setEgg] = useState(null) // 完成彩蛋：回复结束后小概率冒出的像素小家伙
   const [bgImage, setBgImage] = useState(() => localStorage.getItem('yanji-bg-image') || '')
   const bgFileRef = useRef(null)
@@ -641,7 +643,7 @@ export default function Chat() {
     <div className="chat-panel">
       {/* Sidebar */}
       <div className={'chat-sidebar' + (sidebarOpen ? ' open' : '')}>
-        <ConversationList onClose={() => setSidebarOpen(false)} onStartCall={openCall} onOpenGames={() => setGamesOpen(true)} onOpenMusic={() => setMusicOpen(true)} onOpenWheel={() => setWheelOpen(true)} onOpenFortune={() => setFortuneOpen(true)} onOpenChecklist={() => setChecklistOpen(true)} onOpenHealth={() => setHealthOpen(true)} onOpenPeriod={() => setPeriodOpen(true)} onOpenAlbum={() => setAlbumOpen(true)} />
+        <ConversationList onClose={() => setSidebarOpen(false)} onStartCall={openCall} onOpenGames={() => setGamesOpen(true)} onOpenMusic={() => setMusicOpen(true)} onOpenWheel={() => setWheelOpen(true)} onOpenFortune={() => setFortuneOpen(true)} onOpenChecklist={() => setChecklistOpen(true)} onOpenHealth={() => setHealthOpen(true)} onOpenPeriod={() => setPeriodOpen(true)} onOpenAlbum={() => setAlbumOpen(true)} onOpenIdleJournal={() => setIdleJournalOpen(true)} />
       </div>
       {sidebarOpen && <div className="sidebar-backdrop" onClick={() => setSidebarOpen(false)} />}
 
@@ -860,6 +862,7 @@ export default function Chat() {
       {healthOpen && <HealthCard onClose={() => setHealthOpen(false)} />}
       {periodOpen && <PeriodCard onClose={() => setPeriodOpen(false)} />}
       {albumOpen && <HeartCardAlbum onClose={() => setAlbumOpen(false)} />}
+      {idleJournalOpen && <IdleJournal onClose={() => setIdleJournalOpen(false)} />}
       {annCard && (
         <AnniversaryCard
           data={annCard}
