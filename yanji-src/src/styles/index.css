@@ -2968,6 +2968,13 @@ textarea.form-input { display: block; margin: 8px 16px 12px; }
 .music-card-artist { font-size: 12px; color: var(--text-muted); margin-top: 1px; }
 .music-card-reason { font-size: 12px; color: var(--text-mid); margin-top: 4px; line-height: 1.4; }
 .music-card-err { font-size: 11.5px; color: #c76b6b; margin-top: 4px; }
+.music-card-sub-btn {
+  margin-top: 5px; padding: 3px 10px; font-size: 11.5px; cursor: pointer;
+  border: 1px solid var(--border); border-radius: 999px;
+  background: none; color: var(--text-mid);
+}
+.music-card-sub-btn:disabled { opacity: .55; cursor: default; }
+.music-card-sub-note { font-size: 11.5px; color: var(--text-muted); margin-top: 4px; }
 .music-card-play {
   width: 34px; height: 34px; flex-shrink: 0; border: none; cursor: pointer;
   border-radius: 50%; background: var(--accent); color: #fff;
