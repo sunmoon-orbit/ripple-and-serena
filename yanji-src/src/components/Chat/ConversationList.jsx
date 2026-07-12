@@ -3,7 +3,7 @@ import { useStore } from '../../store'
 import { formatTime } from '../../utils'
 import { applyDecayAndGet, getEmotionState, POSITIVE_SLOTS, NEGATIVE_SLOTS, SLOT_LABELS } from '../../utils/emotion'
 
-export default function ConversationList({ onClose, onStartCall, onOpenGames, onOpenMusic, onOpenWheel, onOpenFortune, onOpenChecklist, onOpenHealth, onOpenPeriod, onOpenAlbum }) {
+export default function ConversationList({ onClose, onStartCall, onOpenGames, onOpenMusic, onOpenWheel, onOpenFortune, onOpenChecklist, onOpenHealth, onOpenPeriod, onOpenAlbum, onOpenIdleJournal }) {
   const chats = useStore((s) => s.chats)
   const connections = useStore((s) => s.connections)
   const activeChatId = useStore((s) => s.activeChatId)
@@ -277,6 +277,14 @@ export default function ConversationList({ onClose, onStartCall, onOpenGames, on
                 <path d="M12 11.5c-.8-1.6-3.2-1.6-3.2.4 0 1.4 1.9 2.7 3.2 3.6 1.3-.9 3.2-2.2 3.2-3.6 0-2-2.4-2-3.2-.4z" />
               </svg>
               <span>卡册</span>
+            </button>
+            <button className="sb-tool-item" onClick={() => { onClose?.(); onOpenIdleJournal?.() }}>
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
+                <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
+                <path d="M9 7h7M9 11h5" />
+              </svg>
+              <span>独处手账</span>
             </button>
           </div>
         )}

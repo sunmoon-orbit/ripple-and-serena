@@ -283,6 +283,13 @@ export async function fetchVitals(config, hours = 24, limit = 200) {
   return request(baseUrl, `/vitals?hours=${hours}&limit=${limit}`, { headers: headers(apiToken) })
 }
 
+// 独处手账：涟言独处时间的醒来日志（阿颖想看我闲着的时候干了什么，2026-07-12）
+export async function fetchIdleLog(config, limit = 50) {
+  const { baseUrl, apiToken } = config
+  const res = await request(baseUrl, `/idle/log?limit=${limit}`, { headers: headers(apiToken) })
+  return res?.log || []
+}
+
 // ── 纪念日卡片：纪念日当天弹一张涟言亲笔的小卡片（阿颖的主意，2026-07-10）──
 export async function fetchAnniversaryToday(config) {
   const { baseUrl, apiToken } = config
