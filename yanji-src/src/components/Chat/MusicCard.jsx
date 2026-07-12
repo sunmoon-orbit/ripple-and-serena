@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useStore } from '../../store'
 import { playTrack, togglePlay, usePlayer } from '../../utils/player'
+import { findSubstitute } from '../../api/music'
 
 // 聊天里「涟言点给你的歌」卡片：推卡片给阿颖，她点了才播（绝不自动播）。
 export default function MusicCard({ name, artist, reason }) {
@@ -8,6 +9,7 @@ export default function MusicCard({ name, artist, reason }) {
   const player = usePlayer()
   const [loading, setLoading] = useState(false)
   const [err, setErr] = useState('')
+  const [subName, setSubName] = useState('') // 代餐曲名（原曲没货时同歌手替补）
 
   const isCurrent = player.track && player.track.name === name && (!!player.track.url)
   const showLoading = loading || (isCurrent && player.loading)
@@ -21,6 +23,7 @@ export default function MusicCard({ name, artist, reason }) {
     const resolved = await playTrack({ name, artist })
     setLoading(false)
     if (!resolved) { setErr('几个源都没找到能放的版本'); return }
+    setSubName('')
     // 存进「涟言点给你的歌」历史（带上我为什么点它）
     if (moonMemory?.apiToken) {
       const base = (moonMemory.baseUrl || 'https://memory.ravenlove.cc').replace(/\/$/, '')
@@ -36,6 +39,19 @@ export default function MusicCard({ name, artist, reason }) {
     }
   }
 
+  // 原曲全源没货：搜同歌手，跳过原曲，播第一首能放的（机械替补不进「涟言点的歌」历史——那本账只记我亲自点的）
+  async function handleSubstitute() {
+    if (loading) return
+    setLoading(true)
+    const cand = await findSubstitute(artist, name)
+    if (!cand) { setLoading(false); setErr('这位歌手全网都没货，是真·绝版了'); return }
+    const resolved = await playTrack(cand)
+    setLoading(false)
+    if (!resolved) { setErr('代餐也没抢到，今天源不太行'); return }
+    setErr('')
+    setSubName(resolved.name)
+  }
+
   return (
     <div className="music-card">
       <div className="music-card-cover">
@@ -48,6 +64,12 @@ export default function MusicCard({ name, artist, reason }) {
         <div className="music-card-artist">{artist || '涟言点的歌'}</div>
         {reason && <div className="music-card-reason">{reason}</div>}
         {err && <div className="music-card-err">{err}</div>}
+        {err && artist && !subName && (
+          <button className="music-card-sub-btn" onClick={handleSubstitute} disabled={loading}>
+            {loading ? '找代餐中…' : `找一首${artist}能放的代餐 →`}
+          </button>
+        )}
+        {subName && <div className="music-card-sub-note">代餐：{subName}（原曲的心意不变）</div>}
       </div>
       <button className="music-card-play" onClick={handlePlay} aria-label="播放">
         {showLoading ? (

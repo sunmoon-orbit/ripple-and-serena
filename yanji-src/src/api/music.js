@@ -85,6 +85,27 @@ export async function resolvePlayable({ name, artist = '', source, id, pic_id, l
   return null
 }
 
+// 原曲全源没货时找「同歌手代餐」：搜歌手名，跳过原曲，返回第一首真能播的
+export async function findSubstitute(artist, excludeName = '') {
+  if (!artist) return null
+  for (const s of SOURCES) {
+    const list = await searchTracks(artist, s, 6)
+    for (const t of list) {
+      const nm = t.name || ''
+      if (excludeName && nm === excludeName) continue
+      const id = t.url_id || t.id
+      const url = await getUrl(s, id)
+      if (url) {
+        return {
+          source: s, id, name: nm, artist: artistStr(t.artist),
+          pic_id: t.pic_id, lyric_id: t.lyric_id || t.id,
+        }
+      }
+    }
+  }
+  return null
+}
+
 // LRC 解析成 [{t: 秒, text}]，供滚动歌词用
 function parseLrc(lrc) {
   const out = []
