@@ -2881,12 +2881,37 @@ textarea.form-input { display: block; margin: 8px 16px 12px; }
 .coread-reader { position: relative; }
 
 /* ── 书架：真正的书 + 句级划线批注 ───────────────────────────── */
-.bookread-shelf { display: flex; flex-direction: column; gap: 10px; }
+.bookread-shelf { display: flex; flex-direction: column; gap: 14px; }
+/* 分层小标题：闲书层/正经层/工具层（2026-07-12） */
+.bookread-shelf-section { display: flex; flex-direction: column; gap: 10px; }
+.bookread-shelf-label {
+  font-size: 12px; color: var(--text-faint); letter-spacing: 2px;
+  display: flex; align-items: baseline; gap: 8px;
+  border-bottom: 1px dashed var(--border); padding-bottom: 4px;
+}
+.bookread-shelf-label span { font-size: 11px; letter-spacing: 0; }
 .bookread-book {
+  position: relative;
   display: flex; gap: 0; border-radius: 12px; overflow: hidden; cursor: pointer;
   background: var(--card); border: 1px solid var(--border); transition: all 0.15s;
 }
 .bookread-book:hover { border-color: var(--accent); }
+/* 读讫章：红印泥小方章斜盖在卡片右上角，阿颖和涟言各一枚 */
+.bookread-stamps {
+  position: absolute; top: 8px; right: 10px;
+  display: flex; gap: 6px; pointer-events: none;
+}
+.bookread-stamp {
+  font-family: 'Kaiti SC', 'STKaiti', KaiTi, serif;
+  font-size: 11px; line-height: 1.25; text-align: center;
+  color: #c0392b; border: 1.5px solid rgba(192, 57, 43, 0.75);
+  border-radius: 4px; padding: 2px 5px;
+  transform: rotate(-8deg); opacity: 0.85;
+  background: color-mix(in srgb, #c0392b 6%, transparent);
+}
+.bookread-stamp.crow { transform: rotate(6deg); }
+.bookread-stamp i { display: block; font-style: normal; font-size: 9px; opacity: 0.8; }
+.bookread-stamped { color: #c0392b !important; border-color: rgba(192, 57, 43, 0.6) !important; }
 .bookread-spine { width: 8px; flex-shrink: 0; }
 .bookread-book-main { padding: 12px 14px; flex: 1; min-width: 0; }
 .bookread-book-title { font-size: 15px; font-weight: 600; color: var(--text); }
