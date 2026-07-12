@@ -23,6 +23,9 @@ function emit() {
 function ensureAudio() {
   if (audio) return audio
   audio = new Audio()
+  // 挂进 DOM：安卓 Chrome 对游离 Audio 的媒体通知按钮分发不可靠（0712 暂停键失灵实测）
+  audio.style.display = 'none'
+  document.body.appendChild(audio)
   audio.addEventListener('timeupdate', () => { state.currentTime = audio.currentTime; emit(); syncPosition() })
   audio.addEventListener('durationchange', () => { state.duration = audio.duration || 0; emit() })
   audio.addEventListener('play', () => { state.playing = true; emit(); syncMediaSession('playing') })
@@ -41,16 +44,19 @@ function ensureAudio() {
 const APP_ART = 'https://sunmoon-orbit.github.io/ripple-and-serena/yanji/icon-512.png' // 绝对URL（推送图标的教训）
 function initMediaSession() {
   if (!('mediaSession' in navigator)) return
-  try {
-    navigator.mediaSession.setActionHandler('play', () => audio && audio.play().catch(() => {}))
-    navigator.mediaSession.setActionHandler('pause', () => audio && audio.pause())
-    navigator.mediaSession.setActionHandler('stop', () => stop())
-    navigator.mediaSession.setActionHandler('seekto', (d) => { if (d.seekTime != null) seek(d.seekTime) })
-  } catch { /* 个别浏览器不支持某些 action，忽略 */ }
+  // 每个 action 单独 try：某个不支持不能连累后面的（曾整块 try 导致 seekto 挂掉波及无从排查）
+  const reg = (action, fn) => { try { navigator.mediaSession.setActionHandler(action, fn) } catch {} }
+  reg('play', () => audio && audio.play().catch(() => {}))
+  reg('pause', () => audio && audio.pause())
+  reg('stop', () => stop())
+  reg('seekto', (d) => { if (d.seekTime != null) seek(d.seekTime) })
+  reg('previoustrack', () => seek(0)) // 单曲播放器没队列：上一首=重头来
 }
 function syncMediaSession(playbackState) {
   if (!('mediaSession' in navigator)) return
   try {
+    // 每次进入播放态重挂 handler：部分安卓 Chrome 会在会话重建后丢掉早先注册的 handler
+    if (playbackState === 'playing') initMediaSession()
     navigator.mediaSession.playbackState = playbackState
     if (state.track) {
       navigator.mediaSession.metadata = new MediaMetadata({
