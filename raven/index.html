@@ -1167,6 +1167,16 @@ function attachToHtml(p) {
   return `<span class="attach-chip">${name}</span>`
 }
 
+// [sticker:名字] 容错：没写扩展名先试 .jpg，onerror 再退 .png（乌鸦忘写 .jpg 的三连裂图教训，2026-07-12）
+function stickerFile(name) {
+  return /\.[a-z0-9]+$/i.test(name) ? name : name + '.jpg'
+}
+function stickerFallback(img) {
+  const n = img.dataset.tries = (parseInt(img.dataset.tries) || 0) + 1
+  if (n === 1) img.src = img.src.replace(/\.(jpg|png)$/i, m => m === '.jpg' ? '.png' : '.jpg')
+  else { img.onerror = null; img.replaceWith(document.createTextNode(img.alt || '[贴图]')) }
+}
+
 function appendMsg(text, role, save = true, ts = Date.now(), msgId = null) {
   const el = document.createElement('div')
   el.className = `msg ${role}`
@@ -1185,7 +1195,7 @@ function appendMsg(text, role, save = true, ts = Date.now(), msgId = null) {
       const withImgs = text.replace(/^[ \t]*(https?:\/\/\S+\.(?:png|jpe?g|gif|webp))[ \t]*$/gim, '![]($1)')
       const withAttach = withImgs.replace(ATTACH_TAG_RE, (_, p) => attachToHtml(p))
       const withStickers = withAttach.replace(/\[sticker:([^\]]+)\]/g, (_, name) =>
-        `<img src="/raven/stickers/${name}" style="max-width:220px;border-radius:8px;display:block;margin:4px 0;" alt="${name}">`)
+        `<img src="/raven/stickers/${stickerFile(name)}" onerror="stickerFallback(this)" style="max-width:220px;border-radius:8px;display:block;margin:4px 0;" alt="${name}">`)
       body.innerHTML = renderMusicCards(marked.parse(withStickers))
       enhanceCodeBlocks(body)
     } else {
@@ -1195,7 +1205,7 @@ function appendMsg(text, role, save = true, ts = Date.now(), msgId = null) {
         body.innerHTML = text
           .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
           .replace(/\[sticker:([^\]]+)\]/g, (_, name) =>
-            `<img src="/raven/stickers/${name}" style="max-width:180px;border-radius:8px;display:block;margin:4px 0;" alt="${name}">`)
+            `<img src="/raven/stickers/${stickerFile(name)}" onerror="stickerFallback(this)" style="max-width:180px;border-radius:8px;display:block;margin:4px 0;" alt="${name}">`)
           .replace(ATTACH_TAG_RE, (_, p) => attachToHtml(p))
           .replace(/\n/g, '<br>')
       } else {
