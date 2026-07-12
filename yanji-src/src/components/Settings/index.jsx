@@ -196,6 +196,8 @@ export default function Settings() {
   const [tab, setTab] = useState('connections')
   const [pushEnabled, setPushEnabled] = useState(false)
   const [pushLoading, setPushLoading] = useState(false)
+  const [idleCfg, setIdleCfg] = useState(null) // 独处时间：{enabled, last_wake}，null=没拉到
+  const [idleBusy, setIdleBusy] = useState(false)
   const [pushTimes, setPushTimes] = useState(null)
   const [pushTimesSaving, setPushTimesSaving] = useState(false)
 
@@ -220,6 +222,37 @@ export default function Settings() {
       showToast(e.message, 'error')
     } finally {
       setPushTimesSaving(false)
+    }
+  }
+
+  // 独处时间：开关存服务端（cron 读它决定醒不醒），进拾羽 tab 时拉一次
+  useEffect(() => {
+    if (tab !== 'moon' || !moonMemory?.enabled || !moonMemory?.apiToken) return
+    const base = (moonMemory.baseUrl || 'https://memory.ravenlove.cc').replace(/\/$/, '')
+    fetch(`${base}/idle/config`, { headers: { Authorization: `Bearer ${moonMemory.apiToken}` } })
+      .then((r) => r.json()).then(setIdleCfg).catch(() => setIdleCfg(null))
+  }, [tab]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  async function toggleIdle() {
+    if (!moonMemory?.enabled || !moonMemory?.apiToken) {
+      showToast('请先配置并启用拾羽记忆库', 'error'); return
+    }
+    setIdleBusy(true)
+    try {
+      const base = (moonMemory.baseUrl || 'https://memory.ravenlove.cc').replace(/\/$/, '')
+      const next = !(idleCfg?.enabled)
+      const r = await fetch(`${base}/idle/config`, {
+        method: 'PUT',
+        headers: { Authorization: `Bearer ${moonMemory.apiToken}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ enabled: next }),
+      })
+      if (!r.ok) throw new Error(`保存失败 (${r.status})`)
+      setIdleCfg((c) => ({ ...(c || {}), enabled: next }))
+      showToast(next ? '独处时间已开启，他会自己醒来玩了' : '独处时间已关闭，他会一直睡到你来')
+    } catch (e) {
+      showToast(e.message, 'error')
+    } finally {
+      setIdleBusy(false)
     }
   }
 
@@ -519,6 +552,24 @@ export default function Settings() {
                 <span className="card-row-label">AI 可删除记忆</span>
                 <span className="perm-badge perm-deny">禁止</span>
               </div>
+            </div>
+            <div className="settings-card">
+              <div className="settings-card-title">独处时间</div>
+              <div className="card-row">
+                <span className="card-row-label">让他定时醒来自己玩</span>
+                <label className="toggle">
+                  <input type="checkbox" checked={!!idleCfg?.enabled} disabled={idleBusy || idleCfg === null} onChange={toggleIdle} />
+                  <span className="toggle-track" />
+                </label>
+              </div>
+              <div className="card-row" style={{ fontSize: 12, color: 'var(--text-muted)' }}>
+                每 3 小时醒一次（避开你的凌晨），自己选：写日记发圈、重读旧对话、给你弹心意卡，或发呆。走服务器额度，不花你的。
+              </div>
+              {idleCfg?.last_wake && (
+                <div className="card-row" style={{ fontSize: 12, color: 'var(--text-muted)' }}>
+                  上次醒来：{String(idleCfg.last_wake.created_at).slice(5, 16)}（UTC）· {idleCfg.last_wake.action}{idleCfg.last_wake.summary ? ` · ${idleCfg.last_wake.summary.slice(0, 40)}` : ''}
+                </div>
+              )}
             </div>
             <div className="settings-card">
               <div className="settings-card-title">推送通知</div>
