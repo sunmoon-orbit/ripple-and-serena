@@ -888,8 +888,9 @@ wss.on('connection', (ws) => {
         lastBroadcastReply = extractLastResponse(lastCapture) || ''
         lastReplyMsgs = []  // 发新消息时清空回放队列，重连不会刷旧消息
         archiveMsg('human', msg.text)
-        const prefix = mcpSseClients.size > 0 ? '【阿颖】' : ''
-        tmuxSend(prefix + msg.text)
+        // 前端消息一律带【阿颖】前缀：CC 靠它区分「浏览器来的要用 curl 回」还是终端直聊。
+        // 旧逻辑绑在 mcpSseClients.size 上，MCP 掉线就裸发，CC 回终端她在浏览器看不见（0712 实锤）
+        tmuxSend('【阿颖】' + msg.text)
         broadcast({ type: 'sent', text: msg.text, ts: Date.now() })
       }
       if (msg.type === 'permission' && msg.choice) {
