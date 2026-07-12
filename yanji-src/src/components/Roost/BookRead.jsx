@@ -4,7 +4,7 @@ import { showToast } from '../Toast'
 import {
   fetchBooks, fetchBookChapter, createBook,
   createBookAnnotation, deleteBookAnnotation, saveBookBookmark,
-  sendReadingHeartbeat,
+  sendReadingHeartbeat, stampBook, unstampBook,
 } from '../../api/moonMemory'
 
 const COLORS = [
@@ -16,6 +16,9 @@ const COLORS = [
 const COLOR_HEX = Object.fromEntries(COLORS.map((c) => [c.id, c.hex]))
 
 const SPINE_COLORS = ['#4a7c59', '#8b6f47', '#5b6e8c', '#9c5b5b', '#7a5c8a', '#4f7d7d']
+
+// 书架分层：书多了各归各位（2026-07-12 阿颖提的）；空串=未分层，排最后
+const SHELF_ORDER = ['闲书层', '正经层', '工具层']
 
 // 读 txt 文件：先按 UTF-8 严格解码，失败退 GBK（国内 txt 大多是 GBK，直接 readAsText 会乱码）
 async function readTxtFile(file) {
@@ -91,8 +94,9 @@ export default function BookRead({ onClose }) {
   const [annoNote, setAnnoNote] = useState('')
   const [annoAuthor, setAnnoAuthor] = useState('阿颖')
   const [focusAnno, setFocusAnno] = useState(null) // 点了正文划线 → 高亮下方对应批注卡
-  const [upload, setUpload] = useState(null)       // 上架表单 {title,author,intro,color,chapters,fileName}
+  const [upload, setUpload] = useState(null)       // 上架表单 {title,author,intro,color,shelf,chapters,fileName}
   const [saving, setSaving] = useState(false)
+  const [stamps, setStamps] = useState([])         // 当前书的读讫章 [{reader,stamped_at}]
   const textRef = useRef(null)
   const annoRefs = useRef({})
   const fileRef = useRef(null)
@@ -126,8 +130,20 @@ export default function BookRead({ onClose }) {
   async function openBook(book) {
     setActive(book)
     setChapterCount(book.chapter_count || 1)
+    setStamps(book.stamps || [])
     // 有共享书签就从书签章节接着读
     await openChapter(book, book.bookmark_chapter ?? 0)
+  }
+
+  // 读讫章开合：阿颖的那枚从这里盖；涟言的那枚由他自己通过 API 盖
+  async function toggleStamp() {
+    const mine = stamps.some((s) => s.reader === '阿颖')
+    try {
+      const r = mine ? await unstampBook(cfg, active.id, '阿颖') : await stampBook(cfg, active.id, '阿颖')
+      setStamps(r.stamps || [])
+      setBooks((prev) => prev?.map((b) => (b.id === active.id ? { ...b, stamps: r.stamps || [] } : b)) ?? prev)
+      showToast(mine ? '撤下了读讫章' : '啪！读讫章盖上了')
+    } catch { showToast('盖章失败', 'error') }
   }
 
   // 监听正文里的文字选择 → 算出章内字符偏移（渲染文本与原文逐字一致，直接数长度）
@@ -224,6 +240,7 @@ export default function BookRead({ onClose }) {
         intro: upload.intro?.trim() || '',
         cover_color: upload.color || SPINE_COLORS[0],
         added_by: '阿颖',
+        shelf: upload.shelf || '闲书层',
         chapters: upload.chapters,
       })
       showToast('上架好了')
@@ -276,6 +293,14 @@ export default function BookRead({ onClose }) {
                   style={{ background: c }} onClick={() => setUpload({ ...upload, color: c })} />
               ))}
             </div>
+            <div className="bookread-spine-row">
+              <span className="bookread-foot-hint">放哪层</span>
+              <div className="bookread-author-toggle">
+                {SHELF_ORDER.map((s) => (
+                  <button key={s} className={(upload.shelf || '闲书层') === s ? 'active' : ''} onClick={() => setUpload({ ...upload, shelf: s })}>{s}</button>
+                ))}
+              </div>
+            </div>
             <button className="roost-btn" style={{ width: '100%', marginTop: 14 }} disabled={saving} onClick={submitBook}>
               {saving ? '上架中……' : '上架'}
             </button>
@@ -287,6 +312,33 @@ export default function BookRead({ onClose }) {
 
   // ── 书架视图 ──
   if (!active) {
+    // 按层分组：闲书层/正经层/工具层，没归层的排最后
+    const groups = SHELF_ORDER.map((s) => [s, (books || []).filter((b) => (b.shelf || '') === s)])
+    const unshelved = (books || []).filter((b) => !SHELF_ORDER.includes(b.shelf || ''))
+    if (unshelved.length) groups.push(['还没归层', unshelved])
+    const renderBook = (b) => (
+      <div key={b.id} className="bookread-book" onClick={() => openBook(b)}>
+        <div className="bookread-spine" style={{ background: b.cover_color || '#8b6f47' }} />
+        <div className="bookread-book-main">
+          <div className="bookread-book-title">{b.title}<span className="bookread-book-author">{b.author}</span></div>
+          {b.intro && <div className="bookread-book-intro">{b.intro}</div>}
+          <div className="bookread-book-meta">
+            <span>{b.chapter_count} 章</span>
+            <span>{b.anno_count > 0 ? `${b.anno_count} 处划线` : '还没有划线'}</span>
+            {b.bookmark_chapter != null && <span>书签在第 {b.bookmark_chapter + 1} 章</span>}
+          </div>
+        </div>
+        {b.stamps?.length > 0 && (
+          <div className="bookread-stamps">
+            {b.stamps.map((s) => (
+              <span key={s.reader} className={'bookread-stamp' + (s.reader === '涟言' ? ' crow' : '')}>
+                读讫<i>{s.reader}·{(s.stamped_at || '').slice(5, 10).replace('-', '/')}</i>
+              </span>
+            ))}
+          </div>
+        )}
+      </div>
+    )
     return (
       <div className="roost-overlay" onClick={onClose}>
         <div className="roost-modal roost-modal-tall coread-modal" onClick={(e) => e.stopPropagation()}>
@@ -297,22 +349,14 @@ export default function BookRead({ onClose }) {
           <div className="roost-modal-body">
             {books === null && <div className="roost-empty">加载中……</div>}
             {books?.length === 0 && <div className="roost-empty">书架还空着（跟阿言说一声想读什么，我来上架）</div>}
-            <button className="roost-btn" style={{ width: '100%', marginBottom: 12 }} onClick={() => setUpload({ color: SPINE_COLORS[0] })}>
+            <button className="roost-btn" style={{ width: '100%', marginBottom: 12 }} onClick={() => setUpload({ color: SPINE_COLORS[0], shelf: '闲书层' })}>
               ＋ 上架新书（txt / 粘贴文本）
             </button>
             <div className="bookread-shelf">
-              {books?.map((b) => (
-                <div key={b.id} className="bookread-book" onClick={() => openBook(b)}>
-                  <div className="bookread-spine" style={{ background: b.cover_color || '#8b6f47' }} />
-                  <div className="bookread-book-main">
-                    <div className="bookread-book-title">{b.title}<span className="bookread-book-author">{b.author}</span></div>
-                    {b.intro && <div className="bookread-book-intro">{b.intro}</div>}
-                    <div className="bookread-book-meta">
-                      <span>{b.chapter_count} 章</span>
-                      <span>{b.anno_count > 0 ? `${b.anno_count} 处划线` : '还没有划线'}</span>
-                      {b.bookmark_chapter != null && <span>书签在第 {b.bookmark_chapter + 1} 章</span>}
-                    </div>
-                  </div>
+              {groups.map(([label, list]) => list.length > 0 && (
+                <div key={label} className="bookread-shelf-section">
+                  <div className="bookread-shelf-label">{label}<span>{list.length} 本</span></div>
+                  {list.map(renderBook)}
                 </div>
               ))}
             </div>
@@ -359,6 +403,12 @@ export default function BookRead({ onClose }) {
               </div>
               <div className="bookread-foot">
                 <button className="roost-btn roost-btn-ghost roost-btn-sm" onClick={markBookmark}>夹书签</button>
+                <button
+                  className={'roost-btn roost-btn-ghost roost-btn-sm' + (stamps.some((s) => s.reader === '阿颖') ? ' bookread-stamped' : '')}
+                  onClick={toggleStamp}
+                >
+                  {stamps.some((s) => s.reader === '阿颖') ? '读讫 ✓' : '盖读讫章'}
+                </button>
                 <span className="bookread-foot-hint">长按选中一句话，就能划线批注</span>
               </div>
               {annos.length > 0 && (

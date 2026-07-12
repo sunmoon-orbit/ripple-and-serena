@@ -189,6 +189,19 @@ export async function fetchBookAnnotationsAll(config, bookId) {
   return request(baseUrl, `/books/${bookId}/annotations`, { headers: headers(apiToken) })
 }
 
+// 读讫章：读完一本盖一枚，阿颖和涟言各一枚分开盖
+export async function stampBook(config, bookId, reader) {
+  const { baseUrl, apiToken } = config
+  return request(baseUrl, `/books/${bookId}/stamp`, {
+    method: 'POST', headers: headers(apiToken), body: JSON.stringify({ reader }),
+  })
+}
+
+export async function unstampBook(config, bookId, reader) {
+  const { baseUrl, apiToken } = config
+  return request(baseUrl, `/books/${bookId}/stamp/${encodeURIComponent(reader)}`, { method: 'DELETE', headers: headers(apiToken) })
+}
+
 // ── 衔信（信件）──
 export async function fetchLetters(config, category) {
   const { baseUrl, apiToken } = config
