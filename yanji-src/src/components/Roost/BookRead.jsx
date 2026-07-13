@@ -79,6 +79,20 @@ function buildSegments(content, annos) {
   return segs
 }
 
+// 本地阅读进度：退出后重进自动回到上次读到的章节和位置（2026-07-13 阿颖的建议）。
+// 手动「夹书签」仍是共享书签（涟言那边看得到）；这份是本机自动记的，谁的设备记谁的。
+const POS_KEY = 'yanji_book_pos'
+function loadPos(bookId) {
+  try { return JSON.parse(localStorage.getItem(POS_KEY) || '{}')[bookId] || null } catch { return null }
+}
+function savePos(bookId, ch, scroll) {
+  try {
+    const all = JSON.parse(localStorage.getItem(POS_KEY) || '{}')
+    all[bookId] = { ch, scroll: Math.round(scroll), at: Date.now() }
+    localStorage.setItem(POS_KEY, JSON.stringify(all))
+  } catch { /* ignore */ }
+}
+
 export default function BookRead({ onClose }) {
   const moonMemory = useStore((s) => s.moonMemory)
   const cfg = { baseUrl: (moonMemory?.baseUrl || 'https://memory.ravenlove.cc').replace(/\/$/, ''), apiToken: moonMemory?.apiToken }
@@ -100,6 +114,9 @@ export default function BookRead({ onClose }) {
   const textRef = useRef(null)
   const annoRefs = useRef({})
   const fileRef = useRef(null)
+  const bodyRef = useRef(null)          // 阅读视图的滚动容器
+  const restoreScrollRef = useRef(0)    // 章节渲染完后要恢复到的滚动位置
+  const scrollTimerRef = useRef(null)
 
   useEffect(() => {
     if (!cfg.apiToken) { setBooks([]); return }
@@ -118,12 +135,14 @@ export default function BookRead({ onClose }) {
     return () => clearInterval(t)
   }, [active])
 
-  const openChapter = useCallback(async (book, idx) => {
+  const openChapter = useCallback(async (book, idx, restoreScroll = 0) => {
     setLoading(true)
     setPending(null); setComposing(false); setFocusAnno(null)
     try {
       const ch = await fetchBookChapter(cfg, book.id, idx)
+      restoreScrollRef.current = restoreScroll
       setChapter(ch)
+      savePos(book.id, idx, restoreScroll)
     } catch { showToast('章节加载失败', 'error') } finally { setLoading(false) }
   }, [])
 
@@ -131,8 +150,25 @@ export default function BookRead({ onClose }) {
     setActive(book)
     setChapterCount(book.chapter_count || 1)
     setStamps(book.stamps || [])
-    // 有共享书签就从书签章节接着读
-    await openChapter(book, book.bookmark_chapter ?? 0)
+    // 优先回到本机自动进度（章+滚动位置），没有再看共享书签
+    const pos = loadPos(book.id)
+    const startIdx = Math.min(pos?.ch ?? book.bookmark_chapter ?? 0, (book.chapter_count || 1) - 1)
+    await openChapter(book, startIdx, pos?.ch === startIdx ? pos.scroll : 0)
+  }
+
+  // 章节渲染完成后恢复滚动位置（直接设 scrollTop 会在内容挂载前丢失，放 effect 里）
+  useEffect(() => {
+    if (!chapter || !bodyRef.current) return
+    bodyRef.current.scrollTop = restoreScrollRef.current
+    restoreScrollRef.current = 0
+  }, [chapter])
+
+  // 滚动时静默记进度（防抖 300ms；savePos 只写 localStorage，组件卸载后落笔也安全）
+  function onBodyScroll(e) {
+    if (!active || !chapter) return
+    const top = e.target.scrollTop
+    clearTimeout(scrollTimerRef.current)
+    scrollTimerRef.current = setTimeout(() => savePos(active.id, chapter.idx, top), 300)
   }
 
   // 读讫章开合：阿颖的那枚从这里盖；涟言的那枚由他自己通过 API 盖
@@ -378,7 +414,7 @@ export default function BookRead({ onClose }) {
           <span className="coread-reader-title">{active.title}</span>
           <button className="roost-modal-close" onClick={onClose}>✕</button>
         </div>
-        <div className="roost-modal-body">
+        <div className="roost-modal-body" ref={bodyRef} onScroll={onBodyScroll}>
           {loading && <div className="roost-empty">翻开书页……</div>}
           {!loading && chapter && (
             <>
