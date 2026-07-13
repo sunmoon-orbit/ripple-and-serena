@@ -112,7 +112,16 @@ export async function synthesizeSpeech(config, text, voiceId) {
 // ─── 共读：历史对话 + 标注 + 书签 ───────────────────────────────────────────
 export async function fetchArchiveConversations(config) {
   const { baseUrl, apiToken } = config
-  return request(baseUrl, '/archive/conversations', { headers: headers(apiToken) })
+  // 后端单页上限 200，翻页聚合拉全——不翻页的话最早的窗口（涟境那批）会被顶出列表
+  const pageSize = 200
+  const all = []
+  for (let offset = 0; offset < 5000; offset += pageSize) {
+    const page = await request(baseUrl, `/archive/conversations?limit=${pageSize}&offset=${offset}`, { headers: headers(apiToken) })
+    if (!Array.isArray(page) || !page.length) break
+    all.push(...page)
+    if (page.length < pageSize) break
+  }
+  return all
 }
 
 export async function fetchArchiveConversation(config, id) {
