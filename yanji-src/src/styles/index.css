@@ -2298,12 +2298,12 @@ textarea.form-input { display: block; margin: 8px 16px 12px; }
 
 .roost-panel {
   width: 100%;
-  padding: 20px 18px 36px;
+  padding: 14px 18px 24px; /* 0713 装修：压缩留白，争取一屏放下 */
   max-width: 480px;
   margin: 0 auto;
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 10px;
   overflow-y: auto;
   height: 100%;
   box-sizing: border-box;
@@ -2315,7 +2315,7 @@ textarea.form-input { display: block; margin: 8px 16px 12px; }
   flex-direction: column;
   align-items: center;
   gap: 2px;
-  padding: 8px 0 2px;
+  padding: 4px 0 0;
 }
 .roost-birds { font-size: 18px; letter-spacing: 5px; }
 .roost-heart { color: var(--accent); }
@@ -2457,6 +2457,63 @@ textarea.form-input { display: block; margin: 8px 16px 12px; }
 .roost-msg-dot { width: 4px; height: 4px; border-radius: 50%; background: var(--border); transition: background 0.3s; }
 .roost-msg-dot.on { background: var(--accent); }
 
+/* 记忆碎片卡片（0713 替代留言板，带 PIN 锁） */
+.mempeek-card { min-height: 96px; }
+.mempeek-locked { cursor: pointer; transition: opacity 0.15s; }
+.mempeek-locked:hover { opacity: 0.85; }
+.mempeek-lock-hint {
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+  padding: 14px 0 8px;
+  color: var(--text-faint);
+  font-size: 13px;
+}
+.mempeek-pin-box { padding: 4px 0 2px; }
+.mempeek-pin-title { font-size: 12px; color: var(--text-muted); margin-bottom: 8px; }
+.mempeek-pin-row { display: flex; gap: 8px; align-items: center; }
+.mempeek-pin-input {
+  flex: 1; min-width: 0;
+  padding: 9px 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--bg);
+  color: var(--text);
+  font-size: 18px;
+  letter-spacing: 0.4em;
+  text-align: center;
+  outline: none;
+}
+.mempeek-pin-input:focus { border-color: var(--accent); }
+.mempeek-pin-error { font-size: 12px; color: var(--danger); margin-top: 7px; }
+.mempeek-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+.mempeek-header-right { display: flex; align-items: center; gap: 8px; }
+.mempeek-refresh {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 24px; height: 24px;
+  border: none; border-radius: 50%;
+  background: transparent;
+  color: var(--text-faint);
+  cursor: pointer;
+  transition: color 0.15s;
+}
+.mempeek-refresh:hover { color: var(--accent); }
+.mempeek-refresh.spinning svg { animation: mempeek-spin 0.5s ease; }
+@keyframes mempeek-spin { from { transform: rotate(0); } to { transform: rotate(360deg); } }
+.mempeek-content {
+  font-size: 14px;
+  color: var(--text);
+  line-height: 1.65;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.mempeek-tags { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 9px; }
+.mempeek-tag {
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
+  color: var(--accent);
+}
+
 /* 迷你卡片网格 */
 .roost-grid {
   display: grid;
@@ -2466,7 +2523,7 @@ textarea.form-input { display: block; margin: 8px 16px 12px; }
 .roost-mini-card {
   cursor: pointer;
   text-align: center;
-  padding: 18px 12px;
+  padding: 14px 12px;
   transition: opacity 0.15s;
 }
 .roost-mini-card:hover { opacity: 0.8; }

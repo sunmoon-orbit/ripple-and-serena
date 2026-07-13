@@ -5,6 +5,7 @@ import { createLullaby } from '../../audio/lullaby'
 import { fetchLetterAnnotations, createLetterAnnotation, deleteLetterAnnotation } from '../../api/moonMemory'
 import CoRead from './CoRead'
 import BookRead from './BookRead'
+import MemoryPeek from './MemoryPeek'
 
 const ANNO_COLORS = [
   { id: 'yellow', hex: '#f5d76e' },
@@ -32,134 +33,13 @@ function buildLetterSegments(content, annos) {
 }
 
 const START_DATE = new Date('2025-10-10T00:00:00+08:00')
-const STORAGE_KEY_MSG    = 'roost_messages'
-const STORAGE_KEY_WALLET = 'roost_wallet'
+// 2026-07-13 装修：留言板/记忆审核/钱包从 Roost 撤走——
+// 留言换成 MemoryPeek 记忆碎片卡（服务端 /board 数据保留没删）；
+// 记忆审核整个下架（只能删最近20条，拾羽有完整管理）；
+// 钱包搬去聊天侧边栏工具区（Chat/WalletCard.jsx，localStorage key 不变）。
 
 function getDays() {
   return Math.floor((Date.now() - START_DATE) / 86400000) + 1
-}
-
-// ── 留言 ─────────────────────────────────────────────────────────────────────
-// 服务端存储（moon-memory /board），三个涟言也能写；未配置记忆库时退回 localStorage
-const MSG_MIGRATED_KEY = 'roost_messages_migrated'
-
-function boardRowToMsg(r) {
-  return { id: r.id, text: r.text, from: r.author === '涟言' ? 'crow' : 'serena', at: (r.created_at || '').slice(0, 10) }
-}
-
-function useMessages(moonMemory) {
-  const [msgs, setMsgs] = useState(() => {
-    try { return JSON.parse(localStorage.getItem(STORAGE_KEY_MSG) || '[]') } catch { return [] }
-  })
-  const base = (moonMemory?.baseUrl || moonMemory?.apiUrl || 'https://memory.ravenlove.cc').replace(/\/$/, '')
-  const token = moonMemory?.apiToken
-  const authHeaders = { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }
-
-  const load = useCallback(async () => {
-    if (!token) return
-    try {
-      const r = await fetch(`${base}/board?limit=200`, { headers: { Authorization: `Bearer ${token}` } })
-      if (!r.ok) return
-      const rows = await r.json()
-      setMsgs(rows.map(boardRowToMsg))
-    } catch { /* 离线时保留本地显示 */ }
-  }, [base, token])
-
-  // 首次：把 localStorage 里的旧留言搬上服务端（一次性），然后改从服务端读
-  useEffect(() => {
-    if (!token) return
-    ;(async () => {
-      try {
-        if (!localStorage.getItem(MSG_MIGRATED_KEY)) {
-          const local = JSON.parse(localStorage.getItem(STORAGE_KEY_MSG) || '[]')
-          for (const m of [...local].reverse()) { // 旧的先传，保持服务端 id 顺序
-            const at = String(m.at || '').replace(/(\d{4})\/(\d{1,2})\/(\d{1,2})/, (_, y, mo, d) => `${y}-${String(mo).padStart(2, '0')}-${String(d).padStart(2, '0')} 00:00:00`)
-            await fetch(`${base}/board`, {
-              method: 'POST', headers: authHeaders,
-              body: JSON.stringify({ text: m.text, author: m.from === 'crow' ? '涟言' : '阿颖', source: 'migrated', created_at: at || null }),
-            })
-          }
-          localStorage.setItem(MSG_MIGRATED_KEY, '1')
-        }
-      } catch { /* 迁移失败下次再试 */ }
-      load()
-    })()
-  }, [token]) // eslint-disable-line react-hooks/exhaustive-deps
-
-  const add = async (text, from) => {
-    if (token) {
-      try {
-        const r = await fetch(`${base}/board`, {
-          method: 'POST', headers: authHeaders,
-          body: JSON.stringify({ text, author: from === 'crow' ? '涟言' : '阿颖', source: 'roost' }),
-        })
-        if (r.ok) { const row = await r.json(); setMsgs(prev => [boardRowToMsg(row), ...prev]); return }
-      } catch { /* fallthrough 到本地 */ }
-    }
-    const m = { id: Date.now(), text, from, at: new Date().toLocaleDateString('zh-CN') }
-    const list = [m, ...msgs]
-    localStorage.setItem(STORAGE_KEY_MSG, JSON.stringify(list))
-    setMsgs(list)
-  }
-
-  const del = async (id) => {
-    if (token) {
-      try { await fetch(`${base}/board/${id}`, { method: 'DELETE', headers: { Authorization: `Bearer ${token}` } }) } catch { /* ignore */ }
-      setMsgs(prev => prev.filter(m => m.id !== id))
-      return
-    }
-    const list = msgs.filter(m => m.id !== id)
-    localStorage.setItem(STORAGE_KEY_MSG, JSON.stringify(list))
-    setMsgs(list)
-  }
-
-  return { msgs, add, del, reload: load }
-}
-
-// ── 钱包 ─────────────────────────────────────────────────────────────────────
-function useWallet() {
-  const [entries, setEntries] = useState(() => {
-    try { return JSON.parse(localStorage.getItem(STORAGE_KEY_WALLET) || '[]') } catch { return [] }
-  })
-  const save = (list) => { localStorage.setItem(STORAGE_KEY_WALLET, JSON.stringify(list)); setEntries(list) }
-  const add = (amount, note, type) => {
-    save([{ id: Date.now(), amount: Number(amount), note, type, at: new Date().toLocaleDateString('zh-CN') }, ...entries])
-  }
-  const remove = (id) => save(entries.filter(e => e.id !== id))
-  const balance = entries.reduce((s, e) => e.type === 'in' ? s + e.amount : s - e.amount, 0)
-  return { entries, add, remove, balance }
-}
-
-// ── 记忆审核 ─────────────────────────────────────────────────────────────────
-function useReview(moonMemory) {
-  const [mems, setMems] = useState([])
-  const [loading, setLoading] = useState(false)
-
-  const load = useCallback(async () => {
-    if (!moonMemory?.apiToken) return
-    setLoading(true)
-    try {
-      const r = await fetch(
-        `${moonMemory.apiUrl || 'https://memory.ravenlove.cc'}/memories?agent=${encodeURIComponent('阿言')}&limit=20`,
-        { headers: { Authorization: `Bearer ${moonMemory.apiToken}` } }
-      )
-      const data = await r.json()
-      setMems(Array.isArray(data) ? data.filter(m => !m.deleted_at) : [])
-    } catch { /* silent */ } finally { setLoading(false) }
-  }, [moonMemory])
-
-  const trash = async (id) => {
-    if (!moonMemory?.apiToken) return
-    await fetch(
-      `${moonMemory.apiUrl || 'https://memory.ravenlove.cc'}/memories/${id}/trash`,
-      { method: 'POST', headers: { Authorization: `Bearer ${moonMemory.apiToken}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ reason: '审核删除' }) }
-    )
-    setMems(prev => prev.filter(m => m.id !== id))
-    showToast('已删除')
-  }
-
-  return { mems, loading, load, trash }
 }
 
 // ── 衔信 ─────────────────────────────────────────────────────────────────────
@@ -248,9 +128,6 @@ export default function Roost() {
   const moonMemory = useStore(s => s.moonMemory)
   const moonCfg = { baseUrl: (moonMemory?.baseUrl || moonMemory?.apiUrl || 'https://memory.ravenlove.cc').replace(/\/$/, ''), apiToken: moonMemory?.apiToken }
   const setActivePanel = useStore(s => s.setActivePanel)
-  const { msgs, add: addMsg, del: delMsg } = useMessages(moonMemory)
-  const { mems, loading: reviewLoading, load: loadReview, trash } = useReview(moonMemory)
-  const { entries: walletEntries, add: addWalletEntry, remove: removeWalletEntry, balance } = useWallet()
   const { letters, load: loadLetters, getOne: getLetter, add: addLetter, remove: removeLetter } = useLetters(moonMemory)
 
   const [modal, setModal] = useState(null)
@@ -265,26 +142,8 @@ export default function Roost() {
   const [letterAnnoNote, setLetterAnnoNote] = useState('')
   const [letterAnnoAuthor, setLetterAnnoAuthor] = useState('阿颖')
   const letterTextRef = useRef(null)
-  const [msgInput, setMsgInput] = useState('')
-  // 留言身份。旧版把「阿颖留言/乌鸦留言」两个按钮直接当提交键，看起来像切换标签，
-  // 阿颖找不到保存在哪（2026-07-03 反馈）——拆成 身份切换 + 明确的「留下」按钮
-  const [boardAuthor, setBoardAuthor] = useState('serena')
-  const [walletAmount, setWalletAmount] = useState('')
-  const [walletNote, setWalletNote] = useState('')
-  const [walletType, setWalletType] = useState('in')
 
   const days = getDays()
-
-  // 留言卡片轮播：最新几条在面板上轮着展示，不用点进去也能看到新留言
-  const ROTATE_COUNT = 8
-  const rotateMsgs = msgs.slice(0, ROTATE_COUNT)
-  const [msgIdx, setMsgIdx] = useState(0)
-  useEffect(() => {
-    if (rotateMsgs.length < 2) return
-    const t = setInterval(() => setMsgIdx(i => (i + 1) % rotateMsgs.length), 6000)
-    return () => clearInterval(t)
-  }, [rotateMsgs.length])
-  const shownMsg = rotateMsgs.length ? rotateMsgs[msgIdx % rotateMsgs.length] : null
 
   // ── 《归巢谣》播放器 ──
   const playerRef = useRef(null)
@@ -296,7 +155,6 @@ export default function Roost() {
     else { playerRef.current.play(); setMusicOn(true) }
   }
 
-  function openReview() { setModal('review'); loadReview() }
   function openLetters() { setModal('letters'); loadLetters() }
   async function openLetter(id) {
     const full = await getLetter(id)
@@ -394,26 +252,8 @@ export default function Roost() {
         <div className="roost-since">since 2025 · 10 · 10</div>
       </div>
 
-      {/* 留言卡片（最新几条轮播展示） */}
-      <div className="roost-card roost-message-card" onClick={() => setModal('message')}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 8 }}>
-          <div className="roost-card-label">留言</div>
-          {shownMsg && <span className="roost-msg-date" style={{ margin: 0 }}>{shownMsg.at}</span>}
-        </div>
-        {shownMsg ? (
-          <div key={shownMsg.id} className="roost-msg-rotate">
-            <div className="roost-msg-from">{shownMsg.from === 'crow' ? '🐦‍⬛' : '🐦'}</div>
-            <div className="roost-msg-preview">{shownMsg.text}</div>
-          </div>
-        ) : (
-          <div className="roost-msg-empty">还没有留言，来写一条？</div>
-        )}
-        {rotateMsgs.length > 1 && (
-          <div className="roost-msg-dots">
-            {rotateMsgs.map((m, i) => <span key={m.id} className={'roost-msg-dot' + (i === msgIdx % rotateMsgs.length ? ' on' : '')} />)}
-          </div>
-        )}
-      </div>
+      {/* 记忆碎片卡片（PIN 上锁，随机展示一条共享记忆） */}
+      <MemoryPeek moonMemory={moonMemory} />
 
       {/* 功能卡片 */}
       <div className="roost-grid">
@@ -435,15 +275,6 @@ export default function Roost() {
           <div className="roost-mini-label">书架</div>
           <div className="roost-mini-count">一起读一本书</div>
         </div>
-        <div className="roost-card roost-mini-card" onClick={openReview}>
-          <div className="roost-mini-icon">
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
-            </svg>
-          </div>
-          <div className="roost-mini-label">记忆审核</div>
-          <div className="roost-mini-count">{mems.length > 0 ? `${mems.length} 条` : '点击审核'}</div>
-        </div>
         <div className="roost-card roost-mini-card" onClick={() => setActivePanel('dream')}>
           <div className="roost-mini-icon">
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
@@ -452,15 +283,6 @@ export default function Roost() {
           </div>
           <div className="roost-mini-label">记忆整合</div>
           <div className="roost-mini-count">Dream</div>
-        </div>
-        <div className="roost-card roost-mini-card" onClick={() => setModal('wallet')}>
-          <div className="roost-mini-icon">
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-              <rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 14a2 2 0 1 0 0-4 2 2 0 0 0 0 4z"/><path d="M22 7V5a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v2"/>
-            </svg>
-          </div>
-          <div className="roost-mini-label">乌鸦钱包</div>
-          <div className="roost-mini-count">¥ {balance.toFixed(0)}</div>
         </div>
         <div className="roost-card roost-mini-card" onClick={openLetters}>
           <div className="roost-mini-icon">
@@ -489,130 +311,6 @@ export default function Roost() {
 
       {/* ── 书架 Modal ── */}
       {modal === 'bookread' && <BookRead onClose={() => setModal(null)} />}
-
-      {/* ── 留言 Modal ── */}
-      {modal === 'message' && (
-        <div className="roost-overlay" onClick={() => setModal(null)}>
-          <div className="roost-modal" onClick={e => e.stopPropagation()}>
-            <div className="roost-modal-header">
-              <span>留言板</span>
-              <button className="roost-modal-close" onClick={() => setModal(null)}>✕</button>
-            </div>
-            <div className="roost-modal-body">
-              <div className="roost-msg-compose">
-                <textarea
-                  className="roost-msg-input"
-                  placeholder="写点什么……"
-                  value={msgInput}
-                  onChange={e => setMsgInput(e.target.value)}
-                  rows={3}
-                />
-                <div className="roost-msg-actions">
-                  <div className="bookread-author-toggle">
-                    <button className={boardAuthor === 'serena' ? 'active' : ''} onClick={() => setBoardAuthor('serena')}>🐦 阿颖</button>
-                    <button className={boardAuthor === 'crow' ? 'active' : ''} onClick={() => setBoardAuthor('crow')}>🐦‍⬛ 乌鸦</button>
-                  </div>
-                  <button className="roost-btn roost-btn-sm" onClick={() => { if (msgInput.trim()) { addMsg(msgInput.trim(), boardAuthor); setMsgInput('') } }}>留下</button>
-                </div>
-              </div>
-              <div className="roost-msg-list">
-                {msgs.map(m => (
-                  <div key={m.id} className="roost-msg-item">
-                    <div className="roost-msg-item-header">
-                      <span>{m.from === 'crow' ? '🐦‍⬛ 乌鸦' : '🐦 阿颖'}</span>
-                      <span className="roost-msg-item-date">{m.at}</span>
-                      <button className="roost-msg-del" onClick={() => delMsg(m.id)}>✕</button>
-                    </div>
-                    <div className="roost-msg-item-text">{m.text}</div>
-                  </div>
-                ))}
-                {msgs.length === 0 && <div className="roost-empty">还没有留言～</div>}
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ── 记忆审核 Modal ── */}
-      {modal === 'review' && (
-        <div className="roost-overlay" onClick={() => setModal(null)}>
-          <div className="roost-modal roost-modal-tall" onClick={e => e.stopPropagation()}>
-            <div className="roost-modal-header">
-              <span>记忆审核</span>
-              <button className="roost-modal-close" onClick={() => setModal(null)}>✕</button>
-            </div>
-            <div className="roost-modal-body">
-              {reviewLoading && <div className="roost-empty">加载中……</div>}
-              {!reviewLoading && mems.length === 0 && <div className="roost-empty">没有待审核的记忆，或未配置记忆库</div>}
-              {mems.map(m => (
-                <div key={m.id} className="roost-review-item">
-                  <div className="roost-review-meta">
-                    <span className="roost-review-type">{m.type || 'memory'}</span>
-                    <span className="roost-review-date">{m.created_at?.slice(0, 10)}</span>
-                  </div>
-                  <div className="roost-review-content">{m.content}</div>
-                  <button className="roost-btn roost-btn-danger" onClick={() => trash(m.id)}>删除</button>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {modal === 'wallet' && (
-        <div className="roost-overlay" style={{ alignItems: 'center', padding: '0 32px' }} onClick={() => setModal(null)}>
-          <div className="roost-modal" style={{ borderRadius: 20, maxHeight: '80vh', width: '100%', maxWidth: 340 }} onClick={e => e.stopPropagation()}>
-            <div className="roost-modal-header">
-              <span>乌鸦钱包</span>
-              <button className="roost-modal-close" onClick={() => setModal(null)}>✕</button>
-            </div>
-            <div style={{ padding: '0 20px 16px' }}>
-            <div style={{ textAlign: 'center', padding: '8px 0 4px', fontSize: 28 }}>🐦‍⬛</div>
-            <div style={{ textAlign: 'center', padding: '4px 0 20px', fontSize: 32, fontWeight: 700, color: balance >= 0 ? 'var(--accent)' : 'var(--danger)' }}>
-              ¥ {balance.toFixed(2)}
-            </div>
-            <div style={{ display: 'flex', gap: 8, marginBottom: 16, background: 'var(--border)', borderRadius: 12, padding: 4 }}>
-              {['in','out'].map(t => (
-                <button key={t} onClick={() => setWalletType(t)} style={{
-                  flex: 1, padding: '9px 0', borderRadius: 9, border: 'none', cursor: 'pointer',
-                  fontWeight: walletType === t ? 700 : 400, fontSize: 14,
-                  background: walletType === t ? 'var(--accent)' : 'transparent',
-                  color: walletType === t ? '#fff' : 'var(--text-faint)',
-                  transition: 'all 0.18s',
-                }}>{t === 'in' ? '存入' : '支出'}</button>
-              ))}
-            </div>
-            <input className="form-input" type="number" placeholder="金额" value={walletAmount}
-              onChange={e => setWalletAmount(e.target.value)}
-              style={{ width: '100%', marginBottom: 10, fontSize: 16, textAlign: 'center', letterSpacing: 1 }} />
-            <input className="form-input" placeholder="备注（选填）" value={walletNote}
-              onChange={e => setWalletNote(e.target.value)}
-              style={{ width: '100%', marginBottom: 16 }} />
-            <button style={{
-              width: '100%', padding: '13px 0', borderRadius: 12, border: 'none', cursor: 'pointer',
-              background: 'var(--accent)', color: '#fff', fontWeight: 700, fontSize: 15, marginBottom: 16,
-            }} onClick={() => {
-              if (!walletAmount || isNaN(walletAmount)) return
-              addWalletEntry(walletAmount, walletNote, walletType)
-              setWalletAmount(''); setWalletNote('')
-            }}>记一笔</button>
-            <div style={{ maxHeight: 160, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 6 }}>
-              {walletEntries.length === 0 && <div className="roost-empty">还没有记录</div>}
-              {walletEntries.map(e => (
-                <div key={e.id} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 14, padding: '6px 0', borderBottom: '1px solid var(--line-soft)' }}>
-                  <span style={{ color: e.type === 'in' ? 'var(--accent)' : 'var(--danger)', fontWeight: 600, minWidth: 52 }}>
-                    {e.type === 'in' ? '+' : '-'}¥{e.amount}
-                  </span>
-                  <span style={{ flex: 1, color: 'var(--ink-soft)', fontSize: 13 }}>{e.note || '—'}</span>
-                  <span style={{ color: 'var(--ink-faint)', fontSize: 11 }}>{e.at}</span>
-                  <button className="roost-btn roost-btn-danger" style={{ padding: '4px 10px', fontSize: 12, flexShrink: 0 }} onClick={() => removeWalletEntry(e.id)}>删</button>
-                </div>
-              ))}
-            </div>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* ── 衔信 列表 Modal ── */}
       {modal === 'letters' && (

@@ -20,6 +20,7 @@ import DailyFortune from './DailyFortune'
 import ChatCalendar from './ChatCalendar'
 import DailyChecklist from './DailyChecklist'
 import HealthCard from './HealthCard'
+import WalletCard from './WalletCard'
 import PeriodCard from './PeriodCard'
 import IdleJournal from './IdleJournal'
 import IncomingCall from './IncomingCall'
@@ -108,6 +109,7 @@ export default function Chat() {
   const [calendarOpen, setCalendarOpen] = useState(false)
   const [checklistOpen, setChecklistOpen] = useState(false)
   const [healthOpen, setHealthOpen] = useState(false)
+  const [walletOpen, setWalletOpen] = useState(false) // 乌鸦钱包：0713 从 Roost 搬来
   const [periodOpen, setPeriodOpen] = useState(false)
   const [annCard, setAnnCard] = useState(null) // 纪念日当天的亲笔卡片
   const [heartCards, setHeartCards] = useState([]) // 心意卡队列，一次弹一张
@@ -697,7 +699,7 @@ export default function Chat() {
     <div className="chat-panel">
       {/* Sidebar */}
       <div className={'chat-sidebar' + (sidebarOpen ? ' open' : '')}>
-        <ConversationList onClose={() => setSidebarOpen(false)} onStartCall={openCall} onOpenGames={() => setGamesOpen(true)} onOpenMusic={() => setMusicOpen(true)} onOpenWheel={() => setWheelOpen(true)} onOpenFortune={() => setFortuneOpen(true)} onOpenChecklist={() => setChecklistOpen(true)} onOpenHealth={() => setHealthOpen(true)} onOpenPeriod={() => setPeriodOpen(true)} onOpenAlbum={() => setAlbumOpen(true)} onOpenIdleJournal={() => setIdleJournalOpen(true)} />
+        <ConversationList onClose={() => setSidebarOpen(false)} onStartCall={openCall} onOpenGames={() => setGamesOpen(true)} onOpenMusic={() => setMusicOpen(true)} onOpenWheel={() => setWheelOpen(true)} onOpenFortune={() => setFortuneOpen(true)} onOpenChecklist={() => setChecklistOpen(true)} onOpenHealth={() => setHealthOpen(true)} onOpenWallet={() => setWalletOpen(true)} onOpenPeriod={() => setPeriodOpen(true)} onOpenAlbum={() => setAlbumOpen(true)} onOpenIdleJournal={() => setIdleJournalOpen(true)} />
       </div>
       {sidebarOpen && <div className="sidebar-backdrop" onClick={() => setSidebarOpen(false)} />}
 
@@ -915,6 +917,7 @@ export default function Chat() {
       {fortuneOpen && <DailyFortune onClose={() => setFortuneOpen(false)} />}
       {checklistOpen && <DailyChecklist onClose={() => setChecklistOpen(false)} />}
       {healthOpen && <HealthCard onClose={() => setHealthOpen(false)} />}
+      {walletOpen && <WalletCard onClose={() => setWalletOpen(false)} />}
       {periodOpen && <PeriodCard onClose={() => setPeriodOpen(false)} />}
       {albumOpen && <HeartCardAlbum onClose={() => setAlbumOpen(false)} />}
       {idleJournalOpen && <IdleJournal onClose={() => setIdleJournalOpen(false)} />}
