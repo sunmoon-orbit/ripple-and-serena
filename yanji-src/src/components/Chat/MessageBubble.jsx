@@ -272,7 +272,7 @@ export default function MessageBubble({ msg, onEdit, onQuote, onDelete, isLast }
   const avatarRadius = avatarConfig?.shape === 'square' ? '6px' : '50%'
   const [editing, setEditing] = useState(false)
   const [ttsState, setTtsState] = useState('idle') // idle | loading | playing
-  const [voiceMode, setVoiceMode] = useState(false) // 语音条模式：正文隐藏，显示音浪
+  const [voiceMode, setVoiceMode] = useState(!!msg.voicemail) // 语音条模式：正文隐藏，显示音浪；语音留言默认就是语音条
   const [ttsDuration, setTtsDuration] = useState(0)
   const audioRef = useRef(null) // 缓存的 Audio，重播不再重新合成
 
@@ -299,6 +299,7 @@ export default function MessageBubble({ msg, onEdit, onQuote, onDelete, isLast }
         const plainText = stripInlineFx(msg.content) // 情绪特效标签只留正文（否则 glow/shake 被念成英文）
           .replace(/\[music:[^\]]+\]/g, '')          // 点歌标签不朗读
           .replace(/\[sticker:[^\]]+\]/g, '')        // 贴图标签不朗读（否则被念成 sticker:文件名）
+          .replace(/\[call:[^\]]+\]/gi, '')          // 来电标签不朗读（0709 教训：新方括号标签同步进清洗）
           .replace(/\[MSG\]/gi, ' ')                 // 漏拆的分段符不朗读（否则被念成英文 MSG）
           .replace(VOICE_TAG_RE, (m, t) => (t.toLowerCase() === 'laughter' ? '(laughs)' : '(breath)'))
           .replace(/!\[[^\]]*\]\([^)]*\)/g, '')   // 图片（贴图）整体去掉
@@ -455,8 +456,21 @@ export default function MessageBubble({ msg, onEdit, onQuote, onDelete, isLast }
                 ) : renderUserContent(msg.content)}
               </>
             )
+          ) : msg.callInvite ? (
+            // 来电记录条：响铃中/已接听/未接来电（未接的下面紧跟一条语音留言）
+            <div className={'call-bubble call-invite' + (msg.callInvite.status === 'ringing' ? ' ringing' : '')}>
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3 19.5 19.5 0 0 1-6-6 19.8 19.8 0 0 1-3-8.7A2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.1 1 .4 2 .7 2.8a2 2 0 0 1-.5 2.1L8.1 9.9a16 16 0 0 0 6 6l1.3-1.3a2 2 0 0 1 2.1-.4c.9.3 1.9.5 2.8.7a2 2 0 0 1 1.7 2z" />
+              </svg>
+              <span className="ci-text">
+                {msg.callInvite.status === 'ringing' ? '来电中…'
+                  : msg.callInvite.status === 'accepted' ? '语音通话'
+                  : '未接来电'}
+                {msg.callInvite.reason && <em className="ci-reason">{msg.callInvite.reason}</em>}
+              </span>
+            </div>
           ) : voiceMode ? (
-            <div className={`voice-bar${ttsState === 'playing' ? ' playing' : ''}`}>
+            <div className={`voice-bar${ttsState === 'playing' ? ' playing' : ''}${msg.voicemail ? ' vb-voicemail' : ''}`}>
               <button className="vb-play" onClick={playTts} aria-label={ttsState === 'playing' ? '暂停' : '播放'}>
                 {ttsState === 'loading' ? (
                   <svg viewBox="0 0 24 24" width="12" height="12" fill="currentColor"><circle cx="4" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="20" cy="12" r="2"/></svg>
@@ -470,6 +484,7 @@ export default function MessageBubble({ msg, onEdit, onQuote, onDelete, isLast }
                 {Array.from({ length: 8 }).map((_, i) => <div key={i} className="vb-bar" />)}
               </div>
               <span className="vb-time">{ttsDuration ? fmtDur(ttsDuration) : '…'}</span>
+              {msg.voicemail && <span className="vb-vm-label">留言</span>}
             </div>
           ) : (
             renderAssistantContent(msg.content, isStreaming)

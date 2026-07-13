@@ -38,6 +38,7 @@ function stripForTts(text) {
     .replace(VOICE_TAG_RE, '')
     .replace(/\[music:[^\]]+\]/g, '')
     .replace(/\[sticker:[^\]]+\]/g, '')
+    .replace(/\[call:[^\]]+\]/gi, '') // 来电标签不朗读（0709 教训：新方括号标签同步进清洗）
     .replace(/!\[[^\]]*\]\([^)]*\)/g, '')
     .replace(/\[([^\]]*)\]\([^)]*\)/g, '$1')
     .replace(/[#*`>_~\[\]]/g, '')
