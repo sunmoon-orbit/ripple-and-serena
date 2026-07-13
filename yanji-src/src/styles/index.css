@@ -2308,6 +2308,9 @@ textarea.form-input { display: block; margin: 8px 16px 12px; }
   height: 100%;
   box-sizing: border-box;
 }
+/* flex 滚动容器的子项默认可压缩：内容超一屏时卡片被压扁、文字穿透到后面的卡片上
+   （0713 记忆碎片长文本亲历）——全体禁止收缩，超了就老实滚动 */
+.roost-panel > * { flex-shrink: 0; }
 
 /* 顶部 */
 .roost-header {
@@ -2457,33 +2460,13 @@ textarea.form-input { display: block; margin: 8px 16px 12px; }
 .roost-msg-dot { width: 4px; height: 4px; border-radius: 50%; background: var(--border); transition: background 0.3s; }
 .roost-msg-dot.on { background: var(--accent); }
 
-/* 记忆碎片卡片（0713 替代留言板，带 PIN 锁） */
-.mempeek-card { min-height: 96px; }
-.mempeek-locked { cursor: pointer; transition: opacity 0.15s; }
-.mempeek-locked:hover { opacity: 0.85; }
+/* 记忆碎片卡片（0713 替代留言板；apiToken 天然锁，同卡册） */
 .mempeek-lock-hint {
   display: flex; align-items: center; justify-content: center; gap: 8px;
   padding: 14px 0 8px;
   color: var(--text-faint);
   font-size: 13px;
 }
-.mempeek-pin-box { padding: 4px 0 2px; }
-.mempeek-pin-title { font-size: 12px; color: var(--text-muted); margin-bottom: 8px; }
-.mempeek-pin-row { display: flex; gap: 8px; align-items: center; }
-.mempeek-pin-input {
-  flex: 1; min-width: 0;
-  padding: 9px 12px;
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  background: var(--bg);
-  color: var(--text);
-  font-size: 18px;
-  letter-spacing: 0.4em;
-  text-align: center;
-  outline: none;
-}
-.mempeek-pin-input:focus { border-color: var(--accent); }
-.mempeek-pin-error { font-size: 12px; color: var(--danger); margin-top: 7px; }
 .mempeek-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
 .mempeek-header-right { display: flex; align-items: center; gap: 8px; }
 .mempeek-refresh {
@@ -2502,8 +2485,11 @@ textarea.form-input { display: block; margin: 8px 16px 12px; }
   font-size: 14px;
   color: var(--text);
   line-height: 1.65;
-  white-space: pre-wrap;
   word-break: break-word;
+  display: -webkit-box;
+  -webkit-line-clamp: 7; /* 长记忆最多七行，别把一屏目标又撑破 */
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 .mempeek-tags { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 9px; }
 .mempeek-tag {
