@@ -2370,10 +2370,10 @@ textarea.form-input { display: block; margin: 8px 16px 12px; }
   border: 1px solid var(--border);
 }
 
-/* 纪念日 */
+/* 纪念日（0713 二次压缩：她说可以再小一点，一屏为先） */
 .roost-anniversary {
   text-align: center;
-  padding: 16px 20px;
+  padding: 10px 16px;
   background: var(--surface);
   position: relative;
 }
@@ -2393,7 +2393,7 @@ textarea.form-input { display: block; margin: 8px 16px 12px; }
   color: var(--accent);
   opacity: 0.85;
   letter-spacing: 0.12em;
-  margin-bottom: 10px;
+  margin-bottom: 6px;
 }
 .roost-amp {
   font-style: normal;
@@ -2403,7 +2403,7 @@ textarea.form-input { display: block; margin: 8px 16px 12px; }
 }
 .roost-days-num {
   font-family: 'Cormorant Garamond', Georgia, serif;
-  font-size: 48px;
+  font-size: 38px;
   font-weight: 300;
   line-height: 1;
   color: var(--text);
@@ -2421,7 +2421,7 @@ textarea.form-input { display: block; margin: 8px 16px 12px; }
   font-size: 12px;
   color: var(--accent);
   letter-spacing: 0.18em;
-  margin-top: 6px;
+  margin-top: 4px;
   opacity: 0.75;
 }
 
@@ -2461,6 +2461,7 @@ textarea.form-input { display: block; margin: 8px 16px 12px; }
 .roost-msg-dot.on { background: var(--accent); }
 
 /* 记忆碎片卡片（0713 替代留言板；apiToken 天然锁，同卡册） */
+.mempeek-card { padding: 13px 16px; } /* 比通用 roost-card 再收一点 */
 .mempeek-lock-hint {
   display: flex; align-items: center; justify-content: center; gap: 8px;
   padding: 14px 0 8px;
@@ -2487,7 +2488,7 @@ textarea.form-input { display: block; margin: 8px 16px 12px; }
   line-height: 1.65;
   word-break: break-word;
   display: -webkit-box;
-  -webkit-line-clamp: 7; /* 长记忆最多七行，别把一屏目标又撑破 */
+  -webkit-line-clamp: 3; /* 只露三行当引子——长记忆本来也看不全，少即是多（0713 她的意思） */
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
