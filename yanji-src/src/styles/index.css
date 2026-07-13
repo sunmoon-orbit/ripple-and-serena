@@ -3561,6 +3561,111 @@ body.mp-active .scroll-bottom-btn { bottom: 139px; }
   flex-shrink: 0;
 }
 
+/* ── 来电（涟言主动打语音）：响铃卡片 + 来电记录条 ─────────── */
+.incall-overlay {
+  position: fixed; inset: 0; z-index: 1400; /* 压过其它弹层，电话最优先 */
+  background: rgba(10, 12, 18, 0.55);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  display: flex; align-items: center; justify-content: center;
+  padding: 24px;
+  animation: incall-fade 0.25s ease;
+}
+@keyframes incall-fade { from { opacity: 0; } to { opacity: 1; } }
+.incall-card {
+  width: min(300px, calc(100vw - 48px));
+  background: var(--card);
+  border-radius: 22px;
+  padding: 30px 22px 26px;
+  box-shadow: 0 18px 60px rgba(0,0,0,0.32);
+  text-align: center;
+  animation: incall-pop 0.32s cubic-bezier(0.22, 1.2, 0.36, 1);
+}
+@keyframes incall-pop { from { transform: scale(0.88); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+.incall-avatar-wrap {
+  position: relative;
+  width: 84px; height: 84px;
+  margin: 0 auto 14px;
+}
+.incall-avatar {
+  position: relative; z-index: 2;
+  width: 84px; height: 84px;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--accent-dim);
+  color: var(--accent);
+  overflow: hidden;
+}
+.incall-avatar img { width: 100%; height: 100%; object-fit: cover; }
+.incall-ring {
+  position: absolute; inset: 0; z-index: 1;
+  border-radius: 50%;
+  border: 2px solid var(--accent);
+  opacity: 0;
+  animation: incall-pulse 2.2s ease-out infinite;
+}
+.incall-ring.r2 { animation-delay: 0.7s; }
+@keyframes incall-pulse {
+  0% { transform: scale(1); opacity: 0.55; }
+  100% { transform: scale(1.75); opacity: 0; }
+}
+.incall-name { font-size: 19px; font-weight: 700; color: var(--text); }
+.incall-sub { font-size: 12.5px; color: var(--text-muted); margin-top: 4px; }
+.incall-reason {
+  font-size: 13.5px; color: var(--text);
+  background: var(--accent-dim);
+  border-radius: 10px;
+  padding: 8px 12px;
+  margin: 12px 4px 0;
+  line-height: 1.5;
+}
+.incall-count { font-size: 10.5px; color: var(--text-faint); margin-top: 10px; }
+.incall-actions {
+  display: flex; justify-content: center; gap: 52px;
+  margin-top: 20px;
+}
+.incall-btn {
+  width: 58px; height: 58px;
+  border: none; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  color: #fff; cursor: pointer;
+  transition: transform 0.15s ease;
+}
+.incall-btn:active { transform: scale(0.92); }
+.incall-btn.accept { background: #5fa86e; animation: incall-nudge 1.6s ease-in-out infinite; }
+.incall-btn.decline { background: #c96a5f; }
+@keyframes incall-nudge {
+  0%, 100% { transform: translateY(0); }
+  12% { transform: translateY(-3px) rotate(-4deg); }
+  24% { transform: translateY(0) rotate(3deg); }
+  36% { transform: translateY(-2px) rotate(0); }
+  48% { transform: translateY(0); }
+}
+
+/* 聊天里的来电记录条（助手侧，复用 .call-bubble 底子） */
+.call-invite .ci-text { display: flex; flex-direction: column; gap: 1px; }
+.call-invite .ci-reason {
+  font-style: normal;
+  font-size: 11px; color: var(--text-faint);
+}
+.call-invite.ringing svg { animation: incall-shake 1.2s ease-in-out infinite; }
+@keyframes incall-shake {
+  0%, 100% { transform: rotate(0); }
+  10% { transform: rotate(-12deg); }
+  20% { transform: rotate(10deg); }
+  30% { transform: rotate(-8deg); }
+  40% { transform: rotate(0); }
+}
+
+/* 语音留言：语音条右侧的小标 */
+.vb-vm-label {
+  font-size: 10px; color: var(--text-faint);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 1px 4px;
+  flex-shrink: 0;
+  user-select: none;
+}
+
 /* ── 小月历（月经周期）——复用 health-card 底子 ─────────── */
 .period-status {
   border-radius: 10px;

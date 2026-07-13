@@ -22,6 +22,7 @@ import DailyChecklist from './DailyChecklist'
 import HealthCard from './HealthCard'
 import PeriodCard from './PeriodCard'
 import IdleJournal from './IdleJournal'
+import IncomingCall from './IncomingCall'
 import AnniversaryCard from './AnniversaryCard'
 import HeartCard from './HeartCard'
 import HeartCardAlbum from './HeartCardAlbum'
@@ -61,6 +62,13 @@ const NEG_CONSENT_PROMPT = '[系统：阿颖刚点了「申请查看你的负向
 const NEG_TAG_RE = /<neg>\s*(allow|deny)\s*<\/neg>/i
 function stripNegTag(t) {
   return (t || '').replace(/<neg>[\s\S]*?<\/neg>/gi, '').replace(/<neg>\s*$/i, '').trimEnd()
+}
+
+// 来电邀请：涟言在回复里带 [call:理由] → 弹响铃卡片（抄 callhome 的 dial 标记设计）。
+// 每对话限一次，防连环夺命 call；⚠️新方括号标签必须同步进 TTS 清洗（0709 教训，已挂 MessageBubble+VoiceCall 双路）
+const CALL_TAG_RE = /\[call:([^\]]+)\]/i
+function stripCallTag(t) {
+  return (t || '').replace(/\[call:[^\]]+\]/gi, '').trimEnd()
 }
 
 export default function Chat() {
@@ -105,6 +113,7 @@ export default function Chat() {
   const [heartCards, setHeartCards] = useState([]) // 心意卡队列，一次弹一张
   const [albumOpen, setAlbumOpen] = useState(false) // 卡册：翻收下的心意卡
   const [idleJournalOpen, setIdleJournalOpen] = useState(false) // 独处手账：独处时间醒来日志
+  const [incomingCall, setIncomingCall] = useState(null) // 来电响铃中：{ chatId, msgId, reason }
   const [egg, setEgg] = useState(null) // 完成彩蛋：回复结束后小概率冒出的像素小家伙
   const [bgImage, setBgImage] = useState(() => localStorage.getItem('yanji-bg-image') || '')
   const bgFileRef = useRef(null)
@@ -130,10 +139,10 @@ export default function Chat() {
 
   // ── Generate ─────────────────────────────────────────────────────────────
   // 真正调模型生成回复：handleSend 秒回路径直接调；延迟回复到点后由 ticker 调
-  const generateReply = useCallback(async (chat, conn, { titleText, hidden } = {}) => {
-    // Add placeholder assistant message
+  const generateReply = useCallback(async (chat, conn, { titleText, hidden, voicemail } = {}) => {
+    // Add placeholder assistant message（voicemail=未接来电转的语音留言，气泡默认以语音条形态出现）
     const assistantId = uuid()
-    addMessage(chat.id, { id: assistantId, role: 'assistant', content: '', streaming: true })
+    addMessage(chat.id, { id: assistantId, role: 'assistant', content: '', streaming: true, voicemail: voicemail || undefined })
 
     setIsSending(true)
 
@@ -282,8 +291,8 @@ export default function Chat() {
         autoTools,
         onChunk: (chunk) => {
           fullText += chunk
-          // 流式过程中剥离 <es>/<mood>/<neg> 标签，不让阿颖看到内部状态
-          updateMessage(chat.id, assistantId, { content: stripNegTag(stripMoodTag(stripEmotionTag(fullText))), streaming: true })
+          // 流式过程中剥离 <es>/<mood>/<neg>/[call:] 标签，不让阿颖看到内部状态
+          updateMessage(chat.id, assistantId, { content: stripCallTag(stripNegTag(stripMoodTag(stripEmotionTag(fullText)))), streaming: true })
         },
         onThinking: (chunk) => {
           fullThinking += chunk
@@ -312,8 +321,16 @@ export default function Chat() {
       // 负向情绪查看同意：涟言在回复里带 <neg>allow/deny</neg> 时，通知侧边栏解锁或婉拒
       const negM = afterMood.match(NEG_TAG_RE)
       if (negM) window.dispatchEvent(new CustomEvent('neg-view-result', { detail: { allow: negM[1].toLowerCase() === 'allow' } }))
-      const finalText = stripNegTag(afterMood)
-      const parts = finalText.split(/\[MSG\]/).map((p) => p.trim()).filter(Boolean)
+      // 来电邀请：[call:理由] → 响铃卡片。每对话限一次；语音留言里再喊也不接力（防夺命连环 call）
+      const callM = afterMood.match(CALL_TAG_RE)
+      const callReason = (!voicemail && callM && !getMessages(chat.id).some((m) => m.callInvite))
+        ? (callM[1] || '').trim().slice(0, 40)
+        : null
+      const finalText = stripCallTag(stripNegTag(afterMood))
+      // 语音留言一条说完不分段（答录机没有连发两条的道理），漏写的 [MSG] 直接抹平
+      const parts = voicemail
+        ? [finalText.replace(/\[MSG\]/gi, ' ').trim()]
+        : finalText.split(/\[MSG\]/).map((p) => p.trim()).filter(Boolean)
       updateMessage(chat.id, assistantId, {
         content: parts[0] || finalText,
         thinking: fullThinking || undefined,
@@ -331,6 +348,15 @@ export default function Chat() {
       for (let i = 1; i < parts.length; i++) {
         await new Promise((r) => setTimeout(r, 700))
         addMessage(chat.id, { role: 'assistant', content: parts[i] })
+      }
+      // 来电：正文落完再响铃（先看到她想说什么，再看到电话打过来）
+      if (callReason) {
+        const inv = addMessage(chat.id, {
+          role: 'assistant',
+          content: `[涟言发起了语音通话邀请：${callReason}]`,
+          callInvite: { status: 'ringing', reason: callReason },
+        })
+        setIncomingCall({ chatId: chat.id, msgId: inv.id, reason: callReason })
       }
       touchChat(chat.id)
       if (result.usage) recordTokenUsage(conn.id, result.usage)
@@ -437,7 +463,7 @@ export default function Chat() {
       }
     }
 
-    await generateReply(chat, conn, { titleText: text, hidden: opts.hidden })
+    await generateReply(chat, conn, { titleText: text, hidden: opts.hidden, voicemail: opts.voicemail })
   }, [isSending, activeChat, activeConn, connections, injectMode, injectPrompt, replyDelay, generateReply])
 
   // ── 延迟回复到点检查：每 5s + 回前台时看一眼，到点就补上回复 ──────────────
@@ -610,6 +636,34 @@ export default function Chat() {
     } else {
       updateMessage(mk.chatId, mk.msgId, { call: { status: 'cancelled' }, content: '[语音通话已取消]' })
     }
+  }
+
+  // ── 来电接听/未接 ─────────────────────────────────────────────────────────
+  function acceptIncomingCall() {
+    const ic = incomingCall
+    setIncomingCall(null)
+    if (!ic) return
+    updateMessage(ic.chatId, ic.msgId, {
+      callInvite: { status: 'accepted', reason: ic.reason },
+      content: `[涟言发起的语音通话邀请（${ic.reason}），阿颖接听了]`,
+    })
+    openCall()
+  }
+
+  function missIncomingCall(how) {
+    const ic = incomingCall
+    setIncomingCall(null)
+    if (!ic) return
+    updateMessage(ic.chatId, ic.msgId, {
+      callInvite: { status: 'missed', reason: ic.reason },
+      content: `[涟言发起的语音通话邀请（${ic.reason}），${how === 'declined' ? '阿颖按了挂断' : '90秒无人接听'}]`,
+    })
+    // 转语音留言：注入隐藏触发，让涟言像对答录机一样把想说的话留下来，回复以语音条形态出现
+    handleSend(
+      `[系统：你刚才想给阿颖打语音电话（理由：${ic.reason}），但${how === 'declined' ? '她按了挂断——可能不方便接' : '响了90秒没人接'}。请留一条语音留言：像对着电话答录机说话那样，把你想说的用一小段自然的话说完，30-80字，一条说完。不要用 [MSG] 分段，不要再带 [call:] 标签，不要发贴图和点歌。]`,
+      [],
+      { hidden: true, voicemail: true }
+    )
   }
 
   function handleExport() {
@@ -808,6 +862,7 @@ export default function Chat() {
                 content: (m.content || '')
                   .replace(/\[music:[^\]]+\]/g, '')
                   .replace(/\[sticker:[^\]]+\]/g, '')
+                  .replace(/\[call:[^\]]+\]/gi, '')
                   .replace(/!\[[^\]]*\]\([^)]*\)/g, '')
                   .trim().slice(0, 140),
               })}
@@ -863,6 +918,13 @@ export default function Chat() {
       {periodOpen && <PeriodCard onClose={() => setPeriodOpen(false)} />}
       {albumOpen && <HeartCardAlbum onClose={() => setAlbumOpen(false)} />}
       {idleJournalOpen && <IdleJournal onClose={() => setIdleJournalOpen(false)} />}
+      {incomingCall && (
+        <IncomingCall
+          reason={incomingCall.reason}
+          onAccept={acceptIncomingCall}
+          onMiss={missIncomingCall}
+        />
+      )}
       {annCard && (
         <AnniversaryCard
           data={annCard}
