@@ -169,6 +169,18 @@ async function executeTool(name, args, { searchConfig, moonMemoryConfig, onStatu
     onStatus?.('摇签中...')
     return await executeFortuneDraw(args)
   }
+  // 记忆库工具统一兜底：定义表里有的直接交给 executeMemoryTool，不必在上面逐个登记。
+  // ⚠️0714 教训：新工具要在「定义/执行器/这里」三处登记，第三处漏了 send_heart_card、
+  // daily_checklist、period_tracker、衔信三件共六个——模型一调就吃「未知工具」，
+  // 心意卡等于从上线起就没通过言叽发出去过。改成查定义表根治，以后加工具只登记两处。
+  if (getMemoryToolDefinitions().some((t) => t.name === name)) {
+    const statusMap = {
+      send_heart_card: '写心意卡...', daily_checklist: '记小票...', period_tracker: '看小月历...',
+      list_letters: '翻信匣...', read_letter: '展开信纸...', annotate_letter: '在信上划线...',
+    }
+    onStatus?.(statusMap[name] || '用工具中...')
+    return await executeMemoryTool(name, args, moonMemoryConfig)
+  }
   return `未知工具: ${name}`
 }
 
