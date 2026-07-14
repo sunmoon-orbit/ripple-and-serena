@@ -912,9 +912,13 @@ export default function Settings() {
                       className={'avatar-mode-btn' + (voiceCallStyle === 'soft' ? ' active' : '')}
                       onClick={() => setVoiceCallStyle('soft')}
                     >浅色头像</button>
+                    <button
+                      className={'avatar-mode-btn' + (voiceCallStyle === 'duo' ? ' active' : '')}
+                      onClick={() => setVoiceCallStyle('duo')}
+                    >双语泡泡</button>
                   </div>
                 </div>
-                <p className="card-hint">浅色头像样式用的是上面「聊天头像 - 助手头像」里的图片，换头像通话页会跟着换；没设置图片时圆框里还是小乌鸦。</p>
+                <p className="card-hint">浅色头像和双语泡泡样式用的是「聊天头像」里设置的图片，没设时是小乌鸦。双语泡泡是两个头像＋滚动字幕气泡的通话页，配合通话里的 EN 按钮用：你说中文，涟言用英文回，气泡里英文原文＋中文翻译一起看。EN 双语模式三种样式里都能开。</p>
               </div>
             </Section>
           </>

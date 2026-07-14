@@ -1,7 +1,7 @@
 import { useRef, useState, useCallback, useEffect } from 'react'
 import { marked } from 'marked'
 import hljs from 'highlight.js'
-import { formatTime } from '../../utils'
+import { formatTime, splitTranslation } from '../../utils'
 import { useStore } from '../../store'
 import { synthesizeSpeech } from '../../api/moonMemory'
 import MusicCard from './MusicCard'
@@ -159,6 +159,19 @@ function renderAssistantContent(content, isStreaming) {
   if (!content) {
     return <div className="bubble-markdown" dangerouslySetInnerHTML={{ __html: isStreaming ? '<span class="cursor-blink">▌</span>' : '' }} />
   }
+  // 双语通话的回复：[译:中文] 尾标签渲染成同气泡里的翻译块（英文正文 + 虚线 + 中文，仿参考截图）
+  const { main: biMain, zh: biZh } = splitTranslation(content)
+  if (biZh) {
+    return (
+      <>
+        {renderAssistantContent(biMain, isStreaming)}
+        <div className="bubble-zh">
+          <span className="bubble-zh-badge">中</span>
+          {biZh}
+        </div>
+      </>
+    )
+  }
   if (!MUSIC_TAG_RE.test(content)) {
     return <MarkdownBlock html={parseMarkdown(content)} enhance={!isStreaming} />
   }
@@ -300,6 +313,7 @@ export default function MessageBubble({ msg, onEdit, onQuote, onDelete, isLast }
           .replace(/\[music:[^\]]+\]/g, '')          // 点歌标签不朗读
           .replace(/\[sticker:[^\]]+\]/g, '')        // 贴图标签不朗读（否则被念成 sticker:文件名）
           .replace(/\[call:[^\]]+\]/gi, '')          // 来电标签不朗读（0709 教训：新方括号标签同步进清洗）
+          .replace(/\[译[:：][\s\S]*?\]/g, '')       // 双语翻译标签不朗读（嘴上只念英文，翻译是给眼睛的）
           .replace(/\[MSG\]/gi, ' ')                 // 漏拆的分段符不朗读（否则被念成英文 MSG）
           .replace(VOICE_TAG_RE, (m, t) => (t.toLowerCase() === 'laughter' ? '(laughs)' : '(breath)'))
           .replace(/!\[[^\]]*\]\([^)]*\)/g, '')   // 图片（贴图）整体去掉

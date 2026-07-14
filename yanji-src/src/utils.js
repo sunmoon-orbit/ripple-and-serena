@@ -12,6 +12,15 @@ export function escapeHtml(str) {
     .replace(/"/g, '&quot;')
 }
 
+// 双语通话：涟言英文回复末尾带 [译:中文翻译] 标签 → 拆成 { main: 英文正文, zh: 中文翻译 }
+// 只认结尾处的标签（中途出现的方括号不误伤）；没有标签时 zh 为 null，正文原样返回
+export function splitTranslation(text) {
+  if (!text) return { main: text, zh: null }
+  const m = text.match(/\[译[:：]\s*([\s\S]*?)\]\s*$/)
+  if (!m || !m[1].trim()) return { main: text, zh: null }
+  return { main: text.slice(0, m.index).trim(), zh: m[1].trim() }
+}
+
 export function formatTime(ts) {
   if (!ts) return ''
   const d = new Date(ts)

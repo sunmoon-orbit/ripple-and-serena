@@ -4,10 +4,15 @@ import { useStore } from '../../store'
 import { synthesizeSpeech, transcribeAudio } from '../../api/moonMemory'
 import { showToast } from '../Toast'
 import { stripInlineFx } from '../../utils/moodFx'
+import { splitTranslation } from '../../utils'
 
 const VOICE_TAG_RE = /\[(breath|laughter)\]/gi
 const NUM_BARS = 24       // 乌鸦样式：一排镜像频谱
 const SOFT_BARS = 18      // 浅色样式：头像两侧各 9 根
+const DUO_BARS = 12       // 双语泡泡样式：头像和聊天记录之间的小波形
+
+// 双语模式开关跨通话记住；没手动选过时，双语泡泡样式默认开（那个样式就是为翻译做的）
+const BILINGUAL_KEY = 'yanji_call_en'
 
 // 像素乌鸦（两种样式共用：乌鸦样式当主角，浅色样式没设头像时兜底）
 function CrowSvg({ className }) {
@@ -39,6 +44,7 @@ function stripForTts(text) {
     .replace(/\[music:[^\]]+\]/g, '')
     .replace(/\[sticker:[^\]]+\]/g, '')
     .replace(/\[call:[^\]]+\]/gi, '') // 来电标签不朗读（0709 教训：新方括号标签同步进清洗）
+    .replace(/\[译[:：][\s\S]*?\]/g, '') // 双语翻译标签兜底：正常已被 splitTranslation 摘走，这里防漏
     .replace(/!\[[^\]]*\]\([^)]*\)/g, '')
     .replace(/\[([^\]]*)\]\([^)]*\)/g, '$1')
     .replace(/[#*`>_~\[\]]/g, '')
@@ -52,15 +58,28 @@ export default function VoiceCall({ onClose, onSend }) {
   const messages = messagesByChatId[activeChatId] || []
 
   const soft = voiceCallStyle === 'soft'
-  const numBars = soft ? SOFT_BARS : NUM_BARS
+  const duo = voiceCallStyle === 'duo'
+  const numBars = duo ? DUO_BARS : soft ? SOFT_BARS : NUM_BARS
   const avatarImg = avatarConfig?.assistantImage || null
+  const userImg = avatarConfig?.userImage || null
 
   const [ttsState, setTtsState] = useState('idle') // idle | loading | playing
   const [recording, setRecording] = useState(false)
   const [transcribing, setTranscribing] = useState(false)
   const [aiText, setAiText] = useState('')
+  const [aiZh, setAiZh] = useState('')   // 双语模式：英文回复配的中文翻译
   const [userText, setUserText] = useState('')
   const [duration, setDuration] = useState(0)
+  // 双语模式：她说中文、我用英文回（英文嗓音更好听），字幕英中对照
+  const [bilingual, setBilingual] = useState(() => {
+    try {
+      const v = localStorage.getItem(BILINGUAL_KEY)
+      return v == null ? voiceCallStyle === 'duo' : v === '1'
+    } catch { return voiceCallStyle === 'duo' }
+  })
+  // 双语泡泡样式：本次通话的对话记录（每次通话从头记，像参考图那样滚动气泡）
+  const [log, setLog] = useState([])
+  const logRef = useRef(null)
   // 通话中打字：识别不准的字（人名、生僻词）可以直接敲出来发
   const [typeOpen, setTypeOpen] = useState(false)
   const [typedText, setTypedText] = useState('')
@@ -106,7 +125,7 @@ export default function VoiceCall({ onClose, onSend }) {
     return () => clearInterval(t)
   }, [])
 
-  // Watch for new AI messages → auto-TTS
+  // Watch for new AI messages → auto-TTS。双语模式先把 [译:] 摘出来：嘴上只念英文，字幕英中都给
   useEffect(() => {
     const last = messages[messages.length - 1]
     if (
@@ -117,13 +136,31 @@ export default function VoiceCall({ onClose, onSend }) {
       last.id !== lastTtsId.current
     ) {
       lastTtsId.current = last.id
-      const text = stripForTts(last.content)
+      const { main, zh } = splitTranslation(last.content)
+      const text = stripForTts(main)
       if (text) {
+        setAiZh(zh || '')
+        setLog((l) => [...l, { role: 'ai', en: text, zh: zh || '' }])
         speakQueue.current.push(text)
         if (!speakBusy.current) drainQueue()
       }
     }
   }, [messages])
+
+  // 双语泡泡样式：新气泡出来时滚到底
+  useEffect(() => {
+    const el = logRef.current
+    if (el) el.scrollTop = el.scrollHeight
+  }, [log])
+
+  function toggleBilingual() {
+    setBilingual((v) => {
+      const nv = !v
+      try { localStorage.setItem(BILINGUAL_KEY, nv ? '1' : '0') } catch {}
+      showToast(nv ? '双语模式开：我用英文说，翻译给你看' : '双语模式关：回到中文', 'info')
+      return nv
+    })
+  }
 
   // ── 可视化 ──
   function getAnalyser() {
@@ -206,7 +243,8 @@ export default function VoiceCall({ onClose, onSend }) {
         const text = r?.text || ''
         if (text && mounted.current) {
           setUserText(text)
-          onSend(text, [], { voice: true, voiceDuration: dur, voiceTone: r.tone || undefined })
+          setLog((l) => [...l, { role: 'user', text }])
+          onSend(text, [], { voice: true, voiceDuration: dur, voiceTone: r.tone || undefined, bilingual: bilingual || undefined })
         } else if (!text) showToast('没识别到内容，再说一次', 'info')
       } catch (e) {
         showToast(e.message || '转写失败', 'error', 5000)
@@ -287,8 +325,9 @@ export default function VoiceCall({ onClose, onSend }) {
     const text = typedText.trim()
     if (!text) return
     setUserText(text)
+    setLog((l) => [...l, { role: 'user', text }])
     setTypedText('')
-    onSend(text, [], { instant: true })
+    onSend(text, [], { instant: true, bilingual: bilingual || undefined })
   }
 
   function handleClose() {
@@ -319,12 +358,67 @@ export default function VoiceCall({ onClose, onSend }) {
   )
 
   return createPortal(
-    <div className={'vc-overlay' + (soft ? ' vc-soft' : '')}>
+    <div className={'vc-overlay' + (soft ? ' vc-soft' : '') + (duo ? ' vc-duo' : '')}>
       <span className="vc-blob b1" />
       <span className="vc-blob b2" />
       <div className="vc-container">
 
-        {soft ? (
+        {duo ? (
+          <>
+            {/* ── 双语泡泡样式（参考阿颖 0714 发来的截图：双头像 + 滚动字幕气泡 + 泡内英中对照）── */}
+            <div className="vcd-pill">{statusLabel}</div>
+            <div className="vc-timer">{fmtDur(duration)}</div>
+
+            <div className="vcd-heads" ref={stageRef}>
+              <div className="vcd-person">
+                <div className={'vcd-avatar' + (mode === 'speaking' ? ' active' : '')}>
+                  {avatarImg ? <img src={avatarImg} alt="涟言" /> : <CrowSvg className="vc-crow" />}
+                </div>
+                <span className="vcd-name">涟言</span>
+              </div>
+              <span className="vcd-heart" aria-hidden="true">♡</span>
+              <div className="vcd-person">
+                <div className={'vcd-avatar' + (mode === 'listening' ? ' active' : '')}>
+                  {userImg ? <img src={userImg} alt="阿颖" /> : (
+                    <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="#a58ba0" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+                      <circle cx="12" cy="8" r="4" />
+                      <path d="M4 20c0-4 3.6-7 8-7s8 3 8 7" />
+                    </svg>
+                  )}
+                </div>
+                <span className="vcd-name">阿颖</span>
+              </div>
+            </div>
+
+            {/* 小波形分隔（录音=麦克风频谱，播放=TTS频谱） */}
+            <div className={`vcd-wave ${mode}`}>
+              {Array.from({ length: DUO_BARS }).map((_, i) => bar(i))}
+            </div>
+
+            {/* 滚动字幕：我的气泡英文在上、虚线下面中文翻译；她的气泡靠右 */}
+            <div className="vcd-log" ref={logRef}>
+              {log.length === 0 && (
+                <div className="vcd-empty">
+                  {bilingual ? '点麦克风说中文，我用英文回你，翻译写在气泡里' : '点麦克风，说给我听'}
+                </div>
+              )}
+              {log.map((m, i) => m.role === 'user' ? (
+                <div key={i} className="vcd-row user">
+                  <div className="vcd-bubble vcd-user">{m.text}</div>
+                </div>
+              ) : (
+                <div key={i} className="vcd-row ai">
+                  <div className="vcd-bubble vcd-ai">
+                    {m.zh ? <span className="vcd-badge">中</span> : null}
+                    <div className="vcd-en">{m.en}</div>
+                    {m.zh ? <div className="vcd-divider" /> : null}
+                    {m.zh ? <div className="vcd-zh">{m.zh}</div> : null}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </>
+        ) : soft ? (
           <>
             {/* ── 浅色头像样式 ── */}
             <div className={`vcs-head ${mode}`} ref={stageRef}>
@@ -353,6 +447,7 @@ export default function VoiceCall({ onClose, onSend }) {
             ) : (
               <div className="vcs-quote vcs-quote-empty">…</div>
             )}
+            {aiZh ? <div className="vcs-zh">{aiZh}</div> : null}
 
             <div className="vcs-caption-label">
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round">
@@ -388,6 +483,7 @@ export default function VoiceCall({ onClose, onSend }) {
               {aiText ? (
                 <p className={'vc-ai-text' + (mode === 'speaking' || ttsState === 'loading' ? '' : ' done')}>{aiText}</p>
               ) : null}
+              {aiZh ? <p className="vc-ai-zh">{aiZh}</p> : null}
             </div>
           </>
         )}
@@ -414,6 +510,13 @@ export default function VoiceCall({ onClose, onSend }) {
 
         {/* Push-to-talk + hang up */}
         <div className="vc-controls">
+          <button
+            className={'vc-kbd vc-lang' + (bilingual ? ' open' : '')}
+            onClick={toggleBilingual}
+            title={bilingual ? '双语模式开着：我说英文，翻译给你看。点一下关' : '开双语模式：你说中文，我用英文回'}
+          >
+            <span className="vc-lang-txt">EN<small>中</small></span>
+          </button>
           <button
             className={'vc-kbd' + (typeOpen ? ' open' : '')}
             onClick={() => setTypeOpen((v) => !v)}
