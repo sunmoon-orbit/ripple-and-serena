@@ -1801,6 +1801,114 @@ textarea.form-input { display: block; margin: 8px 16px 12px; }
 }
 .vc-spin { animation: stt-spin 0.8s linear infinite; }
 
+/* ── 双语模式（EN 按钮）：乌鸦/浅色样式下的翻译辅助行 ── */
+.vc-ai-zh {
+  font-size: 13px; color: rgba(255,255,255,0.55); line-height: 1.6; margin: 0;
+  padding-top: 6px; border-top: 1px dashed rgba(255,255,255,0.22);
+}
+.vcs-zh {
+  width: 100%; text-align: center; font-size: 14px; color: #8a93a8; line-height: 1.65;
+  padding: 8px 24px 0; margin-top: -10px; border-top: 1px dashed #d3dae6;
+}
+.vc-lang-txt { font-size: 13px; font-weight: 600; letter-spacing: 0.02em; display: flex; align-items: baseline; gap: 1px; }
+.vc-lang-txt small { font-size: 9px; font-weight: 500; opacity: 0.75; }
+
+/* ═══ 双语泡泡样式（vc-duo，参考阿颖 0714 发来的截图：双头像+滚动字幕气泡）═══ */
+.vc-overlay.vc-duo { background: linear-gradient(170deg, #fbf3ec 0%, #f6e9e4 55%, #f1e2df 100%); }
+.vc-duo .vc-blob { opacity: 0.5; }
+.vc-duo .vc-blob.b1 { background: #f3d9c8; }
+.vc-duo .vc-blob.b2 { background: #e8d3e2; }
+.vc-duo .vc-container { max-width: 420px; height: 100%; padding: 24px 18px 28px; gap: 9px; }
+.vc-duo .vc-timer { color: rgba(140, 110, 100, 0.55); }
+
+.vcd-pill {
+  background: rgba(255,255,255,0.85); color: #8a6f66;
+  font-size: 12.5px; letter-spacing: 0.12em;
+  border-radius: 999px; padding: 6px 18px;
+  box-shadow: 0 3px 12px rgba(180, 140, 125, 0.16);
+}
+.vcd-heads { display: flex; align-items: flex-start; justify-content: center; gap: 18px; margin-top: 2px; }
+.vcd-person { display: flex; flex-direction: column; align-items: center; gap: 6px; }
+.vcd-heart { color: #d9a8a0; font-size: 15px; align-self: center; margin-top: -16px; }
+.vcd-avatar {
+  width: 76px; height: 76px; border-radius: 50%; overflow: hidden;
+  background: #fff; display: flex; align-items: center; justify-content: center;
+  box-shadow: 0 6px 18px rgba(180, 140, 125, 0.22), 0 0 0 3px rgba(255,255,255,0.9);
+  transition: transform 0.12s ease-out, box-shadow 0.2s;
+}
+.vcd-avatar img { width: 100%; height: 100%; object-fit: cover; }
+.vcd-avatar .vc-crow { width: 52px; height: 38px; }
+/* 谁在出声谁的头像轻轻放大（--vc-level 由 JS 写在 vcd-heads 上） */
+.vcd-avatar.active {
+  transform: scale(calc(1 + var(--vc-level, 0) * 0.08));
+  box-shadow: 0 6px 18px rgba(180, 140, 125, 0.25), 0 0 0 3px color-mix(in srgb, var(--accent) 55%, #fff);
+}
+.vcd-name { font-size: 12.5px; color: #8a6f66; letter-spacing: 0.06em; }
+
+.vcd-wave { display: flex; align-items: center; justify-content: center; gap: 3px; height: 26px; flex-shrink: 0; }
+.vc-duo .vc-bar { width: 2.5px; background: rgba(190, 150, 135, 0.45); max-height: 22px; }
+.vcd-wave.idle .vc-bar { animation: vc-bar-idle 2.8s ease-in-out infinite alternate; }
+.vcd-wave.thinking .vc-bar { animation: vc-bar-think 0.9s ease-in-out infinite alternate; }
+.vcd-wave.listening .vc-bar { background: color-mix(in srgb, var(--accent) 70%, #b98a7a); }
+.vcd-wave.speaking .vc-bar { background: rgba(160, 115, 100, 0.6); }
+
+.vcd-log {
+  flex: 1; min-height: 0; width: 100%;
+  overflow-y: auto; display: flex; flex-direction: column; gap: 10px;
+  padding: 4px 2px; -webkit-overflow-scrolling: touch;
+}
+.vcd-empty { text-align: center; color: #bfa79c; font-size: 13px; margin: auto; line-height: 1.7; }
+.vcd-row { display: flex; flex-shrink: 0; }
+.vcd-row.ai { justify-content: flex-start; }
+.vcd-row.user { justify-content: flex-end; }
+.vcd-bubble { position: relative; max-width: 84%; border-radius: 16px; padding: 10px 14px; font-size: 14px; line-height: 1.65; }
+.vcd-ai {
+  background: rgba(255,255,255,0.92); color: #55463f;
+  border-top-left-radius: 6px;
+  box-shadow: 0 3px 12px rgba(180, 140, 125, 0.14);
+}
+.vcd-user {
+  background: color-mix(in srgb, var(--accent) 26%, #fff);
+  color: #5a4a44; border-top-right-radius: 6px;
+  box-shadow: 0 3px 12px rgba(180, 140, 125, 0.12);
+}
+.vcd-en { color: #4d4038; }
+.vcd-divider { border-top: 1.5px dashed #dcc8bd; margin: 8px 0; }
+.vcd-zh { color: #93817a; font-size: 13.5px; }
+.vcd-badge {
+  position: absolute; top: -7px; right: -5px;
+  width: 18px; height: 18px; border-radius: 6px;
+  background: #e8b099; color: #fff; font-size: 10.5px; font-weight: 600;
+  display: flex; align-items: center; justify-content: center;
+  box-shadow: 0 2px 6px rgba(180, 120, 95, 0.35);
+}
+
+/* 双语泡泡样式的控件配色（浅底） */
+.vc-duo .vc-mic { background: #fff; color: #8a6f66; box-shadow: 0 6px 20px rgba(180, 140, 125, 0.28); }
+.vc-duo .vc-mic.recording { background: #e0556a; color: #fff; }
+.vc-duo .vc-kbd { background: #fff; color: #8a6f66; box-shadow: 0 4px 14px rgba(180, 140, 125, 0.22); }
+.vc-duo .vc-kbd.open { background: color-mix(in srgb, var(--accent) 75%, #b98a7a); color: #fff; }
+.vc-duo .vc-hangup { background: #e08a86; box-shadow: 0 4px 18px rgba(224, 138, 134, 0.45); }
+.vc-duo .vc-hangup:hover { background: #d17a76; }
+.vc-duo .vc-type-input { background: rgba(255,255,255,0.88); color: #55463f; box-shadow: 0 3px 12px rgba(180,140,125,0.14); }
+.vc-duo .vc-type-input::placeholder { color: #c4aa9e; }
+.vc-duo .vc-controls { margin-top: 2px; }
+
+/* 双语回复留在聊天记录里：气泡内英文正文下方虚线+中文翻译（带「中」小角标） */
+.bubble-zh {
+  position: relative; margin-top: 8px; padding: 8px 26px 0 0;
+  border-top: 1.5px dashed var(--border);
+  color: var(--text-muted); font-size: 13.5px; line-height: 1.65;
+  white-space: pre-wrap;
+}
+.bubble-zh-badge {
+  position: absolute; right: 0; top: 8px;
+  width: 17px; height: 17px; border-radius: 5px;
+  background: color-mix(in srgb, var(--accent) 70%, #fff); color: #fff;
+  font-size: 10px; font-weight: 600;
+  display: inline-flex; align-items: center; justify-content: center;
+}
+
 /* ===== Settings Panel extra ===== */
 .settings-panel { padding-bottom: 40px; }
 .settings-content { width: 100%; max-width: 640px; margin: 0 auto; padding: 20px 20px 40px; flex: 1; overflow-y: auto; }

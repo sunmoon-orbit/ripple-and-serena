@@ -72,6 +72,11 @@ function stripCallTag(t) {
   return (t || '').replace(/\[call:[^\]]+\]/gi, '').trimEnd()
 }
 
+// 双语通话（阿颖 2026-07-14 提议）：她说中文、涟言用英文回（英文嗓音更好听），
+// 字幕给英文原文+中文翻译。藏在 injected 字段随通话消息下发，挂断后自然失效。
+// ⚠️[译:] 是新方括号标签，已同步进 TTS 清洗（VoiceCall.stripForTts + MessageBubble.playTts，0709 规矩）
+const BILINGUAL_NOTE = '[双语通话模式：现在是语音通话，请直接用口语化、自然的英文回复她（你的声音说英文更好听），保持简短（2-4 句）；然后另起一行，用 [译:这里放中文翻译] 在末尾附上这段话的完整中文翻译。方括号里只放翻译文本，不要嵌套贴图、点歌等其他标签。]'
+
 export default function Chat() {
   const store = useStore()
   const {
@@ -418,8 +423,11 @@ export default function Chat() {
     if (!conn?.apiKey) { showToast('连接未配置 API Key', 'error'); return }
 
     // Add user message. 注入模式：原文照常显示给阿颖，注入词只藏在 injected 字段里，
-    // 发往模型时才拼到句尾——前端看不到，更美观。
-    const inject = injectMode && injectPrompt ? injectPrompt : undefined
+    // 发往模型时才拼到句尾——前端看不到，更美观。双语通话的指令也走这条暗道。
+    const inject = [
+      injectMode && injectPrompt ? injectPrompt : null,
+      opts.bilingual ? BILINGUAL_NOTE : null,
+    ].filter(Boolean).join('\n\n') || undefined
     const segments = opts.segments && opts.segments.length > 1 ? opts.segments : null
     if (segments) {
       // 分段发送：每段一条气泡；图片挂最后一段，引用挂第一段，注入词只挂最后一段
