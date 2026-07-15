@@ -13,6 +13,8 @@ export function normalizeProvider(raw) {
   return 'openai'
 }
 
+function isReasoningModel(m) { return /^o[1-9]|^o3-mini/.test(m || '') }
+
 function buildApiUrl(baseUrl, provider) {
   let url = (baseUrl || '').trim().replace(/\/$/, '')
   if (provider === 'openai') {
@@ -336,26 +338,27 @@ async function callWithTools({
     if (provider === 'openai') {
       const url = buildApiUrl(connection.baseUrl, 'openai')
       const bodyMsgs = buildOpenAIMessages(convo, systemPrompt, iter === 0 ? dynamicContext : undefined)
-      const body = { model, messages: bodyMsgs, temperature: safeTemp, max_tokens: maxTokens }
+      const body = { model, messages: bodyMsgs }
+      if (isReasoningModel(model)) {
+        body.max_completion_tokens = maxTokens
+      } else {
+        body.temperature = safeTemp; body.max_tokens = maxTokens
+      }
       if (formattedTools.length) { body.tools = formattedTools; body.tool_choice = 'auto' }
-      let resp = await fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + connection.apiKey },
-        body: JSON.stringify(body),
-      })
-      // 部分免费/第三方 OpenAI 端点不支持 tools 参数，400 时自动降级为无工具重试
-      if (!resp.ok && resp.status === 400 && body.tools) {
+      const hdrs = { 'Content-Type': 'application/json', Authorization: 'Bearer ' + connection.apiKey }
+      let resp = await fetch(url, { method: 'POST', headers: hdrs, body: JSON.stringify(body) })
+      if (!resp.ok && resp.status === 400) {
         const errText = await resp.text()
         if (/tool|function|unsupported|invalid.*param/i.test(errText)) {
           delete body.tools; delete body.tool_choice
-          resp = await fetch(url, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + connection.apiKey },
-            body: JSON.stringify(body),
-          })
-        } else {
-          throw new Error('OpenAI ' + resp.status + ': ' + errText.slice(0, 200))
+          resp = await fetch(url, { method: 'POST', headers: hdrs, body: JSON.stringify(body) })
         }
+        if (!resp.ok && resp.status === 400 && /temperature|max_tokens|stream_options|unsupported/i.test(errText || '')) {
+          delete body.temperature; delete body.max_tokens
+          body.max_completion_tokens = body.max_completion_tokens || maxTokens
+          resp = await fetch(url, { method: 'POST', headers: hdrs, body: JSON.stringify(body) })
+        }
+        if (!resp.ok) throw new Error('OpenAI ' + resp.status + ': ' + (errText || '').slice(0, 200))
       }
       if (!resp.ok) throw new Error('OpenAI ' + resp.status + ': ' + (await resp.text()).slice(0, 200))
       const data = await resp.json()
@@ -502,11 +505,19 @@ async function callStream({ connection, messages, systemPrompt, dynamicContext, 
   if (provider === 'openai') {
     const url = buildApiUrl(connection.baseUrl, 'openai')
     const bodyMsgs = buildOpenAIMessages(messages, systemPrompt, dynamicContext)
-    const resp = await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + connection.apiKey },
-      body: JSON.stringify({ model, messages: bodyMsgs, temperature: safeTemp, max_tokens: maxTokens, stream: true, stream_options: { include_usage: true } }),
-    })
+    const body = { model, messages: bodyMsgs, stream: true, stream_options: { include_usage: true } }
+    if (isReasoningModel(model)) {
+      body.max_completion_tokens = maxTokens
+    } else {
+      body.temperature = safeTemp; body.max_tokens = maxTokens
+    }
+    const hdrs = { 'Content-Type': 'application/json', Authorization: 'Bearer ' + connection.apiKey }
+    let resp = await fetch(url, { method: 'POST', headers: hdrs, body: JSON.stringify(body) })
+    if (!resp.ok && resp.status === 400) {
+      delete body.stream_options; delete body.temperature; delete body.max_tokens
+      body.max_completion_tokens = body.max_completion_tokens || maxTokens
+      resp = await fetch(url, { method: 'POST', headers: hdrs, body: JSON.stringify(body) })
+    }
     if (!resp.ok) {
       const e = await resp.text()
       const hint = resp.status === 405 ? '（检查 Base URL 是否含 /v1）' : resp.status === 403 ? '（API Key 无效）' : ''
