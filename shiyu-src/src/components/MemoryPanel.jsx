@@ -82,23 +82,20 @@ function EmotionHeatmap({ data, selectedDate, onSelectDate, offset = 0 }) {
   }
 
   function cellColor(d) {
-    if (!d.valence && d.valence !== 0) return undefined
-    const v = d.valence  // -1 ~ 1
-    const a = d.arousal ?? 0.5  // 0 ~ 1
-    const alpha = 0.2 + a * 0.8
+    if (!d.n) return undefined
+    const v = d.valence ?? 0
+    const a = d.arousal ?? 0.3
+    const alpha = Math.max(0.3, 0.2 + a * 0.8)
     if (v > 0.2) {
-      // 暖色：橙红
       const r = Math.round(200 + v * 55)
       const g = Math.round(120 - v * 60)
       return `rgba(${r},${g},60,${alpha.toFixed(2)})`
     } else if (v < -0.2) {
-      // 冷色：蓝紫
       const b = Math.round(180 + Math.abs(v) * 60)
       const r = Math.round(80 - Math.abs(v) * 40)
       return `rgba(${r},100,${b},${alpha.toFixed(2)})`
     } else {
-      // 中性：灰
-      return `rgba(150,150,150,${(0.15 + a * 0.3).toFixed(2)})`
+      return `rgba(150,150,150,${Math.max(0.3, 0.15 + a * 0.3).toFixed(2)})`
     }
   }
 
