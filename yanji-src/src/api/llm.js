@@ -336,12 +336,27 @@ async function callWithTools({
     if (provider === 'openai') {
       const url = buildApiUrl(connection.baseUrl, 'openai')
       const bodyMsgs = buildOpenAIMessages(convo, systemPrompt, iter === 0 ? dynamicContext : undefined)
-      const body = { model, messages: bodyMsgs, temperature: safeTemp, max_tokens: maxTokens, tools: formattedTools, tool_choice: 'auto' }
-      const resp = await fetch(url, {
+      const body = { model, messages: bodyMsgs, temperature: safeTemp, max_tokens: maxTokens }
+      if (formattedTools.length) { body.tools = formattedTools; body.tool_choice = 'auto' }
+      let resp = await fetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + connection.apiKey },
         body: JSON.stringify(body),
       })
+      // 部分免费/第三方 OpenAI 端点不支持 tools 参数，400 时自动降级为无工具重试
+      if (!resp.ok && resp.status === 400 && body.tools) {
+        const errText = await resp.text()
+        if (/tool|function|unsupported|invalid.*param/i.test(errText)) {
+          delete body.tools; delete body.tool_choice
+          resp = await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + connection.apiKey },
+            body: JSON.stringify(body),
+          })
+        } else {
+          throw new Error('OpenAI ' + resp.status + ': ' + errText.slice(0, 200))
+        }
+      }
       if (!resp.ok) throw new Error('OpenAI ' + resp.status + ': ' + (await resp.text()).slice(0, 200))
       const data = await resp.json()
       if (data.usage) accUsage(usage, {
