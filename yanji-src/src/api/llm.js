@@ -348,15 +348,17 @@ async function callWithTools({
       const hdrs = { 'Content-Type': 'application/json', Authorization: 'Bearer ' + connection.apiKey }
       let resp = await fetch(url, { method: 'POST', headers: hdrs, body: JSON.stringify(body) })
       if (!resp.ok && resp.status === 400) {
-        const errText = await resp.text()
-        if (/tool|function|unsupported|invalid.*param/i.test(errText)) {
+        let errText = await resp.text()
+        if (body.tools && /tool|function|unsupported|invalid.*param/i.test(errText)) {
           delete body.tools; delete body.tool_choice
           resp = await fetch(url, { method: 'POST', headers: hdrs, body: JSON.stringify(body) })
+          if (!resp.ok && resp.status === 400) errText = await resp.text()
         }
-        if (!resp.ok && resp.status === 400 && /temperature|max_tokens|stream_options|unsupported/i.test(errText || '')) {
+        if (!resp.ok && resp.status === 400) {
           delete body.temperature; delete body.max_tokens
           body.max_completion_tokens = body.max_completion_tokens || maxTokens
           resp = await fetch(url, { method: 'POST', headers: hdrs, body: JSON.stringify(body) })
+          if (!resp.ok) errText = await resp.text()
         }
         if (!resp.ok) throw new Error('OpenAI ' + resp.status + ': ' + (errText || '').slice(0, 200))
       }
