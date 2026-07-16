@@ -638,7 +638,8 @@ export default function Chat() {
     const msgs = getMessages(mk.chatId)
     const idx = msgs.findIndex((m) => m.id === mk.msgId)
     // 通话里没说过一句话 = 已取消（同微信：点开就挂断不算通话）
-    const spoke = idx >= 0 && msgs.slice(idx + 1).some((m) => m.voice)
+    // voice=push-to-talk, instant=通话中打字, 或AI回了消息——任一都算通话成立
+    const spoke = idx >= 0 && msgs.slice(idx + 1).some((m) => m.voice || m.instant || (m.role === 'assistant' && !m.sys))
     if (spoke) {
       const fmt = `${String(Math.floor(secs / 60)).padStart(2, '0')}:${String(secs % 60).padStart(2, '0')}`
       updateMessage(mk.chatId, mk.msgId, { call: { status: 'ended', duration: secs }, content: `[语音通话，时长 ${fmt}]` })
