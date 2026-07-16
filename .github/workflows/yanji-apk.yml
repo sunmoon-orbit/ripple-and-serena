@@ -1,0 +1,74 @@
+name: Build Yanji APK
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'yanji-app/**'
+      - '.github/workflows/yanji-apk.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: android-actions/setup-android@v3
+
+      - name: Install deps
+        working-directory: yanji-app
+        run: npm install
+
+      - name: Add android platform
+        working-directory: yanji-app
+        run: npx cap add android
+
+      # 用言叽 PWA 图标生成安卓图标/启动屏（512→1024 放大，runner 自带 ImageMagick）
+      - name: Generate app icons
+        working-directory: yanji-app
+        run: |
+          mkdir -p assets
+          convert ../yanji-src/public/icon-512.png -resize 1024x1024 assets/logo.png
+          npx @capacitor/assets generate --android --iconBackgroundColor '#1a1a1f' --splashBackgroundColor '#1a1a1f'
+
+      # 麦克风等权限（语音通话需要），cap add 生成的 manifest 每次都是新的，构建前注入
+      - name: Patch AndroidManifest permissions
+        run: |
+          MANIFEST=yanji-app/android/app/src/main/AndroidManifest.xml
+          sed -i 's#<uses-permission android:name="android.permission.INTERNET" />#<uses-permission android:name="android.permission.INTERNET" />\n    <uses-permission android:name="android.permission.RECORD_AUDIO" />\n    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />\n    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />#' "$MANIFEST"
+          grep -q RECORD_AUDIO "$MANIFEST" || { echo "permission patch failed"; exit 1; }
+
+      - name: Sync
+        working-directory: yanji-app
+        run: npx cap sync android
+
+      - name: Build debug APK
+        working-directory: yanji-app/android
+        run: ./gradlew assembleDebug --no-daemon
+
+      - name: Publish to Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: yanji-apk
+          name: 言叽 APK（自用）
+          body: |
+            言叽 Android 自用包（Capacitor 在线壳，内容始终是线上最新，改前端不用重装）。
+
+            安装步骤：
+            1. 手机点下面的 app-debug.apk 下载安装，需允许「未知来源」
+            2. ⚠️ 装好后把「言叽」加进分应用代理名单，否则直连被墙打不开
+            3. 首次语音通话会弹麦克风权限，允许即可
+          files: yanji-app/android/app/build/outputs/apk/debug/app-debug.apk

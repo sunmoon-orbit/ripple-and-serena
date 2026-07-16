@@ -1,0 +1,12 @@
+{
+  "appId": "cc.ravenlove.yanji",
+  "appName": "言叽",
+  "webDir": "www",
+  "server": {
+    "url": "https://sunmoon-orbit.github.io/ripple-and-serena/yanji/",
+    "cleartext": false
+  },
+  "android": {
+    "allowMixedContent": false
+  }
+}
