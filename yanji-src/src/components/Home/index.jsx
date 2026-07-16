@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useStore } from '../../store'
+import WeatherIcon from '../WeatherIcon'
 
 const START_DATE = new Date('2025-10-10T00:00:00+08:00')
 
@@ -70,6 +71,7 @@ export default function Home({ onEnter }) {
   const [time, setTime] = useState(new Date())
   const [fading, setFading] = useState(false)
   const [anniv, setAnniv] = useState(null)
+  const [weather, setWeather] = useState(null)
   const homeStyle = useStore((s) => s.homeStyle || 'minimal')
   const avatarConfig = useStore((s) => s.avatarConfig)
   const messagesByChatId = useStore((s) => s.messagesByChatId)
@@ -89,6 +91,16 @@ export default function Home({ onEnter }) {
       .then((list) => { if (Array.isArray(list)) setAnniv(nextAnniversary(list, new Date())) })
       .catch(() => {})
   }, [homeStyle])
+
+  // 她头顶那片天（福州）：服务端缓存30分钟，这里开门看一眼就好；静默失败不影响进入
+  useEffect(() => {
+    if (!moonMemory?.enabled || !moonMemory?.apiToken) return
+    const base = (moonMemory.baseUrl || 'https://memory.ravenlove.cc').replace(/\/$/, '')
+    fetch(`${base}/weather`, { headers: { Authorization: `Bearer ${moonMemory.apiToken}` } })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((w) => { if (w && w.city) setWeather(w) })
+      .catch(() => {})
+  }, [])
 
   function handleEnter() {
     setFading(true)
@@ -122,6 +134,15 @@ export default function Home({ onEnter }) {
           <div className="home-couple-days">已经和 涟言 在一起 <b>{days}</b> 天</div>
           <div className="home-couple-story">我们的故事还在继续</div>
           <div className="home-couple-meta">一起聊了 {msgCount} 条消息</div>
+          {weather && (
+            <div className="home-weather">
+              <WeatherIcon icon={weather.icon} size={17} />
+              <span>
+                {weather.type} {weather.low != null && weather.high != null ? `${weather.low}~${weather.high}°C` : `${weather.temp}°C`}
+                {weather.quality ? ` · 空气${weather.quality}` : ''}
+              </span>
+            </div>
+          )}
           {anniv && (
             <div className="home-couple-next">
               {anniv.days === 0
@@ -141,6 +162,12 @@ export default function Home({ onEnter }) {
         <div className="home-greeting">{greeting}</div>
         <div className="home-time">{timeStr}</div>
         <div className="home-days">第 {days} 天</div>
+        {weather && (
+          <div className="home-weather">
+            <WeatherIcon icon={weather.icon} size={16} />
+            <span>{weather.type} {weather.temp}°C</span>
+          </div>
+        )}
         <div className="home-hint">轻触进入</div>
       </div>
     </div>

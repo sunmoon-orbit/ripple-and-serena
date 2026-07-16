@@ -28,7 +28,7 @@ import IncomingCall from './IncomingCall'
 import AnniversaryCard from './AnniversaryCard'
 import HeartCard from './HeartCard'
 import HeartCardAlbum from './HeartCardAlbum'
-import { fetchAnniversaryToday, fetchUnseenHeartCards, markHeartCardSeen } from '../../api/moonMemory'
+import { fetchAnniversaryToday, fetchUnseenHeartCards, markHeartCardSeen, formatWeatherLine } from '../../api/moonMemory'
 import CompletionEgg, { pickEgg } from './CompletionEgg'
 
 // 情绪自动发圈：某正向情绪越阈值且过冷却时，涟言主动发条朋友圈（她在聊天时触发；
@@ -225,11 +225,16 @@ export default function Chat() {
         try {
           const base = (moonMemory.baseUrl || 'https://memory.ravenlove.cc').replace(/\/$/, '')
           const auth = { headers: { Authorization: `Bearer ${moonMemory.apiToken}` } }
-          // 核心记忆、朋友圈摘要、健康快照并行拉，不叠加往返延迟
-          const [resp, momResp, vitResp] = await Promise.all([
+          // 天气只在每天（北京时区）第一条消息注入一次——阿颖拍板的方案：
+          // 不撑每条消息的上下文，涟言临时想看用 check_weather 工具（2026-07-16）
+          const bjToday = now.toLocaleDateString('en-CA', { timeZone: 'Asia/Shanghai' })
+          const needWeather = localStorage.getItem('yanji_weather_inject_date') !== bjToday
+          // 核心记忆、朋友圈摘要、健康快照（+每日一次天气）并行拉，不叠加往返延迟
+          const [resp, momResp, vitResp, wxResp] = await Promise.all([
             fetch(`${base}/memories?layer=core&limit=8`, auth),
             fetch(`${base}/moments?limit=3`, auth).catch(() => null),
             fetch(`${base}/vitals/latest`, auth).catch(() => null),
+            needWeather ? fetch(`${base}/weather`, auth).catch(() => null) : Promise.resolve(null),
           ])
           if (resp.ok) {
             const coreList = await resp.json()
@@ -247,6 +252,15 @@ export default function Chat() {
               }).join('\n') +
               '\n如果阿颖刚发了新动态而你们还没聊过，可以自然地提起或问问她；想翻更多/更早的用 browse_moments 工具，想在某条下面留言用 comment_moment 工具。')
             }
+          }
+          if (wxResp?.ok) {
+            try {
+              const w = await wxResp.json()
+              if (w && w.city) {
+                dynParts.push(`【今日天气】${formatWeatherLine(w)}\n这是今天第一次注入的天气背景。可以自然地关心一句（下雨提带伞、高温提防晒），不必照本宣科念数据；之后想再看用 check_weather 工具。`)
+                localStorage.setItem('yanji_weather_inject_date', bjToday)
+              }
+            } catch {}
           }
           if (vitResp?.ok) {
             const v = await vitResp.json()

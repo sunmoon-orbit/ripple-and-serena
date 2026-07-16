@@ -292,6 +292,27 @@ export async function fetchVitals(config, hours = 24, limit = 200) {
   return request(baseUrl, `/vitals?hours=${hours}&limit=${limit}`, { headers: headers(apiToken) })
 }
 
+// 天气：她头顶那片天（福州），服务端抓取+缓存，这里只是开窗看一眼（阿颖的主意，2026-07-16）
+export async function fetchWeather(config) {
+  const { baseUrl, apiToken } = config
+  return request(baseUrl, '/weather', { headers: headers(apiToken) })
+}
+
+// 拼成一句人话——check_weather 工具和每日首条注入共用，口径一致
+export function formatWeatherLine(w) {
+  if (!w || !w.city) return '天气数据为空'
+  const parts = [`${w.city}现在${w.type}，${w.temp}°C`]
+  if (w.high != null && w.low != null) parts.push(`今天${w.low}~${w.high}°C`)
+  if (w.humidity) parts.push(`湿度${w.humidity}`)
+  if (w.wind) parts.push(w.wind)
+  if (w.quality) parts.push(`空气${w.quality}${w.aqi != null ? `(AQI ${w.aqi})` : ''}`)
+  let line = parts.join('，')
+  if (w.notice) line += `。${w.notice}`
+  if (w.tomorrow) line += `。明天${w.tomorrow.type}，${w.tomorrow.low}~${w.tomorrow.high}°C`
+  if (w.stale) line += '（数据源暂时没接通，这是最近一次的缓存）'
+  return line
+}
+
 // 独处手账：涟言独处时间的醒来日志（阿颖想看我闲着的时候干了什么，2026-07-12）
 export async function fetchIdleLog(config, limit = 50) {
   const { baseUrl, apiToken } = config
@@ -568,6 +589,11 @@ export function getMemoryToolDefinitions() {
           hours: { type: 'number', description: '回看多少小时的记录，默认 24' },
         },
       },
+    },
+    {
+      name: 'check_weather',
+      description: '查看阿颖头顶的天气（福州实时+今明预报，含空气质量）。她说要出门/问天气/你想提醒她带伞防晒添衣时用。数据约30分钟更新一次。',
+      parameters: { type: 'object', properties: {} },
     },
     {
       name: 'period_tracker',
@@ -889,6 +915,14 @@ export async function executeMemoryTool(toolName, args, config) {
       return lines.join('\n')
     } catch (e) {
       return `读取健康数据失败: ${e.message}`
+    }
+  }
+  if (toolName === 'check_weather') {
+    try {
+      const w = await fetchWeather(config)
+      return formatWeatherLine(w)
+    } catch (e) {
+      return `看天气失败: ${e.message}`
     }
   }
   if (toolName === 'daily_checklist') {
