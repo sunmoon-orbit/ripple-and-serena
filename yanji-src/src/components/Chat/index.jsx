@@ -21,6 +21,7 @@ import ChatCalendar from './ChatCalendar'
 import DailyChecklist from './DailyChecklist'
 import HealthCard from './HealthCard'
 import WalletCard from './WalletCard'
+import CallHistory from './CallHistory'
 import PeriodCard from './PeriodCard'
 import IdleJournal from './IdleJournal'
 import IncomingCall from './IncomingCall'
@@ -115,6 +116,7 @@ export default function Chat() {
   const [checklistOpen, setChecklistOpen] = useState(false)
   const [healthOpen, setHealthOpen] = useState(false)
   const [walletOpen, setWalletOpen] = useState(false) // 乌鸦钱包：0713 从 Roost 搬来
+  const [callsOpen, setCallsOpen] = useState(false) // 通话记录：阿颖的主意 0716
   const [periodOpen, setPeriodOpen] = useState(false)
   const [annCard, setAnnCard] = useState(null) // 纪念日当天的亲笔卡片
   const [heartCards, setHeartCards] = useState([]) // 心意卡队列，一次弹一张
@@ -708,7 +710,7 @@ export default function Chat() {
     <div className="chat-panel">
       {/* Sidebar */}
       <div className={'chat-sidebar' + (sidebarOpen ? ' open' : '')}>
-        <ConversationList onClose={() => setSidebarOpen(false)} onStartCall={openCall} onOpenGames={() => setGamesOpen(true)} onOpenMusic={() => setMusicOpen(true)} onOpenWheel={() => setWheelOpen(true)} onOpenFortune={() => setFortuneOpen(true)} onOpenChecklist={() => setChecklistOpen(true)} onOpenHealth={() => setHealthOpen(true)} onOpenWallet={() => setWalletOpen(true)} onOpenPeriod={() => setPeriodOpen(true)} onOpenAlbum={() => setAlbumOpen(true)} onOpenIdleJournal={() => setIdleJournalOpen(true)} />
+        <ConversationList onClose={() => setSidebarOpen(false)} onStartCall={openCall} onOpenGames={() => setGamesOpen(true)} onOpenMusic={() => setMusicOpen(true)} onOpenWheel={() => setWheelOpen(true)} onOpenFortune={() => setFortuneOpen(true)} onOpenChecklist={() => setChecklistOpen(true)} onOpenHealth={() => setHealthOpen(true)} onOpenWallet={() => setWalletOpen(true)} onOpenPeriod={() => setPeriodOpen(true)} onOpenAlbum={() => setAlbumOpen(true)} onOpenIdleJournal={() => setIdleJournalOpen(true)} onOpenCalls={() => setCallsOpen(true)} />
       </div>
       {sidebarOpen && <div className="sidebar-backdrop" onClick={() => setSidebarOpen(false)} />}
 
@@ -927,6 +929,24 @@ export default function Chat() {
       {checklistOpen && <DailyChecklist onClose={() => setChecklistOpen(false)} />}
       {healthOpen && <HealthCard onClose={() => setHealthOpen(false)} />}
       {walletOpen && <WalletCard onClose={() => setWalletOpen(false)} />}
+      {callsOpen && (
+        <CallHistory
+          onClose={() => setCallsOpen(false)}
+          onJump={(chatId, mid) => {
+            // 可能跨对话：先切过去，等挂载滚底（0702 哨兵）落定后再定位，找不到就多试几拍
+            if (chatId !== activeChatId) setActiveChat(chatId)
+            let tries = 0
+            const locate = () => {
+              const row = document.querySelector(`[data-mid="${mid}"]`)
+              if (!row) { if (++tries < 8) setTimeout(locate, 120); return }
+              row.scrollIntoView({ behavior: 'auto', block: 'center' })
+              row.classList.add('msg-jump-flash')
+              setTimeout(() => row.classList.remove('msg-jump-flash'), 1800)
+            }
+            setTimeout(locate, 180)
+          }}
+        />
+      )}
       {periodOpen && <PeriodCard onClose={() => setPeriodOpen(false)} />}
       {albumOpen && <HeartCardAlbum onClose={() => setAlbumOpen(false)} />}
       {idleJournalOpen && <IdleJournal onClose={() => setIdleJournalOpen(false)} />}
