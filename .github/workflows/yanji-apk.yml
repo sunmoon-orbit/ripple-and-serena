@@ -66,7 +66,9 @@ jobs:
       - name: Patch AndroidManifest permissions
         run: |
           MANIFEST=yanji-app/android/app/src/main/AndroidManifest.xml
-          sed -i 's#<uses-permission android:name="android.permission.INTERNET" />#<uses-permission android:name="android.permission.INTERNET" />\n    <uses-permission android:name="android.permission.RECORD_AUDIO" />\n    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />\n    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />#' "$MANIFEST"
+          # FOREGROUND_SERVICE_MEDIA_PLAYBACK：media-session 插件只声明了 FOREGROUND_SERVICE，
+          # Android 14 (targetSdk 34) 起前台服务还要对应的类型化权限，缺了就 SecurityException 闪退
+          sed -i 's#<uses-permission android:name="android.permission.INTERNET" />#<uses-permission android:name="android.permission.INTERNET" />\n    <uses-permission android:name="android.permission.RECORD_AUDIO" />\n    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />\n    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />\n    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />#' "$MANIFEST"
           grep -q RECORD_AUDIO "$MANIFEST" || { echo "permission patch failed"; exit 1; }
 
       - name: Sync
