@@ -2276,6 +2276,12 @@ textarea.form-input { display: block; margin: 8px 16px 12px; }
   border: 1px solid color-mix(in srgb, var(--accent) 25%, transparent);
 }
 .home-couple-hint { margin-top: 0; }
+/* 进入页天气行：她头顶那片天（方案b，2026-07-16） */
+.home-weather {
+  display: inline-flex; align-items: center; gap: 5px;
+  font-size: 12px; color: var(--text-muted); margin-top: 6px;
+}
+.home-weather svg { color: var(--accent); flex-shrink: 0; }
 
 /* ===== 思考链 ===== */
 .thinking-block {
