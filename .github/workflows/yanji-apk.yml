@@ -36,12 +36,12 @@ jobs:
         working-directory: yanji-app
         run: npx cap add android
 
-      # 用言叽 PWA 图标生成安卓图标/启动屏（512→1024 放大，runner 自带 ImageMagick）
+      # 用言叽 PWA 图标生成安卓图标/启动屏（512→1024 放大用 @capacitor/assets 自带的 sharp，不依赖 ImageMagick）
       - name: Generate app icons
         working-directory: yanji-app
         run: |
           mkdir -p assets
-          convert ../yanji-src/public/icon-512.png -resize 1024x1024 assets/logo.png
+          node -e "require('sharp')('../yanji-src/public/icon-512.png').resize(1024,1024).toFile('assets/logo.png').then(()=>console.log('logo ok'))"
           npx @capacitor/assets generate --android --iconBackgroundColor '#1a1a1f' --splashBackgroundColor '#1a1a1f'
 
       # 麦克风等权限（语音通话需要），cap add 生成的 manifest 每次都是新的，构建前注入
