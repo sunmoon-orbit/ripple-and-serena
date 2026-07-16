@@ -28,6 +28,24 @@ jobs:
 
       - uses: android-actions/setup-android@v3
 
+      # 固定 debug 签名：runner 每次随机生成 keystore 会导致签名不一致、无法覆盖安装
+      # 首次运行生成并提交回仓库，之后永远复用同一把（debug 密钥无机密价值，公开无妨）
+      - name: Ensure stable debug keystore
+        run: |
+          if [ ! -f yanji-app/debug.keystore ]; then
+            keytool -genkeypair -v -keystore yanji-app/debug.keystore \
+              -storepass android -alias androiddebugkey -keypass android \
+              -keyalg RSA -keysize 2048 -validity 10950 \
+              -dname "CN=Android Debug,O=Android,C=US"
+            git config user.name "github-actions[bot]"
+            git config user.email "github-actions[bot]@users.noreply.github.com"
+            git add yanji-app/debug.keystore
+            git commit -m "chore: 固定言叽APK debug签名 [skip ci]"
+            git push
+          fi
+          mkdir -p ~/.android
+          cp yanji-app/debug.keystore ~/.android/debug.keystore
+
       - name: Install deps
         working-directory: yanji-app
         run: npm install
