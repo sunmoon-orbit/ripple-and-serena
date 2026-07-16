@@ -7,6 +7,20 @@ import { useStore } from '../../store'
 // 按时间倒序列一张单子；点任意一条跳回那次通话在对话里的位置——
 // 通话前后的语音条还能重听（TTS 生成过就缓存，不重新合成）。
 
+// 和侧边栏工具区同款描边 SVG（feather 风），别用 emoji——和前端风格不搭（阿颖点名）
+const PHONE_PATH = 'M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 12 19.79 19.79 0 0 1 1.63 3.41 2 2 0 0 1 3.6 1.23h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L7.91 8.81a16 16 0 0 0 6.06 6.06l.96-.96a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z'
+
+function CallIcon({ kind, size = 15 }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <path d={PHONE_PATH} />
+      {kind === 'missed' && (<><line x1="17" y1="1" x2="23" y2="7" /><line x1="23" y1="1" x2="17" y2="7" /></>)}
+      {kind === 'cancelled' && (<><polyline points="23 7 23 1 17 1" /><line x1="16" y1="8" x2="23" y2="1" /></>)}
+      {kind === 'ended' && (<><path d="M15.05 5A5 5 0 0 1 19 8.95" /><path d="M15.05 1A9 9 0 0 1 23 8.94" /></>)}
+    </svg>
+  )
+}
+
 function fmtDur(secs) {
   return `${String(Math.floor(secs / 60)).padStart(2, '0')}:${String(secs % 60).padStart(2, '0')}`
 }
@@ -74,7 +88,7 @@ export default function CallHistory({ onClose, onJump }) {
 
         {!total && (
           <div style={{ textAlign: 'center', padding: '28px 0 36px', color: 'var(--text-faint)', fontSize: 14 }}>
-            <div style={{ fontSize: 30, marginBottom: 10 }}>📞</div>
+            <div style={{ marginBottom: 10, opacity: 0.6 }}><CallIcon kind="ended" size={30} /></div>
             还没有通话记录——侧边栏「语音通话」打一个试试？
           </div>
         )}
@@ -94,11 +108,12 @@ export default function CallHistory({ onClose, onJump }) {
               >
                 {/* 方向/状态图标：未接=红，取消=灰，接通=主题色 */}
                 <span style={{
-                  fontSize: 16, width: 30, height: 30, borderRadius: '50%',
+                  width: 30, height: 30, borderRadius: '50%',
                   display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
-                  background: c.kind === 'missed' ? 'rgba(220,80,80,0.12)' : 'var(--border)',
+                  background: c.kind === 'missed' ? 'rgba(220,80,80,0.12)' : c.kind === 'ended' ? 'var(--accent-dim)' : 'var(--border)',
+                  color: c.kind === 'missed' ? 'var(--danger, #d05050)' : c.kind === 'ended' ? 'var(--accent)' : 'var(--text-faint)',
                 }}>
-                  {c.kind === 'missed' ? '📵' : c.kind === 'cancelled' ? '📴' : '📞'}
+                  <CallIcon kind={c.kind} />
                 </span>
                 <span style={{ flex: 1, minWidth: 0 }}>
                   <span style={{
