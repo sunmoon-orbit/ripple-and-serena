@@ -5,7 +5,8 @@
   "description": "言叽 Android 壳（Capacitor 在线壳，加载 GitHub Pages 线上言叽）",
   "dependencies": {
     "@capacitor/android": "^6.2.0",
-    "@capacitor/core": "^6.2.0"
+    "@capacitor/core": "^6.2.0",
+    "@jofr/capacitor-media-session": "^4.0.0"
   },
   "devDependencies": {
     "@capacitor/cli": "^6.2.0",
