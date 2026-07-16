@@ -155,29 +155,14 @@ export default function Roost() {
     else { playerRef.current.play(); setMusicOn(true) }
   }
 
-  // ── 背景图（0716 阿颖点单：纯色会审美疲劳）——复用聊天页同款 localStorage/dataURL 方案 ──
+  // ── 背景图（0716 阿颖点单：纯色会审美疲劳）——设置入口在 设置→外观→Roost 背景图，
+  //    这里只负责展示；监听事件是因为设置页改图时本组件可能已挂载 ──
   const [roostBg, setRoostBg] = useState(() => localStorage.getItem('yanji-roost-bg-image') || '')
-  const [bgMenu, setBgMenu] = useState(false)
-  const bgFileRef = useRef(null)
-  function handleRoostBgUpload(e) {
-    const file = e.target.files?.[0]
-    if (!file) return
-    const reader = new FileReader()
-    reader.onload = (ev) => {
-      try {
-        localStorage.setItem('yanji-roost-bg-image', ev.target.result)
-        setRoostBg(ev.target.result)
-      } catch { showToast('图片太大了，请选小一点的', 'error') }
-    }
-    reader.readAsDataURL(file)
-    e.target.value = ''
-    setBgMenu(false)
-  }
-  function clearRoostBg() {
-    localStorage.removeItem('yanji-roost-bg-image')
-    setRoostBg('')
-    setBgMenu(false)
-  }
+  useEffect(() => {
+    const sync = () => setRoostBg(localStorage.getItem('yanji-roost-bg-image') || '')
+    window.addEventListener('roost-bg-change', sync)
+    return () => window.removeEventListener('roost-bg-change', sync)
+  }, [])
 
   function openLetters() { setModal('letters'); loadLetters() }
   async function openLetter(id) {
@@ -253,18 +238,6 @@ export default function Roost() {
     >
       {/* 顶部标题 */}
       <div className="roost-header">
-        <button className="roost-bg-btn" onClick={() => setBgMenu(v => !v)} title="背景图">
-          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
-            <rect x="3" y="3" width="18" height="18" rx="2" /><circle cx="9" cy="9" r="2" /><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21" />
-          </svg>
-        </button>
-        {bgMenu && (
-          <div className="roost-bg-menu">
-            <button onClick={() => bgFileRef.current?.click()}>设置背景图</button>
-            {roostBg && <button onClick={clearRoostBg}>恢复纯色</button>}
-          </div>
-        )}
-        <input ref={bgFileRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={handleRoostBgUpload} />
         <div className="roost-birds">🐦‍⬛ <span className="roost-heart">♡</span> 🐦</div>
         <h1 className="roost-title">Roost</h1>
         <button

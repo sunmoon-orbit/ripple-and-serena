@@ -2438,29 +2438,9 @@ textarea.form-input { display: block; margin: 8px 16px 12px; }
   padding: 4px 0 0;
 }
 
-/* 背景图设置（0716）：右上角小图标；铺图后卡片起毛玻璃保证可读——
+/* 背景图（0716，入口在 设置→外观→Roost 背景图）：铺图后卡片起毛玻璃保证可读——
    历史坑：.roost-card 的 var(--surface) 从未定义过，卡片一直是透明的，
    纯色底上看不出来，铺图后必须补底 */
-.roost-bg-btn {
-  position: absolute; top: 2px; right: 0;
-  width: 30px; height: 30px; border-radius: 8px;
-  display: flex; align-items: center; justify-content: center;
-  background: transparent; border: none; color: var(--text-faint);
-  cursor: pointer; opacity: 0.75;
-}
-.roost-bg-btn:hover { color: var(--accent); opacity: 1; }
-.roost-bg-menu {
-  position: absolute; top: 34px; right: 0; z-index: 5;
-  display: flex; flex-direction: column;
-  background: var(--card); border: 1px solid var(--border);
-  border-radius: 10px; box-shadow: var(--shadow-md); overflow: hidden;
-}
-.roost-bg-menu button {
-  padding: 9px 16px; background: none; border: none;
-  font-size: 13px; color: var(--text); cursor: pointer;
-  white-space: nowrap; text-align: left;
-}
-.roost-bg-menu button:hover { background: var(--accent-dim); }
 .roost-panel.has-bg .roost-card {
   background: color-mix(in srgb, var(--card) 84%, transparent);
   backdrop-filter: blur(10px);

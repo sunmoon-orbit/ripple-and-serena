@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useStore } from '../../store'
 import { normalizeProvider, BUILTIN_MODELS } from '../../api/llm'
 import { checkHealth, fetchPushSchedule, savePushSchedule } from '../../api/moonMemory'
@@ -13,6 +13,54 @@ function Section({ title, children }) {
       <h3 className="settings-section-title">{title}</h3>
       {children}
     </div>
+  )
+}
+
+// Roost 背景图（0716 阿颖：设置类操作放外观页更顺手，Roost 页右上角的入口撤了）
+function RoostBgSection() {
+  const [bg, setBg] = useState(() => localStorage.getItem('yanji-roost-bg-image') || '')
+  const fileRef = useRef(null)
+  function onPick(e) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    const reader = new FileReader()
+    reader.onload = (ev) => {
+      try {
+        localStorage.setItem('yanji-roost-bg-image', ev.target.result)
+        setBg(ev.target.result)
+        window.dispatchEvent(new Event('roost-bg-change'))
+        showToast('背景已设置', 'success')
+      } catch { showToast('图片太大了，请选小一点的', 'error') }
+    }
+    reader.readAsDataURL(file)
+    e.target.value = ''
+  }
+  function clear() {
+    localStorage.removeItem('yanji-roost-bg-image')
+    setBg('')
+    window.dispatchEvent(new Event('roost-bg-change'))
+  }
+  return (
+    <Section title="Roost 背景图">
+      <div className="settings-card">
+        <div className="card-row">
+          <span className="card-row-label">图片背景</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            {bg && (
+              <span style={{
+                width: 44, height: 30, borderRadius: 6, flexShrink: 0,
+                backgroundImage: `url(${bg})`, backgroundSize: 'cover', backgroundPosition: 'center',
+                border: '1px solid var(--border)',
+              }} />
+            )}
+            <button className="btn-sm btn-primary" onClick={() => fileRef.current?.click()}>{bg ? '换一张' : '选择图片'}</button>
+            {bg && <button className="btn-sm btn-ghost" onClick={clear}>恢复纯色</button>}
+          </div>
+        </div>
+        <p className="card-hint">给 Roost 页铺一张自己的照片，卡片会自动起毛玻璃保证文字可读。图片存在这台设备的浏览器里。</p>
+        <input ref={fileRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={onPick} />
+      </div>
+    </Section>
   )
 }
 
@@ -838,7 +886,7 @@ export default function Settings() {
                     <span style={{
                       width: avatarConfig?.size || 28, height: avatarConfig?.size || 28,
                       borderRadius: avatarConfig?.shape === 'square' ? '6px' : '50%',
-                      background: 'rgba(191,181,216,0.20)', border: '1px solid var(--border)',
+                      background: 'var(--accent-dim)', border: '1px solid var(--border)',
                       display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
                       overflow: 'hidden', flexShrink: 0,
                     }}>
@@ -899,6 +947,7 @@ export default function Settings() {
                 <p className="card-hint">纪念卡显示两个人的头像（用「聊天头像」里设置的图片，没设时是小乌鸦和小蜂鸟）、在一起的天数、聊过的消息数，还有距离下一个纪念日的倒数。</p>
               </div>
             </Section>
+            <RoostBgSection />
             <Section title="语音通话样式">
               <div className="settings-card">
                 <div className="card-row">
