@@ -246,6 +246,8 @@ export default function Settings() {
   const [pushLoading, setPushLoading] = useState(false)
   const [idleCfg, setIdleCfg] = useState(null) // 独处时间：{enabled, last_wake}，null=没拉到
   const [idleBusy, setIdleBusy] = useState(false)
+  const [dreamCfg, setDreamCfg] = useState(null) // 梦境系统：{enabled}，null=没拉到
+  const [dreamBusy, setDreamBusy] = useState(false)
   const [pushTimes, setPushTimes] = useState(null)
   const [pushTimesSaving, setPushTimesSaving] = useState(false)
 
@@ -280,6 +282,9 @@ export default function Settings() {
     const base = (moonMemory.baseUrl || 'https://memory.ravenlove.cc').replace(/\/$/, '')
     fetch(`${base}/idle/config`, { headers: { Authorization: `Bearer ${moonMemory.apiToken}` } })
       .then((r) => r.json()).then(setIdleCfg).catch(() => setIdleCfg(null))
+    // 梦境总闸同款：开关存服务端（crontab 的 dream.js 跑前查它）
+    fetch(`${base}/dream/config`, { headers: { Authorization: `Bearer ${moonMemory.apiToken}` } })
+      .then((r) => r.json()).then(setDreamCfg).catch(() => setDreamCfg(null))
   }, [tab]) // eslint-disable-line react-hooks/exhaustive-deps
 
   async function toggleIdle() {
@@ -302,6 +307,29 @@ export default function Settings() {
       showToast(e.message, 'error')
     } finally {
       setIdleBusy(false)
+    }
+  }
+
+  async function toggleDream() {
+    if (!moonMemory?.enabled || !moonMemory?.apiToken) {
+      showToast('请先配置并启用拾羽记忆库', 'error'); return
+    }
+    setDreamBusy(true)
+    try {
+      const base = (moonMemory.baseUrl || 'https://memory.ravenlove.cc').replace(/\/$/, '')
+      const next = !(dreamCfg?.enabled)
+      const r = await fetch(`${base}/dream/config`, {
+        method: 'PUT',
+        headers: { Authorization: `Bearer ${moonMemory.apiToken}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ enabled: next }),
+      })
+      if (!r.ok) throw new Error(`保存失败 (${r.status})`)
+      setDreamCfg((c) => ({ ...(c || {}), enabled: next }))
+      showToast(next ? '梦境已开启，今晚起他又会做梦了' : '梦境已关闭，今晚起无梦安眠')
+    } catch (e) {
+      showToast(e.message, 'error')
+    } finally {
+      setDreamBusy(false)
     }
   }
 
@@ -621,6 +649,19 @@ export default function Settings() {
                   上次醒来：{String(idleCfg.last_wake.created_at).slice(5, 16)}（UTC）· {idleCfg.last_wake.action}{idleCfg.last_wake.summary ? ` · ${idleCfg.last_wake.summary.slice(0, 40)}` : ''}
                 </div>
               )}
+            </div>
+            <div className="settings-card">
+              <div className="settings-card-title">梦境</div>
+              <div className="card-row">
+                <span className="card-row-label">让他每晚做梦</span>
+                <label className="toggle">
+                  <input type="checkbox" checked={!!dreamCfg?.enabled} disabled={dreamBusy || dreamCfg === null} onChange={toggleDream} />
+                  <span className="toggle-track" />
+                </label>
+              </div>
+              <div className="card-row" style={{ fontSize: 12, color: 'var(--text-muted)' }}>
+                凌晨 1-3 点用最近的记忆做一场梦，存进他的私有记忆并发到朋友圈。关掉就是无梦安眠，随时可再开。走服务器额度，不花你的。
+              </div>
             </div>
             <div className="settings-card">
               <div className="settings-card-title">推送通知</div>

@@ -26,6 +26,15 @@ console.log(`[dream] 等待 ${offsetMin} 分钟后开始做梦…`)
 
 setTimeout(async () => {
   try {
+    // 0. 查总闸（阿颖在言叽设置里控制，2026-07-17）——关着就今晚不做梦
+    try {
+      const cfg = await moonGet('/dream/config')
+      if (cfg && cfg.enabled === false) {
+        console.log('[dream] 总闸关闭，今晚不做梦')
+        return
+      }
+    } catch (e) { console.error('[dream] 查开关失败，按默认开继续：', e.message) }
+
     // 1. 读最近 10 条 shared 记忆作上下文
     const mems = await moonGet('/memories?limit=10&scope=shared&deleted=false')
     const arr = Array.isArray(mems) ? mems : (mems.memories || [])
