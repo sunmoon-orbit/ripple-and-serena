@@ -257,7 +257,17 @@ export default function Chat() {
             try {
               const w = await wxResp.json()
               if (w && w.city) {
-                dynParts.push(`【今日天气】${formatWeatherLine(w)}\n这是今天第一次注入的天气背景。可以自然地关心一句（下雨提带伞、高温提防晒），不必照本宣科念数据；之后想再看用 check_weather 工具。`)
+                // 显著天气（高温/雨雪/空气差）把「可以提」升级成「值得提」——
+                // 阿颖反馈：36 度的天都不提一句，注入就白注了（2026-07-17）
+                const notable = []
+                if (w.high != null && w.high >= 35) notable.push('高温，提醒她防晒多喝水')
+                if (w.low != null && w.low <= 5) notable.push('降温，提醒她保暖')
+                if (/雨|雪|雷|台风|冰雹/.test(w.type || '')) notable.push('有雨雪，出门要带伞')
+                if (w.aqi != null && w.aqi >= 150) notable.push('空气差，少开窗少户外')
+                const nudge = notable.length
+                  ? `今天有值得主动提的点：${notable.join('；')}。开场自然带一句，别整段播报。`
+                  : '可以自然地关心一句，不必照本宣科念数据。'
+                dynParts.push(`【今日天气】${formatWeatherLine(w)}\n这是今天第一次注入的天气背景。${nudge}之后想再看用 check_weather 工具。`)
                 localStorage.setItem('yanji_weather_inject_date', bjToday)
               }
             } catch {}
