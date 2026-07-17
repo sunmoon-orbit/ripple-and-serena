@@ -1,6 +1,76 @@
 const SW_PATH = '/ripple-and-serena/yanji/sw.js'
 const SW_SCOPE = '/ripple-and-serena/yanji/'
 
+// ── APK 原生推送（FCM）────────────────────────────────────────
+// Capacitor 在线壳里 Web Push 是死的（WebView 无 PushManager 订阅通道），
+// 走壳注入的 PushNotifications 插件拿 FCM token 上报服务器（2026-07-17）。
+
+const FCM_TOKEN_KEY = 'yanji_fcm_token'
+
+export function isNativeApp() {
+  return !!window.Capacitor?.isNativePlatform?.()
+}
+
+function nativePush() {
+  return window.Capacitor?.Plugins?.PushNotifications || null
+}
+
+export function getNativePushToken() {
+  try { return localStorage.getItem(FCM_TOKEN_KEY) } catch { return null }
+}
+
+export async function subscribeNativePush(moonMemoryConfig) {
+  const PN = nativePush()
+  if (!PN) throw new Error('推送插件不可用——APK 版本太旧，去下载页装最新的安装包')
+
+  let perm = await PN.checkPermissions()
+  if (perm.receive !== 'granted') perm = await PN.requestPermissions()
+  if (perm.receive !== 'granted') throw new Error('通知权限未授权，去系统设置里允许言叽的通知')
+
+  const token = await new Promise((resolve, reject) => {
+    const timer = setTimeout(
+      () => reject(new Error('获取推送 token 超时——检查 Google Play 服务是否在代理名单里')),
+      20000
+    )
+    PN.addListener('registration', (r) => { clearTimeout(timer); resolve(r.value) })
+    PN.addListener('registrationError', (e) => {
+      clearTimeout(timer)
+      reject(new Error(`推送注册失败: ${JSON.stringify(e).slice(0, 120)}`))
+    })
+    PN.register()
+  })
+
+  const { apiUrl, apiToken } = moonMemoryConfig
+  const resp = await fetch(`${apiUrl}/push/fcm-token`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiToken}` },
+    body: JSON.stringify({ token }),
+  })
+  if (!resp.ok) {
+    const detail = await resp.text().catch(() => '')
+    throw new Error(`token 保存失败 (${resp.status}): ${detail.slice(0, 100)}`)
+  }
+  const data = await resp.json().catch(() => ({}))
+  try { localStorage.setItem(FCM_TOKEN_KEY, token) } catch { /* 私密模式等 */ }
+  // 服务器还没配服务账号时如实告知，别让她以为已经通了
+  if (data.fcmConfigured === false) throw new Error('token 已保存，但服务器 FCM 尚未配置完成')
+  return token
+}
+
+export async function unsubscribeNativePush(moonMemoryConfig) {
+  const token = getNativePushToken()
+  const { apiUrl, apiToken } = moonMemoryConfig
+  if (token) {
+    await fetch(`${apiUrl}/push/fcm-unsubscribe`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiToken}` },
+      body: JSON.stringify({ token }),
+    }).catch(() => {})
+  }
+  try { localStorage.removeItem(FCM_TOKEN_KEY) } catch { /* noop */ }
+  await nativePush()?.unregister?.().catch?.(() => {})
+}
+
 function urlBase64ToUint8Array(base64String) {
   const padding = '='.repeat((4 - (base64String.length % 4)) % 4)
   const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/')
