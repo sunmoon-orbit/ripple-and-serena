@@ -419,7 +419,9 @@ async function callWithTools({
     // ── Anthropic ────────────────────────────────────────────────────
     if (provider === 'anthropic') {
       const url = buildApiUrl(connection.baseUrl, 'anthropic')
-      const bodyMsgs = buildAnthropicMessages(convo, iter === 0 ? dynamicContext : undefined)
+      // 每次迭代都传 dynamicContext：工具循环后续步骤不再丢失注入内容；
+      // buildAnthropicMessages 保证注入永远在断点后，不影响缓存命中
+      const bodyMsgs = buildAnthropicMessages(convo, dynamicContext)
       const body = { model, max_tokens: maxTokens, messages: bodyMsgs, tools: formattedTools, temperature: safeTemp }
       if (systemPrompt?.trim()) {
         body.system = [{ type: 'text', text: systemPrompt, cache_control: { type: 'ephemeral', ttl: '1h' } }]
@@ -751,8 +753,11 @@ function buildAnthropicMessages(messages, dynamicContext) {
     return { role: m.role, content: m.content }
   })
 
-  // 把时间/核心记忆等每轮变动的内容注入到最后一条用户消息前——
-  // 不写进缓存前缀，不毁历史命中，按普通输入价计费
+  // 把时间/核心记忆等每轮变动的内容注入到最后一条用户消息——
+  // 不写进缓存前缀，不毁历史命中，按普通输入价计费。
+  // 工具循环的后续迭代也注入（否则模型第二步起丢天气/情绪/核心记忆）：
+  // tool_result 消息里 dyn 必须追加在 tool_result 块之后（块序要求），
+  // 且该消息永远在最后一个缓存断点之后，注入不碰前缀（见 CLWD postmortem 审计 0717）
   if (dynamicContext?.trim() && out.length > 0) {
     const lastIdx = out.length - 1
     const last = out[lastIdx]
@@ -761,7 +766,8 @@ function buildAnthropicMessages(messages, dynamicContext) {
       if (typeof last.content === 'string') {
         out[lastIdx] = { ...last, content: [dynBlock, { type: 'text', text: last.content }] }
       } else if (Array.isArray(last.content)) {
-        out[lastIdx] = { ...last, content: [dynBlock, ...last.content] }
+        const hasToolResult = last.content.some((b) => b?.type === 'tool_result')
+        out[lastIdx] = { ...last, content: hasToolResult ? [...last.content, dynBlock] : [dynBlock, ...last.content] }
       }
     }
   }
