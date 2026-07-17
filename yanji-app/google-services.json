@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "489411757582",
+    "project_id": "yanji-ravenlove",
+    "storage_bucket": "yanji-ravenlove.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:489411757582:android:68632f15cd7dec90a55e5f",
+        "android_client_info": {
+          "package_name": "cc.ravenlove.yanji"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCM7nvP5z8TR6gYRSoMvC8FWaEF5s3flhc"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

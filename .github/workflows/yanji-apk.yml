@@ -54,6 +54,18 @@ jobs:
         working-directory: yanji-app
         run: npx cap add android
 
+      # FCM 推送：google-services.json 进 app 模块。Capacitor 的 android 模板自带
+      # 「检测到 google-services.json 就 apply google-services 插件」的逻辑，
+      # 这里只保证 root build.gradle 有 classpath（模板缺失则注入），再验证两头都在
+      - name: Wire FCM (google-services.json)
+        run: |
+          cp yanji-app/google-services.json yanji-app/android/app/google-services.json
+          if ! grep -q 'com.google.gms:google-services' yanji-app/android/build.gradle; then
+            sed -i "s#classpath 'com.android.tools.build:gradle#classpath 'com.google.gms:google-services:4.4.2'\n        classpath 'com.android.tools.build:gradle#" yanji-app/android/build.gradle
+          fi
+          grep -q 'com.google.gms' yanji-app/android/build.gradle || { echo 'root build.gradle 缺 google-services classpath'; exit 1; }
+          grep -q 'google-services' yanji-app/android/app/build.gradle || { echo 'app build.gradle 缺 google-services 应用逻辑'; exit 1; }
+
       # 用言叽 PWA 图标生成安卓图标/启动屏（512→1024 放大用 @capacitor/assets 自带的 sharp，不依赖 ImageMagick）
       - name: Generate app icons
         working-directory: yanji-app

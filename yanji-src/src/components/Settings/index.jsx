@@ -4,7 +4,7 @@ import { normalizeProvider, BUILTIN_MODELS } from '../../api/llm'
 import { checkHealth, fetchPushSchedule, savePushSchedule } from '../../api/moonMemory'
 import { showToast } from '../Toast'
 import { uuid } from '../../utils'
-import { subscribePush, unsubscribePush, getSubscription } from '../../api/push'
+import { subscribePush, unsubscribePush, getSubscription, isNativeApp, subscribeNativePush, unsubscribeNativePush, getNativePushToken } from '../../api/push'
 import { DELAY_MODES } from '../../utils/replyDelay'
 
 function Section({ title, children }) {
@@ -250,7 +250,8 @@ export default function Settings() {
   const [pushTimesSaving, setPushTimesSaving] = useState(false)
 
   useEffect(() => {
-    getSubscription().then((sub) => setPushEnabled(!!sub)).catch(() => {})
+    if (isNativeApp()) setPushEnabled(!!getNativePushToken())
+    else getSubscription().then((sub) => setPushEnabled(!!sub)).catch(() => {})
   }, [])
 
   useEffect(() => {
@@ -311,12 +312,14 @@ export default function Settings() {
     setPushLoading(true)
     try {
       const moonConfig = { apiUrl: (moonMemory.baseUrl || '').replace(/\/$/, ''), apiToken: moonMemory.apiToken }
+      // APK（Capacitor 壳）里 Web Push 不可用，走 FCM 原生通道
+      const native = isNativeApp()
       if (pushEnabled) {
-        await unsubscribePush(moonConfig)
+        await (native ? unsubscribeNativePush(moonConfig) : unsubscribePush(moonConfig))
         setPushEnabled(false)
         showToast('已关闭推送通知')
       } else {
-        await subscribePush(moonConfig)
+        await (native ? subscribeNativePush(moonConfig) : subscribePush(moonConfig))
         setPushEnabled(true)
         showToast('推送通知已开启！')
       }
@@ -628,9 +631,14 @@ export default function Settings() {
                   <span className="toggle-track" />
                 </label>
               </div>
-              {!('PushManager' in window) && (
+              {!isNativeApp() && !('PushManager' in window) && (
                 <div className="card-row" style={{ fontSize: 12, color: 'var(--text-muted)' }}>
                   此浏览器不支持推送通知
+                </div>
+              )}
+              {isNativeApp() && (
+                <div className="card-row" style={{ fontSize: 12, color: 'var(--text-muted)' }}>
+                  APK 走 FCM 原生推送——Google Play 服务要在代理名单里，否则收不到
                 </div>
               )}
               {pushTimes !== null && (
