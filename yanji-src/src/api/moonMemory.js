@@ -33,6 +33,13 @@ export async function fetchMemories(config, params = {}) {
   return request(baseUrl, path, { headers: headers(apiToken) })
 }
 
+// 语义混合搜索（服务端 hybridSearch：向量+关键词）——措辞不同也能命中
+export async function semanticSearchMemories(config, q, k) {
+  const { baseUrl, apiToken } = config
+  const qs = new URLSearchParams({ q, k: String(k) })
+  return request(baseUrl, `/memories/semantic?${qs.toString()}`, { headers: headers(apiToken) })
+}
+
 export async function createMemory(config, body) {
   const { baseUrl, apiToken } = config
   return request(baseUrl, '/memories', {
@@ -661,17 +668,24 @@ export async function executeMemoryTool(toolName, args, config) {
   if (toolName === 'search_memories') {
     try {
       const limit = Math.min(args.limit || 5, 20)
-      // 把多词查询拆成单词分别搜索，结果按 id 去重合并（避免短语匹配漏掉相关记忆）
-      const terms = String(args.query || '').trim().split(/\s+/).filter(Boolean)
-      const seen = new Set()
-      const results = []
-      for (const term of terms) {
-        const hits = await fetchMemories(config, { q: term, scope: args.scope, limit })
-        for (const m of hits) {
-          if (!seen.has(m.id)) { seen.add(m.id); results.push(m) }
+      // 语义混合搜索优先（向量+关键词，措辞不同也能命中）；0717 小桃案：
+      // 旧版纯 LIKE 匹配对措辞敏感，库里明明有「小桃是猫」却搜不到
+      let results = []
+      try {
+        const hits = await semanticSearchMemories(config, String(args.query || '').trim(), limit)
+        results = (args.scope ? hits.filter((m) => m.scope === args.scope) : hits).slice(0, limit)
+      } catch {
+        // 兜底：语义接口不可用（未配 embedding key / 超时）退回多词 LIKE 搜索
+        const terms = String(args.query || '').trim().split(/\s+/).filter(Boolean)
+        const seen = new Set()
+        for (const term of terms) {
+          const hits = await fetchMemories(config, { q: term, scope: args.scope, limit })
+          for (const m of hits) {
+            if (!seen.has(m.id)) { seen.add(m.id); results.push(m) }
+            if (results.length >= limit) break
+          }
           if (results.length >= limit) break
         }
-        if (results.length >= limit) break
       }
       if (!results.length) return '未找到相关记忆'
       return results.map((m, i) =>
