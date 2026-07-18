@@ -4,6 +4,7 @@ import Splash from './components/Splash'
 import PasswordGate from './components/PasswordGate'
 import { ToastHost } from './components/Toast'
 import MemoryPanel from './components/MemoryPanel'
+import StarMapPanel from './components/StarMapPanel'
 import TrashPanel from './components/TrashPanel'
 import StatsPanel from './components/StatsPanel'
 import SettingsPanel from './components/SettingsPanel'
@@ -19,6 +20,7 @@ const NAV = [
 export default function App() {
   const theme = useStore((s) => s.theme)
   const panel = useStore((s) => s.panel)
+  const memoryView = useStore((s) => s.memoryView)
   const setPanel = useStore((s) => s.setPanel)
   const [splash, setSplash] = useState(true)
   const [unlocked, setUnlocked] = useState(false)
@@ -37,7 +39,7 @@ export default function App() {
 
   return (
     <div className="app">
-      {panel === 'memory' && <MemoryPanel />}
+      {panel === 'memory' && (memoryView === 'starmap' ? <StarMapPanel /> : <MemoryPanel />)}
       {panel === 'stats' && <StatsPanel />}
       {panel === 'trash' && <TrashPanel />}
       {panel === 'settings' && <SettingsPanel />}

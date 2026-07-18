@@ -29,6 +29,10 @@ export const useStore = create(
       // ── 当前面板 ──
       panel: 'memory',
       setPanel: (panel) => set({ panel }),
+
+      // ── 记忆视图（年轮列表 / 记忆星图）──
+      memoryView: 'list',
+      setMemoryView: (memoryView) => set({ memoryView }),
     }),
     {
       name: 'shiyu-store',
@@ -38,6 +42,7 @@ export const useStore = create(
         fetchLimit: s.fetchLimit,
         theme: s.theme,
         passwordHash: s.passwordHash,
+        memoryView: s.memoryView,
       }),
     }
   )

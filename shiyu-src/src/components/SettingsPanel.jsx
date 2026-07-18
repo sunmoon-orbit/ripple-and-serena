@@ -32,7 +32,7 @@ function fmtBackup(report) {
 }
 
 export default function SettingsPanel() {
-  const { baseUrl, apiToken, theme, setTheme, setConn, passwordHash, setPassword } = useStore()
+  const { baseUrl, apiToken, theme, setTheme, setConn, passwordHash, setPassword, memoryView, setMemoryView } = useStore()
   const [url, setUrl] = useState(baseUrl || 'https://memory.ravenlove.cc')
   const [token, setToken] = useState(apiToken)
   const [testing, setTesting] = useState(false)
@@ -216,6 +216,20 @@ export default function SettingsPanel() {
             </button>
           ))}
         </div>
+
+        <div className="row" style={{ marginTop: 14 }}><span className="row-label">记忆视图</span></div>
+        <div className="theme-grid">
+          {[
+            { id: 'list', label: '年轮列表', dot: '#8FA3BC' },
+            { id: 'starmap', label: '记忆星图', dot: '#F5D97E' },
+          ].map((v) => (
+            <button key={v.id} className={'theme-chip' + (memoryView === v.id ? ' active' : '')} onClick={() => setMemoryView(v.id)}>
+              <span className="theme-chip-dot" style={{ background: v.dot }} />
+              <span className="theme-chip-label">{v.label}</span>
+            </button>
+          ))}
+        </div>
+        <p style={{ fontSize: 12, opacity: 0.5, margin: '8px 2px 0' }}>星图把每条记忆画成一颗星，语义相近的星之间有连线。PC 大屏观感更佳。</p>
       </div>
     </div>
   )

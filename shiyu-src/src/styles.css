@@ -746,6 +746,70 @@ input, textarea, select { font-family: inherit; font-size: 15px; color: var(--in
 }
 .memorable-toggle .toggle { flex-shrink: 0; }
 
+/* ── 记忆星图 ── */
+.starmap-wrap {
+  position: fixed; inset: 0;
+  z-index: 10;                       /* 在 .nav(50) 之下，导航照常可用 */
+  background: #070B14;
+  animation: fade-in 0.4s ease;
+}
+.starmap-canvas {
+  position: absolute; inset: 0;
+  width: 100%; height: 100%;
+  touch-action: none;                /* 拖动/双指缩放交给 JS */
+  cursor: grab;
+}
+.starmap-canvas:active { cursor: grabbing; }
+.starmap-topbar {
+  position: absolute; top: 0; left: 0; right: 0;
+  display: flex; align-items: center; gap: 10px;
+  padding: calc(14px + env(safe-area-inset-top)) 16px 10px;
+  pointer-events: none;              /* 不挡画布拖动，按钮单独恢复 */
+}
+.starmap-topbar h1 {
+  font-size: 17px; font-weight: 700; color: #DCE4F5; margin: 0;
+  text-shadow: 0 1px 8px rgba(0,0,0,0.6);
+}
+.starmap-stats { font-size: 12px; color: rgba(200,212,238,0.55); }
+.starmap-btn {
+  pointer-events: auto;
+  width: 32px; height: 32px; border-radius: 9px;
+  display: inline-flex; align-items: center; justify-content: center;
+  background: rgba(150,170,215,0.12); color: #C6D2EA;
+  transition: background 0.15s;
+}
+.starmap-btn:hover { background: rgba(150,170,215,0.24); }
+.starmap-hint {
+  position: absolute; top: 46%; left: 0; right: 0;
+  text-align: center; font-size: 14px; color: rgba(200,212,238,0.6);
+  pointer-events: none;
+}
+.starmap-legend {
+  position: absolute; left: 0; right: 0;
+  bottom: calc(66px + env(safe-area-inset-bottom));
+  display: flex; justify-content: center; flex-wrap: wrap; gap: 4px 12px;
+  padding: 0 12px; pointer-events: none;
+}
+.starmap-legend-item {
+  display: inline-flex; align-items: center; gap: 5px;
+  font-size: 11px; color: rgba(200,212,238,0.6);
+}
+.starmap-legend-dot { width: 7px; height: 7px; border-radius: 50%; }
+
+/* 星图详情卡（复用 .modal-overlay/.modal 底部抽屉）*/
+.starmap-detail { background: #131A2A; color: #D6E0F2; }
+.starmap-detail-head { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
+.starmap-detail-type {
+  font-size: 12px; font-weight: 600; padding: 2px 10px; border-radius: 20px;
+}
+.starmap-detail-meta { font-size: 12px; color: rgba(200,212,238,0.5); }
+.starmap-detail-body {
+  font-size: 14px; line-height: 1.75; white-space: pre-wrap; word-break: break-word;
+  max-height: 52vh; overflow-y: auto;
+}
+.starmap-detail-tags { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 12px; }
+.starmap-detail-tags .tag { background: rgba(150,170,215,0.14); color: rgba(200,212,238,0.75); }
+
 /* ── 桌面端适配 ── */
 @media (min-width: 1000px) {
   .app { max-width: 1060px; }
