@@ -43,6 +43,7 @@ export function getEmotionState() {
 function saveState(state) {
   try { localStorage.setItem(EMOTION_KEY, JSON.stringify(state)) } catch {}
   window.dispatchEvent(new Event('emotion-update'))
+  try { window.YanjiNative?.updateEmotion(JSON.stringify(state.slots)) } catch {}
 }
 
 // 读取时自动应用时间衰减
