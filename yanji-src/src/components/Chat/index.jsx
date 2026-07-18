@@ -651,6 +651,28 @@ export default function Chat() {
     URL.revokeObjectURL(url)
   }
 
+  async function handleServerRestore() {
+    setBgMenuOpen(false)
+    const moonMemory = useStore.getState().moonMemory || {}
+    if (!moonMemory?.apiToken) { showToast('请先在设置里配置拾羽记忆库连接', 'error'); return }
+    if (!window.confirm('从服务器恢复会覆盖当前所有对话记录，确定吗？')) return
+    try {
+      const base = (moonMemory.baseUrl || 'https://memory.ravenlove.cc').replace(/\/$/, '')
+      const r = await fetch(`${base}/backup/yanji/latest`, {
+        headers: { Authorization: `Bearer ${moonMemory.apiToken}` },
+      })
+      if (r.status === 404) { showToast('服务器上还没有备份', 'error'); return }
+      if (!r.ok) throw new Error(`(${r.status})`)
+      const text = await r.text()
+      JSON.parse(text)
+      localStorage.setItem('llm_hub_state_v1', text)
+      showToast('已从服务器恢复，正在刷新…', 'success')
+      setTimeout(() => window.location.reload(), 800)
+    } catch (e) {
+      showToast('恢复失败：' + e.message, 'error')
+    }
+  }
+
   function handleBackupImport(e) {
     const file = e.target.files?.[0]
     if (!file) return
@@ -816,7 +838,8 @@ export default function Chat() {
                 <button onClick={() => { setBgMenuOpen(false); handleExport() }}>导出当前对话</button>
               )}
               <button onClick={handleBackupExport}>备份全部数据</button>
-              <button onClick={() => { setBgMenuOpen(false); importFileRef.current?.click() }}>恢复备份</button>
+              <button onClick={() => { setBgMenuOpen(false); importFileRef.current?.click() }}>从文件恢复</button>
+              <button onClick={handleServerRestore}>从服务器恢复</button>
               <button onClick={() => { setBgMenuOpen(false); bgFileRef.current?.click() }}>设置背景图</button>
               <button onClick={clearBg}>清除背景图</button>
             </div>,
