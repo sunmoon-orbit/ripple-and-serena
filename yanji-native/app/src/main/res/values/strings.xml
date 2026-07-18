@@ -5,4 +5,5 @@
     <string name="channel_service">后台常驻</string>
     <string name="reply_label">回复</string>
     <string name="notification_service_text">言叽在后台陪着你</string>
+    <string name="widget_description">在一起纪念日 + 今日签</string>
 </resources>
