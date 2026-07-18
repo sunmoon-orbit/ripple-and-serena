@@ -109,6 +109,11 @@ function mergeWithDefaults(persisted) {
 const persisted = loadPersistedState()
 const initialState = mergeWithDefaults(persisted)
 
+// 同步应用主题——在 React 首帧之前，避免开屏动画闪默认紫色
+if (initialState.theme && initialState.theme !== 'default') {
+  document.documentElement.setAttribute('data-theme', initialState.theme)
+}
+
 export const useStore = create((set, get) => ({
   ...initialState,
 
