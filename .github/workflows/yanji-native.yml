@@ -1,0 +1,67 @@
+name: Build Yanji Native APK
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'yanji-native/**'
+      - '.github/workflows/yanji-native.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: android-actions/setup-android@v3
+
+      # google-services.json 从 yanji-app 复用（同一个 Firebase 项目）
+      - name: Copy google-services.json
+        run: cp yanji-app/google-services.json yanji-native/app/google-services.json
+
+      # 用 PWA 图标生成 mipmap
+      - name: Generate launcher icon
+        run: |
+          sudo apt-get update -qq && sudo apt-get install -y -qq imagemagick >/dev/null
+          for dpi in mdpi:48 hdpi:72 xhdpi:96 xxhdpi:144 xxxhdpi:192; do
+            name="${dpi%%:*}"
+            size="${dpi##*:}"
+            mkdir -p "yanji-native/app/src/main/res/mipmap-${name}"
+            convert yanji-src/public/icon-512.png -resize "${size}x${size}" "yanji-native/app/src/main/res/mipmap-${name}/ic_launcher.png"
+          done
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Build debug APK
+        working-directory: yanji-native
+        run: gradle assembleDebug --no-daemon
+
+      - name: Publish to Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: yanji-native-apk
+          name: 言叽原生版 APK
+          body: |
+            言叽 Android 原生版（Kotlin + WebView 混合架构）。
+
+            相比旧版 Capacitor 壳的改进：
+            - 通知栏直接打字回复
+            - 后台前台服务常驻，不被系统杀
+            - 系统分享目标（别的 app 里可以分享内容到言叽）
+            - 原生文件选择器
+
+            安装步骤：
+            1. 下载 app-debug.apk 安装，需允许「未知来源」
+            2. ⚠️ 装好后把「言叽」加进分应用代理名单，否则直连被墙
+            3. 首次打开允许通知权限
+          files: yanji-native/app/build/outputs/apk/debug/app-debug.apk

@@ -1,0 +1,1 @@
+-keepclassmembers class cc.ravenlove.yanji.WebBridge { public *; }
