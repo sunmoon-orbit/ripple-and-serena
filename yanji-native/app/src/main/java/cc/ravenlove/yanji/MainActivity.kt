@@ -2,14 +2,17 @@ package cc.ravenlove.yanji
 
 import android.Manifest
 import android.annotation.SuppressLint
+import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.graphics.Color
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.view.View
 import android.webkit.*
 import android.widget.FrameLayout
+import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
@@ -41,6 +44,7 @@ class MainActivity : AppCompatActivity() {
         }
 
         splash = findViewById(R.id.splash)
+        applySplashTheme(splash)
         webView = findViewById(R.id.webview)
 
         webView.settings.apply {
@@ -172,6 +176,23 @@ class MainActivity : AppCompatActivity() {
     override fun onBackPressed() {
         if (webView.canGoBack()) webView.goBack()
         else super.onBackPressed()
+    }
+
+    private fun applySplashTheme(splash: FrameLayout) {
+        val theme = getSharedPreferences("yanji_theme", Context.MODE_PRIVATE)
+            .getString("theme", "default") ?: "default"
+        data class SplashColors(val bg: Int, val text: Int)
+        val colors = when (theme) {
+            "xilan"    -> SplashColors(Color.parseColor("#FDF5F5"), Color.parseColor("#A07878"))
+            "qingwu"   -> SplashColors(Color.parseColor("#F6FAF6"), Color.parseColor("#6B8B6D"))
+            "claude"   -> SplashColors(Color.parseColor("#F7F4EF"), Color.parseColor("#9A6B50"))
+            "glass"    -> SplashColors(Color.parseColor("#F3F7F9"), Color.parseColor("#5A8898"))
+            "guanduan" -> SplashColors(Color.parseColor("#F8F8F6"), Color.parseColor("#AA6B48"))
+            else       -> SplashColors(Color.parseColor("#F4F2FA"), Color.parseColor("#7B6FA2"))
+        }
+        splash.setBackgroundColor(colors.bg)
+        val label = splash.getChildAt(0) as? TextView
+        label?.setTextColor(colors.text)
     }
 
     override fun onDestroy() {
