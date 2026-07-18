@@ -621,9 +621,8 @@ export default function Chat() {
   async function handleBackupExport() {
     setBgMenuOpen(false)
     const raw = localStorage.getItem('llm_hub_state_v1') || '{}'
-    // APK 的 WebView 里 blob 下载静默无效（没有下载监听器），改传服务器（2026-07-17）
-    if (window.Capacitor?.isNativePlatform?.()) {
-      if (!moonMemory?.apiToken) { showToast('APK 里备份走服务器，请先配置拾羽记忆库', 'error'); return }
+    const moonMemory = useStore.getState().moonMemory || {}
+    if (moonMemory?.apiToken) {
       try {
         const base = (moonMemory.baseUrl || 'https://memory.ravenlove.cc').replace(/\/$/, '')
         const r = await fetch(`${base}/backup/yanji`, {
@@ -635,9 +634,8 @@ export default function Chat() {
         const d = await r.json()
         showToast(`已备份到服务器 ✓ (${(d.size / 1024 / 1024).toFixed(1)}MB)`, 'success')
       } catch (e) {
-        showToast(`备份失败 ${e.message}`, 'error')
+        showToast(`服务器备份失败 ${e.message}，尝试本地下载…`, 'error')
       }
-      return
     }
     const filename = `yanji-backup-${new Date().toISOString().slice(0,10)}.json`
     const blob = new Blob([raw], { type: 'application/json;charset=utf-8' })
