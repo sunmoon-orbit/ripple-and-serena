@@ -35,4 +35,28 @@ class WebBridge(private val activity: MainActivity) {
             activity.sendBroadcast(intent)
         }
     }
+
+    @JavascriptInterface
+    fun updateTheme(themeId: String) {
+        activity.getSharedPreferences("yanji_theme", Context.MODE_PRIVATE)
+            .edit()
+            .putString("theme", themeId)
+            .apply()
+
+        refreshAllWidgets()
+    }
+
+    private fun refreshAllWidgets() {
+        val manager = AppWidgetManager.getInstance(activity)
+        for (cls in arrayOf(YanjiWidget::class.java, EmotionWidget::class.java)) {
+            val ids = manager.getAppWidgetIds(ComponentName(activity, cls))
+            if (ids.isNotEmpty()) {
+                val intent = Intent(activity, cls).apply {
+                    action = AppWidgetManager.ACTION_APPWIDGET_UPDATE
+                    putExtra(AppWidgetManager.EXTRA_APPWIDGET_IDS, ids)
+                }
+                activity.sendBroadcast(intent)
+            }
+        }
+    }
 }

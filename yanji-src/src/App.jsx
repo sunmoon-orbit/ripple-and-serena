@@ -52,6 +52,7 @@ export default function App() {
       document.documentElement.style.removeProperty('--bubble-user-bg')
       document.documentElement.style.removeProperty('--bubble-asst-bg')
     }
+    try { window.YanjiNative?.updateTheme(theme || 'default') } catch {}
   }, [theme, glassOpacity])
 
   useEffect(() => {

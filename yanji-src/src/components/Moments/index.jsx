@@ -111,7 +111,7 @@ function Post({ post, cfg, onLike, onComment, onAIComment, onDelete }) {
       </div>
 
       {showComments && (
-        <div style={{ marginTop: 10, paddingLeft: 46, borderLeft: '2px solid var(--border)', marginLeft: 18 }}>
+        <div style={{ marginTop: 10, paddingLeft: 12, borderLeft: '2px solid var(--border)', marginLeft: 18 }}>
           {post.comments?.map(c => (
             <div key={c.id} style={{ fontSize: 13, marginBottom: 8, color: 'var(--text)', lineHeight: 1.6 }}>
               <span style={{ color: c.author === '涟言' ? 'var(--accent)' : 'var(--text)', fontWeight: 600 }}>{c.author}：</span>
@@ -120,7 +120,7 @@ function Post({ post, cfg, onLike, onComment, onAIComment, onDelete }) {
           ))}
           <div style={{ display: 'flex', gap: 6, marginTop: 10 }}>
             <input
-              style={{ flex: 1, padding: '7px 10px', borderRadius: 8, border: '1px solid var(--border)', background: 'transparent', fontSize: 13, color: 'var(--text)', outline: 'none' }}
+              style={{ flex: 1, minWidth: 0, padding: '7px 10px', borderRadius: 8, border: '1px solid var(--border)', background: 'transparent', fontSize: 13, color: 'var(--text)', outline: 'none' }}
               placeholder="说点什么…"
               value={commentInput}
               onChange={e => setCommentInput(e.target.value)}
@@ -323,7 +323,7 @@ export default function Moments() {
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
           <div style={{ width: 32, height: 32, borderRadius: '50%', background: 'rgba(160,120,80,0.09)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 17, flexShrink: 0 }}>🐦</div>
           <input
-            style={{ flex: 1, border: 'none', background: 'transparent', fontSize: 14, color: 'var(--text)', outline: 'none' }}
+            style={{ flex: 1, minWidth: 0, border: 'none', background: 'transparent', fontSize: 14, color: 'var(--text)', outline: 'none' }}
             placeholder="在想什么…"
             value={input}
             onChange={e => setInput(e.target.value)}

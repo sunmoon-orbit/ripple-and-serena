@@ -114,7 +114,7 @@ export const useStore = create((set, get) => ({
 
   // ─── panel navigation ─────────────────────────────────────────────
   setActivePanel: (panel) => set({ activePanel: panel }),
-  setTheme: (theme) => set((s) => { savePersistedState({ ...s, theme }); return { theme } }),
+  setTheme: (theme) => set((s) => { savePersistedState({ ...s, theme }); try { window.YanjiNative?.updateTheme(theme === 'default' ? 'default' : theme) } catch {}; return { theme } }),
   setGlassOpacity: (v) => set((s) => { savePersistedState({ ...s, glassOpacity: v }); return { glassOpacity: v } }),
   setScrollAnchor: (v) => set((s) => { savePersistedState({ ...s, scrollAnchor: v }); return { scrollAnchor: v } }),
   setReplyDelay: (v) => set((s) => { savePersistedState({ ...s, replyDelay: v }); return { replyDelay: v } }),
