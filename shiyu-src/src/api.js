@@ -39,6 +39,8 @@ export const api = {
   moveToTrash: (id) => req(`/memories/${id}/trash`, { method: 'POST', body: '{}' }),
   restore: (id) => req(`/memories/${id}/restore`, { method: 'POST', body: '{}' }),
   related: (id, k = 5) => req(`/memories/${id}/related?k=${k}`),
+  graph: () => req('/memories/graph'),
+  get: (id) => req(`/memories/${id}`),
   semantic: (q, k = 20) => req(`/memories/semantic?q=${encodeURIComponent(q)}&k=${k}`),
   emotionHeatmap: (params = {}) => req('/memories/emotion-heatmap' + qs(params)),
   anniversaries: () => req('/anniversaries'),
