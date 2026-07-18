@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">言叽</string>
+    <string name="channel_chat">聊天消息</string>
+    <string name="channel_service">后台常驻</string>
+    <string name="reply_label">回复</string>
+    <string name="notification_service_text">言叽在后台陪着你</string>
+</resources>
