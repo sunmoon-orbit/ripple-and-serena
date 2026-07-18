@@ -122,7 +122,12 @@ function fileMime(name) {
 function fileBlobUrl(f) {
   return URL.createObjectURL(new Blob([f.content], { type: fileMime(f.filename) }))
 }
-function downloadGenFile(f) {
+async function downloadGenFile(f) {
+  const blob = new Blob([f.content], { type: fileMime(f.filename) })
+  const file = new File([blob], f.filename, { type: blob.type })
+  if (navigator.canShare?.({ files: [file] })) {
+    try { await navigator.share({ files: [file], title: f.filename }); return } catch {}
+  }
   const url = fileBlobUrl(f)
   const a = document.createElement('a')
   a.href = url; a.download = f.filename; a.click()
@@ -556,11 +561,16 @@ export default function MessageBubble({ msg, onEdit, onQuote, onDelete, isLast }
             </button>
           )}
           {!isUser && !isStreaming && (
-            <button className="msg-edit-icon-btn" title="下载为文件" onClick={() => {
+            <button className="msg-edit-icon-btn" title="下载为文件" onClick={async () => {
+              const name = `reply-${msg.id || Date.now()}.md`
               const blob = new Blob([msg.content], { type: 'text/markdown;charset=utf-8' })
+              const file = new File([blob], name, { type: blob.type })
+              if (navigator.canShare?.({ files: [file] })) {
+                try { await navigator.share({ files: [file], title: name }); return } catch {}
+              }
               const url = URL.createObjectURL(blob)
               const a = document.createElement('a')
-              a.href = url; a.download = `reply-${msg.id || Date.now()}.md`; a.click()
+              a.href = url; a.download = name; a.click()
               URL.revokeObjectURL(url)
             }}>
               <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
