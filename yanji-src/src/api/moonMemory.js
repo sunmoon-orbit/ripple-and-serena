@@ -83,7 +83,7 @@ export async function fetchHeatmap(config) {
 }
 
 export async function checkHealth(config) {
-  const { baseUrl } = config
+  const baseUrl = (config.baseUrl || 'https://memory.ravenlove.cc').replace(/\/$/, '')
   return request(baseUrl, '/health')
 }
 
