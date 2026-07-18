@@ -308,7 +308,8 @@ export default function Moments() {
   const list = posts || []
 
   return (
-    <div className="panel">
+    <div className="panel-shell">
+      <div className="moments-inner">
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '18px 2px 16px' }}>
         <h2 style={{ fontSize: 20, fontWeight: 700 }}>朋友圈</h2>
         <button onClick={handleAIPost} disabled={aiPosting} style={{
@@ -381,6 +382,7 @@ export default function Moments() {
           {loadingMore ? '翻着呢…' : '看更早的 ↓'}
         </button>
       )}
+      </div>
     </div>
   )
 }
