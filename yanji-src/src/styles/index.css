@@ -134,6 +134,15 @@
   color: var(--text);
   border-top-color: rgba(100,150,170,0.18);
 }
+[data-theme="glass"] .health-overlay,
+[data-theme="glass"] .idlej-overlay {
+  backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
+}
+[data-theme="glass"] .health-card,
+[data-theme="glass"] .idlej-card {
+  background: rgba(255,255,255,0.92);
+  backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+}
 
 /* ===== 官端主题（Claude 官方 App 提取的原版配色，来自 chatnest 的 design tokens） ===== */
 [data-theme="guanduan"] {
