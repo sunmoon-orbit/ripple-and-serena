@@ -639,12 +639,15 @@ export default function Chat() {
       }
       return
     }
+    const filename = `yanji-backup-${new Date().toISOString().slice(0,10)}.json`
     const blob = new Blob([raw], { type: 'application/json;charset=utf-8' })
+    const file = new File([blob], filename, { type: blob.type })
+    if (navigator.canShare?.({ files: [file] })) {
+      try { await navigator.share({ files: [file], title: filename }); return } catch {}
+    }
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
-    a.href = url
-    a.download = `yanji-backup-${new Date().toISOString().slice(0,10)}.json`
-    a.click()
+    a.href = url; a.download = filename; a.click()
     URL.revokeObjectURL(url)
   }
 
@@ -721,7 +724,7 @@ export default function Chat() {
     )
   }
 
-  function handleExport() {
+  async function handleExport() {
     if (!activeChat || !messages.length) return
     const title = activeChat.title || '新对话'
     const model = activeChat.model || activeConn?.name || ''
@@ -738,12 +741,15 @@ export default function Chat() {
       lines.push(m.content?.trim() || '', ``, `---`, ``)
     })
 
+    const mdName = `${title.replace(/[\/\\:*?"<>|]/g, '_')}.md`
     const blob = new Blob([lines.join('\n')], { type: 'text/markdown;charset=utf-8' })
+    const file = new File([blob], mdName, { type: blob.type })
+    if (navigator.canShare?.({ files: [file] })) {
+      try { await navigator.share({ files: [file], title: mdName }); return } catch {}
+    }
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
-    a.href = url
-    a.download = `${title.replace(/[\/\\:*?"<>|]/g, '_')}.md`
-    a.click()
+    a.href = url; a.download = mdName; a.click()
     URL.revokeObjectURL(url)
   }
 
