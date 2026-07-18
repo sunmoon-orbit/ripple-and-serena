@@ -15,10 +15,12 @@ class YanjiWidget : AppWidgetProvider() {
         val date = beijingDateStr()
         val days = daysTogether(date)
         val card = computeCard("阿颖", date)
+        val bgRes = themeBg(context)
 
         for (id in ids) {
             val views = RemoteViews(context.packageName, R.layout.widget_layout)
 
+            views.setInt(R.id.widget_root, "setBackgroundResource", bgRes)
             views.setTextViewText(R.id.widget_days, "在一起第 $days 天")
             views.setTextViewText(R.id.widget_date, "${date.replace("-", ".")} · 今日${card.level}")
             views.setTextViewText(R.id.widget_detail, "宜 ${card.yi.take(2).joinToString(" · ")}  ✦ ${card.lucky}")
@@ -36,6 +38,19 @@ class YanjiWidget : AppWidgetProvider() {
 
     companion object {
         private const val TOGETHER_EPOCH = "2025-10-10"
+
+        fun themeBg(context: Context): Int {
+            val theme = context.getSharedPreferences("yanji_theme", Context.MODE_PRIVATE)
+                .getString("theme", "default") ?: "default"
+            return when (theme) {
+                "xilan" -> R.drawable.widget_bg_xilan
+                "qingwu" -> R.drawable.widget_bg_qingwu
+                "claude" -> R.drawable.widget_bg_claude
+                "glass" -> R.drawable.widget_bg_glass
+                "guanduan" -> R.drawable.widget_bg_guanduan
+                else -> R.drawable.widget_bg
+            }
+        }
 
         private data class Level(val key: String, val weight: Int)
         private data class Card(val level: String, val yi: List<String>, val lucky: String)

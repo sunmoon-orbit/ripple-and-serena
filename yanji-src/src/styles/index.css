@@ -2181,7 +2181,7 @@ textarea.form-input { display: block; margin: 8px 16px 12px; }
   .panel-title { font-size: 14px; }
   .dream-start-btn,.dream-result,.dream-panel>.settings-card { margin-left: 12px; margin-right: 12px; }
   .settings-content { max-width: none; margin: 0; padding: 16px 12px 40px; }
-  .moments-inner { padding: 0 12px; }
+  .moments-inner { padding: 0 12px; overflow-y: auto; overflow-x: hidden; flex: 1; min-height: 0; }
   .toast-container { bottom: calc(60px + env(safe-area-inset-bottom, 0px)); }
   /* iOS Safari 在 font-size < 16px 的输入框上会自动放大页面，强制 16px 防止 */
   .form-input, .filter-select, textarea.form-input { font-size: 16px; }
