@@ -24,11 +24,13 @@ jobs:
 
       - uses: android-actions/setup-android@v3
 
-      # google-services.json 从 yanji-app 复用（同一个 Firebase 项目）
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.11.1'
+
       - name: Copy google-services.json
         run: cp yanji-app/google-services.json yanji-native/app/google-services.json
 
-      # 用 PWA 图标生成 mipmap
       - name: Generate launcher icon
         run: |
           sudo apt-get update -qq && sudo apt-get install -y -qq imagemagick >/dev/null
@@ -39,14 +41,9 @@ jobs:
             convert yanji-src/public/icon-512.png -resize "${size}x${size}" "yanji-native/app/src/main/res/mipmap-${name}/ic_launcher.png"
           done
 
-      # 生成 Gradle wrapper
-      - name: Generate Gradle wrapper
-        working-directory: yanji-native
-        run: gradle wrapper --gradle-version 8.11.1
-
       - name: Build debug APK
         working-directory: yanji-native
-        run: ./gradlew assembleDebug --no-daemon
+        run: gradle assembleDebug --no-daemon
 
       - name: Publish to Release
         uses: softprops/action-gh-release@v2
