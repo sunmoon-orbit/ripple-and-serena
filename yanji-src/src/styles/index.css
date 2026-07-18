@@ -2172,6 +2172,7 @@ textarea.form-input { display: block; margin: 8px 16px 12px; }
   .panel-title { font-size: 14px; }
   .dream-start-btn,.dream-result,.dream-panel>.settings-card { margin-left: 12px; margin-right: 12px; }
   .settings-content { max-width: none; margin: 0; padding: 16px 12px 40px; }
+  .moments-inner { padding: 0 12px; }
   .toast-container { bottom: calc(60px + env(safe-area-inset-bottom, 0px)); }
   /* iOS Safari 在 font-size < 16px 的输入框上会自动放大页面，强制 16px 防止 */
   .form-input, .filter-select, textarea.form-input { font-size: 16px; }
@@ -2179,6 +2180,16 @@ textarea.form-input { display: block; margin: 8px 16px 12px; }
 @media (min-width: 901px) {
   .icon-nav-items { display: flex; flex-direction: column; gap: 4px; }
   .icon-nav-btn { display: flex; align-items: center; justify-content: center; }
+
+  /* ── PC 桌面适配 ── */
+  .messages-area { padding: 20px 32px; }
+  .memory-list { padding: 16px 24px; display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 10px; }
+  .memory-toolbar { padding: 12px 24px; }
+  .roost-panel { max-width: 640px; padding: 20px 28px 32px; }
+  .moments-inner { max-width: 560px; margin: 0 auto; width: 100%; padding: 0 20px; }
+  .dream-content { max-width: 680px; padding: 24px 28px; }
+  .settings-content { max-width: 680px; padding: 24px 28px 40px; }
+  .chat-sidebar { width: 280px; }
 }
 
 /* ===== 开场动画 ===== */
