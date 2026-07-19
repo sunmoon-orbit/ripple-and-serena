@@ -707,15 +707,14 @@ export default function Settings() {
                   APK 走 FCM 原生推送——Google Play 服务要在代理名单里，否则收不到
                 </div>
               )}
-              {isNativeApp() && (
+              {/* 诊断行只在出问题时现身；一切正常就不打扰（0719 阿颖嫌 ✅ 那行不和谐，删了）*/}
+              {isNativeApp() && !(window.YanjiNative?.getFcmToken && window.YanjiNative.getFcmToken()) && (
                 <div className="card-row" style={{ fontSize: 12, color: 'var(--text-muted)' }}>
                   诊断：{!window.YanjiNative?.getFcmToken
                     ? '⚠️ APK 版本太旧（无 token 桥接），去 Releases 下载最新安装包'
-                    : (window.YanjiNative.getFcmToken()
-                      ? `✅ 推送 token 已就位（${window.YanjiNative.getFcmToken().slice(0, 12)}…）`
-                      : (window.YanjiNative.getFcmError?.()
-                        ? `⚠️ Google 注册失败：${window.YanjiNative.getFcmError()}`
-                        : '⚠️ token 未获取——Google 推送服务不可达，检查 Google Play 服务的代理，重启 app 再看'))}
+                    : (window.YanjiNative.getFcmError?.()
+                      ? `⚠️ Google 注册失败：${window.YanjiNative.getFcmError()}`
+                      : '⚠️ token 未获取——Google 推送服务不可达，检查 Google Play 服务的代理，重启 app 再看')}
                 </div>
               )}
               {pushTimes !== null && (
