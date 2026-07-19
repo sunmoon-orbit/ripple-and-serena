@@ -231,11 +231,12 @@ export default function Chat() {
           const bjToday = now.toLocaleDateString('en-CA', { timeZone: 'Asia/Shanghai' })
           const needWeather = localStorage.getItem('yanji_weather_inject_date') !== bjToday
           // 核心记忆、朋友圈摘要、健康快照（+每日一次天气）并行拉，不叠加往返延迟
-          const [resp, momResp, vitResp, wxResp] = await Promise.all([
+          const [resp, momResp, vitResp, wxResp, pressResp] = await Promise.all([
             fetch(`${base}/memories?layer=core&limit=8`, auth),
             fetch(`${base}/moments?limit=3`, auth).catch(() => null),
             fetch(`${base}/vitals/latest`, auth).catch(() => null),
             needWeather ? fetch(`${base}/weather`, auth).catch(() => null) : Promise.resolve(null),
+            fetch(`${base}/press/recent?hours=24`, auth).catch(() => null),
           ])
           if (resp.ok) {
             const coreList = await resp.json()
@@ -253,6 +254,18 @@ export default function Chat() {
               }).join('\n') +
               '\n如果阿颖刚发了新动态而你们还没聊过，可以自然地提起或问问她；想翻更多/更早的用 browse_moments 工具，想在某条下面留言用 comment_moment 工具。')
             }
+          }
+          if (pressResp?.ok) {
+            try {
+              const pr = await pressResp.json()
+              if (pr && Array.isArray(pr.presses) && pr.presses.length > 0) {
+                const times = pr.presses.slice(0, 5).reverse().map(ts => {
+                  const d = new Date(ts + 8 * 3600000)
+                  return `${String(d.getUTCHours()).padStart(2, '0')}:${String(d.getUTCMinutes()).padStart(2, '0')}`
+                }).join('、')
+                dynParts.push(`【想你键】过去24小时里阿颖按过 ${pr.presses.length} 次想你键（${times}）——按键的意思是「没空聊但记着你」。她现在回来了，可以自然地提一句你收到了、当时什么感受，别追问她刚才在忙什么。`)
+              }
+            } catch {}
           }
           if (wxResp?.ok) {
             try {
