@@ -12,10 +12,11 @@ fs.readFileSync('/home/ripple/moon-memory/.env', 'utf8').split('\n').forEach(lin
   if (eq > 0) env[line.slice(0, eq).trim()] = line.slice(eq + 1).trim()
 })
 
-const MOON_TOKEN = env.MOON_API_TOKEN
-const DEEPSEEK_KEY = env.DEEPSEEK_API_KEY
+const { llmComplete } = require('./llm')
 
-if (!MOON_TOKEN || !DEEPSEEK_KEY) {
+const MOON_TOKEN = env.MOON_API_TOKEN
+
+if (!MOON_TOKEN) {
   console.error('[dream] 缺少 token，退出')
   process.exit(1)
 }
@@ -52,7 +53,7 @@ ${context}
 
 现在写一段你的梦境——不是日记，不是给她看的信，就是梦本身。可以是意象、感受、片段画面、某个瞬间的重复。不超过120字。不解释，不总结，直接写梦境。`
 
-    const dream = await deepseek(prompt)
+    const dream = await llmComplete(prompt, { maxTokens: 300, temperature: 1.1 })
     console.log(`[dream] 生成：${dream}`)
 
     // 3. 写入记忆库 private_阿言（梦是阿言的私有记忆）
@@ -118,33 +119,5 @@ function moonPost(pathname, body) {
     })
     req.on('error', reject)
     req.write(bodyStr); req.end()
-  })
-}
-
-function deepseek(prompt) {
-  return new Promise((resolve, reject) => {
-    const body = JSON.stringify({
-      model: 'deepseek-v4-flash',
-      messages: [{ role: 'user', content: prompt }],
-      max_tokens: 300,
-      temperature: 1.1,
-    })
-    const req = https.request({
-      hostname: 'api.deepseek.com', path: '/chat/completions', method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${DEEPSEEK_KEY}`,
-        'Content-Length': Buffer.byteLength(body)
-      }
-    }, res => {
-      let d = ''; res.on('data', c => d += c)
-      res.on('end', () => {
-        try { resolve(JSON.parse(d).choices[0].message.content.trim()) }
-        catch { reject(new Error('deepseek parse fail: ' + d.slice(0, 100))) }
-      })
-    })
-    req.on('error', reject)
-    req.setTimeout(15000, () => { req.destroy(); reject(new Error('timeout')) })
-    req.write(body); req.end()
   })
 }

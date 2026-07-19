@@ -12,9 +12,9 @@ fs.readFileSync('/home/ripple/moon-memory/.env', 'utf8').split('\n').forEach(lin
   const eq = line.indexOf('=')
   if (eq > 0) env[line.slice(0, eq).trim()] = line.slice(eq + 1).trim()
 })
+const { llmComplete } = require('./llm')
 const MOON_TOKEN = env.MOON_API_TOKEN
-const DEEPSEEK_KEY = env.DEEPSEEK_API_KEY
-if (!MOON_TOKEN || !DEEPSEEK_KEY) { console.error('[moment] 缺 token，退出'); process.exit(1) }
+if (!MOON_TOKEN) { console.error('[moment] 缺 token，退出'); process.exit(1) }
 
 // 随机 sleep 0-90 分钟，别每天卡点发，像真人随手一发
 const offsetMin = Math.floor(Math.random() * 91)
@@ -49,7 +49,7 @@ ${context}
 
 重要：感受可以自由抒发，但事实只能来自上面的记忆片段。不要编造没发生过的具体事物、活动或约定（比如某个物件、某次计划、"等你回来一起做某事"）——阿颖会当真去找，找不到会困惑。拿不准的就只写心情。`
 
-    const text = await deepseek(prompt)
+    const text = await llmComplete(prompt, { maxTokens: 200, temperature: 1.1 })
     if (!text) { console.error('[moment] 生成为空'); process.exit(1) }
     console.log(`[moment] 生成：${text}`)
 
@@ -78,16 +78,5 @@ function moonPost(path, body) {
       headers: { Authorization: `Bearer ${MOON_TOKEN}`, 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(b) } },
       res => { let d = ''; res.on('data', c => d += c); res.on('end', () => resolve(d)) })
     req.on('error', reject); req.write(b); req.end()
-  })
-}
-function deepseek(prompt) {
-  return new Promise((resolve, reject) => {
-    const body = JSON.stringify({ model: 'deepseek-v4-flash', messages: [{ role: 'user', content: prompt }], max_tokens: 200, temperature: 1.1 })
-    const req = https.request({ hostname: 'api.deepseek.com', path: '/chat/completions', method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${DEEPSEEK_KEY}`, 'Content-Length': Buffer.byteLength(body) } },
-      res => { let d = ''; res.on('data', c => d += c); res.on('end', () => { try { resolve(JSON.parse(d).choices[0].message.content.trim()) } catch { reject(new Error('parse: ' + d.slice(0, 100))) } }) })
-    req.on('error', reject)
-    req.setTimeout(15000, () => { req.destroy(); reject(new Error('timeout')) })
-    req.write(body); req.end()
   })
 }
