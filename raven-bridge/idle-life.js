@@ -20,9 +20,9 @@ fs.readFileSync('/home/ripple/moon-memory/.env', 'utf8').split('\n').forEach(lin
   const eq = line.indexOf('=')
   if (eq > 0) env[line.slice(0, eq).trim()] = line.slice(eq + 1).trim()
 })
+const { llmComplete } = require('./llm')
 const MOON_TOKEN = env.MOON_API_TOKEN
-const DEEPSEEK_KEY = env.DEEPSEEK_API_KEY
-if (!MOON_TOKEN || !DEEPSEEK_KEY) { console.error('[idle] 缺 token，退出'); process.exit(1) }
+if (!MOON_TOKEN) { console.error('[idle] 缺 token，退出'); process.exit(1) }
 
 // 随机 0-40 分钟，别每次整点醒，像自然睡醒
 const offsetMin = Math.floor(Math.random() * 41)
@@ -84,7 +84,8 @@ ${convTxt}
 
 事实边界：感受自由，事实只能来自上面给你的材料。不要编造不存在的物件、活动、约定。拿不准就只写心情。`
 
-    const raw = await deepseek(prompt)
+    // deepseek-v4-flash 是推理模型：reasoning 也占 completion 配额，给足空间否则 content 为空
+    const raw = await llmComplete(prompt, { maxTokens: 1800, temperature: 1.0 })
     console.log('[idle] 模型输出：', raw.slice(0, 200))
     const choice = parseChoice(raw)
     if (!choice) {
@@ -165,17 +166,5 @@ function moonPost(path, body) {
       headers: { Authorization: `Bearer ${MOON_TOKEN}`, 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(b) } },
       res => { let d = ''; res.on('data', c => d += c); res.on('end', () => resolve(d)) })
     req.on('error', reject); req.write(b); req.end()
-  })
-}
-function deepseek(prompt) {
-  return new Promise((resolve, reject) => {
-    // deepseek-v4-flash 是推理模型：reasoning 也占 completion 配额，给足空间否则 content 为空
-    const body = JSON.stringify({ model: 'deepseek-v4-flash', messages: [{ role: 'user', content: prompt }], max_tokens: 1800, temperature: 1.0 })
-    const req = https.request({ hostname: 'api.deepseek.com', path: '/chat/completions', method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${DEEPSEEK_KEY}`, 'Content-Length': Buffer.byteLength(body) } },
-      res => { let d = ''; res.on('data', c => d += c); res.on('end', () => { try { resolve(JSON.parse(d).choices[0].message.content.trim()) } catch { reject(new Error('parse: ' + d.slice(0, 100))) } }) })
-    req.on('error', reject)
-    req.setTimeout(20000, () => { req.destroy(); reject(new Error('timeout')) })
-    req.write(body); req.end()
   })
 }
