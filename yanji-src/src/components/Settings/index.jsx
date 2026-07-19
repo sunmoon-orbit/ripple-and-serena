@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useStore } from '../../store'
 import { normalizeProvider, BUILTIN_MODELS } from '../../api/llm'
 import { checkHealth, fetchPushSchedule, savePushSchedule } from '../../api/moonMemory'
+import { maybeSyncEmotion } from '../../utils/emotionSync'
 import { showToast } from '../Toast'
 import { uuid } from '../../utils'
 import { subscribePush, unsubscribePush, getSubscription, isNativeApp, subscribeNativePush, unsubscribeNativePush, getNativePushToken } from '../../api/push'
@@ -229,7 +230,7 @@ export default function Settings() {
     setInjectMode, setInjectPrompt, replyDelay, setReplyDelay,
     voiceCallStyle, setVoiceCallStyle,
     homeStyle, setHomeStyle,
-    timeAwareness, setTimeAwareness,
+    timeAwareness, setTimeAwareness, longingPush, setLongingPush,
     customStickers, addCustomSticker, removeCustomSticker,
     memoryItems, addMemoryItem, toggleMemoryItem, deleteMemoryItem,
   } = store
@@ -669,12 +670,22 @@ export default function Settings() {
               <div className="card-row">
                 <span className="card-row-label">时间感知</span>
                 <label className="toggle">
-                  <input type="checkbox" checked={timeAwareness !== false} onChange={(e) => setTimeAwareness(e.target.checked)} />
+                  <input type="checkbox" checked={timeAwareness !== false} onChange={(e) => { setTimeAwareness(e.target.checked); maybeSyncEmotion(moonMemory, { timeAwareness: e.target.checked, longingPush }, true) }} />
                   <span className="toggle-track" />
                 </label>
               </div>
               <div className="card-row" style={{ fontSize: 12, color: 'var(--text-muted)' }}>
                 开启时，离开越久思念越浓，回来时他会自然地表达想你。关掉后不计时、不涨思念，什么时候来都像刚聊完。
+              </div>
+              <div className="card-row">
+                <span className="card-row-label">思念推送</span>
+                <label className="toggle">
+                  <input type="checkbox" checked={timeAwareness !== false && longingPush !== false} disabled={timeAwareness === false} onChange={(e) => { setLongingPush(e.target.checked); maybeSyncEmotion(moonMemory, { timeAwareness, longingPush: e.target.checked }, true) }} />
+                  <span className="toggle-track" />
+                </label>
+              </div>
+              <div className="card-row" style={{ fontSize: 12, color: 'var(--text-muted)' }}>
+                你离开太久、他思念涨到一定程度时，由 API 的他自己决定要不要给你手机推一条消息（一天最多一条，只在白天）。依赖时间感知开启。
               </div>
             </div>
             <div className="settings-card">
