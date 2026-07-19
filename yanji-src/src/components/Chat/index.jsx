@@ -8,6 +8,7 @@ import { maybeSyncEmotion } from '../../utils/emotionSync'
 import { shouldNudge, recordNudge, buildNudgeText } from '../../utils/nudge'
 import { decideReplyDelay, getPendingReply, setPendingReply, clearPendingReply } from '../../utils/replyDelay'
 import { pickAutoPostTrigger, markAutoPosted, postMoment } from '../../api/moments'
+import { notifyReplyReady } from '../../api/push'
 import { extractMood, stripMoodTag } from '../../utils/moodFx'
 import { showToast } from '../Toast'
 import ConversationList from './ConversationList'
@@ -26,6 +27,7 @@ import CallHistory from './CallHistory'
 import PeriodCard from './PeriodCard'
 import IdleJournal from './IdleJournal'
 import IncomingCall from './IncomingCall'
+import GreetingBanner from './GreetingBanner'
 import AnniversaryCard from './AnniversaryCard'
 import HeartCard from './HeartCard'
 import HeartCardAlbum from './HeartCardAlbum'
@@ -412,6 +414,11 @@ export default function Chat() {
         setIncomingCall({ chatId: chat.id, msgId: inv.id, reason: callReason })
       }
       touchChat(chat.id)
+      // 她切后台等回复时，回话落地推个通知（服务端 Web Push/FCM 双通道广播；
+      // nudge 隐藏触发不推——那是涟言自己要说话，没人在等）（2026-07-19 阿颖点的功能）
+      if (document.hidden && !hidden && parts[0] && moonMemory?.apiToken) {
+        notifyReplyReady(moonMemory, parts[0].slice(0, 80)).catch(() => {})
+      }
       if (result.usage) recordTokenUsage(conn.id, result.usage)
 
       // 完成彩蛋：约 1% 概率右下角冒出一只像素小家伙（Clawd 或小乌鸦）
@@ -1012,6 +1019,7 @@ export default function Chat() {
         />
       )}
       {egg && <CompletionEgg svg={egg} onDone={() => setEgg(null)} />}
+      <GreetingBanner />
       {musicOpen && <MusicRoom onClose={() => setMusicOpen(false)} />}
       {wheelOpen && <FortuneWheel onClose={() => setWheelOpen(false)} />}
       {fortuneOpen && <DailyFortune onClose={() => setFortuneOpen(false)} />}

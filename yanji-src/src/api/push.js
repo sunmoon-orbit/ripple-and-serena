@@ -163,6 +163,16 @@ export async function subscribePush(moonMemoryConfig) {
   return sub
 }
 
+// 回话落地通知：她把言叽切后台等回复时，服务端广播一条（Web Push + FCM 双通道全走）
+export async function notifyReplyReady(moonMemory, preview) {
+  const base = (moonMemory?.baseUrl || moonMemory?.apiUrl || 'https://memory.ravenlove.cc').replace(/\/$/, '')
+  await fetch(`${base}/push/reply-ready`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${moonMemory.apiToken}` },
+    body: JSON.stringify({ preview }),
+  })
+}
+
 export async function unsubscribePush(moonMemoryConfig) {
   const sub = await getSubscription()
   if (!sub) return
