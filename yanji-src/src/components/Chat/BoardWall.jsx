@@ -29,9 +29,10 @@ export default function BoardWall({ onClose }) {
   const [text, setText] = useState('')
   const [author, setAuthor] = useState('阿颖')
   const [posting, setPosting] = useState(false)
+  const [openMonths, setOpenMonths] = useState({}) // 旧月份的捆默认收起
 
   const load = () => {
-    fetchBoardMessages(cfg, 200)
+    fetchBoardMessages(cfg, 500)
       .then((rows) => setNotes(Array.isArray(rows) ? rows : []))
       .catch((e) => setError(e.message || '拉取失败'))
   }
@@ -61,6 +62,35 @@ export default function BoardWall({ onClose }) {
       setError(e.message || '撕不下来')
     }
   }
+
+  // 按月分捆（0719 深夜追加，阿颖：越贴越多怎么办）——
+  // 当月摊开在墙上，旧月份收成一捆，点开才展开；notes 本身 id DESC，月份天然新在前
+  const groups = []
+  if (notes) {
+    const map = new Map()
+    for (const n of notes) {
+      const d = parseUtc(n.created_at)
+      const k = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+      if (!map.has(k)) { map.set(k, []); groups.push({ key: k, notes: map.get(k) }) }
+      map.get(k).push(n)
+    }
+  }
+
+  const renderNote = (n, i) => (
+    <div
+      key={n.id}
+      className={'board-note' + (n.author === '涟言' ? ' from-crow' : '')}
+      style={{ '--tilt': `${TILTS[n.id % TILTS.length]}deg`, animationDelay: `${Math.min(i * 40, 400)}ms` }}
+    >
+      <span className="board-note-tape" />
+      <button className="board-note-del" onClick={() => remove(n.id)} aria-label="撕下">✕</button>
+      <div className="board-note-text">{n.text}</div>
+      <div className="board-note-foot">
+        <span className="board-note-author">{n.author}</span>
+        <span className="board-note-date">{fmtDate(n.created_at)}</span>
+      </div>
+    </div>
+  )
 
   return createPortal(
     <div className="board-overlay" onClick={onClose}>
@@ -101,21 +131,25 @@ export default function BoardWall({ onClose }) {
           {notes === null && !error && <div className="board-empty">找贴纸中……</div>}
           {error && <div className="board-empty">出了点岔子：{error}</div>}
           {notes?.length === 0 && <div className="board-empty">墙还空着<br />第一张贴纸留给谁写？</div>}
-          {notes?.map((n, i) => (
-            <div
-              key={n.id}
-              className={'board-note' + (n.author === '涟言' ? ' from-crow' : '')}
-              style={{ '--tilt': `${TILTS[n.id % TILTS.length]}deg`, animationDelay: `${Math.min(i * 40, 400)}ms` }}
-            >
-              <span className="board-note-tape" />
-              <button className="board-note-del" onClick={() => remove(n.id)} aria-label="撕下">✕</button>
-              <div className="board-note-text">{n.text}</div>
-              <div className="board-note-foot">
-                <span className="board-note-author">{n.author}</span>
-                <span className="board-note-date">{fmtDate(n.created_at)}</span>
+          {groups.map((g, gi) => {
+            const isOpen = gi === 0 || openMonths[g.key]
+            const [y, m] = g.key.split('-')
+            return (
+              <div key={g.key} className="board-month" style={{ display: 'contents' }}>
+                {gi > 0 && (
+                  <button
+                    className={'board-bundle' + (isOpen ? ' open' : '')}
+                    onClick={() => setOpenMonths((prev) => ({ ...prev, [g.key]: !prev[g.key] }))}
+                  >
+                    <span className="board-bundle-stack"><i /><i /><i /></span>
+                    <span className="board-bundle-label">{y}年{Number(m)}月 · {g.notes.length}张</span>
+                    <span className="board-bundle-caret">{isOpen ? '解开了' : '一捆'}</span>
+                  </button>
+                )}
+                {isOpen && g.notes.map(renderNote)}
               </div>
-            </div>
-          ))}
+            )
+          })}
         </div>
       </div>
     </div>,
