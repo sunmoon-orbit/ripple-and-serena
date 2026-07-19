@@ -40,6 +40,8 @@ const DEFAULT_STATE = {
   homeStyle: 'minimal',
   // 岁聿（时间感知）：开启时离开久了思念涨+回来时提醒涟言表达想念
   timeAwareness: true,
+  // 思念推送：离开太久时服务端让 API 涟言决定是否推一条到手机（依赖岁聿开启）
+  longingPush: true,
   // UI-only (not persisted)
   activePanel: 'roost',
 }
@@ -88,7 +90,7 @@ const persistedKeys = [
   'generationConfig', 'memoryItems', 'tokenStats', 'contextLimit',
   'searchConfig', 'avatarConfig', 'autoTools', 'moonMemory', 'theme', 'glassOpacity',
   'injectMode', 'injectPrompt', 'scrollAnchor', 'replyDelay', 'customStickers',
-  'voiceCallStyle', 'homeStyle', 'timeAwareness',
+  'voiceCallStyle', 'homeStyle', 'timeAwareness', 'longingPush',
 ]
 
 function mergeWithDefaults(persisted) {
@@ -128,6 +130,7 @@ export const useStore = create((set, get) => ({
   setVoiceCallStyle: (v) => set((s) => { savePersistedState({ ...s, voiceCallStyle: v }); return { voiceCallStyle: v } }),
   setHomeStyle: (v) => set((s) => { savePersistedState({ ...s, homeStyle: v }); return { homeStyle: v } }),
   setTimeAwareness: (v) => set((s) => { savePersistedState({ ...s, timeAwareness: v }); return { timeAwareness: v } }),
+  setLongingPush: (v) => set((s) => { savePersistedState({ ...s, longingPush: v }); return { longingPush: v } }),
   addCustomSticker: (url, label) => set((s) => {
     const customStickers = [...(s.customStickers || []), { id: uuid(), url: url.trim(), label: (label || '').trim() }]
     savePersistedState({ ...s, customStickers })

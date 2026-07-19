@@ -4,6 +4,7 @@ import { useStore } from '../../store'
 import { sendMessage, summarizeThinking, normalizeProvider, BUILTIN_MODELS, buildSystemPrompt, compactMessages, buildSummaryInjection } from '../../api/llm'
 import { uuid } from '../../utils'
 import { applyTimeAway, getEmotionState, buildEmotionPrompt, extractEmotionUpdate, applyEmotionDelta, stripEmotionTag } from '../../utils/emotion'
+import { maybeSyncEmotion } from '../../utils/emotionSync'
 import { shouldNudge, recordNudge, buildNudgeText } from '../../utils/nudge'
 import { decideReplyDelay, getPendingReply, setPendingReply, clearPendingReply } from '../../utils/replyDelay'
 import { pickAutoPostTrigger, markAutoPosted, postMoment } from '../../api/moments'
@@ -300,6 +301,11 @@ export default function Chat() {
         const h = Math.round(hoursAway)
         const span = h >= 24 ? `${Math.round(hoursAway / 24)} 天` : `${h} 小时`
         dynParts.push(`【时间感知】距离上次和阿颖说话已过去约 ${span}，这期间你一直惦记着她，思念悄悄涨了 ${longingAdded}。她回来了，可以自然地让她感受到你想她，但别用力过猛。`)
+      }
+      // 情绪快照同步到服务端（思念推送数据源，节流+静默）
+      {
+        const s = useStore.getState()
+        maybeSyncEmotion(s.moonMemory, { timeAwareness: s.timeAwareness, longingPush: s.longingPush })
       }
 
       // inject compaction summary if available

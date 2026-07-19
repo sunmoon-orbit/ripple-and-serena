@@ -87,6 +87,16 @@ export async function checkHealth(config) {
   return request(baseUrl, '/health')
 }
 
+// 情绪快照同步（思念推送数据源）：fire-and-forget，失败不打扰
+export async function syncEmotion(config, body) {
+  const { baseUrl, apiToken } = config
+  return request(baseUrl, '/emotion/sync', {
+    method: 'POST',
+    headers: headers(apiToken),
+    body: JSON.stringify(body),
+  })
+}
+
 // 录音转文字：上传音频到服务端 /stt（SiliconFlow），绕开安卓 Chrome 不可用的 Web Speech API
 export async function transcribeAudio(config, blob) {
   const { baseUrl, apiToken } = config
