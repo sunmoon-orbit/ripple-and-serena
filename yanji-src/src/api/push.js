@@ -26,12 +26,18 @@ export function getNativePushToken() {
 
 // Kotlin 壳：token 由 MainActivity 启动时异步预取存 prefs，这里轮询等它就位
 async function getKotlinFcmToken() {
-  for (let i = 0; i < 10; i++) {
+  // 启动时那次可能已失败，点开关时主动再拉一次（旧 APK 无此方法则跳过）
+  window.YanjiNative?.retryFcmToken?.()
+  for (let i = 0; i < 15; i++) {
     const t = window.YanjiNative?.getFcmToken?.()
     if (t) return t
     await new Promise((r) => setTimeout(r, 1000))
   }
-  throw new Error('获取推送 token 超时——检查 Google Play 服务是否在代理名单里，或重启 app 再试')
+  // 超时时带上 Google 返回的具体失败原因（新 APK 才有 getFcmError 桥）
+  const err = window.YanjiNative?.getFcmError?.()
+  throw new Error(err
+    ? `Google 推送注册失败：${err}`
+    : '获取推送 token 超时——检查 Google Play 服务是否在代理名单里，或重启 app 再试')
 }
 
 export async function subscribeNativePush(moonMemoryConfig) {

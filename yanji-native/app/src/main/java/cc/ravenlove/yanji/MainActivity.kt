@@ -152,15 +152,23 @@ class MainActivity : AppCompatActivity() {
         // 图片分享后续版本支持
     }
 
+    // WebBridge 暴露给前端的重试入口
+    fun retryFcmToken() = fetchFcmToken()
+
     private fun fetchFcmToken() {
+        val prefs = getSharedPreferences("yanji_fcm", Context.MODE_PRIVATE)
         try {
             com.google.firebase.messaging.FirebaseMessaging.getInstance().token
                 .addOnSuccessListener { token ->
-                    getSharedPreferences("yanji_fcm", Context.MODE_PRIVATE)
-                        .edit().putString("token", token).apply()
+                    prefs.edit().putString("token", token).remove("error").apply()
                 }
-        } catch (_: Exception) {
-            // Google Play 服务不可用（代理没配好等），前端会显示 token 为空
+                .addOnFailureListener { e ->
+                    // 失败原因写 prefs，前端诊断行直接显示（SERVICE_NOT_AVAILABLE=网络不通等）
+                    prefs.edit().putString("error", (e.message ?: e.toString()).take(200)).apply()
+                }
+        } catch (e: Exception) {
+            // Google Play 服务不可用（缺 GMS/初始化失败等）
+            prefs.edit().putString("error", (e.message ?: e.toString()).take(200)).apply()
         }
     }
 

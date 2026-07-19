@@ -25,6 +25,19 @@ class WebBridge(private val activity: MainActivity) {
             .getString("token", "") ?: ""
     }
 
+    // token 获取失败时的具体原因（Google 返回的异常信息），空串=没失败或还没结果
+    @JavascriptInterface
+    fun getFcmError(): String {
+        return activity.getSharedPreferences("yanji_fcm", Context.MODE_PRIVATE)
+            .getString("error", "") ?: ""
+    }
+
+    // 前端点开关时重试拉取 token（首次启动失败后不用杀 app 重开）
+    @JavascriptInterface
+    fun retryFcmToken() {
+        activity.runOnUiThread { activity.retryFcmToken() }
+    }
+
     @JavascriptInterface
     fun updateEmotion(slotsJson: String) {
         activity.getSharedPreferences("yanji_emotion", Context.MODE_PRIVATE)

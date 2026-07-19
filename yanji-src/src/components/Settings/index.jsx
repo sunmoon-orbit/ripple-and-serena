@@ -702,7 +702,9 @@ export default function Settings() {
                     ? '⚠️ APK 版本太旧（无 token 桥接），去 Releases 下载最新安装包'
                     : (window.YanjiNative.getFcmToken()
                       ? `✅ 推送 token 已就位（${window.YanjiNative.getFcmToken().slice(0, 12)}…）`
-                      : '⚠️ token 未获取——Google 推送服务不可达，检查 Google Play 服务的代理，重启 app 再看')}
+                      : (window.YanjiNative.getFcmError?.()
+                        ? `⚠️ Google 注册失败：${window.YanjiNative.getFcmError()}`
+                        : '⚠️ token 未获取——Google 推送服务不可达，检查 Google Play 服务的代理，重启 app 再看'))}
                 </div>
               )}
               {pushTimes !== null && (
