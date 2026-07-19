@@ -121,6 +121,9 @@ class MainActivity : AppCompatActivity() {
         // 请求通知权限
         requestNotificationPermission()
 
+        // 预取 FCM token 存 prefs，前端通过 WebBridge.getFcmToken() 读取上报服务器
+        fetchFcmToken()
+
         // 启动前台常驻服务
         KeepAliveService.start(this)
 
@@ -147,6 +150,18 @@ class MainActivity : AppCompatActivity() {
             }
         }
         // 图片分享后续版本支持
+    }
+
+    private fun fetchFcmToken() {
+        try {
+            com.google.firebase.messaging.FirebaseMessaging.getInstance().token
+                .addOnSuccessListener { token ->
+                    getSharedPreferences("yanji_fcm", Context.MODE_PRIVATE)
+                        .edit().putString("token", token).apply()
+                }
+        } catch (_: Exception) {
+            // Google Play 服务不可用（代理没配好等），前端会显示 token 为空
+        }
     }
 
     private fun requestNotificationPermission() {
