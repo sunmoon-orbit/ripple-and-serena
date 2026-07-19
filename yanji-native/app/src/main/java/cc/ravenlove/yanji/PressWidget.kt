@@ -22,11 +22,27 @@ class PressWidget : AppWidgetProvider() {
     companion object {
         private const val ACTION_PRESS = "cc.ravenlove.yanji.ACTION_PRESS"
         private var lastPressAt = 0L // 防手滑连点：2 秒内只算一次
+
+        // 跟随言叽主题换底色（主题存法同 YanjiWidget.themeBg，切主题时 WebBridge 刷新）
+        fun themeBg(context: Context): Int {
+            val theme = context.getSharedPreferences("yanji_theme", Context.MODE_PRIVATE)
+                .getString("theme", "default") ?: "default"
+            return when (theme) {
+                "xilan" -> R.drawable.press_widget_bg_xilan
+                "qingwu" -> R.drawable.press_widget_bg_qingwu
+                "claude" -> R.drawable.press_widget_bg_claude
+                "glass" -> R.drawable.press_widget_bg_glass
+                "guanduan" -> R.drawable.press_widget_bg_guanduan
+                else -> R.drawable.press_widget_bg
+            }
+        }
     }
 
     override fun onUpdate(context: Context, manager: AppWidgetManager, ids: IntArray) {
+        val bgRes = themeBg(context)
         for (id in ids) {
             val views = RemoteViews(context.packageName, R.layout.press_widget_layout)
+            views.setInt(R.id.press_widget_root, "setBackgroundResource", bgRes)
             val intent = Intent(context, PressWidget::class.java).apply { action = ACTION_PRESS }
             val pi = PendingIntent.getBroadcast(
                 context, 0, intent,

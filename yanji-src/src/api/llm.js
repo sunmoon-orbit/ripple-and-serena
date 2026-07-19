@@ -20,13 +20,13 @@ function buildApiUrl(baseUrl, provider) {
   if (provider === 'openai') {
     if (url.includes('/chat/completions')) return url
     if (!url) url = 'https://api.openai.com/v1'
-    if (!url.includes('/v1')) url += '/v1'
+    if (!/\/v\d/.test(url)) url += '/v1' // 已带版本号的（如 GLM 的 /v4）别再追加 /v1
     return url + '/chat/completions'
   }
   if (provider === 'anthropic') {
     if (url.includes('/messages')) return url
     if (!url) url = 'https://api.anthropic.com/v1'
-    if (!url.includes('/v1')) url += '/v1'
+    if (!/\/v\d/.test(url)) url += '/v1'
     return url + '/messages'
   }
   return url
