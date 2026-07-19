@@ -3,7 +3,7 @@ import { useStore } from '../../store'
 import { formatTime } from '../../utils'
 import { applyDecayAndGet, getEmotionState, POSITIVE_SLOTS, NEGATIVE_SLOTS, SLOT_LABELS } from '../../utils/emotion'
 
-export default function ConversationList({ onClose, onStartCall, onOpenGames, onOpenMusic, onOpenWheel, onOpenFortune, onOpenChecklist, onOpenHealth, onOpenPeriod, onOpenAlbum, onOpenIdleJournal, onOpenWallet, onOpenCalls }) {
+export default function ConversationList({ onClose, onStartCall, onOpenGames, onOpenMusic, onOpenWheel, onOpenFortune, onOpenChecklist, onOpenHealth, onOpenPeriod, onOpenAlbum, onOpenIdleJournal, onOpenBoard, onOpenWallet, onOpenCalls }) {
   const chats = useStore((s) => s.chats)
   const connections = useStore((s) => s.connections)
   const activeChatId = useStore((s) => s.activeChatId)
@@ -292,6 +292,15 @@ export default function ConversationList({ onClose, onStartCall, onOpenGames, on
                 <path d="M12 11.5c-.8-1.6-3.2-1.6-3.2.4 0 1.4 1.9 2.7 3.2 3.6 1.3-.9 3.2-2.2 3.2-3.6 0-2-2.4-2-3.2-.4z" />
               </svg>
               <span>卡册</span>
+            </button>
+            <button className="sb-tool-item" onClick={() => { onClose?.(); onOpenBoard?.() }}>
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M5 4 L19 4 L19 20 L14 20 L14 15 L5 15 Z" />
+                <path d="M14 20 L14 15 L19 15" />
+                <line x1="8" y1="8" x2="16" y2="8" />
+                <line x1="8" y1="11.5" x2="13" y2="11.5" />
+              </svg>
+              <span>便利贴墙</span>
             </button>
             <button className="sb-tool-item" onClick={() => { onClose?.(); onOpenIdleJournal?.() }}>
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">

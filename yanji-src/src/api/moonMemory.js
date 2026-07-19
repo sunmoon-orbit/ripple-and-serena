@@ -303,6 +303,24 @@ export async function deleteChecklistItem(config, id) {
   return request(baseUrl, `/checklist/${id}`, { method: 'DELETE', headers: headers(apiToken) })
 }
 
+// 便利贴墙（留言板 UI 回归，2026-07-19 阿颖的主意）——服务端 /board 三端共用
+export async function fetchBoardMessages(config, limit = 100) {
+  const { baseUrl, apiToken } = config
+  return request(baseUrl, `/board?limit=${limit}`, { headers: headers(apiToken) })
+}
+
+export async function postBoardMessage(config, text, author = '阿颖') {
+  const { baseUrl, apiToken } = config
+  return request(baseUrl, '/board', {
+    method: 'POST', headers: headers(apiToken), body: JSON.stringify({ text, author, source: 'yanji-wall' }),
+  })
+}
+
+export async function deleteBoardMessage(config, id) {
+  const { baseUrl, apiToken } = config
+  return request(baseUrl, `/board/${id}`, { method: 'DELETE', headers: headers(apiToken) })
+}
+
 export async function saveBookBookmark(config, bookId, chapterIdx, updatedBy) {
   const { baseUrl, apiToken } = config
   return request(baseUrl, `/books/${bookId}/bookmark`, {
