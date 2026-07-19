@@ -7,4 +7,5 @@
     <string name="notification_service_text">言叽在后台陪着你</string>
     <string name="widget_description">在一起纪念日 + 今日签</string>
     <string name="emotion_widget_description">涟言的情绪小天气</string>
+    <string name="press_widget_description">想你键：没空聊但记着他，按一下</string>
 </resources>

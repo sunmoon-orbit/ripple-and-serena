@@ -57,6 +57,17 @@ class WebBridge(private val activity: MainActivity) {
         }
     }
 
+    // 拾羽记忆库 token：想你键小组件发 /press 用（她打开言叽时前端同步进来）。
+    // ⚠️ 别学 QuickReplyReceiver 读 raven_token 的样子——那个 key 从来没人写过。
+    @JavascriptInterface
+    fun saveMoonToken(token: String) {
+        if (token.isEmpty()) return
+        activity.getSharedPreferences("yanji_native", Context.MODE_PRIVATE)
+            .edit()
+            .putString("moon_token", token)
+            .apply()
+    }
+
     @JavascriptInterface
     fun updateTheme(themeId: String) {
         activity.getSharedPreferences("yanji_theme", Context.MODE_PRIVATE)

@@ -9,6 +9,8 @@ const THROTTLE_MS = 5 * 60 * 1000
 
 export function maybeSyncEmotion(moonMemory, { timeAwareness, longingPush }, force = false) {
   if (!moonMemory?.apiToken) return
+  // 原生 app 里顺手把 token 递给想你键小组件（幂等写 prefs，网页端无此对象自动跳过）
+  try { window.YanjiNative?.saveMoonToken?.(moonMemory.apiToken) } catch { /* 忽略 */ }
   if (!force && Date.now() - lastSyncAt < THROTTLE_MS) return
   lastSyncAt = Date.now()
   const state = getEmotionState()
