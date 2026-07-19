@@ -135,11 +135,13 @@
   border-top-color: rgba(100,150,170,0.18);
 }
 [data-theme="glass"] .health-overlay,
-[data-theme="glass"] .idlej-overlay {
+[data-theme="glass"] .idlej-overlay,
+[data-theme="glass"] .board-overlay {
   backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
 }
 [data-theme="glass"] .health-card,
-[data-theme="glass"] .idlej-card {
+[data-theme="glass"] .idlej-card,
+[data-theme="glass"] .board-card {
   background: rgba(255,255,255,0.92);
   backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
 }
@@ -3753,6 +3755,123 @@ body.mp-active .scroll-bottom-btn { bottom: 139px; }
   text-align: center; line-height: 1.6;
   flex-shrink: 0;
 }
+
+/* ── 便利贴墙：留言板 UI 回归（2026-07-19 阿颖的主意） ─────────── */
+.board-overlay {
+  position: fixed; inset: 0; z-index: 1200;
+  background: rgba(0,0,0,0.4);
+  display: flex; align-items: center; justify-content: center;
+  padding: 20px;
+}
+.board-card {
+  width: min(400px, calc(100vw - 40px));
+  max-height: calc(100vh - 80px);
+  display: flex; flex-direction: column;
+  background: var(--card);
+  border-radius: 16px;
+  padding: 18px 16px 14px;
+  box-shadow: 0 12px 40px rgba(0,0,0,0.18);
+}
+.board-head { position: relative; margin-bottom: 12px; flex-shrink: 0; }
+.board-title { font-size: 16px; font-weight: 700; color: var(--text); }
+.board-sub { font-size: 11px; color: var(--text-faint); margin-top: 3px; }
+.board-close {
+  position: absolute; top: -2px; right: -2px;
+  background: none; border: none; cursor: pointer;
+  color: var(--text-faint); font-size: 14px; padding: 4px;
+}
+.board-compose { flex-shrink: 0; margin-bottom: 12px; }
+.board-input {
+  width: 100%; resize: none;
+  background: var(--accent-dim);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 9px 11px;
+  font-size: 13.5px; line-height: 1.6; color: var(--text);
+  font-family: inherit;
+}
+.board-input:focus { outline: none; border-color: var(--border-md); }
+.board-compose-row {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-top: 7px;
+}
+.board-author-toggle { display: flex; gap: 5px; }
+.board-author-chip {
+  border: 1px solid var(--border-md);
+  background: none;
+  color: var(--text-muted);
+  border-radius: 999px;
+  font-size: 11.5px; padding: 3px 11px;
+  cursor: pointer;
+}
+.board-author-chip.active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff; font-weight: 600;
+}
+.board-post-btn {
+  border: none; cursor: pointer;
+  background: var(--accent);
+  color: #fff; font-weight: 600;
+  font-size: 12.5px; padding: 6px 16px;
+  border-radius: 999px;
+}
+.board-post-btn:disabled { opacity: 0.45; cursor: default; }
+.board-wall {
+  min-height: 0; overflow-y: auto;
+  display: grid; grid-template-columns: 1fr 1fr;
+  gap: 12px 10px;
+  align-items: start;
+  padding: 6px 2px 4px;
+}
+.board-empty {
+  grid-column: 1 / -1;
+  text-align: center; color: var(--text-faint);
+  font-size: 12.5px; padding: 24px 0; line-height: 1.8;
+}
+.board-note {
+  position: relative;
+  /* 两种便签色都从主题色调出来，换肤跟着走 */
+  background: color-mix(in srgb, var(--accent-soft) 26%, #fffdf6);
+  border-radius: 3px;
+  padding: 18px 10px 8px;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.10), 0 6px 14px rgba(0,0,0,0.05);
+  transform: rotate(var(--tilt, 0deg));
+  animation: board-stick 0.35s ease backwards;
+}
+.board-note.from-crow {
+  background: color-mix(in srgb, var(--accent) 22%, #fdfcf8);
+}
+@keyframes board-stick {
+  from { opacity: 0; transform: rotate(var(--tilt, 0deg)) scale(0.9) translateY(6px); }
+  to { opacity: 1; transform: rotate(var(--tilt, 0deg)) scale(1) translateY(0); }
+}
+.board-note-tape {
+  position: absolute; top: -6px; left: 50%;
+  width: 38px; height: 13px;
+  transform: translateX(-50%) rotate(-1.5deg);
+  background: color-mix(in srgb, var(--accent) 26%, rgba(255,255,255,0.6));
+  opacity: 0.75;
+  border-radius: 1px;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.08);
+}
+.board-note-del {
+  position: absolute; top: 3px; right: 3px;
+  background: none; border: none; cursor: pointer;
+  color: rgba(0,0,0,0.18); font-size: 10px; padding: 3px;
+}
+.board-note-del:hover { color: rgba(0,0,0,0.45); }
+.board-note-text {
+  font-size: 12.5px; line-height: 1.65;
+  color: var(--text);
+  word-break: break-word; white-space: pre-wrap;
+}
+.board-note-foot {
+  display: flex; align-items: baseline; justify-content: space-between;
+  margin-top: 8px; gap: 6px;
+}
+.board-note-author { font-size: 10.5px; font-weight: 700; color: var(--text-mid); }
+.board-note-date { font-size: 9.5px; color: var(--text-faint); }
 
 /* ── 来电（涟言主动打语音）：响铃卡片 + 来电记录条 ─────────── */
 .incall-overlay {

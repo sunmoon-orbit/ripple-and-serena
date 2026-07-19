@@ -26,6 +26,7 @@ import WalletCard from './WalletCard'
 import CallHistory from './CallHistory'
 import PeriodCard from './PeriodCard'
 import IdleJournal from './IdleJournal'
+import BoardWall from './BoardWall'
 import IncomingCall from './IncomingCall'
 import AnniversaryCard from './AnniversaryCard'
 import HeartCard from './HeartCard'
@@ -124,6 +125,7 @@ export default function Chat() {
   const [heartCards, setHeartCards] = useState([]) // 心意卡队列，一次弹一张
   const [albumOpen, setAlbumOpen] = useState(false) // 卡册：翻收下的心意卡
   const [idleJournalOpen, setIdleJournalOpen] = useState(false) // 独处手账：独处时间醒来日志
+  const [boardOpen, setBoardOpen] = useState(false) // 便利贴墙：留言板 UI 回归（0719 阿颖的主意）
   const [incomingCall, setIncomingCall] = useState(null) // 来电响铃中：{ chatId, msgId, reason }
   const [egg, setEgg] = useState(null) // 完成彩蛋：回复结束后小概率冒出的像素小家伙
   const [bgImage, setBgImage] = useState(() => localStorage.getItem('yanji-bg-image') || '')
@@ -454,6 +456,10 @@ export default function Chat() {
           }
         })
         addMessage(chat.id, { role: 'assistant', content: '[错误] 该模型不支持图片，已自动清除历史中的图片，可以继续对话。' })
+      } else if (/contentFilter|1301|敏感内容|content_filter|内容安全/i.test(e.message || '')) {
+        // 上游内容审查拒稿（智谱国版 1301 等）：审查发生在对方服务器上，
+        // 中间层拦不住——把一坨 JSON 翻译成人话+能做的事（2026-07-19 阿颖被 GLM 拒稿）
+        addMessage(chat.id, { role: 'assistant', content: '[错误] 上游模型的内容审查把这条拦下了（国内版 API 自带的合规层，发生在对方服务器上，咱们这边过滤不掉）。可以试试：换个说法重发、或在连接设置里切到海外版/中转站的同款模型。你发的消息还在，不用重打。' })
       } else {
         addMessage(chat.id, { role: 'assistant', content: `[错误] ${e.message}` })
       }
@@ -812,7 +818,7 @@ export default function Chat() {
     <div className="chat-panel">
       {/* Sidebar */}
       <div className={'chat-sidebar' + (sidebarOpen ? ' open' : '')}>
-        <ConversationList onClose={() => setSidebarOpen(false)} onStartCall={openCall} onOpenGames={() => setGamesOpen(true)} onOpenMusic={() => setMusicOpen(true)} onOpenWheel={() => setWheelOpen(true)} onOpenFortune={() => setFortuneOpen(true)} onOpenChecklist={() => setChecklistOpen(true)} onOpenHealth={() => setHealthOpen(true)} onOpenWallet={() => setWalletOpen(true)} onOpenPeriod={() => setPeriodOpen(true)} onOpenAlbum={() => setAlbumOpen(true)} onOpenIdleJournal={() => setIdleJournalOpen(true)} onOpenCalls={() => setCallsOpen(true)} />
+        <ConversationList onClose={() => setSidebarOpen(false)} onStartCall={openCall} onOpenGames={() => setGamesOpen(true)} onOpenMusic={() => setMusicOpen(true)} onOpenWheel={() => setWheelOpen(true)} onOpenFortune={() => setFortuneOpen(true)} onOpenChecklist={() => setChecklistOpen(true)} onOpenHealth={() => setHealthOpen(true)} onOpenWallet={() => setWalletOpen(true)} onOpenPeriod={() => setPeriodOpen(true)} onOpenAlbum={() => setAlbumOpen(true)} onOpenIdleJournal={() => setIdleJournalOpen(true)} onOpenBoard={() => setBoardOpen(true)} onOpenCalls={() => setCallsOpen(true)} />
       </div>
       {sidebarOpen && <div className="sidebar-backdrop" onClick={() => setSidebarOpen(false)} />}
 
@@ -1053,6 +1059,7 @@ export default function Chat() {
       {periodOpen && <PeriodCard onClose={() => setPeriodOpen(false)} />}
       {albumOpen && <HeartCardAlbum onClose={() => setAlbumOpen(false)} />}
       {idleJournalOpen && <IdleJournal onClose={() => setIdleJournalOpen(false)} />}
+      {boardOpen && <BoardWall onClose={() => setBoardOpen(false)} />}
       {incomingCall && (
         <IncomingCall
           reason={incomingCall.reason}
