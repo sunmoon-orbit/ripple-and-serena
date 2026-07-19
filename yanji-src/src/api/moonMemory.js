@@ -193,6 +193,14 @@ export async function fetchBook(config, id) {
   return request(baseUrl, `/books/${id}`, { headers: headers(apiToken) })
 }
 
+// 追更：往已有的书末尾续章（连载书一段段贴进来）
+export async function appendBookChapters(config, bookId, chapters) {
+  const { baseUrl, apiToken } = config
+  return request(baseUrl, `/books/${bookId}/chapters`, {
+    method: 'POST', headers: headers(apiToken), body: JSON.stringify({ chapters }),
+  })
+}
+
 export async function fetchBookChapter(config, bookId, idx) {
   const { baseUrl, apiToken } = config
   return request(baseUrl, `/books/${bookId}/chapters/${idx}`, { headers: headers(apiToken) })

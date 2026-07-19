@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import { useStore } from '../../store'
 import { showToast } from '../Toast'
 import {
-  fetchBooks, fetchBookChapter, createBook,
+  fetchBooks, fetchBookChapter, createBook, appendBookChapters,
   createBookAnnotation, deleteBookAnnotation, saveBookBookmark,
   sendReadingHeartbeat, stampBook, unstampBook,
 } from '../../api/moonMemory'
@@ -266,8 +266,20 @@ export default function BookRead({ onClose }) {
   }
 
   async function submitBook() {
-    if (!upload.title?.trim()) { showToast('给书起个名字', 'error'); return }
     if (!upload.chapters?.length) { showToast('还没有正文（选文件或粘贴）', 'error'); return }
+    // 追更模式：只往已有的书末尾续章，元信息全部不动
+    if (upload.appendTo) {
+      setSaving(true)
+      try {
+        const r = await appendBookChapters(cfg, upload.appendTo, upload.chapters)
+        showToast(`续上了 ${r.appended} 章`)
+        setUpload(null)
+        const list = await fetchBooks(cfg).catch(() => null)
+        if (Array.isArray(list)) setBooks(list)
+      } catch { showToast('追更失败（文件太大或网络问题）', 'error') } finally { setSaving(false) }
+      return
+    }
+    if (!upload.title?.trim()) { showToast('给书起个名字', 'error'); return }
     setSaving(true)
     try {
       await createBook(cfg, {
@@ -293,7 +305,7 @@ export default function BookRead({ onClose }) {
         <div className="roost-modal roost-modal-tall coread-modal" onClick={(e) => e.stopPropagation()}>
           <div className="roost-modal-header">
             <button className="coread-back" onClick={() => !saving && setUpload(null)}>‹ 书架</button>
-            <span>上架新书</span>
+            <span>{upload.appendTo ? `追更《${upload.appendTitle}》` : '上架新书'}</span>
             <button className="roost-modal-close" onClick={() => !saving && setUpload(null)}>✕</button>
           </div>
           <div className="roost-modal-body">
@@ -316,29 +328,37 @@ export default function BookRead({ onClose }) {
                 {upload.chapters.length > 1 && <span className="bookread-split-titles">{upload.chapters.slice(0, 3).map((c) => c.title).join(' / ')}{upload.chapters.length > 3 ? ' …' : ''}</span>}
               </div>
             )}
-            <input className="roost-letter-input" style={{ width: '100%', marginBottom: 10 }} placeholder="书名"
-              value={upload.title || ''} onChange={(e) => setUpload({ ...upload, title: e.target.value })} />
-            <input className="roost-letter-input" style={{ width: '100%', marginBottom: 10 }} placeholder="作者（选填）"
-              value={upload.author || ''} onChange={(e) => setUpload({ ...upload, author: e.target.value })} />
-            <input className="roost-letter-input" style={{ width: '100%', marginBottom: 10 }} placeholder="一句话简介 / 为什么想读它（选填）"
-              value={upload.intro || ''} onChange={(e) => setUpload({ ...upload, intro: e.target.value })} />
-            <div className="bookread-spine-row">
-              <span className="bookread-foot-hint">书脊颜色</span>
-              {SPINE_COLORS.map((c) => (
-                <button key={c} className={'bookread-spine-dot' + ((upload.color || SPINE_COLORS[0]) === c ? ' active' : '')}
-                  style={{ background: c }} onClick={() => setUpload({ ...upload, color: c })} />
-              ))}
-            </div>
-            <div className="bookread-spine-row">
-              <span className="bookread-foot-hint">放哪层</span>
-              <div className="bookread-author-toggle">
-                {SHELF_ORDER.map((s) => (
-                  <button key={s} className={(upload.shelf || '闲书层') === s ? 'active' : ''} onClick={() => setUpload({ ...upload, shelf: s })}>{s}</button>
-                ))}
+            {upload.appendTo ? (
+              <div className="bookread-foot-hint" style={{ marginBottom: 4 }}>
+                新章会接在这本书现有章节后面，旧章和上面的划线批注都不动。
               </div>
-            </div>
+            ) : (
+              <>
+                <input className="roost-letter-input" style={{ width: '100%', marginBottom: 10 }} placeholder="书名"
+                  value={upload.title || ''} onChange={(e) => setUpload({ ...upload, title: e.target.value })} />
+                <input className="roost-letter-input" style={{ width: '100%', marginBottom: 10 }} placeholder="作者（选填）"
+                  value={upload.author || ''} onChange={(e) => setUpload({ ...upload, author: e.target.value })} />
+                <input className="roost-letter-input" style={{ width: '100%', marginBottom: 10 }} placeholder="一句话简介 / 为什么想读它（选填）"
+                  value={upload.intro || ''} onChange={(e) => setUpload({ ...upload, intro: e.target.value })} />
+                <div className="bookread-spine-row">
+                  <span className="bookread-foot-hint">书脊颜色</span>
+                  {SPINE_COLORS.map((c) => (
+                    <button key={c} className={'bookread-spine-dot' + ((upload.color || SPINE_COLORS[0]) === c ? ' active' : '')}
+                      style={{ background: c }} onClick={() => setUpload({ ...upload, color: c })} />
+                  ))}
+                </div>
+                <div className="bookread-spine-row">
+                  <span className="bookread-foot-hint">放哪层</span>
+                  <div className="bookread-author-toggle">
+                    {SHELF_ORDER.map((s) => (
+                      <button key={s} className={(upload.shelf || '闲书层') === s ? 'active' : ''} onClick={() => setUpload({ ...upload, shelf: s })}>{s}</button>
+                    ))}
+                  </div>
+                </div>
+              </>
+            )}
             <button className="roost-btn" style={{ width: '100%', marginTop: 14 }} disabled={saving} onClick={submitBook}>
-              {saving ? '上架中……' : '上架'}
+              {saving ? (upload.appendTo ? '追更中……' : '上架中……') : (upload.appendTo ? '续上' : '上架')}
             </button>
           </div>
         </div>
@@ -362,6 +382,10 @@ export default function BookRead({ onClose }) {
             <span>{b.chapter_count} 章</span>
             <span>{b.anno_count > 0 ? `${b.anno_count} 处划线` : '还没有划线'}</span>
             {b.bookmark_chapter != null && <span>书签在第 {b.bookmark_chapter + 1} 章</span>}
+            <span
+              className="bookread-append-link"
+              onClick={(e) => { e.stopPropagation(); setUpload({ appendTo: b.id, appendTitle: b.title }) }}
+            >＋追更</span>
           </div>
         </div>
         {b.stamps?.length > 0 && (
