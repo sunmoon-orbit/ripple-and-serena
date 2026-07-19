@@ -34,6 +34,20 @@ jobs:
       - name: Copy google-services.json
         run: cp yanji-app/google-services.json yanji-native/app/google-services.json
 
+      # 固定签名：secret 存在时用持久 keystore，更新可覆盖安装；没配则退回随机 debug 签名
+      - name: Restore signing keystore
+        env:
+          KS_B64: ${{ secrets.YANJI_KEYSTORE_B64 }}
+        run: |
+          if [ -n "$KS_B64" ]; then
+            echo "$KS_B64" | base64 -d > /tmp/yanji-release.p12
+            echo "YANJI_KEYSTORE_FILE=/tmp/yanji-release.p12" >> "$GITHUB_ENV"
+            echo "YANJI_KEYSTORE_PASS=android" >> "$GITHUB_ENV"
+            echo "固定签名已启用"
+          else
+            echo "未配置 YANJI_KEYSTORE_B64 secret，退回随机 debug 签名"
+          fi
+
       - name: Generate launcher icon
         run: |
           sudo apt-get update -qq && sudo apt-get install -y -qq imagemagick >/dev/null
@@ -73,4 +87,6 @@ jobs:
             1. 下载 app-debug.apk 安装，需允许「未知来源」
             2. ⚠️ 装好后把「言叽」加进分应用代理名单，否则直连被墙
             3. 首次打开允许通知权限
+
+            更新：固定签名已启用（2026-07-19 起），以后直接安装新包覆盖即可，不用卸载。
           files: yanji-native/app/build/outputs/apk/debug/app-debug.apk

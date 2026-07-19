@@ -12,8 +12,24 @@ android {
         applicationId = "cc.ravenlove.yanji"
         minSdk = 26
         targetSdk = 35
-        versionCode = 1
-        versionName = "1.0.0"
+        // versionCode 跟 CI run number 走：每个新包都是「升级」，同签名可直接覆盖安装
+        versionCode = (System.getenv("GITHUB_RUN_NUMBER") ?: "1").toInt()
+        versionName = "1.0." + (System.getenv("GITHUB_RUN_NUMBER") ?: "0")
+    }
+
+    signingConfigs {
+        // CI 从 GH secret 还原固定 keystore 时启用；签名稳定=更新不再冲突（此前
+        // assembleDebug 每次随机生成 debug keystore，也是 FIS_AUTH_ERROR 白名单坑的根源）
+        val ksPath = System.getenv("YANJI_KEYSTORE_FILE")
+        if (!ksPath.isNullOrBlank()) {
+            create("stable") {
+                storeFile = file(ksPath)
+                storeType = "PKCS12"
+                storePassword = System.getenv("YANJI_KEYSTORE_PASS") ?: "android"
+                keyAlias = "yanji"
+                keyPassword = System.getenv("YANJI_KEYSTORE_PASS") ?: "android"
+            }
+        }
     }
 
     buildTypes {
@@ -21,9 +37,11 @@ android {
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+            signingConfigs.findByName("stable")?.let { signingConfig = it }
         }
         debug {
             isMinifyEnabled = false
+            signingConfigs.findByName("stable")?.let { signingConfig = it }
         }
     }
 
