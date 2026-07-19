@@ -3997,32 +3997,3 @@ body.mp-active .scroll-bottom-btn { bottom: 139px; }
   font-family: 'Kaiti SC', 'STKaiti', KaiTi, serif;
   font-size: 12px; color: var(--text-faint);
 }
-
-/* ── 时段开屏语（GreetingBanner，阿言亲笔语料在 api/greeting.js）── */
-.greeting-banner {
-  position: fixed;
-  top: calc(env(safe-area-inset-top, 0px) + 14px);
-  left: 50%;
-  transform: translateX(-50%);
-  z-index: 1300; /* 盖过普通弹层(1200)，让位给 toast */
-  max-width: min(86vw, 420px);
-  padding: 10px 18px;
-  border-radius: 20px;
-  background: var(--card);
-  color: var(--text);
-  border: 1px solid var(--border);
-  box-shadow: var(--shadow-md);
-  font-size: 14px;
-  line-height: 1.5;
-  cursor: pointer;
-  animation: greeting-in 0.45s ease both;
-}
-.greeting-banner.leaving { animation: greeting-out 0.4s ease both; }
-@keyframes greeting-in {
-  from { opacity: 0; transform: translateX(-50%) translateY(-10px); }
-  to   { opacity: 1; transform: translateX(-50%) translateY(0); }
-}
-@keyframes greeting-out {
-  from { opacity: 1; }
-  to   { opacity: 0; transform: translateX(-50%) translateY(-8px); }
-}
