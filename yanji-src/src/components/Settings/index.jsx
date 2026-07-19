@@ -250,6 +250,8 @@ export default function Settings() {
   const [idleBusy, setIdleBusy] = useState(false)
   const [dreamCfg, setDreamCfg] = useState(null) // 梦境系统：{enabled}，null=没拉到
   const [dreamBusy, setDreamBusy] = useState(false)
+  const [llmCfg, setLlmCfg] = useState(null) // 服务端投手阵容：{providers,isDefault}，null=没拉到
+  const [llmBusy, setLlmBusy] = useState(false)
   const [pushTimes, setPushTimes] = useState(null)
   const [pushTimesSaving, setPushTimesSaving] = useState(false)
 
@@ -287,7 +289,66 @@ export default function Settings() {
     // 梦境总闸同款：开关存服务端（crontab 的 dream.js 跑前查它）
     fetch(`${base}/dream/config`, { headers: { Authorization: `Bearer ${moonMemory.apiToken}` } })
       .then((r) => r.json()).then(setDreamCfg).catch(() => setDreamCfg(null))
+    // 服务端投手阵容（自动任务用哪些模型顶班，消费端 raven-bridge/llm.js 每次跑现读）
+    fetch(`${base}/llm/config`, { headers: { Authorization: `Bearer ${moonMemory.apiToken}` } })
+      .then((r) => r.json()).then(setLlmCfg).catch(() => setLlmCfg(null))
   }, [tab]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  const editProvider = (i, field, val) => setLlmCfg((c) => {
+    const providers = [...c.providers]
+    providers[i] = { ...providers[i], [field]: val }
+    return { ...c, providers }
+  })
+  const moveProvider = (i, dir) => setLlmCfg((c) => {
+    const providers = [...c.providers]
+    const j = i + dir
+    if (j < 0 || j >= providers.length) return c
+    ;[providers[i], providers[j]] = [providers[j], providers[i]]
+    return { ...c, providers }
+  })
+  const removeProvider = (i) => setLlmCfg((c) => ({ ...c, providers: c.providers.filter((_, k) => k !== i) }))
+  const addProvider = () => setLlmCfg((c) => c.providers.length >= 5 ? c
+    : { ...c, providers: [...c.providers, { name: '', url: 'https://', model: '', key: '' }] })
+
+  async function saveLlmCfg() {
+    if (!moonMemory?.enabled || !moonMemory?.apiToken) { showToast('请先配置并启用拾羽记忆库', 'error'); return }
+    setLlmBusy(true)
+    try {
+      const base = (moonMemory.baseUrl || 'https://memory.ravenlove.cc').replace(/\/$/, '')
+      const r = await fetch(`${base}/llm/config`, {
+        method: 'PUT',
+        headers: { Authorization: `Bearer ${moonMemory.apiToken}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ providers: llmCfg.providers }),
+      })
+      const data = await r.json().catch(() => ({}))
+      if (!r.ok) throw new Error(data.error || `保存失败 (${r.status})`)
+      setLlmCfg({ providers: data.providers, isDefault: false })
+      showToast('投手阵容已保存，下一次自动任务就按新阵容上场')
+    } catch (e) {
+      showToast(e.message, 'error')
+    } finally {
+      setLlmBusy(false)
+    }
+  }
+
+  async function resetLlmCfg() {
+    if (!moonMemory?.apiToken) return
+    setLlmBusy(true)
+    try {
+      const base = (moonMemory.baseUrl || 'https://memory.ravenlove.cc').replace(/\/$/, '')
+      const r = await fetch(`${base}/llm/config`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${moonMemory.apiToken}` },
+      })
+      const data = await r.json()
+      setLlmCfg({ providers: data.providers, isDefault: true })
+      showToast('已恢复默认阵容（DeepSeek 主投，GLM 顶班）')
+    } catch (e) {
+      showToast(e.message, 'error')
+    } finally {
+      setLlmBusy(false)
+    }
+  }
 
   async function toggleIdle() {
     if (!moonMemory?.enabled || !moonMemory?.apiToken) {
@@ -664,6 +725,42 @@ export default function Settings() {
               <div className="card-row" style={{ fontSize: 12, color: 'var(--text-muted)' }}>
                 凌晨 1-3 点用最近的记忆做一场梦，存进他的私有记忆并发到朋友圈。关掉就是无梦安眠，随时可再开。走服务器额度，不花你的。
               </div>
+            </div>
+            <div className="settings-card">
+              <div className="settings-card-title">服务端投手</div>
+              <div className="card-row" style={{ fontSize: 12, color: 'var(--text-muted)' }}>
+                做梦、自动发圈、独处时间、思念推送这些服务端任务用的模型，按顺序顶班：1 号失败就换 2 号，下一次任务又从 1 号试起。改完立即生效，不用重启任何东西。钥匙留空 = 用服务器上已存的（DeepSeek / GLM 都存了）。
+              </div>
+              {llmCfg === null && (
+                <div className="card-row" style={{ fontSize: 12, color: 'var(--text-muted)' }}>拉取阵容中……</div>
+              )}
+              {llmCfg?.providers?.map((p, i) => (
+                <div key={i} style={{ border: '1px solid var(--border)', borderRadius: 10, padding: 10, marginBottom: 8 }}>
+                  <div style={{ display: 'flex', gap: 6, alignItems: 'center', marginBottom: 6 }}>
+                    <span style={{ fontSize: 12, color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>{i + 1} 号</span>
+                    <input className="form-input" style={{ flex: 1, minWidth: 0 }} value={p.name}
+                      onChange={(e) => editProvider(i, 'name', e.target.value)} placeholder="名称（如 deepseek）" />
+                    <button className="btn-sm btn-ghost" disabled={i === 0} onClick={() => moveProvider(i, -1)} aria-label="上移">↑</button>
+                    <button className="btn-sm btn-ghost" disabled={i === llmCfg.providers.length - 1} onClick={() => moveProvider(i, 1)} aria-label="下移">↓</button>
+                    <button className="btn-sm btn-ghost danger" disabled={llmCfg.providers.length <= 1} onClick={() => removeProvider(i)} aria-label="移除">✕</button>
+                  </div>
+                  <input className="form-input" style={{ marginBottom: 6 }} value={p.model}
+                    onChange={(e) => editProvider(i, 'model', e.target.value)} placeholder="模型名（如 glm-4-flash）" />
+                  <input className="form-input" style={{ marginBottom: 6 }} value={p.url}
+                    onChange={(e) => editProvider(i, 'url', e.target.value)} placeholder="接口地址（https://…/chat/completions）" />
+                  <input className="form-input" type="password" value={p.key || ''}
+                    onChange={(e) => editProvider(i, 'key', e.target.value)} placeholder="API 钥匙（留空=用服务器已存的）" />
+                </div>
+              ))}
+              {llmCfg && (
+                <div className="card-row" style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                  <button className="btn-sm btn-ghost" disabled={llmBusy || llmCfg.providers.length >= 5} onClick={addProvider}>+ 添加投手</button>
+                  <button className="btn-sm btn-primary" disabled={llmBusy} onClick={saveLlmCfg}>{llmBusy ? '保存中……' : '保存阵容'}</button>
+                  {!llmCfg.isDefault && (
+                    <button className="btn-sm btn-ghost" disabled={llmBusy} onClick={resetLlmCfg}>恢复默认</button>
+                  )}
+                </div>
+              )}
             </div>
             <div className="settings-card">
               <div className="settings-card-title">岁聿</div>
