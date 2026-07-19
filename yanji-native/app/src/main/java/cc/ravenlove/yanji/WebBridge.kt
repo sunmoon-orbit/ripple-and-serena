@@ -80,7 +80,7 @@ class WebBridge(private val activity: MainActivity) {
 
     private fun refreshAllWidgets() {
         val manager = AppWidgetManager.getInstance(activity)
-        for (cls in arrayOf(YanjiWidget::class.java, EmotionWidget::class.java)) {
+        for (cls in arrayOf(YanjiWidget::class.java, EmotionWidget::class.java, PressWidget::class.java)) {
             val ids = manager.getAppWidgetIds(ComponentName(activity, cls))
             if (ids.isNotEmpty()) {
                 val intent = Intent(activity, cls).apply {
