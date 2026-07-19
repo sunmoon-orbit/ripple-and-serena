@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/press_widget_root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="@drawable/press_widget_bg"
+    android:padding="8dp"
+    android:gravity="center">
+
+    <TextView
+        android:id="@+id/press_emoji"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="🐦‍⬛"
+        android:textSize="24sp" />
+
+    <TextView
+        android:id="@+id/press_label"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="想你键"
+        android:textSize="11sp"
+        android:textColor="#FFFFFF"
+        android:textStyle="bold"
+        android:layout_marginTop="2dp" />
+
+</LinearLayout>
