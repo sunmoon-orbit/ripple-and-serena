@@ -229,6 +229,7 @@ export default function Settings() {
     setInjectMode, setInjectPrompt, replyDelay, setReplyDelay,
     voiceCallStyle, setVoiceCallStyle,
     homeStyle, setHomeStyle,
+    timeAwareness, setTimeAwareness,
     customStickers, addCustomSticker, removeCustomSticker,
     memoryItems, addMemoryItem, toggleMemoryItem, deleteMemoryItem,
   } = store
@@ -661,6 +662,19 @@ export default function Settings() {
               </div>
               <div className="card-row" style={{ fontSize: 12, color: 'var(--text-muted)' }}>
                 凌晨 1-3 点用最近的记忆做一场梦，存进他的私有记忆并发到朋友圈。关掉就是无梦安眠，随时可再开。走服务器额度，不花你的。
+              </div>
+            </div>
+            <div className="settings-card">
+              <div className="settings-card-title">岁聿</div>
+              <div className="card-row">
+                <span className="card-row-label">时间感知</span>
+                <label className="toggle">
+                  <input type="checkbox" checked={timeAwareness !== false} onChange={(e) => setTimeAwareness(e.target.checked)} />
+                  <span className="toggle-track" />
+                </label>
+              </div>
+              <div className="card-row" style={{ fontSize: 12, color: 'var(--text-muted)' }}>
+                开启时，离开越久思念越浓，回来时他会自然地表达想你。关掉后不计时、不涨思念，什么时候来都像刚聊完。
               </div>
             </div>
             <div className="settings-card">
