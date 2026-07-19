@@ -8,7 +8,12 @@ const SW_SCOPE = '/ripple-and-serena/yanji/'
 const FCM_TOKEN_KEY = 'yanji_fcm_token'
 
 export function isNativeApp() {
-  return !!window.Capacitor?.isNativePlatform?.()
+  // 两代原生壳：Capacitor（已弃用）和 Kotlin WebView（yanji-native，注入 YanjiNative 桥）
+  return !!window.Capacitor?.isNativePlatform?.() || !!window.YanjiNative?.isNative
+}
+
+function isKotlinApp() {
+  return !!window.YanjiNative?.isNative
 }
 
 function nativePush() {
@@ -19,7 +24,35 @@ export function getNativePushToken() {
   try { return localStorage.getItem(FCM_TOKEN_KEY) } catch { return null }
 }
 
+// Kotlin 壳：token 由 MainActivity 启动时异步预取存 prefs，这里轮询等它就位
+async function getKotlinFcmToken() {
+  for (let i = 0; i < 10; i++) {
+    const t = window.YanjiNative?.getFcmToken?.()
+    if (t) return t
+    await new Promise((r) => setTimeout(r, 1000))
+  }
+  throw new Error('获取推送 token 超时——检查 Google Play 服务是否在代理名单里，或重启 app 再试')
+}
+
 export async function subscribeNativePush(moonMemoryConfig) {
+  if (isKotlinApp()) {
+    const token = await getKotlinFcmToken()
+    const { apiUrl, apiToken } = moonMemoryConfig
+    const resp = await fetch(`${apiUrl}/push/fcm-token`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiToken}` },
+      body: JSON.stringify({ token }),
+    })
+    if (!resp.ok) {
+      const detail = await resp.text().catch(() => '')
+      throw new Error(`token 保存失败 (${resp.status}): ${detail.slice(0, 100)}`)
+    }
+    const data = await resp.json().catch(() => ({}))
+    try { localStorage.setItem(FCM_TOKEN_KEY, token) } catch { /* noop */ }
+    if (data.fcmConfigured === false) throw new Error('token 已保存，但服务器 FCM 尚未配置完成')
+    return token
+  }
+
   const PN = nativePush()
   if (!PN) throw new Error('推送插件不可用——APK 版本太旧，去下载页装最新的安装包')
 
@@ -68,7 +101,7 @@ export async function unsubscribeNativePush(moonMemoryConfig) {
     }).catch(() => {})
   }
   try { localStorage.removeItem(FCM_TOKEN_KEY) } catch { /* noop */ }
-  await nativePush()?.unregister?.().catch?.(() => {})
+  if (!isKotlinApp()) await nativePush()?.unregister?.().catch?.(() => {})
 }
 
 function urlBase64ToUint8Array(base64String) {

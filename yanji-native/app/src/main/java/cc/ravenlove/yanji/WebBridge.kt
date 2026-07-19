@@ -17,6 +17,14 @@ class WebBridge(private val activity: MainActivity) {
     @JavascriptInterface
     fun getPlatform(): String = "android-native"
 
+    // FCM token：MainActivity 启动时异步拉取存 prefs，前端订阅推送时读这里。
+    // 空串=还没拿到（Google Play 服务不可达/还在路上），前端可稍后重试。
+    @JavascriptInterface
+    fun getFcmToken(): String {
+        return activity.getSharedPreferences("yanji_fcm", Context.MODE_PRIVATE)
+            .getString("token", "") ?: ""
+    }
+
     @JavascriptInterface
     fun updateEmotion(slotsJson: String) {
         activity.getSharedPreferences("yanji_emotion", Context.MODE_PRIVATE)
