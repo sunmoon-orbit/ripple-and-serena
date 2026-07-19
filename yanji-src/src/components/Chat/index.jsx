@@ -9,7 +9,7 @@ import { shouldNudge, recordNudge, buildNudgeText } from '../../utils/nudge'
 import { decideReplyDelay, getPendingReply, setPendingReply, clearPendingReply } from '../../utils/replyDelay'
 import { pickAutoPostTrigger, markAutoPosted, postMoment } from '../../api/moments'
 import { notifyReplyReady } from '../../api/push'
-import { extractMood, stripMoodTag } from '../../utils/moodFx'
+import { extractMood, stripMoodTag, stripInlineFx } from '../../utils/moodFx'
 import { showToast } from '../Toast'
 import ConversationList from './ConversationList'
 import MessageList from './MessageList'
@@ -27,7 +27,6 @@ import CallHistory from './CallHistory'
 import PeriodCard from './PeriodCard'
 import IdleJournal from './IdleJournal'
 import IncomingCall from './IncomingCall'
-import GreetingBanner from './GreetingBanner'
 import AnniversaryCard from './AnniversaryCard'
 import HeartCard from './HeartCard'
 import HeartCardAlbum from './HeartCardAlbum'
@@ -417,7 +416,15 @@ export default function Chat() {
       // 她切后台等回复时，回话落地推个通知（服务端 Web Push/FCM 双通道广播；
       // nudge 隐藏触发不推——那是涟言自己要说话，没人在等）（2026-07-19 阿颖点的功能）
       if (document.hidden && !hidden && parts[0] && moonMemory?.apiToken) {
-        notifyReplyReady(moonMemory, parts[0].slice(0, 80)).catch(() => {})
+        // 预览要过一遍标签清洗：[breath]/[laughter] 语音标签、[glow] 等行内特效、
+        // 贴图/点歌标签，通知栏里裸奔很难看（0719 阿颖截图里的 [breath]）
+        const preview = stripInlineFx(parts[0])
+          .replace(/\[(?:breath|laughter)\]/gi, ' ')
+          .replace(/\[sticker:[^\]]*\]/gi, '[贴图]')
+          .replace(/\[music:[^\]]*\]/gi, '[给你点了首歌]')
+          .replace(/\s+/g, ' ')
+          .trim()
+        if (preview) notifyReplyReady(moonMemory, preview.slice(0, 80)).catch(() => {})
       }
       if (result.usage) recordTokenUsage(conn.id, result.usage)
 
@@ -1019,7 +1026,6 @@ export default function Chat() {
         />
       )}
       {egg && <CompletionEgg svg={egg} onDone={() => setEgg(null)} />}
-      <GreetingBanner />
       {musicOpen && <MusicRoom onClose={() => setMusicOpen(false)} />}
       {wheelOpen && <FortuneWheel onClose={() => setWheelOpen(false)} />}
       {fortuneOpen && <DailyFortune onClose={() => setFortuneOpen(false)} />}
