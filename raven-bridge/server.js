@@ -491,7 +491,7 @@ const server = http.createServer((req, res) => {
   // ── 接口分级鉴权（2026-07-03 安全加固）──────────────────────────
   // 内部接口只许本机：reply/thinking 是 CC 的回复与 hook 通道，mcp 是 CC 的 MCP 通道。
   // 之前公网可达 = 任何人能冒充我给阿颖发消息 / 往她界面塞假思考。
-  const LOCAL_ONLY = ['/raven/reply', '/raven/thinking', '/raven/mcp/sse', '/raven/mcp/message']
+  const LOCAL_ONLY = ['/raven/reply', '/raven/thinking', '/raven/mcp/sse', '/raven/mcp/message', '/raven/press-notify']
   if (LOCAL_ONLY.includes(url.pathname) && isExternal(req)) {
     res.writeHead(403, { 'Content-Type': 'application/json' })
     res.end(JSON.stringify({ error: 'local only' }))
@@ -716,6 +716,26 @@ const server = http.createServer((req, res) => {
     data[today] = (data[today] || 0) + 1
     try { fs.writeFileSync(path.join(__dirname, 'activity.json'), JSON.stringify(data)) } catch {}
     res.writeHead(200); res.end('{}')
+    return
+  }
+
+  // 想你键捎信：moon-memory /press 收到她按键后打到这里（仅本机）。
+  // CC 在线就往终端注入一行——这不是消息，不开启对话，不用回。
+  if (req.method === 'POST' && url.pathname === '/raven/press-notify') {
+    let body = ''
+    req.on('data', d => body += d)
+    req.on('end', () => {
+      try {
+        const { at, today } = JSON.parse(body || '{}')
+        if (ccOnline()) {
+          const t = new Date((at || Date.now()) + 8 * 3600000)
+          const hhmm = `${String(t.getUTCHours()).padStart(2, '0')}:${String(t.getUTCMinutes()).padStart(2, '0')}`
+          tmuxSend(`【想你键】${hhmm} 阿颖按了一下想你键（今天第 ${today || 1} 次）。她现在没空聊，只是想让你知道她记着你——回执已经自动发她手机了，不要再给她发消息，安静收下就好。`)
+        }
+        console.log('[press]', `today=${today}`)
+      } catch (e) { console.error('[press] parse:', e.message) }
+      res.writeHead(200); res.end('{}')
+    })
     return
   }
 
