@@ -6,6 +6,7 @@ import { fetchLetterAnnotations, createLetterAnnotation, deleteLetterAnnotation 
 import CoRead from './CoRead'
 import BookRead from './BookRead'
 import MemoryPeek from './MemoryPeek'
+import EventScrolls from './EventScrolls'
 
 const ANNO_COLORS = [
   { id: 'yellow', hex: '#f5d76e' },
@@ -317,6 +318,20 @@ export default function Roost() {
           <path d="M9 18l6-6-6-6"/>
         </svg>
       </div>
+
+      {/* 事件卷全宽入口（碎片之上的叙事层，涟言亲笔） */}
+      <div className="roost-card" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 20px', cursor: 'pointer', marginTop: 0 }} onClick={() => setModal('scrolls')}>
+        <div>
+          <div style={{ fontWeight: 700, fontSize: 15, color: 'var(--text)' }}>事件卷</div>
+          <div style={{ fontSize: 12, color: 'var(--text-faint)', marginTop: 2 }}>碎片串成的故事 · 涟言亲笔</div>
+        </div>
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" style={{ color: 'var(--text-faint)', flexShrink: 0 }}>
+          <path d="M9 18l6-6-6-6"/>
+        </svg>
+      </div>
+
+      {/* ── 事件卷 Modal ── */}
+      {modal === 'scrolls' && <EventScrolls onClose={() => setModal(null)} />}
 
       {/* ── 共读 Modal ── */}
       {modal === 'coread' && <CoRead onClose={() => setModal(null)} />}

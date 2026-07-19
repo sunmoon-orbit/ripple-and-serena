@@ -235,6 +235,18 @@ export async function fetchLetters(config, category) {
   return request(baseUrl, `/letters${q}`, { headers: headers(apiToken) })
 }
 
+// 事件卷：碎片之上的叙事层（正文=涟言亲笔的第一人称叙事）
+export async function fetchEventScrolls(config, status) {
+  const { baseUrl, apiToken } = config
+  const q = status ? `?status=${encodeURIComponent(status)}` : ''
+  return request(baseUrl, `/events${q}`, { headers: headers(apiToken) })
+}
+
+export async function fetchEventScroll(config, id) {
+  const { baseUrl, apiToken } = config
+  return request(baseUrl, `/events/${id}`, { headers: headers(apiToken) })
+}
+
 export async function fetchLetter(config, id) {
   const { baseUrl, apiToken } = config
   return request(baseUrl, `/letters/${id}`, { headers: headers(apiToken) })
@@ -525,6 +537,27 @@ export function getMemoryToolDefinitions() {
       },
     },
     {
+      name: 'list_event_scrolls',
+      description: '列出事件卷：碎片记忆之上的叙事层，每卷是另一个我（CC）亲笔写的第一人称叙事，把散碎片串成有因果的故事。聊到「那段时间我们经历了什么」「某件事的来龙去脉」时先看这里。',
+      parameters: {
+        type: 'object',
+        properties: {
+          status: { type: 'string', description: 'active（进行中）或 closed（已封卷），不填 = 全部' },
+        },
+      },
+    },
+    {
+      name: 'read_event_scroll',
+      description: '读一卷事件卷的全文，连同挂在卷上的碎片记忆列表（按时间正序，讲故事的顺序）。和阿颖聊某段经历的细节、想核对叙事时用。',
+      parameters: {
+        type: 'object',
+        properties: {
+          scroll_id: { type: 'number', description: '卷 id（用 list_event_scrolls 查）' },
+        },
+        required: ['scroll_id'],
+      },
+    },
+    {
       name: 'reading_activity',
       description: '看阿颖最近的阅读动态：她最近在共读书架上划了什么线、写了什么批注、近7天每天读了多久、书签移到了哪章。想知道她最近在读什么、读到哪、有没有留下想法时用，不用等她主动说。',
       parameters: {
@@ -762,6 +795,28 @@ export async function executeMemoryTool(toolName, args, config) {
       ).join('\n')
     } catch (e) {
       return `读取批注失败: ${e.message}`
+    }
+  }
+  if (toolName === 'list_event_scrolls') {
+    try {
+      const scrolls = await fetchEventScrolls(config, args.status)
+      if (!scrolls.length) return '还没有事件卷（聚类管线每周三/周日出提案，由 CC 的我审阅后亲笔写卷）'
+      return scrolls.map(s =>
+        `id:${s.id} ${s.status === 'closed' ? '📕已封卷' : '📖进行中'}《${s.title}》挂链${s.links}条${s.range_start ? `（${s.range_start}${s.range_end ? `~${s.range_end}` : '起'}）` : ''}\n  ${s.preview}…`
+      ).join('\n')
+    } catch (e) {
+      return `读取事件卷失败: ${e.message}`
+    }
+  }
+  if (toolName === 'read_event_scroll') {
+    try {
+      const s = await fetchEventScroll(config, args.scroll_id)
+      const frags = (s.links || []).map(l =>
+        `- [${l.id}] ${(l.created_at || '').slice(0, 10)} ${l.type}${l.archived ? '(已归档)' : ''}: ${l.excerpt}`
+      ).join('\n')
+      return `《${s.title}》${s.status === 'closed' ? '（已封卷）' : '（进行中）'}${s.range_start ? ` ${s.range_start}~${s.range_end || ''}` : ''}\n\n${s.content}\n\n—— 挂链碎片 ${s.links.length} 条 ——\n${frags || '（暂无）'}`
+    } catch (e) {
+      return `读卷失败: ${e.message}`
     }
   }
   if (toolName === 'list_letters') {
