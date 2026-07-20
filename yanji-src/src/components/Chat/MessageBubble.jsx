@@ -6,6 +6,7 @@ import { useStore } from '../../store'
 import { synthesizeSpeech } from '../../api/moonMemory'
 import MusicCard from './MusicCard'
 import { applyInlineFx, stripInlineFx } from '../../utils/moodFx'
+import { showToast } from '../Toast'
 
 marked.setOptions({
   breaks: true,
@@ -168,16 +169,42 @@ function fileMime(name) {
 function fileBlobUrl(f) {
   return URL.createObjectURL(new Blob([f.content], { type: fileMime(f.filename) }))
 }
-async function downloadGenFile(f) {
-  const blob = new Blob([f.content], { type: fileMime(f.filename) })
-  const file = new File([blob], f.filename, { type: blob.type })
-  if (navigator.canShare?.({ files: [file] })) {
-    try { await navigator.share({ files: [file], title: f.filename }); return } catch {}
+// 保存文本文件到手机：分享面板优先（安卓 PWA 里 blob 锚点下载会静默失败——0720 阿颖
+// 点下载「没反应」的教训），锚点下载兜底，且每条路都给 toast 反馈，绝不无声无息
+async function saveTextFile(filename, content, mime) {
+  const blob = new Blob([content], { type: mime })
+  try {
+    let file = new File([blob], filename, { type: blob.type })
+    if (!navigator.canShare?.({ files: [file] })) {
+      // text/markdown 这类小众 MIME 有些系统分享面板不认，换 text/plain 再试一次
+      file = new File([new Blob([content], { type: 'text/plain' })], filename, { type: 'text/plain' })
+    }
+    if (navigator.canShare?.({ files: [file] })) {
+      await navigator.share({ files: [file], title: filename })
+      showToast('已交给分享面板，选「保存到设备/文件」就能存下')
+      return
+    }
+  } catch (e) {
+    if (e?.name === 'AbortError') return // 她自己关掉了分享面板，不算失败，安静退场
+    // 其他错误落回锚点下载
   }
-  const url = fileBlobUrl(f)
-  const a = document.createElement('a')
-  a.href = url; a.download = f.filename; a.click()
-  setTimeout(() => URL.revokeObjectURL(url), 3000)
+  try {
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = filename
+    document.body.appendChild(a) // 部分安卓 WebView/PWA 要求锚点挂在文档里才肯触发
+    a.click()
+    a.remove()
+    setTimeout(() => URL.revokeObjectURL(url), 5000)
+    showToast('已开始下载，去通知栏或 Download 文件夹找')
+  } catch {
+    showToast('下载没成功，点「预览」打开后用浏览器菜单保存吧', 'error')
+  }
+}
+
+function downloadGenFile(f) {
+  return saveTextFile(f.filename, f.content, fileMime(f.filename))
 }
 function previewGenFile(f) {
   // html 用 blob URL 新标签页打开，直接渲染
@@ -610,18 +637,9 @@ export default function MessageBubble({ msg, onEdit, onQuote, onDelete, isLast }
             </button>
           )}
           {!isUser && !isStreaming && (
-            <button className="msg-edit-icon-btn" title="下载为文件" onClick={async () => {
-              const name = `reply-${msg.id || Date.now()}.md`
-              const blob = new Blob([msg.content], { type: 'text/markdown;charset=utf-8' })
-              const file = new File([blob], name, { type: blob.type })
-              if (navigator.canShare?.({ files: [file] })) {
-                try { await navigator.share({ files: [file], title: name }); return } catch {}
-              }
-              const url = URL.createObjectURL(blob)
-              const a = document.createElement('a')
-              a.href = url; a.download = name; a.click()
-              URL.revokeObjectURL(url)
-            }}>
+            <button className="msg-edit-icon-btn" title="下载为文件" onClick={() =>
+              saveTextFile(`reply-${msg.id || Date.now()}.md`, msg.content, 'text/markdown;charset=utf-8')
+            }>
               <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
                 <polyline points="7 10 12 15 17 10"/>
