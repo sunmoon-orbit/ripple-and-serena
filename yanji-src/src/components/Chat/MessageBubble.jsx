@@ -169,10 +169,36 @@ function fileMime(name) {
 function fileBlobUrl(f) {
   return URL.createObjectURL(new Blob([f.content], { type: fileMime(f.filename) }))
 }
-// 保存文本文件到手机：分享面板优先（安卓 PWA 里 blob 锚点下载会静默失败——0720 阿颖
-// 点下载「没反应」的教训），锚点下载兜底，且每条路都给 toast 反馈，绝不无声无息
+// 保存文本文件到手机。0720 两轮实测：安卓 PWA（standalone）里 blob 锚点下载静默失败
+// （toast 弹了文件却不落地），分享面板也不弹——真正稳的只有「真实 HTTPS URL +
+// Content-Disposition: attachment」，Chrome 下载管理器会接手（通知栏有进度、落 Download）。
+// 所以顺序：① 服务端下投站（moon-memory /files/stash → /files/dl/:id）
+//          ② 分享面板  ③ blob 锚点  ④ 认输提示走「预览」。每条路都有 toast。
 async function saveTextFile(filename, content, mime) {
+  // ① 服务端真实 URL（首选）
+  try {
+    const { baseUrl, apiToken } = useStore.getState().moonMemory || {}
+    if (apiToken) {
+      const base = (baseUrl || 'https://memory.ravenlove.cc').replace(/\/$/, '')
+      const r = await fetch(`${base}/files/stash`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiToken}` },
+        body: JSON.stringify({ filename, content, mime }),
+      })
+      if (r.ok) {
+        const { id } = await r.json()
+        const a = document.createElement('a')
+        a.href = `${base}/files/dl/${id}`
+        document.body.appendChild(a)
+        a.click()
+        a.remove()
+        showToast('下载已交给系统，看通知栏进度，存在 Download 文件夹')
+        return
+      }
+    }
+  } catch { /* 服务器不通，落回分享面板 */ }
   const blob = new Blob([content], { type: mime })
+  // ② 分享面板
   try {
     let file = new File([blob], filename, { type: blob.type })
     if (!navigator.canShare?.({ files: [file] })) {
@@ -188,6 +214,7 @@ async function saveTextFile(filename, content, mime) {
     if (e?.name === 'AbortError') return // 她自己关掉了分享面板，不算失败，安静退场
     // 其他错误落回锚点下载
   }
+  // ③ blob 锚点（浏览器标签页里好使，PWA 里可能哑——所以只当兜底）
   try {
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
@@ -197,7 +224,7 @@ async function saveTextFile(filename, content, mime) {
     a.click()
     a.remove()
     setTimeout(() => URL.revokeObjectURL(url), 5000)
-    showToast('已开始下载，去通知栏或 Download 文件夹找')
+    showToast('尝试浏览器下载了，若没收到通知，点「预览」后用菜单保存')
   } catch {
     showToast('下载没成功，点「预览」打开后用浏览器菜单保存吧', 'error')
   }
