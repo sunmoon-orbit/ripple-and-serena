@@ -59,6 +59,7 @@ dependencies {
     implementation("androidx.appcompat:appcompat:1.7.0")
     implementation("androidx.webkit:webkit:1.12.1")
     implementation("com.google.android.material:material:1.12.0")
+    implementation("androidx.media:media:1.7.0")
 
     // FCM push
     implementation(platform("com.google.firebase:firebase-bom:33.7.0"))

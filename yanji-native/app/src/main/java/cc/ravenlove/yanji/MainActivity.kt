@@ -27,6 +27,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var webView: WebView
     private lateinit var splash: FrameLayout
     private var fileCallback: ValueCallback<Array<Uri>>? = null
+    lateinit var mediaHelper: MediaNotificationHelper
 
     companion object {
         private const val FILE_CHOOSER_CODE = 1001
@@ -137,6 +138,16 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
+        // 媒体通知：歌曲信息显示在通知栏+锁屏，通知栏按钮回调 JS
+        mediaHelper = MediaNotificationHelper(this)
+        mediaHelper.onAction = { action ->
+            runOnUiThread {
+                webView.evaluateJavascript(
+                    "window.__yanjiMediaAction && window.__yanjiMediaAction('$action')", null
+                )
+            }
+        }
+
         // JS bridge：让前端知道自己在原生 app 里
         webView.addJavascriptInterface(WebBridge(this), "YanjiNative")
 
@@ -157,6 +168,13 @@ class MainActivity : AppCompatActivity() {
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
+        if (intent.action == "MEDIA_ACTION") {
+            val action = intent.getStringExtra("media_action") ?: return
+            webView.evaluateJavascript(
+                "window.__yanjiMediaAction && window.__yanjiMediaAction('$action')", null
+            )
+            return
+        }
         handleShareIntent(intent)
     }
 
@@ -243,6 +261,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     override fun onDestroy() {
+        mediaHelper.release()
         webView.destroy()
         super.onDestroy()
     }
