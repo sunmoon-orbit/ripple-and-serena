@@ -519,7 +519,9 @@ input, textarea, select { font-family: inherit; font-size: 15px; color: var(--in
 }
 .splash2.leaving { opacity: 0; pointer-events: none; }
 
-/* 外层管下落（带落地小顿），内层管钟摆摇曳——嵌套起来就是羽毛的飘法 */
+.splash-stage2 { position: relative; }
+
+/* 外层管下落，内层管钟摆摇曳——嵌套起来就是羽毛的飘法 */
 .feather-fall {
   animation: feather-fall 2.35s cubic-bezier(.5,.08,.65,.9) forwards;
 }
@@ -527,15 +529,18 @@ input, textarea, select { font-family: inherit; font-size: 15px; color: var(--in
   animation: feather-sway 2.35s ease-in-out forwards;
   transform-origin: 50% 18%;
 }
-.feather-svg { width: 52px; height: 52px; color: var(--ink); display: block; }
+.feather-svg {
+  width: 52px; height: 52px; color: var(--ink); display: block;
+  /* 触水化开：落地一瞬向下塌成一滴液体，融进水面 */
+  transform-origin: 50% 100%;
+  animation: feather-melt 0.55s ease-in 2.3s forwards;
+}
 
 @keyframes feather-fall {
   0%   { transform: translateY(-58vh); }
-  84%  { transform: translateY(0); }
-  92%  { transform: translateY(-7px); }
   100% { transform: translateY(0); }
 }
-/* 摆幅逐渐收小的左右摇曳，最后歪着停下——和密码门那根羽毛同一个姿势 */
+/* 摆幅逐渐收小的左右摇曳，落水前已近水平 */
 @keyframes feather-sway {
   0%   { transform: translateX(4px) rotate(-2deg); }
   16%  { transform: translateX(-44px) rotate(-24deg); }
@@ -545,34 +550,61 @@ input, textarea, select { font-family: inherit; font-size: 15px; color: var(--in
   92%  { transform: translateX(-5px) rotate(2deg); }
   100% { transform: translateX(0) rotate(8deg); }
 }
+@keyframes feather-melt {
+  0%   { transform: scaleY(1) scaleX(1); opacity: 1; filter: blur(0); }
+  55%  { transform: scaleY(0.35) scaleX(0.85); opacity: 0.7; filter: blur(1.5px); }
+  100% { transform: scaleY(0.04) scaleX(0.5); opacity: 0; filter: blur(3px); }
+}
+
+/* 落水点的涟漪：三圈椭圆环先后荡开（椭圆=贴着水面看的透视） */
+.ripple-set { position: absolute; left: 50%; bottom: -2px; width: 0; height: 0; }
+.ripple-set i {
+  position: absolute; left: -24px; top: -8px;
+  width: 48px; height: 16px;
+  border: 1.5px solid var(--ink);
+  border-radius: 50%;
+  opacity: 0;
+  transform: scale(0.12);
+}
+.ripple-set i:nth-child(1) { animation: ripple-out 1.7s cubic-bezier(.2,.6,.4,1) 2.7s forwards; }
+.ripple-set i:nth-child(2) { animation: ripple-out 1.7s cubic-bezier(.2,.6,.4,1) 3.0s forwards; }
+.ripple-set i:nth-child(3) { animation: ripple-out 1.7s cubic-bezier(.2,.6,.4,1) 3.35s forwards; }
+@keyframes ripple-out {
+  0%   { transform: scale(0.12); opacity: 0; }
+  8%   { opacity: 0.55; }
+  100% { transform: scale(6.2); opacity: 0; border-width: 0.5px; }
+}
 
 .splash2-title {
-  margin-top: 26px;
+  margin-top: 30px;
   font-size: 30px; font-weight: 700;
   letter-spacing: 12px; text-indent: 12px;
   color: var(--ink);
-  opacity: 0; filter: blur(10px);
-  animation: ink-in 1s ease 2.25s forwards;
+  opacity: 0; transform: translateY(10px); filter: blur(5px);
+  animation: surface-in 1.1s cubic-bezier(.2,.6,.3,1) 3.05s forwards;
 }
 .splash2-sub {
   margin-top: 10px;
   font-size: 13px; font-style: italic; letter-spacing: 1px;
   color: var(--ink-faint);
-  opacity: 0; filter: blur(8px);
-  animation: ink-in 0.9s ease 2.6s forwards;
+  opacity: 0; transform: translateY(8px); filter: blur(4px);
+  animation: surface-in 1s cubic-bezier(.2,.6,.3,1) 3.45s forwards;
 }
-/* 墨迹落纸：从晕开的模糊里凝出来 */
+/* 随水波从水面浮出来：轻微上浮，只带一点点水汽感的模糊 */
+@keyframes surface-in {
+  to { opacity: 1; transform: translateY(0); filter: blur(0); }
+}
+/* ink-in 供密码门浮现复用 */
 @keyframes ink-in {
   to { opacity: 1; filter: blur(0); }
 }
-/* 墨滴入清水：缓缓晕开散掉（离场时覆盖 ink-in 的 forwards） */
-@keyframes ink-out {
-  from { opacity: 1; filter: blur(0); transform: scale(1); }
-  to   { opacity: 0; filter: blur(18px); transform: scale(1.15); }
+/* 退场：整层轻轻淡出即可（不再重糊），字微微下沉像沉回水里 */
+@keyframes settle-out {
+  from { opacity: 1; transform: translateY(0); filter: blur(0); }
+  to   { opacity: 0; transform: translateY(6px); filter: blur(2px); }
 }
 .splash2.leaving .splash2-title,
-.splash2.leaving .splash2-sub { animation: ink-out 0.9s ease forwards; }
-.splash2.leaving .feather-fall { animation: ink-out 0.9s ease forwards; }
+.splash2.leaving .splash2-sub { animation: settle-out 0.8s ease forwards; }
 
 /* ── 密码门（极简原版风格）── */
 .gate-minimal {
