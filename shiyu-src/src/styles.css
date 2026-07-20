@@ -475,10 +475,6 @@ input, textarea, select { font-family: inherit; font-size: 15px; color: var(--in
   font-size: 32px; font-weight: 600;
   color: var(--ink); letter-spacing: 1px; line-height: 1.1;
 }
-.gate-brand-title.plume-title {
-  font-size: 48px; letter-spacing: 2px;
-}
-
 /* ── 纪念日卡片 ── */
 .anniv {
   background: linear-gradient(135deg, var(--olive-active) 0%, var(--olive-mid) 100%);
@@ -513,50 +509,70 @@ input, textarea, select { font-family: inherit; font-size: 15px; color: var(--in
   padding: 14px 18px; margin: 12px 0; font-size: 14px;
 }
 
-/* ── 开场动画 ── */
-.splash {
+/* ── 开场动画：羽毛飘落 + 墨晕（2026-07-20 重做） ── */
+.splash2 {
   position: fixed; inset: 0; z-index: 100;
   background: var(--bg);
-  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 30px;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  transition: opacity 0.9s ease;
+  cursor: pointer;
 }
-.splash-stage { display: flex; gap: 28px; align-items: flex-end; height: 84px; }
-.ball-col { display: flex; flex-direction: column; align-items: center; gap: 10px; }
-.ball { width: 28px; height: 28px; border-radius: 50%; }
-.ball-accent {
-  background: radial-gradient(circle at 35% 28%, #FFB060, #E85810 78%);
-  box-shadow: 0 8px 18px rgba(232,88,16,0.38);
-  animation: bounce 0.80s cubic-bezier(.42,.0,.58,1) infinite;
-}
-.ball-raven {
-  background: radial-gradient(circle at 33% 28%, #3A3A38, #090906 78%);
-  box-shadow: 0 8px 18px rgba(0,0,0,0.38);
-  animation: bounce 0.80s cubic-bezier(.42,.0,.58,1) infinite 0.18s;
-}
-.ball-shadow {
-  width: 28px; height: 5px; border-radius: 50%;
-  background: rgba(30,27,22,0.18);
-  animation: ball-shadow 0.80s cubic-bezier(.42,.0,.58,1) infinite;
-}
-.ball-shadow.delay { animation-delay: 0.18s; }
+.splash2.leaving { opacity: 0; pointer-events: none; }
 
-/* 更夸张的压扁：落地时横向拉宽，腾空时纵向拉长 */
-@keyframes bounce {
-  0%   { transform: translateY(0)    scaleX(1.45) scaleY(0.62); }
-  12%  { transform: translateY(-16px) scaleX(0.96) scaleY(1.04); }
-  50%  { transform: translateY(-58px) scaleX(0.88) scaleY(1.16); }
-  88%  { transform: translateY(-16px) scaleX(0.96) scaleY(1.04); }
-  100% { transform: translateY(0)    scaleX(1.45) scaleY(0.62); }
+/* 外层管下落（带落地小顿），内层管钟摆摇曳——嵌套起来就是羽毛的飘法 */
+.feather-fall {
+  animation: feather-fall 2.35s cubic-bezier(.5,.08,.65,.9) forwards;
 }
-@keyframes ball-shadow {
-  0%,100% { transform: scaleX(1.3); opacity: 0.22; }
-  50%     { transform: scaleX(0.4); opacity: 0.09; }
+.feather-sway {
+  animation: feather-sway 2.35s ease-in-out forwards;
+  transform-origin: 50% 18%;
 }
-.splash-title {
-  font-size: 22px; font-weight: 700; letter-spacing: 4px;
-  color: var(--olive-active);
-  opacity: 0; animation: title-in 0.6s ease 0.5s forwards;
+.feather-svg { width: 52px; height: 52px; color: var(--ink); display: block; }
+
+@keyframes feather-fall {
+  0%   { transform: translateY(-58vh); }
+  84%  { transform: translateY(0); }
+  92%  { transform: translateY(-7px); }
+  100% { transform: translateY(0); }
 }
-@keyframes title-in { to { opacity: 1; } }
+/* 摆幅逐渐收小的左右摇曳，最后歪着停下——和密码门那根羽毛同一个姿势 */
+@keyframes feather-sway {
+  0%   { transform: translateX(4px) rotate(-2deg); }
+  16%  { transform: translateX(-44px) rotate(-24deg); }
+  38%  { transform: translateX(40px) rotate(22deg); }
+  60%  { transform: translateX(-28px) rotate(-15deg); }
+  78%  { transform: translateX(16px) rotate(11deg); }
+  92%  { transform: translateX(-5px) rotate(2deg); }
+  100% { transform: translateX(0) rotate(8deg); }
+}
+
+.splash2-title {
+  margin-top: 26px;
+  font-size: 30px; font-weight: 700;
+  letter-spacing: 12px; text-indent: 12px;
+  color: var(--ink);
+  opacity: 0; filter: blur(10px);
+  animation: ink-in 1s ease 2.25s forwards;
+}
+.splash2-sub {
+  margin-top: 10px;
+  font-size: 13px; font-style: italic; letter-spacing: 1px;
+  color: var(--ink-faint);
+  opacity: 0; filter: blur(8px);
+  animation: ink-in 0.9s ease 2.6s forwards;
+}
+/* 墨迹落纸：从晕开的模糊里凝出来 */
+@keyframes ink-in {
+  to { opacity: 1; filter: blur(0); }
+}
+/* 墨滴入清水：缓缓晕开散掉（离场时覆盖 ink-in 的 forwards） */
+@keyframes ink-out {
+  from { opacity: 1; filter: blur(0); transform: scale(1); }
+  to   { opacity: 0; filter: blur(18px); transform: scale(1.15); }
+}
+.splash2.leaving .splash2-title,
+.splash2.leaving .splash2-sub { animation: ink-out 0.9s ease forwards; }
+.splash2.leaving .feather-fall { animation: ink-out 0.9s ease forwards; }
 
 /* ── 密码门（极简原版风格）── */
 .gate-minimal {
@@ -567,22 +583,23 @@ input, textarea, select { font-family: inherit; font-size: 15px; color: var(--in
   gap: 0; padding: 40px 32px;
 }
 
-.gate-feather {
-  width: 56px; height: 56px;
-  object-fit: contain;
-  margin-bottom: 22px;
-  opacity: 0.85;
+/* 开屏落下的那根羽毛，落地后歪着（角度和 feather-sway 结尾一致） */
+.gate-feather2 {
+  width: 46px; height: 46px;
+  color: var(--ink); opacity: 0.9;
+  margin-bottom: 20px;
+  transform: rotate(8deg);
 }
 
 .gate-brand { text-align: center; margin-bottom: 44px; }
-.gate-brand-title {
-  font-size: 36px; font-weight: 700;
-  color: var(--ink); letter-spacing: 8px;
+.gate-title-cn {
+  font-size: 32px; font-weight: 700;
+  color: var(--ink); letter-spacing: 12px; text-indent: 12px;
   line-height: 1;
 }
 .gate-brand-sub {
-  font-size: 14px; color: var(--ink-faint);
-  font-style: italic; margin-top: 10px;
+  font-size: 13px; color: var(--ink-faint);
+  font-style: italic; margin-top: 12px;
   letter-spacing: 0.5px;
 }
 
@@ -591,17 +608,60 @@ input, textarea, select { font-family: inherit; font-size: 15px; color: var(--in
   display: flex; flex-direction: column; gap: 12px;
 }
 
-.gate-input {
-  width: 100%; padding: 14px 20px;
-  background: var(--surface);
-  border: 1px solid var(--line);
-  border-radius: 14px;
-  font-size: 16px; text-align: center;
-  letter-spacing: 6px; color: var(--ink);
-  transition: border-color 0.18s;
+/* 墨线输入框：无框，聚焦时墨痕从中间向两侧洇开 */
+.ink-field { position: relative; }
+.ink-field::before {
+  content: ''; position: absolute; left: 0; right: 0; bottom: 0;
+  height: 1.5px; background: var(--line);
 }
-.gate-input:focus { outline: none; border-color: var(--olive-mid); }
-.gate-input::placeholder { letter-spacing: 2px; color: var(--ink-faint); font-size: 18px; }
+.ink-field::after {
+  content: ''; position: absolute; left: 50%; bottom: 0;
+  height: 1.5px; width: 0;
+  background: var(--ink);
+  transition: width 0.45s ease, left 0.45s ease;
+}
+.ink-field:focus-within::after { width: 100%; left: 0; }
+.ink-input {
+  width: 100%; padding: 12px 8px 13px;
+  background: transparent; border: none; border-radius: 0;
+  font-size: 18px; text-align: center;
+  letter-spacing: 8px; color: var(--ink);
+}
+.ink-input:focus { outline: none; }
+.ink-input::placeholder { letter-spacing: 2px; color: var(--ink-faint); font-size: 16px; }
+
+/* 解锁「进入」：有输入才浮现的一枚小墨字 */
+.gate-enter {
+  align-self: center; margin-top: 6px;
+  padding: 8px 26px; border-radius: 999px;
+  background: transparent; border: 1px solid var(--line);
+  color: var(--ink-faint); font-size: 14px; letter-spacing: 6px; text-indent: 6px;
+  opacity: 0; transform: translateY(4px); pointer-events: none;
+  transition: opacity 0.35s ease, transform 0.35s ease, color 0.2s, border-color 0.2s;
+}
+.gate-enter.show { opacity: 1; transform: translateY(0); pointer-events: auto; }
+.gate-enter:hover { color: var(--ink); border-color: var(--ink-faint); }
+
+/* 门随开屏墨晕浮现：羽毛→标题→输入区，一层层从模糊里凝出来 */
+.gate-ink .gate-feather2,
+.gate-ink .gate-brand,
+.gate-ink .gate-inputs { opacity: 0; filter: blur(8px); animation: ink-in 0.9s ease forwards; }
+.gate-ink .gate-feather2 { animation-delay: 0.05s; }
+.gate-ink .gate-brand   { animation-delay: 0.22s; }
+.gate-ink .gate-inputs  { animation-delay: 0.4s; }
+
+/* 解锁成功：整扇门化开放行 */
+.gate-ink { transition: opacity 0.42s ease, filter 0.42s ease; }
+.gate-ink.gate-out { opacity: 0; filter: blur(10px); pointer-events: none; }
+
+/* 密码错了轻轻晃头 */
+.gate-err-shake { animation: gate-shake 0.4s ease; }
+@keyframes gate-shake {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-6px); }
+  50% { transform: translateX(5px); }
+  75% { transform: translateX(-3px); }
+}
 
 .gate-btn {
   width: 100%; padding: 13px;
