@@ -54,12 +54,16 @@ const DEFAULTS = [
   { name: 'deepseek', url: 'https://api.deepseek.com/chat/completions', model: 'deepseek-v4-flash', key: '' },
   // glm-4-flash 免费档非推理模型；GLM 的 temperature 上限 <1，tempCap 压回
   { name: 'glm', url: 'https://open.bigmodel.cn/api/paas/v4/chat/completions', model: 'glm-4-flash', key: '', tempCap: 0.95 },
+  // kimi-k2.6 赠送金档（2026-07-20 阿颖薅的）：推理模型且温度锁死只许 1（tempLock），
+  // reasoning 占 max_tokens，minTokens 兜底防 200 上限的调用方喂不饱
+  { name: 'kimi', url: 'https://api.moonshot.cn/v1/chat/completions', model: 'kimi-k2.6', key: '', tempLock: 1, minTokens: 800 },
 ]
 
 // key 留空时按名字回退到 .env 的钥匙（阿颖面板里不用重抄一遍已存的）
 function envKeyFor(name, env) {
   if (/deepseek/i.test(name)) return env.DEEPSEEK_API_KEY
   if (/glm|智谱|zhipu|bigmodel/i.test(name)) return env.GLM_API_KEY
+  if (/kimi|moonshot|月之暗面/i.test(name)) return env.KIMI_API_KEY
   return null
 }
 
@@ -95,10 +99,13 @@ async function llmComplete(prompt, { maxTokens = 300, temperature = 1.0, message
     if (!key) { errors.push(`${p.name}: 无钥匙`); continue }
     let u
     try { u = new URL(p.url) } catch { errors.push(`${p.name}: 地址不合法`); continue }
-    const temp = p.tempCap ? Math.min(temperature, p.tempCap) : temperature
+    // tempLock=只许某个固定温度（kimi 只收 1）；tempCap=有上限压回（GLM <1）
+    const temp = p.tempLock != null ? p.tempLock : (p.tempCap ? Math.min(temperature, p.tempCap) : temperature)
+    // 推理模型 reasoning 占 max_tokens，minTokens 保底喂饱
+    const maxT = p.minTokens ? Math.max(maxTokens, p.minTokens) : maxTokens
     try {
       const text = await post(u.hostname, u.pathname + u.search, key, {
-        model: p.model, messages: msgs, max_tokens: maxTokens, temperature: temp,
+        model: p.model, messages: msgs, max_tokens: maxT, temperature: temp,
       })
       if (i > 0) console.log(`[llm] 主投手掉链子，${p.name} 顶上成功`)
       return text
