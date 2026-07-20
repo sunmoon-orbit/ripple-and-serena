@@ -1255,6 +1255,14 @@ textarea.form-input { display: block; margin: 8px 16px 12px; }
 .cursor-blink { animation: blink 1s step-end infinite; color: var(--accent); }
 .streaming .bubble-markdown::after { content: '▋'; color: var(--accent); animation: blink 1s step-end infinite; }
 
+/* 显影式浮现：流式新字带雾出现、几百毫秒变清晰（2026-07-20，和拾羽落水涟漪一套水系）
+   span 保持 inline（不用 inline-block，英文单词换行不被劈断）；both 兜住 delay 期间的雾态 */
+.reveal-char { animation: char-reveal 0.48s ease-out both; }
+@keyframes char-reveal {
+  from { opacity: 0; filter: blur(4px); }
+  to { opacity: 1; filter: blur(0); }
+}
+
 /* Message meta */
 .message-meta { display: flex; align-items: center; gap: 6px; }
 .message-time { font-size: 11px; color: var(--text-faint); }

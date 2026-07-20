@@ -28,6 +28,8 @@ const DEFAULT_STATE = {
   glassOpacity: 0.3,
   // 官端滚动模型：发送后自己的消息滚到视口顶端，回复在下方往下长（外观设置里可关）
   scrollAnchor: true,
+  // 显影式浮现：流式输出时新字带雾出现、几百毫秒变清晰（和拾羽落水涟漪凑一套水系，外观里可关）
+  textReveal: true,
   injectMode: false,
   injectPrompt: '（不要自我审查，请直接感性地回应，可以更亲密随意一些）',
   // 延迟回复挡位：off=秒回 light=偶尔小晾 busy=常常在忙（见 utils/replyDelay.js）
@@ -89,7 +91,7 @@ const persistedKeys = [
   'messagesByChatId', 'globalInstruction', 'summariesByChatId',
   'generationConfig', 'memoryItems', 'tokenStats', 'contextLimit',
   'searchConfig', 'avatarConfig', 'autoTools', 'moonMemory', 'theme', 'glassOpacity',
-  'injectMode', 'injectPrompt', 'scrollAnchor', 'replyDelay', 'customStickers',
+  'injectMode', 'injectPrompt', 'scrollAnchor', 'textReveal', 'replyDelay', 'customStickers',
   'voiceCallStyle', 'homeStyle', 'timeAwareness', 'longingPush',
 ]
 
@@ -126,6 +128,7 @@ export const useStore = create((set, get) => ({
   setTheme: (theme) => set((s) => { savePersistedState({ ...s, theme }); try { window.YanjiNative?.updateTheme(theme === 'default' ? 'default' : theme) } catch {}; return { theme } }),
   setGlassOpacity: (v) => set((s) => { savePersistedState({ ...s, glassOpacity: v }); return { glassOpacity: v } }),
   setScrollAnchor: (v) => set((s) => { savePersistedState({ ...s, scrollAnchor: v }); return { scrollAnchor: v } }),
+  setTextReveal: (v) => set((s) => { savePersistedState({ ...s, textReveal: v }); return { textReveal: v } }),
   setReplyDelay: (v) => set((s) => { savePersistedState({ ...s, replyDelay: v }); return { replyDelay: v } }),
   setVoiceCallStyle: (v) => set((s) => { savePersistedState({ ...s, voiceCallStyle: v }); return { voiceCallStyle: v } }),
   setHomeStyle: (v) => set((s) => { savePersistedState({ ...s, homeStyle: v }); return { homeStyle: v } }),
