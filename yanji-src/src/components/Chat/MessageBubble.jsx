@@ -119,8 +119,9 @@ function revealNewTail(root, prevLenRef) {
   prevLenRef.current = total
   // markdown 重解析可能让早段文本变短（比如 * 补齐成粗体），长度回退时只校准不动画
   if (total <= prev) return
-  // 首帧灌入长内容（恢复历史/一次性大 chunk）不逐字动画，避免几千个 span
-  if (total - prev > 300) return
+  // 首帧灌入超长内容（恢复历史）不逐字动画，避免几千个 span。
+  // ⚠️阈值别设太低：中转站可能把 SSE 攒成整段大 chunk 冲进来，300 会导致永远跳过没效果（0720 阿颖实测没看到）
+  if (total - prev > 1500) return
   let offset = 0
   let idx = 0
   for (const node of nodes) {
