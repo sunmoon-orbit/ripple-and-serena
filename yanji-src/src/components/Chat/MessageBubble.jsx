@@ -187,12 +187,15 @@ async function saveTextFile(filename, content, mime) {
       })
       if (r.ok) {
         const { id } = await r.json()
-        const a = document.createElement('a')
-        a.href = `${base}/files/dl/${id}`
-        document.body.appendChild(a)
-        a.click()
-        a.remove()
-        showToast('下载已交给系统，看通知栏进度，存在 Download 文件夹')
+        const dlUrl = `${base}/files/dl/${id}`
+        // PWA standalone 里 a.click() 对跨域 URL 静默失败（三轮实测确认），
+        // 隐藏 iframe 加载 Content-Disposition:attachment 的 URL 才能稳触发
+        const iframe = document.createElement('iframe')
+        iframe.style.display = 'none'
+        iframe.src = dlUrl
+        document.body.appendChild(iframe)
+        setTimeout(() => iframe.remove(), 60000)
+        showToast('下载已交给系统，看通知栏或 Download 文件夹')
         return
       }
     }
