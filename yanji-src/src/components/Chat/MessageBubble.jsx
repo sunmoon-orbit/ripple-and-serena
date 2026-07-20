@@ -169,78 +169,48 @@ function fileMime(name) {
 function fileBlobUrl(f) {
   return URL.createObjectURL(new Blob([f.content], { type: fileMime(f.filename) }))
 }
-// 保存文本文件到手机。0720 两轮实测：安卓 PWA（standalone）里 blob 锚点下载静默失败
-// （toast 弹了文件却不落地），分享面板也不弹——真正稳的只有「真实 HTTPS URL +
-// Content-Disposition: attachment」，Chrome 下载管理器会接手（通知栏有进度、落 Download）。
-// 所以顺序：① 服务端下投站（moon-memory /files/stash → /files/dl/:id）
-//          ② 分享面板  ③ blob 锚点  ④ 认输提示走「预览」。每条路都有 toast。
-async function saveTextFile(filename, content, mime) {
-  // ① 服务端真实 URL（首选）
-  try {
-    const { baseUrl, apiToken } = useStore.getState().moonMemory || {}
-    if (apiToken) {
-      const base = (baseUrl || 'https://memory.ravenlove.cc').replace(/\/$/, '')
-      const r = await fetch(`${base}/files/stash`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiToken}` },
-        body: JSON.stringify({ filename, content, mime }),
-      })
-      if (r.ok) {
-        const { id } = await r.json()
-        const dlUrl = `${base}/files/dl/${id}`
-        // PWA standalone 里 a.click()/iframe 对跨域 URL 都静默失败（四轮实测）；
-        // window.open 在 standalone 模式下打开 Chrome Custom Tab，
-        // Chrome 自己处理 Content-Disposition: attachment = 稳下载
-        window.open(dlUrl, '_blank')
-        showToast('正在用浏览器打开下载，留意通知栏')
-        return
-      }
-    }
-  } catch { /* 服务器不通，落回分享面板 */ }
-  const blob = new Blob([content], { type: mime })
-  // ② 分享面板
-  try {
-    let file = new File([blob], filename, { type: blob.type })
-    if (!navigator.canShare?.({ files: [file] })) {
-      // text/markdown 这类小众 MIME 有些系统分享面板不认，换 text/plain 再试一次
-      file = new File([new Blob([content], { type: 'text/plain' })], filename, { type: 'text/plain' })
-    }
-    if (navigator.canShare?.({ files: [file] })) {
-      await navigator.share({ files: [file], title: filename })
-      showToast('已交给分享面板，选「保存到设备/文件」就能存下')
-      return
-    }
-  } catch (e) {
-    if (e?.name === 'AbortError') return // 她自己关掉了分享面板，不算失败，安静退场
-    // 其他错误落回锚点下载
-  }
-  // ③ blob 锚点（浏览器标签页里好使，PWA 里可能哑——所以只当兜底）
-  try {
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = filename
-    document.body.appendChild(a) // 部分安卓 WebView/PWA 要求锚点挂在文档里才肯触发
-    a.click()
-    a.remove()
-    setTimeout(() => URL.revokeObjectURL(url), 5000)
-    showToast('尝试浏览器下载了，若没收到通知，点「预览」后用菜单保存')
-  } catch {
-    showToast('下载没成功，点「预览」打开后用浏览器菜单保存吧', 'error')
-  }
-}
-
-function downloadGenFile(f) {
-  return saveTextFile(f.filename, f.content, fileMime(f.filename))
+// 安卓 PWA standalone 模式下，一切「JavaScript 假装点击」都静默失败（a.click / iframe /
+// window.open，跨域更是全灭），只有用户真实手指点击真实 <a> 链接才能触发下载。
+// 所以 GenFileCard 的下载按钮分两步：第一次点击暂存到服务器拿到真实 URL，按钮变成
+// 真实 <a> 链接；第二次点击是用户真实手势 → Chrome 接管 → 稳下载。
+async function stashFile(filename, content, mime) {
+  const { baseUrl, apiToken } = useStore.getState().moonMemory || {}
+  if (!apiToken) return null
+  const base = (baseUrl || 'https://memory.ravenlove.cc').replace(/\/$/, '')
+  const r = await fetch(`${base}/files/stash`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiToken}` },
+    body: JSON.stringify({ filename, content, mime }),
+  })
+  if (!r.ok) return null
+  const { id } = await r.json()
+  return `${base}/files/dl/${id}`
 }
 function previewGenFile(f) {
-  // html 用 blob URL 新标签页打开，直接渲染
   const url = fileBlobUrl(f)
   window.open(url, '_blank')
   setTimeout(() => URL.revokeObjectURL(url), 60000)
 }
 function GenFileCard({ file }) {
   const isHtml = /\.html?$/i.test(file.filename)
+  const [dlUrl, setDlUrl] = useState(null)
+  const [stashing, setStashing] = useState(false)
+  const handleDownload = async () => {
+    if (dlUrl) return // 已有链接，让 <a> 的默认行为处理
+    setStashing(true)
+    try {
+      const url = await stashFile(file.filename, file.content, fileMime(file.filename))
+      if (url) {
+        setDlUrl(url)
+        showToast('链接已就绪，再点一次「下载」就能存到手机')
+      } else {
+        showToast('服务器暂存失败，点「预览」后用浏览器菜单保存', 'error')
+      }
+    } catch {
+      showToast('网络不通，点「预览」后用浏览器菜单保存', 'error')
+    }
+    setStashing(false)
+  }
   return (
     <div className="msg-file-card">
       <span className="msg-file-icon">
@@ -254,7 +224,12 @@ function GenFileCard({ file }) {
         <span className="msg-file-size">{(file.content.length / 1024).toFixed(1)} KB</span>
       </div>
       {isHtml && <button className="msg-file-btn" onClick={() => previewGenFile(file)}>预览</button>}
-      <button className="msg-file-btn" onClick={() => downloadGenFile(file)}>下载</button>
+      {dlUrl
+        ? <a className="msg-file-btn" href={dlUrl} style={{textDecoration:'none'}}>下载</a>
+        : <button className="msg-file-btn" onClick={handleDownload} disabled={stashing}>
+            {stashing ? '准备中…' : '下载'}
+          </button>
+      }
     </div>
   )
 }
@@ -389,6 +364,7 @@ export default function MessageBubble({ msg, onEdit, onQuote, onDelete, isLast }
   const useImages = avatarConfig?.mode === 'image'
   const avatarRadius = avatarConfig?.shape === 'square' ? '6px' : '50%'
   const [editing, setEditing] = useState(false)
+  const [replyDlUrl, setReplyDlUrl] = useState(null)
   const [ttsState, setTtsState] = useState('idle') // idle | loading | playing
   const [voiceMode, setVoiceMode] = useState(!!msg.voicemail) // 语音条模式：正文隐藏，显示音浪；语音留言默认就是语音条
   const [ttsDuration, setTtsDuration] = useState(0)
@@ -664,15 +640,25 @@ export default function MessageBubble({ msg, onEdit, onQuote, onDelete, isLast }
             </button>
           )}
           {!isUser && !isStreaming && (
-            <button className="msg-edit-icon-btn" title="下载为文件" onClick={() =>
-              saveTextFile(`reply-${msg.id || Date.now()}.md`, msg.content, 'text/markdown;charset=utf-8')
-            }>
-              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-                <polyline points="7 10 12 15 17 10"/>
-                <line x1="12" y1="15" x2="12" y2="3"/>
-              </svg>
-            </button>
+            replyDlUrl
+              ? <a className="msg-edit-icon-btn" href={replyDlUrl} title="点击下载" style={{textDecoration:'none'}}>
+                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                    <polyline points="7 10 12 15 17 10"/>
+                    <line x1="12" y1="15" x2="12" y2="3"/>
+                  </svg>
+                </a>
+              : <button className="msg-edit-icon-btn" title="下载为文件" onClick={async () => {
+                  const url = await stashFile(`reply-${msg.id || Date.now()}.md`, msg.content, 'text/markdown;charset=utf-8')
+                  if (url) { setReplyDlUrl(url); showToast('链接已就绪，再点一次下载图标') }
+                  else showToast('暂存失败，长按消息复制内容吧', 'error')
+                }}>
+                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                    <polyline points="7 10 12 15 17 10"/>
+                    <line x1="12" y1="15" x2="12" y2="3"/>
+                  </svg>
+                </button>
           )}
           {!isUser && !isStreaming && moonMemory?.enabled && (
             <button className={`msg-tts-btn${ttsState !== 'idle' ? ' active' : ''}`} onClick={playTts} title={ttsState === 'playing' ? '停止' : '朗读'}>
