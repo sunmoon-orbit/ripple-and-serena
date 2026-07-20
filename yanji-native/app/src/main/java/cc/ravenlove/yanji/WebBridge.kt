@@ -69,6 +69,18 @@ class WebBridge(private val activity: MainActivity) {
     }
 
     @JavascriptInterface
+    fun updateNowPlaying(title: String, artist: String, coverUrl: String, playing: Boolean, posMs: Long, durationMs: Long) {
+        activity.runOnUiThread {
+            activity.mediaHelper.update(title, artist, coverUrl, playing, posMs, durationMs)
+        }
+    }
+
+    @JavascriptInterface
+    fun clearNowPlaying() {
+        activity.runOnUiThread { activity.mediaHelper.clear() }
+    }
+
+    @JavascriptInterface
     fun updateTheme(themeId: String) {
         activity.getSharedPreferences("yanji_theme", Context.MODE_PRIVATE)
             .edit()

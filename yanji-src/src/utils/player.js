@@ -39,83 +39,79 @@ function ensureAudio() {
   return audio
 }
 
-// ── Media Session：锁屏/通知栏媒体卡片显示歌名+歌手+封面，而不是光秃秃的「言叽」──
-// 注意：只注册用得上的动作。不注册 next/prev，系统就不会画那两个没用的按钮。
-// APK 壳内：Android WebView 不支持 Media Session Web API，桥接到 @jofr/capacitor-media-session
-// 原生插件（同一套 API 形状），它还会起前台服务保住后台播放。插件由壳注入 window.Capacitor，
-// 网页版跑在 Chrome 里时 nativeMS() 恒为 null，走原有 navigator.mediaSession 路径。
-const APP_ART = 'https://sunmoon-orbit.github.io/ripple-and-serena/yanji/icon-512.png' // 绝对URL（推送图标的教训）
-function nativeMS() {
-  try {
-    return window.Capacitor?.isNativePlatform?.() ? window.Capacitor.Plugins?.MediaSession : null
-  } catch { return null }
+// ── Media Session：锁屏/通知栏媒体卡片显示歌名+歌手+封面 ──
+// 原生 APK（yanji-native）：WebView 不支持 Web MediaSession API，通过 YanjiNative JS bridge
+// 调 Kotlin 的 MediaNotificationHelper（真正的 Android MediaSession + MediaStyle 通知）。
+// 浏览器/PWA：走原有 navigator.mediaSession 路径。
+const APP_ART = 'https://sunmoon-orbit.github.io/ripple-and-serena/yanji/icon-512.png'
+function isNativeApp() { return !!window.YanjiNative?.isNative?.() }
+
+// 原生 app 的通知栏按钮回调入口（MainActivity 通过 evaluateJavascript 调用）
+window.__yanjiMediaAction = (action) => {
+  if (!audio) return
+  if (action === 'play') audio.play().catch(() => {})
+  else if (action === 'pause') audio.pause()
+  else if (action === 'stop') stop()
+  else if (action.startsWith('seek:')) { const ms = parseInt(action.slice(5)); if (isFinite(ms)) seek(ms / 1000) }
 }
+
 function initMediaSession() {
-  const n = nativeMS()
-  if (n) {
-    // 插件的 setActionHandler({action}, fn) 与 Web API 同义，逐个 try 同理
-    const reg = (action, fn) => { try { n.setActionHandler({ action }, fn) } catch {} }
-    reg('play', () => audio && audio.play().catch(() => {}))
-    reg('pause', () => audio && audio.pause())
-    reg('stop', () => stop())
-    reg('seekto', (d) => { if (d && d.seekTime != null) seek(d.seekTime) })
-    reg('previoustrack', () => seek(0))
-    return
-  }
+  if (isNativeApp()) return // 原生 app 的 action handler 在 Kotlin 侧注册
   if (!('mediaSession' in navigator)) return
-  // 每个 action 单独 try：某个不支持不能连累后面的（曾整块 try 导致 seekto 挂掉波及无从排查）
   const reg = (action, fn) => { try { navigator.mediaSession.setActionHandler(action, fn) } catch {} }
   reg('play', () => audio && audio.play().catch(() => {}))
   reg('pause', () => audio && audio.pause())
   reg('stop', () => stop())
   reg('seekto', (d) => { if (d.seekTime != null) seek(d.seekTime) })
-  reg('previoustrack', () => seek(0)) // 单曲播放器没队列：上一首=重头来
-}
-function buildMetadata() {
-  return {
-    title: state.track.name || '未知曲目',
-    artist: state.track.artist || '涟言点的歌',
-    album: '言叽',
-    artwork: [{ src: state.track.cover || APP_ART, sizes: '512x512' }],
-  }
+  reg('previoustrack', () => seek(0))
 }
 function syncMediaSession(playbackState) {
-  const n = nativeMS()
-  if (n) {
+  if (isNativeApp()) {
+    if (!state.track) return
     try {
-      if (playbackState === 'playing') initMediaSession()
-      n.setPlaybackState({ playbackState }).catch(() => {})
-      if (state.track) n.setMetadata(buildMetadata()).catch(() => {})
-    } catch { /* 元数据失败不影响播放 */ }
+      const posMs = Math.round((audio?.currentTime || 0) * 1000)
+      const durMs = Math.round((audio?.duration || 0) * 1000)
+      window.YanjiNative.updateNowPlaying(
+        state.track.name || '未知曲目',
+        state.track.artist || '涟言点的歌',
+        state.track.cover || APP_ART,
+        playbackState === 'playing',
+        posMs, durMs
+      )
+    } catch {}
     return
   }
   if (!('mediaSession' in navigator)) return
   try {
-    // 每次进入播放态重挂 handler：部分安卓 Chrome 会在会话重建后丢掉早先注册的 handler
     if (playbackState === 'playing') initMediaSession()
     navigator.mediaSession.playbackState = playbackState
     if (state.track) {
-      navigator.mediaSession.metadata = new MediaMetadata(buildMetadata())
+      navigator.mediaSession.metadata = new MediaMetadata({
+        title: state.track.name || '未知曲目',
+        artist: state.track.artist || '涟言点的歌',
+        album: '言叽',
+        artwork: [{ src: state.track.cover || APP_ART, sizes: '512x512' }],
+      })
     }
-  } catch { /* 元数据失败不影响播放 */ }
+  } catch {}
 }
 let lastNativePos = 0
 function syncPosition() {
-  const n = nativeMS()
-  if (n) {
-    // timeupdate ~4次/秒，过桥是 IPC，节流到 1 秒一次足够通知栏进度条用
+  if (isNativeApp()) {
     const now = Date.now()
     if (now - lastNativePos < 1000) return
     lastNativePos = now
+    if (!state.track || !audio || !isFinite(audio.duration) || audio.duration <= 0) return
     try {
-      if (audio && isFinite(audio.duration) && audio.duration > 0) {
-        n.setPositionState({
-          duration: audio.duration,
-          position: Math.min(audio.currentTime, audio.duration),
-          playbackRate: audio.playbackRate || 1,
-        }).catch(() => {})
-      }
-    } catch { /* 忽略 */ }
+      window.YanjiNative.updateNowPlaying(
+        state.track.name || '未知曲目',
+        state.track.artist || '涟言点的歌',
+        state.track.cover || APP_ART,
+        state.playing,
+        Math.round(audio.currentTime * 1000),
+        Math.round(audio.duration * 1000)
+      )
+    } catch {}
     return
   }
   if (!('mediaSession' in navigator) || !navigator.mediaSession.setPositionState) return
@@ -127,7 +123,7 @@ function syncPosition() {
         playbackRate: audio.playbackRate || 1,
       })
     }
-  } catch { /* 忽略 */ }
+  } catch {}
 }
 
 export function getState() { return { ...state } }
@@ -191,9 +187,8 @@ export function stop() {
   state.track = null
   state.lyrics = []
   emit()
-  const n = nativeMS()
-  if (n) {
-    try { n.setPlaybackState({ playbackState: 'none' }).catch(() => {}) } catch {} // none = 通知栏卡片收走
+  if (isNativeApp()) {
+    try { window.YanjiNative.clearNowPlaying() } catch {}
   } else if ('mediaSession' in navigator) {
     try { navigator.mediaSession.metadata = null; navigator.mediaSession.playbackState = 'none' } catch {}
   }

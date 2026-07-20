@@ -60,6 +60,11 @@
             android:name=".QuickReplyReceiver"
             android:exported="false" />
 
+        <!-- 媒体通知按钮（播放/暂停/停止）的 BroadcastReceiver -->
+        <receiver
+            android:name=".MediaActionReceiver"
+            android:exported="false" />
+
         <!-- 桌面小组件：纪念日+今日签 -->
         <receiver
             android:name=".YanjiWidget"
