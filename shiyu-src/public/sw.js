@@ -1,6 +1,6 @@
 // network-first：在线总拿最新，断网才回退缓存（让 PWA 可装、离线可看上次内容）。
 // 版本号变更时在 activate 清掉旧缓存，避免旧版本 HTML（含过期 theme-color）在网络抖动时被回退吐出。
-const CACHE = 'shiyu-v6';
+const CACHE = 'shiyu-v7';
 
 self.addEventListener('install', () => self.skipWaiting());
 self.addEventListener('activate', (e) => e.waitUntil((async () => {
