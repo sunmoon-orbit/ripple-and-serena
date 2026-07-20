@@ -1,4 +1,4 @@
-import { useRef, useState, useCallback, useEffect } from 'react'
+import { useRef, useState, useCallback, useEffect, useLayoutEffect } from 'react'
 import { marked } from 'marked'
 import hljs from 'highlight.js'
 import { formatTime, splitTranslation } from '../../utils'
@@ -100,9 +100,54 @@ function enhanceCodeBlocks(root) {
   })
 }
 
+// ── 显影式浮现 ──────────────────────────────────────────────────────────────
+// 流式输出时，新冒出来的字带一点雾（模糊+半透明）几百毫秒内变清晰——像相纸显影。
+// 每个 chunk 到来时 dangerouslySetInnerHTML 会整体重设 DOM，所以只把「上次渲染之后
+// 新增的尾巴」逐字包 span 做动画，旧字直接清晰呈现不重播（长消息不卡）。
+// 和拾羽开场的落水涟漪凑成一套水系语言（2026-07-20 阿颖点单，方案 A）。
+function revealNewTail(root, prevLenRef) {
+  if (!root) return
+  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
+    acceptNode: (n) =>
+      // 代码块里的字不做显影：别打散 hljs 的高亮结构，也省性能
+      n.parentElement?.closest('pre, code') ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT,
+  })
+  const nodes = []
+  let total = 0
+  while (walker.nextNode()) { nodes.push(walker.currentNode); total += walker.currentNode.data.length }
+  const prev = prevLenRef.current
+  prevLenRef.current = total
+  // markdown 重解析可能让早段文本变短（比如 * 补齐成粗体），长度回退时只校准不动画
+  if (total <= prev) return
+  // 首帧灌入长内容（恢复历史/一次性大 chunk）不逐字动画，避免几千个 span
+  if (total - prev > 300) return
+  let offset = 0
+  let idx = 0
+  for (const node of nodes) {
+    const len = node.data.length
+    const start = Math.max(prev - offset, 0)
+    offset += len
+    if (start >= len) continue
+    const frag = document.createDocumentFragment()
+    if (start > 0) frag.appendChild(document.createTextNode(node.data.slice(0, start)))
+    for (const ch of node.data.slice(start)) { // for...of 按码点切，CJK/emoji 不劈半
+      const s = document.createElement('span')
+      s.className = 'reveal-char'
+      s.style.animationDelay = `${Math.min(idx * 14, 280)}ms`
+      s.textContent = ch
+      frag.appendChild(s)
+      idx++
+    }
+    node.parentNode.replaceChild(frag, node)
+  }
+}
+
 // markdown 正文容器：渲染后把 html 代码块升级成可运行（流式期间不升级，避免跑半截代码）
-function MarkdownBlock({ html, enhance = true, className = 'bubble-markdown' }) {
+function MarkdownBlock({ html, enhance = true, reveal = false, className = 'bubble-markdown' }) {
   const ref = useRef(null)
+  const prevLenRef = useRef(0)
+  // useLayoutEffect：在浏览器绘制前把新字包上雾，避免先闪清晰再变糊
+  useLayoutEffect(() => { if (reveal) revealNewTail(ref.current, prevLenRef) }, [html, reveal])
   useEffect(() => { if (enhance) enhanceCodeBlocks(ref.current) }, [html, enhance])
   return <div ref={ref} className={className} dangerouslySetInnerHTML={{ __html: html }} />
 }
@@ -160,7 +205,7 @@ function GenFileCard({ file }) {
 }
 
 // 助手正文：把 [music:歌名|歌手|理由] 标签渲染成点歌卡片，其余按 markdown 渲染
-function renderAssistantContent(content, isStreaming) {
+function renderAssistantContent(content, isStreaming, reveal = false) {
   if (!content) {
     return <div className="bubble-markdown" dangerouslySetInnerHTML={{ __html: isStreaming ? '<span class="cursor-blink">▌</span>' : '' }} />
   }
@@ -169,7 +214,7 @@ function renderAssistantContent(content, isStreaming) {
   if (biZh) {
     return (
       <>
-        {renderAssistantContent(biMain, isStreaming)}
+        {renderAssistantContent(biMain, isStreaming, reveal)}
         <div className="bubble-zh">
           <span className="bubble-zh-badge">中</span>
           {biZh}
@@ -178,7 +223,7 @@ function renderAssistantContent(content, isStreaming) {
     )
   }
   if (!MUSIC_TAG_RE.test(content)) {
-    return <MarkdownBlock html={parseMarkdown(content)} enhance={!isStreaming} />
+    return <MarkdownBlock html={parseMarkdown(content)} enhance={!isStreaming} reveal={isStreaming && reveal} />
   }
   const parts = content.split(/(\[music:[^\]]+\])/)
   return (
@@ -191,7 +236,7 @@ function renderAssistantContent(content, isStreaming) {
           return <MusicCard key={i} name={name} artist={artist} reason={reason} />
         }
         return part.trim()
-          ? <MarkdownBlock key={i} html={parseMarkdown(part)} enhance={!isStreaming} />
+          ? <MarkdownBlock key={i} html={parseMarkdown(part)} enhance={!isStreaming} reveal={isStreaming && reveal} />
           : null
       })}
     </>
@@ -285,7 +330,7 @@ export default function MessageBubble({ msg, onEdit, onQuote, onDelete, isLast }
   const isStreaming = msg.streaming
   // [错误] 气泡（请求失败落盘的）：给一个删除钮，能从记录里刷掉
   const isErrorMsg = !isUser && typeof msg.content === 'string' && msg.content.startsWith('[错误]')
-  const { avatarConfig, moonMemory } = useStore()
+  const { avatarConfig, moonMemory, textReveal } = useStore()
   const useImages = avatarConfig?.mode === 'image'
   const avatarRadius = avatarConfig?.shape === 'square' ? '6px' : '50%'
   const [editing, setEditing] = useState(false)
@@ -506,7 +551,7 @@ export default function MessageBubble({ msg, onEdit, onQuote, onDelete, isLast }
               {msg.voicemail && <span className="vb-vm-label">留言</span>}
             </div>
           ) : (
-            renderAssistantContent(msg.content, isStreaming)
+            renderAssistantContent(msg.content, isStreaming, textReveal !== false)
           )}
         </div>
         {!isUser && msg.files?.length > 0 && (

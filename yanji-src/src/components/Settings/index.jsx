@@ -228,6 +228,7 @@ export default function Settings() {
     setGlobalInstruction, setGenerationConfig, setContextLimit, setSearchConfig,
     setAutoTools, setMoonMemory, setTheme, setGlassOpacity, setAvatarConfig, setScrollAnchor,
     setInjectMode, setInjectPrompt, replyDelay, setReplyDelay,
+    textReveal, setTextReveal,
     voiceCallStyle, setVoiceCallStyle,
     homeStyle, setHomeStyle,
     timeAwareness, setTimeAwareness, longingPush, setLongingPush,
@@ -1003,6 +1004,18 @@ export default function Settings() {
                   </label>
                 </div>
                 <p className="card-hint">开启后，发出的消息会滚到屏幕顶端，回复在下方展开（Claude 官方 App 的滚动方式）；关闭则保持跟随最新消息。</p>
+              </div>
+            </Section>
+            <Section title="文字显影">
+              <div className="settings-card">
+                <div className="card-row">
+                  <span className="card-row-label">流式文字显影式浮现</span>
+                  <label className="toggle">
+                    <input type="checkbox" checked={textReveal !== false} onChange={(e) => setTextReveal(e.target.checked)} />
+                    <span className="toggle-track" />
+                  </label>
+                </div>
+                <p className="card-hint">涟言回复时，新出现的字带一层薄雾、几百毫秒内变清晰——像相纸显影。和拾羽开场的落水涟漪是一套水系语言。觉得晃眼可以关。</p>
               </div>
             </Section>
             <Section title="表情包管理">
