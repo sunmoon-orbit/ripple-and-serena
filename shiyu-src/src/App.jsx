@@ -22,7 +22,8 @@ export default function App() {
   const panel = useStore((s) => s.panel)
   const memoryView = useStore((s) => s.memoryView)
   const setPanel = useStore((s) => s.setPanel)
-  const [splash, setSplash] = useState(true)
+  const [splashGone, setSplashGone] = useState(false) // 开屏完全卸载
+  const [gateVisible, setGateVisible] = useState(false) // 开屏开始晕开时，门在底下浮现
   const [unlocked, setUnlocked] = useState(false)
 
   useEffect(() => {
@@ -34,8 +35,13 @@ export default function App() {
     if (meta) meta.setAttribute('content', color)
   }, [theme])
 
-  if (splash) return <Splash onDone={() => setSplash(false)} />
-  if (!unlocked) return <PasswordGate onUnlock={() => setUnlocked(true)} />
+  // 开屏和密码门交叠：字晕开的同时门从底下浮出来，不硬切
+  if (!unlocked) return (
+    <>
+      {gateVisible && <PasswordGate onUnlock={() => setUnlocked(true)} />}
+      {!splashGone && <Splash onLeave={() => setGateVisible(true)} onDone={() => setSplashGone(true)} />}
+    </>
+  )
 
   return (
     <div className="app">
