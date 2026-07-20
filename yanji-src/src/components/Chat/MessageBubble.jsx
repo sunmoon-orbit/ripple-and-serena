@@ -224,7 +224,7 @@ function renderAssistantContent(content, isStreaming, reveal = false) {
     )
   }
   if (!MUSIC_TAG_RE.test(content)) {
-    return <MarkdownBlock html={parseMarkdown(content)} enhance={!isStreaming} reveal={isStreaming && reveal} />
+    return <MarkdownBlock html={parseMarkdown(content)} enhance={!isStreaming} reveal={reveal} />
   }
   const parts = content.split(/(\[music:[^\]]+\])/)
   return (
@@ -237,7 +237,7 @@ function renderAssistantContent(content, isStreaming, reveal = false) {
           return <MusicCard key={i} name={name} artist={artist} reason={reason} />
         }
         return part.trim()
-          ? <MarkdownBlock key={i} html={parseMarkdown(part)} enhance={!isStreaming} reveal={isStreaming && reveal} />
+          ? <MarkdownBlock key={i} html={parseMarkdown(part)} enhance={!isStreaming} reveal={reveal} />
           : null
       })}
     </>
@@ -411,6 +411,9 @@ export default function MessageBubble({ msg, onEdit, onQuote, onDelete, isLast }
   const [voiceTextMode, setVoiceTextMode] = useState(false)
   // 有些模型/代理把 <think>/<next_thinking>/<reasoning> 等标签塞进思考文本里，展示时剥掉
   const thinkingText = (msg.thinking || '').replace(/<\/?[a-zA-Z_][\w:-]*>/g, '').trim()
+  // 显影兜底：中转站可能不流式/延迟回复是整条一次到的，isStreaming 全程 false 就永远不显影。
+  // 挂载时判断消息是否「新鲜」（8s 内创建），新鲜就整体显影一次；翻旧记录不触发（0720 阿颖实测二连没看到雾）
+  const freshRevealRef = useRef(!isUser && Date.now() - new Date(msg.createdAt).getTime() < 8000)
 
   return (
     <div data-mid={msg.id} className={`message-row ${isUser ? 'message-row-user' : 'message-row-assistant'}${isLast ? ' msg-last' : ''}`}>
@@ -552,7 +555,7 @@ export default function MessageBubble({ msg, onEdit, onQuote, onDelete, isLast }
               {msg.voicemail && <span className="vb-vm-label">留言</span>}
             </div>
           ) : (
-            renderAssistantContent(msg.content, isStreaming, textReveal !== false)
+            renderAssistantContent(msg.content, isStreaming, textReveal !== false && (isStreaming || freshRevealRef.current))
           )}
         </div>
         {!isUser && msg.files?.length > 0 && (
