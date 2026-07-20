@@ -110,7 +110,6 @@ function revealNewTail(root, prevLenRef) {
   if (!root) return
   const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
     acceptNode: (n) =>
-      // 代码块里的字不做显影：别打散 hljs 的高亮结构，也省性能
       n.parentElement?.closest('pre, code') ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT,
   })
   const nodes = []
@@ -118,11 +117,13 @@ function revealNewTail(root, prevLenRef) {
   while (walker.nextNode()) { nodes.push(walker.currentNode); total += walker.currentNode.data.length }
   const prev = prevLenRef.current
   prevLenRef.current = total
-  // markdown 重解析可能让早段文本变短（比如 * 补齐成粗体），长度回退时只校准不动画
   if (total <= prev) return
-  // 首帧灌入超长内容（恢复历史）不逐字动画，避免几千个 span。
-  // ⚠️阈值别设太低：中转站可能把 SSE 攒成整段大 chunk 冲进来，300 会导致永远跳过没效果（0720 阿颖实测没看到）
-  if (total - prev > 1500) return
+  const delta = total - prev
+  // 临时诊断：看看中转站每帧推了多少字（确认后删）
+  if (prev === 0 && delta > 20) console.log(`[reveal] 首帧 delta=${delta}`)
+  // 超长首帧限制放宽：只在恢复历史（非流式 prevLenRef 初始化时）才跳过，
+  // 流式中即使 chunk 很大也做显影（上限 200 个 span 防卡）
+  if (delta > 5000) return
   let offset = 0
   let idx = 0
   for (const node of nodes) {
@@ -132,12 +133,17 @@ function revealNewTail(root, prevLenRef) {
     if (start >= len) continue
     const frag = document.createDocumentFragment()
     if (start > 0) frag.appendChild(document.createTextNode(node.data.slice(0, start)))
-    for (const ch of node.data.slice(start)) { // for...of 按码点切，CJK/emoji 不劈半
-      const s = document.createElement('span')
-      s.className = 'reveal-char'
-      s.style.animationDelay = `${Math.min(idx * 14, 280)}ms`
-      s.textContent = ch
-      frag.appendChild(s)
+    const MAX_REVEAL = 200
+    for (const ch of node.data.slice(start)) {
+      if (idx < MAX_REVEAL) {
+        const s = document.createElement('span')
+        s.className = 'reveal-char'
+        s.style.animationDelay = `${Math.min(idx * 14, 280)}ms`
+        s.textContent = ch
+        frag.appendChild(s)
+      } else {
+        frag.appendChild(document.createTextNode(ch))
+      }
       idx++
     }
     node.parentNode.replaceChild(frag, node)
