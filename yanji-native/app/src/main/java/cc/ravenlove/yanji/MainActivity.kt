@@ -2,6 +2,7 @@ package cc.ravenlove.yanji
 
 import android.Manifest
 import android.annotation.SuppressLint
+import android.app.DownloadManager
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -9,10 +10,12 @@ import android.graphics.Color
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.os.Environment
 import android.view.View
 import android.webkit.*
 import android.widget.FrameLayout
 import android.widget.TextView
+import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
@@ -110,6 +113,27 @@ class MainActivity : AppCompatActivity() {
                         it.grant(it.resources)
                     }
                 }
+            }
+        }
+
+        // WebView 不自带下载能力——Content-Disposition: attachment 的响应会被吞掉。
+        // 必须用 DownloadListener 把下载交给系统 DownloadManager。
+        webView.setDownloadListener { url, userAgent, contentDisposition, mimeType, _ ->
+            try {
+                val request = DownloadManager.Request(Uri.parse(url)).apply {
+                    setMimeType(mimeType)
+                    addRequestHeader("User-Agent", userAgent)
+                    val rawName = URLUtil.guessFileName(url, contentDisposition, mimeType)
+                    val fileName = Uri.decode(rawName)
+                    setTitle(fileName)
+                    setDescription("言叽文件下载")
+                    setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
+                    setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, fileName)
+                }
+                (getSystemService(DOWNLOAD_SERVICE) as DownloadManager).enqueue(request)
+                Toast.makeText(this, "开始下载，去通知栏或 Download 文件夹找", Toast.LENGTH_SHORT).show()
+            } catch (e: Exception) {
+                Toast.makeText(this, "下载失败: ${e.message}", Toast.LENGTH_LONG).show()
             }
         }
 
