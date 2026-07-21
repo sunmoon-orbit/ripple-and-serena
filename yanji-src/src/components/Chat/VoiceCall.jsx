@@ -227,7 +227,7 @@ export default function VoiceCall({ onClose, onSend }) {
     }
     let stream
     try {
-      stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+      stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, channelCount: 1 } })
     } catch (e) {
       showToast('麦克风打不开：' + (e.message || e.name), 'error', 5000); return
     }
