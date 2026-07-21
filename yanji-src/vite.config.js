@@ -7,5 +7,6 @@ export default defineConfig({
   build: {
     outDir: '../yanji',
     emptyOutDir: true,
+    sourcemap: true,
   },
 })
