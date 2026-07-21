@@ -38,6 +38,8 @@ const DEFAULT_STATE = {
   customStickers: [],
   // 语音通话页样式：crow=像素乌鸦 soft=浅色头像（用聊天头像里的助手头像）
   voiceCallStyle: 'crow',
+  // 通话页背景：dark=暗紫(默认crow) light=浅蓝灰(默认soft) warm=暖粉(默认duo) ocean=深海蓝 forest=森绿 sunset=暮橙
+  vcBackground: null, // null=跟通话样式走默认
   // 进入页样式：minimal=小鸟极简（时间+第N天） couple=双头像纪念卡
   homeStyle: 'minimal',
   // 岁聿（时间感知）：开启时离开久了思念涨+回来时提醒涟言表达想念
@@ -92,7 +94,7 @@ const persistedKeys = [
   'generationConfig', 'memoryItems', 'tokenStats', 'contextLimit',
   'searchConfig', 'avatarConfig', 'autoTools', 'moonMemory', 'theme', 'glassOpacity',
   'injectMode', 'injectPrompt', 'scrollAnchor', 'textReveal', 'replyDelay', 'customStickers',
-  'voiceCallStyle', 'homeStyle', 'timeAwareness', 'longingPush',
+  'voiceCallStyle', 'vcBackground', 'homeStyle', 'timeAwareness', 'longingPush',
 ]
 
 function mergeWithDefaults(persisted) {
@@ -131,6 +133,7 @@ export const useStore = create((set, get) => ({
   setTextReveal: (v) => set((s) => { savePersistedState({ ...s, textReveal: v }); return { textReveal: v } }),
   setReplyDelay: (v) => set((s) => { savePersistedState({ ...s, replyDelay: v }); return { replyDelay: v } }),
   setVoiceCallStyle: (v) => set((s) => { savePersistedState({ ...s, voiceCallStyle: v }); return { voiceCallStyle: v } }),
+  setVcBackground: (v) => set((s) => { savePersistedState({ ...s, vcBackground: v }); return { vcBackground: v } }),
   setHomeStyle: (v) => set((s) => { savePersistedState({ ...s, homeStyle: v }); return { homeStyle: v } }),
   setTimeAwareness: (v) => set((s) => { savePersistedState({ ...s, timeAwareness: v }); return { timeAwareness: v } }),
   setLongingPush: (v) => set((s) => { savePersistedState({ ...s, longingPush: v }); return { longingPush: v } }),

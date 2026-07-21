@@ -54,7 +54,7 @@ function stripForTts(text) {
 }
 
 export default function VoiceCall({ onClose, onSend }) {
-  const { moonMemory, activeChatId, messagesByChatId, voiceCallStyle, avatarConfig } = useStore()
+  const { moonMemory, activeChatId, messagesByChatId, voiceCallStyle, vcBackground, avatarConfig } = useStore()
   const messages = messagesByChatId[activeChatId] || []
 
   const soft = voiceCallStyle === 'soft'
@@ -358,7 +358,7 @@ export default function VoiceCall({ onClose, onSend }) {
   )
 
   return createPortal(
-    <div className={'vc-overlay' + (soft ? ' vc-soft' : '') + (duo ? ' vc-duo' : '')}>
+    <div className={'vc-overlay' + (soft ? ' vc-soft' : '') + (duo ? ' vc-duo' : '') + (vcBackground ? ` vc-bg-${vcBackground}` : '')}>
       <span className="vc-blob b1" />
       <span className="vc-blob b2" />
       <div className="vc-container">

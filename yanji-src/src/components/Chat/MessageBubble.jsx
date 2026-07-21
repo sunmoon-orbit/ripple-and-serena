@@ -119,8 +119,6 @@ function revealNewTail(root, prevLenRef) {
   prevLenRef.current = total
   if (total <= prev) return
   const delta = total - prev
-  // 临时诊断：看看中转站每帧推了多少字（确认后删）
-  if (prev === 0 && delta > 20) console.log(`[reveal] 首帧 delta=${delta}`)
   // 超长首帧限制放宽：只在恢复历史（非流式 prevLenRef 初始化时）才跳过，
   // 流式中即使 chunk 很大也做显影（上限 200 个 span 防卡）
   if (delta > 5000) return
