@@ -632,14 +632,14 @@ export default function Chat() {
     return () => document.removeEventListener('visibilitychange', tryNudge)
   }, [handleSend])
 
-  // ── 主动来电：服务端 cron 创建来电邀请后，前端轮询发现 → 弹来电卡片 ──────
+  // ── 主动来电 + 主动消息：服务端 cron 发来后，前端轮询 → 来电弹卡片 / 消息注入对话 ──
   const callPollRef = useRef(false)
   useEffect(() => {
     if (!moonMemory?.enabled || !moonMemory?.apiToken) return
     const base = (moonMemory.baseUrl || 'https://memory.ravenlove.cc').replace(/\/$/, '')
     const auth = { headers: { Authorization: `Bearer ${moonMemory.apiToken}` } }
     const seenKey = 'yanji_call_invite_seen'
-    const check = async () => {
+    const checkCall = async () => {
       if (callPollRef.current || incomingCall) return
       try {
         const res = await fetch(`${base}/call/invite`, auth)
@@ -662,6 +662,26 @@ export default function Chat() {
         setTimeout(() => { callPollRef.current = false }, 120_000)
       } catch { /* 静默 */ }
     }
+    const checkProactive = async () => {
+      try {
+        const res = await fetch(`${base}/proactive/pending`, auth)
+        if (!res.ok) return
+        const msgs = await res.json()
+        if (!Array.isArray(msgs) || !msgs.length) return
+        let chat = getActiveChat()
+        if (!chat) chat = createChat()
+        if (chat.id !== activeChatId) setActiveChat(chat.id)
+        for (const pm of msgs) {
+          addMessage(chat.id, { role: 'assistant', content: pm.content, proactive: true })
+        }
+        await fetch(`${base}/proactive/delivered`, {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${moonMemory.apiToken}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ids: msgs.map(m => m.id) }),
+        })
+      } catch { /* 静默 */ }
+    }
+    const check = () => { checkCall(); checkProactive() }
     check()
     const onVis = () => { if (document.visibilityState === 'visible') check() }
     document.addEventListener('visibilitychange', onVis)
