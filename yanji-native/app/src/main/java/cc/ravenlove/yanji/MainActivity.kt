@@ -52,6 +52,7 @@ class MainActivity : AppCompatActivity() {
         splash = findViewById(R.id.splash)
         applySplashTheme(splash)
         webView = findViewById(R.id.webview)
+        WebView.setWebContentsDebuggingEnabled(true)
 
         webView.settings.apply {
             javaScriptEnabled = true
