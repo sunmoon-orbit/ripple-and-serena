@@ -1916,6 +1916,61 @@ textarea.form-input { display: block; margin: 8px 16px 12px; }
 .vc-duo .vc-type-input::placeholder { color: #c4aa9e; }
 .vc-duo .vc-controls { margin-top: 2px; }
 
+/* ═══ 通话背景主题（vc-bg-* 覆盖任何样式的底色和光斑）═══ */
+/* 暗紫（crow 默认）*/
+.vc-bg-dark { background: radial-gradient(130% 100% at 50% 0%, rgba(36, 27, 56, 0.97), rgba(10, 6, 18, 0.98)) !important; }
+.vc-bg-dark .vc-blob.b1 { background: var(--accent) !important; }
+.vc-bg-dark .vc-blob.b2 { background: #56719e !important; }
+/* 浅蓝灰（soft 默认）*/
+.vc-bg-light { background: linear-gradient(168deg, #eff2f8 0%, #e9edf5 45%, #e2e8f1 100%) !important; }
+.vc-bg-light .vc-blob.b1 { background: #ccd8ec !important; }
+.vc-bg-light .vc-blob.b2 { background: #ded5ea !important; }
+/* 暖粉（duo 默认）*/
+.vc-bg-warm { background: linear-gradient(170deg, #fbf3ec 0%, #f6e9e4 55%, #f1e2df 100%) !important; }
+.vc-bg-warm .vc-blob.b1 { background: #f3d9c8 !important; }
+.vc-bg-warm .vc-blob.b2 { background: #e8d3e2 !important; }
+/* 深海蓝 */
+.vc-bg-ocean { background: radial-gradient(130% 100% at 50% 0%, rgba(12, 28, 52, 0.97), rgba(6, 14, 30, 0.98)) !important; }
+.vc-bg-ocean .vc-blob.b1 { background: #2a6da8 !important; }
+.vc-bg-ocean .vc-blob.b2 { background: #1a4a6e !important; }
+/* 森绿 */
+.vc-bg-forest { background: radial-gradient(130% 100% at 50% 0%, rgba(18, 38, 28, 0.97), rgba(8, 18, 12, 0.98)) !important; }
+.vc-bg-forest .vc-blob.b1 { background: #3a8a5a !important; }
+.vc-bg-forest .vc-blob.b2 { background: #2a6848 !important; }
+/* 暮橙 */
+.vc-bg-sunset { background: radial-gradient(130% 100% at 50% 20%, rgba(52, 28, 18, 0.97), rgba(22, 12, 8, 0.98)) !important; }
+.vc-bg-sunset .vc-blob.b1 { background: #c87a3a !important; }
+.vc-bg-sunset .vc-blob.b2 { background: #8a4a2a !important; }
+/* 浅蓝灰/暖粉背景下的文字需要暗色 */
+.vc-bg-light .vc-name, .vc-bg-warm .vc-name { color: #3c4557; }
+.vc-bg-light .vc-timer, .vc-bg-warm .vc-timer { color: rgba(90, 100, 122, 0.5); }
+.vc-bg-light .vc-status, .vc-bg-warm .vc-status { color: #8a93a8; }
+.vc-bg-light .vc-user-text, .vc-bg-warm .vc-user-text { color: rgba(90, 100, 122, 0.5); }
+.vc-bg-light .vc-ai-text, .vc-bg-warm .vc-ai-text { color: #3c4557; }
+/* 深色背景下的文字保持亮色 */
+.vc-bg-dark .vc-name, .vc-bg-ocean .vc-name, .vc-bg-forest .vc-name, .vc-bg-sunset .vc-name { color: rgba(255,255,255,0.92); }
+.vc-bg-dark .vc-timer, .vc-bg-ocean .vc-timer, .vc-bg-forest .vc-timer, .vc-bg-sunset .vc-timer { color: rgba(255,255,255,0.4); }
+.vc-bg-dark .vc-status, .vc-bg-ocean .vc-status, .vc-bg-forest .vc-status, .vc-bg-sunset .vc-status { color: rgba(255,255,255,0.65); }
+
+/* ═══ 通话背景选择器 ═══ */
+.vc-bg-picker { display: flex; gap: 6px; flex-wrap: wrap; }
+.vc-bg-swatch {
+  display: flex; flex-direction: column; align-items: center; gap: 3px;
+  background: none; border: 2px solid transparent; border-radius: 10px;
+  padding: 4px 6px 3px; cursor: pointer; transition: border-color .15s;
+}
+.vc-bg-swatch.active { border-color: var(--accent); }
+.swatch-dot {
+  width: 28px; height: 28px; border-radius: 50%;
+  border: 1px solid var(--border);
+}
+.swatch-auto {
+  display: flex; align-items: center; justify-content: center;
+  font-size: 13px; font-weight: 600; color: var(--text-muted);
+  background: var(--bg-card);
+}
+.swatch-name { font-size: 11px; color: var(--text-muted); }
+
 /* 双语回复留在聊天记录里：气泡内英文正文下方虚线+中文翻译（带「中」小角标） */
 .bubble-zh {
   position: relative; margin-top: 8px; padding: 8px 26px 0 0;
