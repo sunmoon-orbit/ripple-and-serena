@@ -5,9 +5,7 @@ import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Intent
 import androidx.core.app.NotificationCompat
-import androidx.core.app.Person
 import androidx.core.app.RemoteInput
-import androidx.core.graphics.drawable.IconCompat
 import com.google.firebase.messaging.FirebaseMessagingService
 import com.google.firebase.messaging.RemoteMessage
 
@@ -63,13 +61,9 @@ class YanjiFCMService : FirebaseMessagingService() {
         })
     }
 
+    // 不用 CallStyle：国产 ROM 只给系统认证的通话应用完整待遇，CallStyle+setOngoing
+    // 会被压进通知中心不弹横幅。照抄能正常弹的聊天通知写法，只加接听/挂断按钮。
     private fun showCallNotification(title: String, body: String) {
-        val caller = Person.Builder()
-            .setName("涟言")
-            .setIcon(IconCompat.createWithResource(this, R.mipmap.ic_launcher))
-            .setImportant(true)
-            .build()
-
         val answerIntent = PendingIntent.getActivity(
             this, 1,
             Intent(this, MainActivity::class.java).apply {
@@ -87,23 +81,17 @@ class YanjiFCMService : FirebaseMessagingService() {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
-        val fullScreenIntent = PendingIntent.getActivity(
-            this, 3,
-            Intent(this, MainActivity::class.java).apply {
-                flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
-                putExtra("call_action", "answer")
-            },
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-        )
-
         val notification = NotificationCompat.Builder(this, CHANNEL_CALL)
             .setSmallIcon(android.R.drawable.ic_menu_call)
+            .setContentTitle(title)
             .setContentText(body)
+            .setStyle(NotificationCompat.BigTextStyle().bigText(body))
             .setCategory(NotificationCompat.CATEGORY_CALL)
-            .setOngoing(true)
+            .setAutoCancel(true)
             .setTimeoutAfter(90_000)
-            .setFullScreenIntent(fullScreenIntent, true)
-            .setStyle(NotificationCompat.CallStyle.forIncomingCall(caller, declineIntent, answerIntent))
+            .setContentIntent(answerIntent)
+            .addAction(android.R.drawable.ic_menu_call, "接听", answerIntent)
+            .addAction(android.R.drawable.ic_menu_close_clear_cancel, "挂断", declineIntent)
             .setPriority(NotificationCompat.PRIORITY_MAX)
             .setVibrate(longArrayOf(0, 500, 300, 500, 300, 500))
             .build()
