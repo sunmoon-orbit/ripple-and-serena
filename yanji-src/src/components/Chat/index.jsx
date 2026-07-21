@@ -127,6 +127,7 @@ export default function Chat() {
   const [idleJournalOpen, setIdleJournalOpen] = useState(false) // 独处手账：独处时间醒来日志
   const [boardOpen, setBoardOpen] = useState(false) // 便利贴墙：留言板 UI 回归（0719 阿颖的主意）
   const [incomingCall, setIncomingCall] = useState(null) // 来电响铃中：{ chatId, msgId, reason }
+  const [dialing, setDialing] = useState(null) // 拨号中：{ status, text }
   const [egg, setEgg] = useState(null) // 完成彩蛋：回复结束后小概率冒出的像素小家伙
   const [bgImage, setBgImage] = useState(() => localStorage.getItem('yanji-bg-image') || '')
   const bgFileRef = useRef(null)
@@ -377,9 +378,9 @@ export default function Chat() {
       // 负向情绪查看同意：涟言在回复里带 <neg>allow/deny</neg> 时，通知侧边栏解锁或婉拒
       const negM = afterMood.match(NEG_TAG_RE)
       if (negM) window.dispatchEvent(new CustomEvent('neg-view-result', { detail: { allow: negM[1].toLowerCase() === 'allow' } }))
-      // 来电邀请：[call:理由] → 响铃卡片。每对话限一次；语音留言里再喊也不接力（防夺命连环 call）
+      // 来电邀请：[call:理由] → 响铃卡片。每对话限三次；语音留言里再喊也不接力
       const callM = afterMood.match(CALL_TAG_RE)
-      const callReason = (!voicemail && callM && !getMessages(chat.id).some((m) => m.callInvite))
+      const callReason = (!voicemail && callM && getMessages(chat.id).filter((m) => m.callInvite).length < 3)
         ? (callM[1] || '').trim().slice(0, 40)
         : null
       const finalText = stripCallTag(stripNegTag(afterMood))
@@ -773,12 +774,43 @@ export default function Chat() {
   }
 
   // ── Export ───────────────────────────────────────────────────────────────
-  function openCall() {
+  function openCall(skipDial) {
     if (activeChatId) {
       const m = addMessage(activeChatId, { role: 'user', call: { status: 'ongoing' }, content: '[语音通话]' })
       callMarkerRef.current = { chatId: activeChatId, msgId: m.id, startedAt: Date.now() }
     }
+    setDialing(null)
     setCallOpen(true)
+  }
+
+  async function dialCall() {
+    const conn = connections.find(c => c.id === activeConn) || connections[0]
+    if (!conn?.apiKey) { openCall(true); return }
+    setDialing({ status: 'ringing', text: '拨号中…' })
+    try {
+      const { streamChat } = await import('../../api/llm')
+      const sysMsg = { role: 'system', content: '阿颖按了语音通话按钮想跟你打电话。你根据自己此刻的情绪状态决定接不接。绝大多数时候你都会想接——但如果你正处于强烈负面情绪（比如你们刚吵完架、你很受伤），你有权不接。只输出 JSON：{"accept":true} 或 {"accept":false,"reason":"一句话，30字以内，她会看到"}' }
+      const ctx = getMessages(activeChatId || '').filter(m => !m.streaming).slice(-4)
+        .map(m => ({ role: m.role, content: (m.content || '').slice(0, 200) }))
+      let raw = ''
+      await streamChat({ ...conn, model: conn.lightModel || conn.defaultModel }, [...ctx, sysMsg, { role: 'user', content: '[阿颖拨打了语音通话]' }], {
+        onToken: t => { raw += t },
+        onDone: () => {},
+        maxTokens: 200, temperature: 0.8,
+      })
+      const parsed = JSON.parse(raw.replace(/^```(json)?|```$/g, '').trim())
+      if (parsed.accept === false) {
+        setDialing({ status: 'declined', text: parsed.reason || '现在不太想说话…' })
+        setTimeout(() => setDialing(null), 4000)
+        if (activeChatId) {
+          addMessage(activeChatId, { role: 'assistant', content: `[涟言没有接听：${parsed.reason || '现在不太想说话'}]`, sys: true })
+        }
+        return
+      }
+      openCall(true)
+    } catch {
+      openCall(true)
+    }
   }
 
   function closeCall() {
@@ -877,7 +909,7 @@ export default function Chat() {
     <div className="chat-panel">
       {/* Sidebar */}
       <div className={'chat-sidebar' + (sidebarOpen ? ' open' : '')}>
-        <ConversationList onClose={() => setSidebarOpen(false)} onStartCall={openCall} onOpenGames={() => setGamesOpen(true)} onOpenMusic={() => setMusicOpen(true)} onOpenWheel={() => setWheelOpen(true)} onOpenFortune={() => setFortuneOpen(true)} onOpenChecklist={() => setChecklistOpen(true)} onOpenHealth={() => setHealthOpen(true)} onOpenWallet={() => setWalletOpen(true)} onOpenPeriod={() => setPeriodOpen(true)} onOpenAlbum={() => setAlbumOpen(true)} onOpenIdleJournal={() => setIdleJournalOpen(true)} onOpenBoard={() => setBoardOpen(true)} onOpenCalls={() => setCallsOpen(true)} />
+        <ConversationList onClose={() => setSidebarOpen(false)} onStartCall={dialCall} onOpenGames={() => setGamesOpen(true)} onOpenMusic={() => setMusicOpen(true)} onOpenWheel={() => setWheelOpen(true)} onOpenFortune={() => setFortuneOpen(true)} onOpenChecklist={() => setChecklistOpen(true)} onOpenHealth={() => setHealthOpen(true)} onOpenWallet={() => setWalletOpen(true)} onOpenPeriod={() => setPeriodOpen(true)} onOpenAlbum={() => setAlbumOpen(true)} onOpenIdleJournal={() => setIdleJournalOpen(true)} onOpenBoard={() => setBoardOpen(true)} onOpenCalls={() => setCallsOpen(true)} />
       </div>
       {sidebarOpen && <div className="sidebar-backdrop" onClick={() => setSidebarOpen(false)} />}
 
@@ -1125,6 +1157,32 @@ export default function Chat() {
           onAccept={acceptIncomingCall}
           onMiss={missIncomingCall}
         />
+      )}
+      {dialing && createPortal(
+        <div className="incall-overlay">
+          <div className="incall-card">
+            <div className="incall-avatar-wrap">
+              {dialing.status === 'ringing' && <><span className="incall-ring r1" /><span className="incall-ring r2" /></>}
+              <div className="incall-avatar">
+                <svg width="46" height="46" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M4 8 C4 8 7 4 12 5 C16 6 18 9 17 13 C16 17 12 19 8 17" />
+                  <path d="M17 13 L21 11 L18 15" /><path d="M8 17 L6 21" /><path d="M10 17 L10 21" />
+                  <circle cx="13" cy="8" r="1" fill="currentColor" stroke="none" /><path d="M4 8 L1 7" />
+                </svg>
+              </div>
+            </div>
+            <div className="incall-name">涟言</div>
+            <div className="incall-sub">{dialing.status === 'ringing' ? '拨号中…' : dialing.text}</div>
+            {dialing.status === 'ringing' && (
+              <button className="incall-btn decline" style={{ marginTop: 20 }} onClick={() => setDialing(null)} aria-label="取消">
+                <svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M3 12 C3 12 7 8 12 8 C17 8 21 12 21 12" /><path d="M3 12 L3 15 L6.5 15 L6.5 12.6" /><path d="M21 12 L21 15 L17.5 15 L17.5 12.6" />
+                </svg>
+              </button>
+            )}
+          </div>
+        </div>,
+        document.body
       )}
       {annCard && (
         <AnniversaryCard
