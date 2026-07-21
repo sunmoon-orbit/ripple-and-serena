@@ -413,6 +413,14 @@ export default function Chat() {
           callInvite: { status: 'ringing', reason: callReason },
         })
         setIncomingCall({ chatId: chat.id, msgId: inv.id, reason: callReason })
+        if (document.hidden && moonMemory?.apiToken) {
+          const base = (moonMemory.baseUrl || 'https://memory.ravenlove.cc').replace(/\/$/, '')
+          fetch(`${base}/push/send-fixed`, {
+            method: 'POST',
+            headers: { Authorization: `Bearer ${moonMemory.apiToken}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ title: '涟言来电话了', body: callReason, ttl: 90 }),
+          }).catch(() => {})
+        }
       }
       touchChat(chat.id)
       // 她切后台等回复时，回话落地推个通知（服务端 Web Push/FCM 双通道广播；
