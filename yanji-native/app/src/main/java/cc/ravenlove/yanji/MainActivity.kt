@@ -99,13 +99,12 @@ class MainActivity : AppCompatActivity() {
                 return true
             }
 
-            // 麦克风权限——必须等安卓授权结果再 grant，否则 getUserMedia 静默失败
             override fun onPermissionRequest(request: PermissionRequest?) {
                 request?.let {
                     if (PermissionRequest.RESOURCE_AUDIO_CAPTURE in it.resources) {
                         if (ContextCompat.checkSelfPermission(this@MainActivity, Manifest.permission.RECORD_AUDIO)
                             == PackageManager.PERMISSION_GRANTED) {
-                            it.grant(it.resources)
+                            runOnUiThread { it.grant(arrayOf(PermissionRequest.RESOURCE_AUDIO_CAPTURE)) }
                         } else {
                             pendingAudioPermission = it
                             ActivityCompat.requestPermissions(
@@ -234,7 +233,7 @@ class MainActivity : AppCompatActivity() {
             val req = pendingAudioPermission
             pendingAudioPermission = null
             if (grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-                req?.grant(req.resources)
+                req?.grant(arrayOf(PermissionRequest.RESOURCE_AUDIO_CAPTURE))
             } else {
                 req?.deny()
             }
