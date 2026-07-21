@@ -43,7 +43,8 @@ function stripForTts(text) {
     .replace(VOICE_TAG_RE, '')
     .replace(/\[music:[^\]]+\]/g, '')
     .replace(/\[sticker:[^\]]+\]/g, '')
-    .replace(/\[call:[^\]]+\]/gi, '') // 来电标签不朗读（0709 教训：新方括号标签同步进清洗）
+    .replace(/\[call:[^\]]+\]/gi, '')
+    .replace(/\[endcall\]/gi, '')
     .replace(/\[译[:：][\s\S]*?\]/g, '') // 双语翻译标签兜底：正常已被 splitTranslation 摘走，这里防漏
     .replace(/!\[[^\]]*\]\([^)]*\)/g, '')
     .replace(/\[([^\]]*)\]\([^)]*\)/g, '$1')
@@ -93,6 +94,7 @@ export default function VoiceCall({ onClose, onSend }) {
   const speakQueue = useRef([])
   const speakBusy = useRef(false)
   const mounted = useRef(true)
+  const endCallRef = useRef(false)
 
   // 音频可视化：一个 analyser 两用（录音时接麦克风、播放时串在 TTS 链路上）
   const analyserRef = useRef(null)
@@ -137,6 +139,7 @@ export default function VoiceCall({ onClose, onSend }) {
       last.id !== lastTtsId.current
     ) {
       lastTtsId.current = last.id
+      if (/\[endcall\]/i.test(last.content)) endCallRef.current = true
       const { main, zh } = splitTranslation(last.content)
       const text = stripForTts(main)
       if (text) {
@@ -274,9 +277,11 @@ export default function VoiceCall({ onClose, onSend }) {
       if (mounted.current) { setAiText(text); setTtsState('loading') }
       try { await speakOne(text) } catch {}
     }
-    // 说完保留字幕（淡显），只把状态归位
     if (mounted.current) setTtsState('idle')
     speakBusy.current = false
+    if (endCallRef.current && mounted.current) {
+      setTimeout(() => { if (mounted.current) handleClose() }, 1500)
+    }
   }
 
   async function speakOne(text) {

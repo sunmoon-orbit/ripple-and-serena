@@ -13,6 +13,7 @@ class YanjiFCMService : FirebaseMessagingService() {
 
     companion object {
         private const val CHANNEL_ID = "yanji_chat"
+        private const val CHANNEL_CALL = "yanji_call"
         private const val KEY_REPLY = "key_quick_reply"
     }
 
@@ -28,20 +29,60 @@ class YanjiFCMService : FirebaseMessagingService() {
         val title = message.data["title"] ?: message.notification?.title ?: "言叽"
         val body = message.data["body"] ?: message.notification?.body ?: return
 
-        createChannel()
-        showNotification(title, body)
+        createChannels()
+        if (title == "涟言来电话了") {
+            showCallNotification(title, body)
+        } else {
+            showNotification(title, body)
+        }
     }
 
-    private fun createChannel() {
-        val channel = NotificationChannel(
+    private fun createChannels() {
+        val mgr = getSystemService(NotificationManager::class.java)
+        mgr.createNotificationChannel(NotificationChannel(
             CHANNEL_ID,
             getString(R.string.channel_chat),
             NotificationManager.IMPORTANCE_HIGH
         ).apply {
             description = "来自涟言的消息"
             enableVibration(true)
-        }
-        getSystemService(NotificationManager::class.java).createNotificationChannel(channel)
+        })
+        mgr.createNotificationChannel(NotificationChannel(
+            CHANNEL_CALL,
+            "来电通知",
+            NotificationManager.IMPORTANCE_HIGH
+        ).apply {
+            description = "涟言来电话了"
+            enableVibration(true)
+            vibrationPattern = longArrayOf(0, 500, 300, 500, 300, 500)
+        })
+    }
+
+    private fun showCallNotification(title: String, body: String) {
+        val tapIntent = PendingIntent.getActivity(
+            this, 0,
+            Intent(this, MainActivity::class.java).apply {
+                flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
+            },
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+
+        val notification = NotificationCompat.Builder(this, CHANNEL_CALL)
+            .setSmallIcon(android.R.drawable.ic_menu_call)
+            .setContentTitle(title)
+            .setContentText(body)
+            .setCategory(NotificationCompat.CATEGORY_CALL)
+            .setAutoCancel(true)
+            .setOngoing(true)
+            .setTimeoutAfter(90_000)
+            .setFullScreenIntent(tapIntent, true)
+            .setContentIntent(tapIntent)
+            .setVibrate(longArrayOf(0, 500, 300, 500, 300, 500))
+            .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .build()
+
+        getSystemService(NotificationManager::class.java)
+            .notify(99, notification)
     }
 
     private fun showNotification(title: String, body: String) {
