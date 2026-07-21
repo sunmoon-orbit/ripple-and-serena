@@ -164,7 +164,8 @@ class MainActivity : AppCompatActivity() {
         // 启动前台常驻服务
         KeepAliveService.start(this)
 
-        // 处理分享 intent
+        // 处理来电/分享 intent
+        handleCallAction(intent)
         handleShareIntent(intent)
     }
 
@@ -177,7 +178,15 @@ class MainActivity : AppCompatActivity() {
             )
             return
         }
+        handleCallAction(intent)
         handleShareIntent(intent)
+    }
+
+    private fun handleCallAction(intent: Intent?) {
+        if (intent?.getStringExtra("call_action") == "answer") {
+            (getSystemService(NOTIFICATION_SERVICE) as android.app.NotificationManager)
+                .cancel(YanjiFCMService.CALL_NOTIFICATION_ID)
+        }
     }
 
     private fun handleShareIntent(intent: Intent?) {
