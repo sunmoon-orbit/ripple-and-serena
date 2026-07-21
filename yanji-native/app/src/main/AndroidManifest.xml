@@ -62,6 +62,11 @@
             android:name=".QuickReplyReceiver"
             android:exported="false" />
 
+        <!-- 来电通知：挂断按钮 -->
+        <receiver
+            android:name=".CallActionReceiver"
+            android:exported="false" />
+
         <!-- 媒体通知按钮（播放/暂停/停止）的 BroadcastReceiver -->
         <receiver
             android:name=".MediaActionReceiver"

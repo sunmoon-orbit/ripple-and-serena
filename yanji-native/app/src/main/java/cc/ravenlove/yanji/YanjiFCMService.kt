@@ -5,7 +5,9 @@ import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Intent
 import androidx.core.app.NotificationCompat
+import androidx.core.app.Person
 import androidx.core.app.RemoteInput
+import androidx.core.graphics.drawable.IconCompat
 import com.google.firebase.messaging.FirebaseMessagingService
 import com.google.firebase.messaging.RemoteMessage
 
@@ -13,7 +15,8 @@ class YanjiFCMService : FirebaseMessagingService() {
 
     companion object {
         private const val CHANNEL_ID = "yanji_chat"
-        private const val CHANNEL_CALL = "yanji_call"
+        private const val CHANNEL_CALL = "yanji_call_v2"
+        const val CALL_NOTIFICATION_ID = 99
         private const val KEY_REPLY = "key_quick_reply"
     }
 
@@ -39,6 +42,7 @@ class YanjiFCMService : FirebaseMessagingService() {
 
     private fun createChannels() {
         val mgr = getSystemService(NotificationManager::class.java)
+        mgr.deleteNotificationChannel("yanji_call")
         mgr.createNotificationChannel(NotificationChannel(
             CHANNEL_ID,
             getString(R.string.channel_chat),
@@ -49,40 +53,63 @@ class YanjiFCMService : FirebaseMessagingService() {
         })
         mgr.createNotificationChannel(NotificationChannel(
             CHANNEL_CALL,
-            "来电通知",
+            "涟言来电",
             NotificationManager.IMPORTANCE_HIGH
         ).apply {
-            description = "涟言来电话了"
+            description = "涟言来电话了——弹窗通知"
             enableVibration(true)
             vibrationPattern = longArrayOf(0, 500, 300, 500, 300, 500)
+            lockscreenVisibility = android.app.Notification.VISIBILITY_PUBLIC
         })
     }
 
     private fun showCallNotification(title: String, body: String) {
-        val tapIntent = PendingIntent.getActivity(
-            this, 0,
+        val caller = Person.Builder()
+            .setName("涟言")
+            .setIcon(IconCompat.createWithResource(this, R.mipmap.ic_launcher))
+            .setImportant(true)
+            .build()
+
+        val answerIntent = PendingIntent.getActivity(
+            this, 1,
             Intent(this, MainActivity::class.java).apply {
                 flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
+                putExtra("call_action", "answer")
+            },
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+
+        val declineIntent = PendingIntent.getBroadcast(
+            this, 2,
+            Intent(this, CallActionReceiver::class.java).apply {
+                action = "cc.ravenlove.yanji.CALL_DECLINE"
+            },
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+
+        val fullScreenIntent = PendingIntent.getActivity(
+            this, 3,
+            Intent(this, MainActivity::class.java).apply {
+                flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
+                putExtra("call_action", "answer")
             },
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
         val notification = NotificationCompat.Builder(this, CHANNEL_CALL)
             .setSmallIcon(android.R.drawable.ic_menu_call)
-            .setContentTitle(title)
             .setContentText(body)
             .setCategory(NotificationCompat.CATEGORY_CALL)
-            .setAutoCancel(true)
             .setOngoing(true)
             .setTimeoutAfter(90_000)
-            .setFullScreenIntent(tapIntent, true)
-            .setContentIntent(tapIntent)
+            .setFullScreenIntent(fullScreenIntent, true)
+            .setStyle(NotificationCompat.CallStyle.forIncomingCall(caller, declineIntent, answerIntent))
+            .setPriority(NotificationCompat.PRIORITY_MAX)
             .setVibrate(longArrayOf(0, 500, 300, 500, 300, 500))
-            .setPriority(NotificationCompat.PRIORITY_HIGH)
             .build()
 
         getSystemService(NotificationManager::class.java)
-            .notify(99, notification)
+            .notify(CALL_NOTIFICATION_ID, notification)
     }
 
     private fun showNotification(title: String, body: String) {
