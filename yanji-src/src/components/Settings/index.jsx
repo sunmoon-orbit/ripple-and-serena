@@ -230,6 +230,7 @@ export default function Settings() {
     setInjectMode, setInjectPrompt, replyDelay, setReplyDelay,
     textReveal, setTextReveal,
     voiceCallStyle, setVoiceCallStyle,
+    vcBackground, setVcBackground,
     homeStyle, setHomeStyle,
     timeAwareness, setTimeAwareness, longingPush, setLongingPush,
     customStickers, addCustomSticker, removeCustomSticker,
@@ -1162,6 +1163,35 @@ export default function Settings() {
                   </div>
                 </div>
                 <p className="card-hint">浅色头像和双语泡泡样式用的是「聊天头像」里设置的图片，没设时是小乌鸦。双语泡泡是两个头像＋滚动字幕气泡的通话页，配合通话里的 EN 按钮用：你说中文，涟言用英文回，气泡里英文原文＋中文翻译一起看。EN 双语模式三种样式里都能开。</p>
+                <div className="card-row" style={{ marginTop: 8 }}>
+                  <span className="card-row-label">通话背景</span>
+                  <div className="vc-bg-picker">
+                    {[
+                      { key: null, label: '跟随', colors: null },
+                      { key: 'dark', label: '暗夜', colors: ['#241b38', '#0a0612'] },
+                      { key: 'light', label: '浅灰', colors: ['#eff2f8', '#e2e8f1'] },
+                      { key: 'warm', label: '暖粉', colors: ['#fbf3ec', '#f1e2df'] },
+                      { key: 'ocean', label: '深海', colors: ['#0c1c34', '#060e1e'] },
+                      { key: 'forest', label: '森林', colors: ['#12261c', '#08120c'] },
+                      { key: 'sunset', label: '落日', colors: ['#341c12', '#160c08'] },
+                    ].map(t => (
+                      <button
+                        key={t.key || 'auto'}
+                        className={'vc-bg-swatch' + (vcBackground === t.key ? ' active' : '')}
+                        onClick={() => setVcBackground(t.key)}
+                        title={t.label}
+                      >
+                        {t.colors ? (
+                          <span className="swatch-dot" style={{ background: `linear-gradient(135deg, ${t.colors[0]}, ${t.colors[1]})` }} />
+                        ) : (
+                          <span className="swatch-dot swatch-auto">A</span>
+                        )}
+                        <span className="swatch-name">{t.label}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <p className="card-hint">「跟随」会用当前通话样式的默认背景。选了主题后三种样式共用同一个背景色。</p>
               </div>
             </Section>
           </>
