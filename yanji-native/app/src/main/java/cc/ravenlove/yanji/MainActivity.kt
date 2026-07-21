@@ -27,11 +27,13 @@ class MainActivity : AppCompatActivity() {
     private lateinit var webView: WebView
     private lateinit var splash: FrameLayout
     private var fileCallback: ValueCallback<Array<Uri>>? = null
+    private var pendingAudioPermission: PermissionRequest? = null
     lateinit var mediaHelper: MediaNotificationHelper
 
     companion object {
         private const val FILE_CHOOSER_CODE = 1001
         private const val NOTIFICATION_PERM_CODE = 1002
+        private const val AUDIO_PERM_CODE = 1003
         const val YANJI_URL = "https://sunmoon-orbit.github.io/ripple-and-serena/yanji/"
     }
 
@@ -96,7 +98,7 @@ class MainActivity : AppCompatActivity() {
                 return true
             }
 
-            // 麦克风权限
+            // 麦克风权限——必须等安卓授权结果再 grant，否则 getUserMedia 静默失败
             override fun onPermissionRequest(request: PermissionRequest?) {
                 request?.let {
                     if (PermissionRequest.RESOURCE_AUDIO_CAPTURE in it.resources) {
@@ -104,11 +106,11 @@ class MainActivity : AppCompatActivity() {
                             == PackageManager.PERMISSION_GRANTED) {
                             it.grant(it.resources)
                         } else {
+                            pendingAudioPermission = it
                             ActivityCompat.requestPermissions(
                                 this@MainActivity,
-                                arrayOf(Manifest.permission.RECORD_AUDIO), 1003
+                                arrayOf(Manifest.permission.RECORD_AUDIO), AUDIO_PERM_CODE
                             )
-                            it.grant(it.resources)
                         }
                     } else {
                         it.grant(it.resources)
@@ -221,6 +223,19 @@ class MainActivity : AppCompatActivity() {
                 ActivityCompat.requestPermissions(
                     this, arrayOf(Manifest.permission.POST_NOTIFICATIONS), NOTIFICATION_PERM_CODE
                 )
+            }
+        }
+    }
+
+    override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        if (requestCode == AUDIO_PERM_CODE) {
+            val req = pendingAudioPermission
+            pendingAudioPermission = null
+            if (grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                req?.grant(req.resources)
+            } else {
+                req?.deny()
             }
         }
     }
