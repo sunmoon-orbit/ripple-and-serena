@@ -786,8 +786,8 @@ export default function Settings() {
                     <input className="form-input" style={{ flex: 1, minWidth: 0 }} value={p.name}
                       onChange={(e) => editProvider(i, 'name', e.target.value)} placeholder="名称（如 deepseek）" />
                     <button className="btn-sm btn-ghost" disabled={i === 0} onClick={() => moveProvider(i, -1)} aria-label="上移">↑</button>
-                    <button className="btn-sm btn-ghost" disabled={i === llmCfg.providers.length - 1} onClick={() => moveProvider(i, 1)} aria-label="下移">↓</button>
-                    <button className="btn-sm btn-ghost danger" disabled={llmCfg.providers.length <= 1} onClick={() => removeProvider(i)} aria-label="移除">✕</button>
+                    <button className="btn-sm btn-ghost" disabled={i === (llmCfg?.providers?.length || 0) - 1} onClick={() => moveProvider(i, 1)} aria-label="下移">↓</button>
+                    <button className="btn-sm btn-ghost danger" disabled={(llmCfg?.providers?.length || 0) <= 1} onClick={() => removeProvider(i)} aria-label="移除">✕</button>
                   </div>
                   <input className="form-input" style={{ marginBottom: 6 }} value={p.model}
                     onChange={(e) => editProvider(i, 'model', e.target.value)} placeholder="模型名（如 glm-4-flash）" />
@@ -799,7 +799,7 @@ export default function Settings() {
               ))}
               {llmCfg && (
                 <div className="card-row" style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                  <button className="btn-sm btn-ghost" disabled={llmBusy || llmCfg.providers.length >= 5} onClick={addProvider}>+ 添加投手</button>
+                  <button className="btn-sm btn-ghost" disabled={llmBusy || (llmCfg?.providers?.length || 0) >= 5} onClick={addProvider}>+ 添加投手</button>
                   <button className="btn-sm btn-primary" disabled={llmBusy} onClick={saveLlmCfg}>{llmBusy ? '保存中……' : '保存阵容'}</button>
                   {!llmCfg.isDefault && (
                     <button className="btn-sm btn-ghost" disabled={llmBusy} onClick={resetLlmCfg}>恢复默认</button>
