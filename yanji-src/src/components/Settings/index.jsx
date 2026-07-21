@@ -65,6 +65,49 @@ function RoostBgSection() {
   )
 }
 
+function VcBgImagePicker() {
+  const [bg, setBg] = useState(() => localStorage.getItem('yanji-vc-bg-image') || '')
+  const fileRef = useRef(null)
+  function onPick(e) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    const reader = new FileReader()
+    reader.onload = (ev) => {
+      try {
+        localStorage.setItem('yanji-vc-bg-image', ev.target.result)
+        setBg(ev.target.result)
+        showToast('通话背景已设置', 'success')
+      } catch { showToast('图片太大了，请选小一点的', 'error') }
+    }
+    reader.readAsDataURL(file)
+    e.target.value = ''
+  }
+  function clear() {
+    localStorage.removeItem('yanji-vc-bg-image')
+    setBg('')
+  }
+  return (
+    <div className="settings-card">
+      <div className="card-row">
+        <span className="card-row-label">背景图片</span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          {bg && (
+            <span style={{
+              width: 44, height: 30, borderRadius: 6, flexShrink: 0,
+              backgroundImage: `url(${bg})`, backgroundSize: 'cover', backgroundPosition: 'center',
+              border: '1px solid var(--border)',
+            }} />
+          )}
+          <button className="btn-sm btn-primary" onClick={() => fileRef.current?.click()}>{bg ? '换一张' : '选择图片'}</button>
+          {bg && <button className="btn-sm btn-ghost" onClick={clear}>移除</button>}
+        </div>
+      </div>
+      <p className="card-hint">选了图片后通话页会铺上这张照片，加毛玻璃保证文字可读。图片优先于纯色主题。存在本设备浏览器里。</p>
+      <input ref={fileRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={onPick} />
+    </div>
+  )
+}
+
 function AvatarUpload({ label, value, onChange, shape }) {
   function handleFile(e) {
     const file = e.target.files?.[0]
@@ -1193,6 +1236,7 @@ export default function Settings() {
                 </div>
                 <p className="card-hint">「跟随」会用当前通话样式的默认背景。选了主题后三种样式共用同一个背景色。</p>
               </div>
+              <VcBgImagePicker />
             </Section>
           </>
         )}

@@ -61,6 +61,7 @@ export default function VoiceCall({ onClose, onSend }) {
   const duo = voiceCallStyle === 'duo'
   const numBars = duo ? DUO_BARS : soft ? SOFT_BARS : NUM_BARS
   const avatarImg = avatarConfig?.assistantImage || null
+  const [vcBgImage] = useState(() => localStorage.getItem('yanji-vc-bg-image') || '')
   const userImg = avatarConfig?.userImage || null
 
   const [ttsState, setTtsState] = useState('idle') // idle | loading | playing
@@ -358,7 +359,8 @@ export default function VoiceCall({ onClose, onSend }) {
   )
 
   return createPortal(
-    <div className={'vc-overlay' + (soft ? ' vc-soft' : '') + (duo ? ' vc-duo' : '') + (vcBackground ? ` vc-bg-${vcBackground}` : '')}>
+    <div className={'vc-overlay' + (soft ? ' vc-soft' : '') + (duo ? ' vc-duo' : '') + (vcBackground && !vcBgImage ? ` vc-bg-${vcBackground}` : '') + (vcBgImage ? ' vc-bg-custom' : '')}>
+      {vcBgImage && <div className="vc-bg-img" style={{ backgroundImage: `url(${vcBgImage})` }} />}
       <span className="vc-blob b1" />
       <span className="vc-blob b2" />
       <div className="vc-container">
