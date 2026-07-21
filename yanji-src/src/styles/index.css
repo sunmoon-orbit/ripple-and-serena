@@ -1952,6 +1952,24 @@ textarea.form-input { display: block; margin: 8px 16px 12px; }
 .vc-bg-dark .vc-timer, .vc-bg-ocean .vc-timer, .vc-bg-forest .vc-timer, .vc-bg-sunset .vc-timer { color: rgba(255,255,255,0.4); }
 .vc-bg-dark .vc-status, .vc-bg-ocean .vc-status, .vc-bg-forest .vc-status, .vc-bg-sunset .vc-status { color: rgba(255,255,255,0.65); }
 
+/* ═══ 通话自定义背景图 ═══ */
+.vc-bg-img {
+  position: absolute; inset: 0; z-index: 0;
+  background-size: cover; background-position: center; background-repeat: no-repeat;
+}
+.vc-bg-img::after {
+  content: ''; position: absolute; inset: 0;
+  background: rgba(0,0,0,0.35);
+  backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
+}
+.vc-bg-custom .vc-blob { opacity: 0.15; }
+.vc-bg-custom .vc-container { position: relative; z-index: 1; }
+.vc-bg-custom .vc-name { color: rgba(255,255,255,0.95); text-shadow: 0 1px 4px rgba(0,0,0,0.4); }
+.vc-bg-custom .vc-timer { color: rgba(255,255,255,0.5); }
+.vc-bg-custom .vc-status { color: rgba(255,255,255,0.7); }
+.vc-bg-custom .vc-user-text { color: rgba(255,255,255,0.5); }
+.vc-bg-custom .vc-ai-text { color: rgba(255,255,255,0.95); text-shadow: 0 1px 3px rgba(0,0,0,0.3); }
+
 /* ═══ 通话背景选择器 ═══ */
 .vc-bg-picker { display: flex; gap: 6px; flex-wrap: wrap; }
 .vc-bg-swatch {
