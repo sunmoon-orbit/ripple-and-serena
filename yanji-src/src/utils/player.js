@@ -12,6 +12,8 @@ const state = {
   lyrics: [],        // [{t, text}]
   loading: false,
   error: '',
+  queue: [],         // [{name, artist, source, id, pic_id, lyric_id, ...}]
+  queueIdx: -1,
 }
 const listeners = new Set()
 
@@ -30,7 +32,10 @@ function ensureAudio() {
   audio.addEventListener('durationchange', () => { state.duration = audio.duration || 0; emit() })
   audio.addEventListener('play', () => { state.playing = true; emit(); syncMediaSession('playing') })
   audio.addEventListener('pause', () => { state.playing = false; emit(); syncMediaSession('paused') })
-  audio.addEventListener('ended', () => { state.playing = false; state.currentTime = 0; emit(); syncMediaSession('none') })
+  audio.addEventListener('ended', () => {
+    if (state.queue.length && state.queueIdx < state.queue.length - 1) { playNext(); return }
+    state.playing = false; state.currentTime = 0; emit(); syncMediaSession('none')
+  })
   audio.addEventListener('error', () => {
     if (state.loading) return // 还在切源，别误报
     state.error = '播放中断'; emit()
@@ -52,6 +57,8 @@ window.__yanjiMediaAction = (action) => {
   if (action === 'play') audio.play().catch(() => {})
   else if (action === 'pause') audio.pause()
   else if (action === 'stop') stop()
+  else if (action === 'next') playNext()
+  else if (action === 'prev') playPrev()
   else if (action.startsWith('seek:')) { const ms = parseInt(action.slice(5)); if (isFinite(ms)) seek(ms / 1000) }
 }
 
@@ -63,7 +70,8 @@ function initMediaSession() {
   reg('pause', () => audio && audio.pause())
   reg('stop', () => stop())
   reg('seekto', (d) => { if (d.seekTime != null) seek(d.seekTime) })
-  reg('previoustrack', () => seek(0))
+  reg('previoustrack', () => playPrev())
+  reg('nexttrack', () => playNext())
 }
 function syncMediaSession(playbackState) {
   if (isNativeApp()) {
@@ -192,6 +200,25 @@ export function stop() {
   } else if ('mediaSession' in navigator) {
     try { navigator.mediaSession.metadata = null; navigator.mediaSession.playbackState = 'none' } catch {}
   }
+}
+
+export function setQueue(tracks, startIdx = 0) {
+  state.queue = tracks || []
+  state.queueIdx = startIdx
+}
+
+export function playNext() {
+  if (!state.queue.length || state.queueIdx >= state.queue.length - 1) return
+  state.queueIdx++
+  playTrack(state.queue[state.queueIdx])
+}
+
+export function playPrev() {
+  if (!state.queue.length) return
+  if (audio && audio.currentTime > 3) { seek(0); return }
+  if (state.queueIdx <= 0) return
+  state.queueIdx--
+  playTrack(state.queue[state.queueIdx])
 }
 
 export function usePlayer() {
