@@ -212,15 +212,18 @@ export default function VoiceCall({ onClose, onSend }) {
 
   // ── 录音转写（push-to-talk）：点一下开始，再点一下结束并发送 ──
   async function toggleRecord() {
-    if (transcribing) return
+    if (transcribing) { showToast('正在识别你说的话…', 'info'); return }
     if (recording) { // 停止 → onstop 转写
       try { recRef.current?.stop() } catch {}
       return
     }
-    if (ttsState !== 'idle') return // 对方说话时不录
+    if (ttsState !== 'idle') { showToast('等他说完再按麦克风', 'info'); return }
     if (!moonMemory?.apiToken) { showToast('语音通话需要先连接记忆库', 'error'); return }
-    if (!navigator.mediaDevices?.getUserMedia || !window.MediaRecorder) {
-      showToast('当前浏览器不支持录音', 'error'); return
+    if (!navigator.mediaDevices?.getUserMedia) {
+      showToast('当前环境不支持 getUserMedia（' + (navigator.mediaDevices ? '无方法' : '无 mediaDevices') + '）', 'error', 5000); return
+    }
+    if (!window.MediaRecorder) {
+      showToast('当前环境不支持 MediaRecorder', 'error', 5000); return
     }
     let stream
     try {
@@ -537,9 +540,8 @@ export default function VoiceCall({ onClose, onSend }) {
             </svg>
           </button>
           <button
-            className={'vc-mic' + (recording ? ' recording' : '') + (transcribing ? ' busy' : '')}
+            className={'vc-mic' + (recording ? ' recording' : '') + (transcribing ? ' busy' : '') + (ttsState !== 'idle' ? ' waiting' : '')}
             onClick={toggleRecord}
-            disabled={transcribing || ttsState !== 'idle'}
             title={recording ? '点一下结束并发送' : '点一下开始说话'}
           >
             {transcribing ? (
