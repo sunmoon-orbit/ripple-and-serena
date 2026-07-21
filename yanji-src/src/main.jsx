@@ -6,6 +6,7 @@ import './styles/index.css'
 class ErrorBoundary extends React.Component {
   state = { error: null }
   static getDerivedStateFromError(error) { return { error } }
+  componentDidCatch(error, info) { console.error('[ErrorBoundary]', error, info?.componentStack) }
   render() {
     if (this.state.error) {
       return (
