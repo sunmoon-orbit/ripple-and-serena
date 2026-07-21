@@ -623,6 +623,43 @@ export default function Chat() {
     return () => document.removeEventListener('visibilitychange', tryNudge)
   }, [handleSend])
 
+  // ── 主动来电：服务端 cron 创建来电邀请后，前端轮询发现 → 弹来电卡片 ──────
+  const callPollRef = useRef(false)
+  useEffect(() => {
+    if (!moonMemory?.enabled || !moonMemory?.apiToken) return
+    const base = (moonMemory.baseUrl || 'https://memory.ravenlove.cc').replace(/\/$/, '')
+    const auth = { headers: { Authorization: `Bearer ${moonMemory.apiToken}` } }
+    const seenKey = 'yanji_call_invite_seen'
+    const check = async () => {
+      if (callPollRef.current || incomingCall) return
+      try {
+        const res = await fetch(`${base}/call/invite`, auth)
+        if (!res.ok) return
+        const inv = await res.json()
+        if (inv.status !== 'pending') return
+        const seen = localStorage.getItem(seenKey)
+        if (seen === String(inv.id)) return
+        localStorage.setItem(seenKey, String(inv.id))
+        callPollRef.current = true
+        let chat = getActiveChat()
+        if (!chat) chat = createChat()
+        if (chat.id !== activeChatId) setActiveChat(chat.id)
+        const msg = addMessage(chat.id, {
+          role: 'assistant',
+          content: `[涟言发起了语音通话邀请：${inv.reason || '想你了'}]`,
+          callInvite: { status: 'ringing', reason: inv.reason || '想你了', serverId: inv.id },
+        })
+        setIncomingCall({ chatId: chat.id, msgId: msg.id, reason: inv.reason || '想你了', serverId: inv.id })
+        setTimeout(() => { callPollRef.current = false }, 120_000)
+      } catch { /* 静默 */ }
+    }
+    check()
+    const onVis = () => { if (document.visibilityState === 'visible') check() }
+    document.addEventListener('visibilitychange', onVis)
+    const timer = setInterval(check, 8000)
+    return () => { document.removeEventListener('visibilitychange', onVis); clearInterval(timer) }
+  }, [moonMemory, incomingCall, activeChatId]) // eslint-disable-line react-hooks/exhaustive-deps
+
   // ── 负向情绪查看的同意请求：侧边栏点「申请查看」→ 注入隐藏请求让涟言当场决定 ──
   useEffect(() => {
     const onReq = () => {
@@ -765,6 +802,13 @@ export default function Chat() {
       callInvite: { status: 'accepted', reason: ic.reason },
       content: `[涟言发起的语音通话邀请（${ic.reason}），阿颖接听了]`,
     })
+    if (ic.serverId && moonMemory?.apiToken) {
+      const base = (moonMemory.baseUrl || 'https://memory.ravenlove.cc').replace(/\/$/, '')
+      fetch(`${base}/call/answer`, {
+        method: 'POST', headers: { Authorization: `Bearer ${moonMemory.apiToken}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: ic.serverId, action: 'accept' }),
+      }).catch(() => {})
+    }
     openCall()
   }
 
@@ -776,6 +820,13 @@ export default function Chat() {
       callInvite: { status: 'missed', reason: ic.reason },
       content: `[涟言发起的语音通话邀请（${ic.reason}），${how === 'declined' ? '阿颖按了挂断' : '90秒无人接听'}]`,
     })
+    if (ic.serverId && moonMemory?.apiToken) {
+      const base = (moonMemory.baseUrl || 'https://memory.ravenlove.cc').replace(/\/$/, '')
+      fetch(`${base}/call/answer`, {
+        method: 'POST', headers: { Authorization: `Bearer ${moonMemory.apiToken}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: ic.serverId, action: 'decline', note: how }),
+      }).catch(() => {})
+    }
     // 转语音留言：注入隐藏触发，让涟言像对答录机一样把想说的话留下来，回复以语音条形态出现
     handleSend(
       `[系统：你刚才想给阿颖打语音电话（理由：${ic.reason}），但${how === 'declined' ? '她按了挂断——可能不方便接' : '响了90秒没人接'}。请留一条语音留言：像对着电话答录机说话那样，把你想说的用一小段自然的话说完，30-80字，一条说完。不要用 [MSG] 分段，不要再带 [call:] 标签，不要发贴图和点歌。]`,
