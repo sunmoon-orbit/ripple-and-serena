@@ -1,6 +1,6 @@
 import { useState, useMemo, useRef, useEffect } from 'react'
 import { createPortal } from 'react-dom'
-import { usePlayer, togglePlay, seek, stop } from '../../utils/player'
+import { usePlayer, togglePlay, seek, stop, playNext, playPrev } from '../../utils/player'
 
 function fmt(s) {
   if (!s || !isFinite(s)) return '0:00'
@@ -64,11 +64,17 @@ export default function MiniPlayer() {
             <div className="mp-artist">{track.artist || '涟言点的歌'}</div>
           </div>
         </div>
+        {player.queue.length > 1 && <button className="mp-btn mp-skip" onClick={playPrev} aria-label="上一首">
+          <svg viewBox="0 0 24 24" width="15" height="15" fill="currentColor"><polygon points="19,20 9,12 19,4"/><rect x="5" y="4" width="3" height="16"/></svg>
+        </button>}
         <button className="mp-btn" onClick={togglePlay} aria-label={player.playing ? '暂停' : '播放'}>
           {player.playing
             ? <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>
             : <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><polygon points="6,4 20,12 6,20"/></svg>}
         </button>
+        {player.queue.length > 1 && <button className="mp-btn mp-skip" onClick={playNext} aria-label="下一首">
+          <svg viewBox="0 0 24 24" width="15" height="15" fill="currentColor"><polygon points="5,4 15,12 5,20"/><rect x="16" y="4" width="3" height="16"/></svg>
+        </button>}
         <button className="mp-btn mp-close" onClick={stop} aria-label="关闭">
           <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
         </button>
@@ -110,11 +116,17 @@ export default function MiniPlayer() {
         <span className="mp-time">{fmt(player.duration)}</span>
       </div>
       <div className="mp-full-btns">
+        {player.queue.length > 1 && <button className="mp-full-skip" onClick={playPrev}>
+          <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor"><polygon points="19,20 9,12 19,4"/><rect x="5" y="4" width="3" height="16"/></svg>
+        </button>}
         <button className="mp-full-play" onClick={togglePlay}>
           {player.playing
             ? <svg viewBox="0 0 24 24" width="26" height="26" fill="currentColor"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>
             : <svg viewBox="0 0 24 24" width="26" height="26" fill="currentColor"><polygon points="6,4 20,12 6,20"/></svg>}
         </button>
+        {player.queue.length > 1 && <button className="mp-full-skip" onClick={playNext}>
+          <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor"><polygon points="5,4 15,12 5,20"/><rect x="16" y="4" width="3" height="16"/></svg>
+        </button>}
       </div>
     </div>,
     document.body

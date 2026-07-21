@@ -3369,6 +3369,70 @@ textarea.form-input { display: block; margin: 8px 16px 12px; }
 .mpick-heart { border: none; background: none; cursor: pointer; color: var(--text-faint); padding: 4px; flex-shrink: 0; }
 .mpick-heart.on { color: #e08a9a; }
 .mpick-del { border: none; background: none; cursor: pointer; color: var(--text-faint); padding: 4px; flex-shrink: 0; }
+.mpick-tabs {
+  display: flex; gap: 0; padding: 0 10px; border-bottom: 1px solid var(--border);
+  overflow-x: auto; -webkit-overflow-scrolling: touch; flex-shrink: 0;
+}
+.mpick-tabs::-webkit-scrollbar { display: none; }
+.mpick-tab {
+  border: none; background: none; cursor: pointer; padding: 8px 14px; font-size: 13px;
+  color: var(--text-muted); white-space: nowrap; position: relative; flex-shrink: 0;
+}
+.mpick-tab.active { color: var(--accent); font-weight: 600; }
+.mpick-tab.active::after {
+  content: ''; position: absolute; bottom: 0; left: 14px; right: 14px;
+  height: 2px; background: var(--accent); border-radius: 1px;
+}
+.mpick-tab-add { color: var(--accent); font-size: 16px; font-weight: 600; }
+.mpick-tab-count { font-size: 11px; color: var(--text-faint); margin-left: 3px; }
+.mpick-tab-del { margin-left: 5px; font-size: 11px; color: var(--text-faint); cursor: pointer; }
+.mpick-tab-del:hover { color: var(--danger); }
+.mpick-new-pl {
+  display: flex; gap: 8px; padding: 8px 12px; align-items: center; border-bottom: 1px solid var(--border);
+}
+.mpick-new-pl input {
+  flex: 1; border: 1px solid var(--border); border-radius: 6px; padding: 5px 10px;
+  font-size: 13px; background: var(--bg-input); color: var(--text); outline: none;
+}
+.mpick-new-pl input:focus { border-color: var(--accent); }
+.mpick-new-pl button {
+  border: none; background: var(--accent); color: #fff; border-radius: 6px;
+  padding: 5px 12px; font-size: 13px; cursor: pointer;
+}
+.mpick-new-pl button:last-child { background: none; color: var(--text-muted); }
+.mpick-addto-wrap { position: relative; flex-shrink: 0; }
+.mpick-addto {
+  border: none; background: none; cursor: pointer; color: var(--text-faint); padding: 4px;
+}
+.mpick-addto:hover { color: var(--accent); }
+.mpick-pl-dropdown {
+  position: absolute; right: 0; top: 100%; z-index: 50; min-width: 120px;
+  background: var(--bg-card); border: 1px solid var(--border); border-radius: 8px;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.12); overflow: hidden;
+}
+.mpick-pl-opt {
+  display: block; width: 100%; border: none; background: none; text-align: left;
+  padding: 8px 14px; font-size: 13px; color: var(--text); cursor: pointer;
+}
+.mpick-pl-opt:hover { background: var(--accent-soft); }
+.mpick-play-all {
+  border: none; background: var(--accent-soft); color: var(--accent); font-size: 13px;
+  font-weight: 600; padding: 8px 16px; margin: 10px 12px 4px; border-radius: 8px;
+  cursor: pointer; display: block;
+}
+.mpick-play-all:active { transform: scale(0.97); }
+.mp-skip {
+  width: 30px; height: 30px; flex-shrink: 0; border: none; background: none;
+  cursor: pointer; color: var(--text-mid); display: flex; align-items: center; justify-content: center;
+}
+.mp-skip:active { transform: scale(0.9); }
+.mp-full-skip {
+  width: 44px; height: 44px; border: none; background: none; cursor: pointer;
+  color: var(--text); display: flex; align-items: center; justify-content: center;
+  margin: 0 12px;
+}
+.mp-full-skip:active { transform: scale(0.9); }
+.mp-full-btns { gap: 6px; align-items: center; }
 
 /* 播放条出现时，把聊天输入框上推让位（约播放条高度 55px） */
 body.mp-active .chat-input-area { margin-bottom: 55px; }

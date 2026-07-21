@@ -23,6 +23,8 @@ class MediaNotificationHelper(private val context: Context) {
         const val ACTION_PLAY = "cc.ravenlove.yanji.MEDIA_PLAY"
         const val ACTION_PAUSE = "cc.ravenlove.yanji.MEDIA_PAUSE"
         const val ACTION_STOP = "cc.ravenlove.yanji.MEDIA_STOP"
+        const val ACTION_NEXT = "cc.ravenlove.yanji.MEDIA_NEXT"
+        const val ACTION_PREV = "cc.ravenlove.yanji.MEDIA_PREV"
     }
 
     private val nm = context.getSystemService(NotificationManager::class.java)
@@ -43,6 +45,8 @@ class MediaNotificationHelper(private val context: Context) {
             override fun onPlay() { onAction?.invoke("play") }
             override fun onPause() { onAction?.invoke("pause") }
             override fun onStop() { onAction?.invoke("stop") }
+            override fun onSkipToNext() { onAction?.invoke("next") }
+            override fun onSkipToPrevious() { onAction?.invoke("prev") }
             override fun onSeekTo(pos: Long) { onAction?.invoke("seek:$pos") }
         })
     }
@@ -53,7 +57,8 @@ class MediaNotificationHelper(private val context: Context) {
             PlaybackStateCompat.Builder()
                 .setActions(
                     PlaybackStateCompat.ACTION_PLAY or PlaybackStateCompat.ACTION_PAUSE or
-                    PlaybackStateCompat.ACTION_STOP or PlaybackStateCompat.ACTION_SEEK_TO
+                    PlaybackStateCompat.ACTION_STOP or PlaybackStateCompat.ACTION_SEEK_TO or
+                    PlaybackStateCompat.ACTION_SKIP_TO_NEXT or PlaybackStateCompat.ACTION_SKIP_TO_PREVIOUS
                 )
                 .setState(state, posMs, 1f)
                 .build()
@@ -121,6 +126,14 @@ class MediaNotificationHelper(private val context: Context) {
                 mediaPendingIntent(ACTION_PLAY)
             )
         }
+        val prevAction = NotificationCompat.Action(
+            android.R.drawable.ic_media_previous, "上一首",
+            mediaPendingIntent(ACTION_PREV)
+        )
+        val nextAction = NotificationCompat.Action(
+            android.R.drawable.ic_media_next, "下一首",
+            mediaPendingIntent(ACTION_NEXT)
+        )
         val stopAction = NotificationCompat.Action(
             android.R.drawable.ic_delete, "停止",
             mediaPendingIntent(ACTION_STOP)
@@ -131,11 +144,13 @@ class MediaNotificationHelper(private val context: Context) {
             .setContentText(artist)
             .setContentIntent(contentIntent)
             .setLargeIcon(coverBitmap)
+            .addAction(prevAction)
             .addAction(playPauseAction)
+            .addAction(nextAction)
             .addAction(stopAction)
             .setStyle(MediaStyle()
                 .setMediaSession(session.sessionToken)
-                .setShowActionsInCompactView(0))
+                .setShowActionsInCompactView(0, 1, 2))
             .setOngoing(playing)
             .setSilent(true)
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)

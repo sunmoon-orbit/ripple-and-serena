@@ -10,6 +10,8 @@ class MediaActionReceiver : BroadcastReceiver() {
             MediaNotificationHelper.ACTION_PLAY -> "play"
             MediaNotificationHelper.ACTION_PAUSE -> "pause"
             MediaNotificationHelper.ACTION_STOP -> "stop"
+            MediaNotificationHelper.ACTION_NEXT -> "next"
+            MediaNotificationHelper.ACTION_PREV -> "prev"
             else -> return
         }
         // 转发给 MainActivity，由它回调 WebView JS
