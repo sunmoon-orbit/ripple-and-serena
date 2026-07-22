@@ -8,11 +8,13 @@ import StarMapPanel from './components/StarMapPanel'
 import TrashPanel from './components/TrashPanel'
 import StatsPanel from './components/StatsPanel'
 import SettingsPanel from './components/SettingsPanel'
-import { NotebookPen, Trash2, Sparkles, Settings as SettingsIcon } from 'lucide-react'
+import EventsPanel from './components/EventsPanel'
+import { NotebookPen, Trash2, Sparkles, ScrollText, Settings as SettingsIcon } from 'lucide-react'
 
 const NAV = [
   { id: 'memory', label: 'Rings', Icon: NotebookPen },
   { id: 'stats', label: 'Marks', Icon: Sparkles },
+  { id: 'events', label: 'Scrolls', Icon: ScrollText },
   { id: 'trash', label: 'Fossils', Icon: Trash2 },
   { id: 'settings', label: 'Settings', Icon: SettingsIcon },
 ]
@@ -47,6 +49,7 @@ export default function App() {
     <div className="app">
       {panel === 'memory' && (memoryView === 'starmap' ? <StarMapPanel /> : <MemoryPanel />)}
       {panel === 'stats' && <StatsPanel />}
+      {panel === 'events' && <EventsPanel />}
       {panel === 'trash' && <TrashPanel />}
       {panel === 'settings' && <SettingsPanel />}
 
