@@ -48,4 +48,11 @@ export const api = {
   health: () => req('/health'),
   maintainHealth: () => req('/maintain/health'),
   importClaudeAI: (data) => req('/archive/import/claude-ai', { method: 'POST', body: JSON.stringify(data) }),
+  // 事件卷：提案审批 + 开卷（断供 CC 时阿颖也能自己处理）
+  events: (status) => req('/events' + qs({ status })),
+  eventDetail: (id) => req(`/events/${id}`),
+  eventProposals: (status = 'pending') => req(`/events/proposals?status=${status}`),
+  decideProposal: (id, action, punish_ids = []) =>
+    req(`/events/proposals/${id}/decide`, { method: 'POST', body: JSON.stringify({ action, punish_ids }) }),
+  createEvent: (body) => req('/events', { method: 'POST', body: JSON.stringify(body) }),
 }
