@@ -122,6 +122,23 @@ class MainActivity : AppCompatActivity() {
         // WebView 不自带下载能力——Content-Disposition: attachment 的响应会被吞掉。
         // 必须用 DownloadListener 把下载交给系统 DownloadManager。
         webView.setDownloadListener { url, userAgent, contentDisposition, mimeType, _ ->
+            // blob: 是页面内存里的对象，DownloadManager 只认 http/https（备份导出踩中，0723）。
+            // 兜底：回到页面里把 blob 读成 base64，经 JS 桥送回原生落盘。
+            if (url.startsWith("blob:")) {
+                val guessed = Uri.decode(URLUtil.guessFileName(url, contentDisposition, mimeType))
+                val js = """
+                    (function() {
+                      fetch('$url').then(function(r){ return r.blob() }).then(function(b){
+                        var fr = new FileReader();
+                        fr.onload = function(){ YanjiNative.saveBase64File('$guessed', b.type || '$mimeType', fr.result.split(',')[1] || '') };
+                        fr.onerror = function(){ YanjiNative.saveBase64File('', '', '') };
+                        fr.readAsDataURL(b);
+                      }).catch(function(){ YanjiNative.saveBase64File('', '', '') });
+                    })()
+                """.trimIndent()
+                runOnUiThread { webView.evaluateJavascript(js, null) }
+                return@setDownloadListener
+            }
             try {
                 val request = DownloadManager.Request(Uri.parse(url)).apply {
                     setMimeType(mimeType)
@@ -203,6 +220,43 @@ class MainActivity : AppCompatActivity() {
             }
         }
         // 图片分享后续版本支持
+    }
+
+    // blob: 下载兜底的落盘端：WebBridge.saveBase64File 转进来（0723，备份导出）
+    fun saveBase64File(fileName: String, mimeType: String, base64: String) {
+        if (base64.isEmpty()) {
+            runOnUiThread { Toast.makeText(this, "下载失败：没读到文件内容", Toast.LENGTH_LONG).show() }
+            return
+        }
+        Thread {
+            try {
+                val bytes = android.util.Base64.decode(base64, android.util.Base64.DEFAULT)
+                val mime = mimeType.ifEmpty { "application/octet-stream" }
+                // blob: URL 猜不出真名（download 属性传不进 DownloadListener），退到时间戳名
+                val name = if (fileName.isNotEmpty() && !fileName.startsWith("downloadfile")) fileName
+                else "yanji-" + java.text.SimpleDateFormat("yyyyMMdd-HHmmss", java.util.Locale.US).format(java.util.Date()) + when {
+                    mime.contains("json") -> ".json"
+                    mime.contains("html") -> ".html"
+                    mime.contains("text") -> ".txt"
+                    else -> ""
+                }
+                if (Build.VERSION.SDK_INT >= 29) {
+                    val values = android.content.ContentValues().apply {
+                        put(android.provider.MediaStore.Downloads.DISPLAY_NAME, name)
+                        put(android.provider.MediaStore.Downloads.MIME_TYPE, mime)
+                    }
+                    val uri = contentResolver.insert(android.provider.MediaStore.Downloads.EXTERNAL_CONTENT_URI, values)
+                        ?: throw Exception("系统拒绝创建文件")
+                    contentResolver.openOutputStream(uri)?.use { it.write(bytes) } ?: throw Exception("打不开输出流")
+                } else {
+                    val dir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
+                    java.io.File(dir, name).writeBytes(bytes)
+                }
+                runOnUiThread { Toast.makeText(this, "已存到 Download/$name", Toast.LENGTH_LONG).show() }
+            } catch (e: Exception) {
+                runOnUiThread { Toast.makeText(this, "下载失败: ${e.message}", Toast.LENGTH_LONG).show() }
+            }
+        }.start()
     }
 
     // WebBridge 暴露给前端的重试入口

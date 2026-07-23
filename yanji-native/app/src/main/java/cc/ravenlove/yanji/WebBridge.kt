@@ -68,6 +68,13 @@ class WebBridge(private val activity: MainActivity) {
             .apply()
     }
 
+    // blob: 下载兜底：DownloadManager 只认 http/https，备份导出这类 blob: URL
+    // 由 MainActivity 注入的 JS 把内容读成 base64 送回来，原生写进 Download 目录（0723）
+    @JavascriptInterface
+    fun saveBase64File(fileName: String, mimeType: String, base64: String) {
+        activity.saveBase64File(fileName, mimeType, base64)
+    }
+
     @JavascriptInterface
     fun updateNowPlaying(title: String, artist: String, coverUrl: String, playing: Boolean, posMs: Long, durationMs: Long) {
         activity.runOnUiThread {
