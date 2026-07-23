@@ -10,13 +10,15 @@ async function nowherePost(path, body = {}) {
     body: JSON.stringify(body),
   })
   if (!r.ok) throw new Error(`nowhere ${r.status}`)
-  return r.json()
+  // 工具结果必须是字符串：直传对象会以对象形式存进聊天历史，
+  // 之后每次请求 OpenAI 兼容端都 400（0723 GLM/DeepSeek 双双炸过）
+  return JSON.stringify(await r.json())
 }
 
 async function nowhereGet(path) {
   const r = await fetch(BASE + path)
   if (!r.ok) throw new Error(`nowhere ${r.status}`)
-  return r.json()
+  return JSON.stringify(await r.json())
 }
 
 export const NOWHERE_TOOL_DEFS = [
