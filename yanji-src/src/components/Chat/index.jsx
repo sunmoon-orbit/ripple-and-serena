@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom'
 import { useStore } from '../../store'
 import { sendMessage, summarizeThinking, normalizeProvider, BUILTIN_MODELS, buildSystemPrompt, compactMessages, buildSummaryInjection } from '../../api/llm'
 import { uuid } from '../../utils'
+import { downloadBlob } from '../../utils/download'
 import { applyTimeAway, getEmotionState, buildEmotionPrompt, extractEmotionUpdate, applyEmotionDelta, stripEmotionTag } from '../../utils/emotion'
 import { maybeSyncEmotion } from '../../utils/emotionSync'
 import { shouldNudge, recordNudge, buildNudgeText } from '../../utils/nudge'
@@ -751,10 +752,7 @@ export default function Chat() {
     if (navigator.canShare?.({ files: [file] })) {
       try { await navigator.share({ files: [file], title: filename }); return } catch {}
     }
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url; a.download = filename; a.click()
-    URL.revokeObjectURL(url)
+    downloadBlob(blob, filename)
   }
 
   async function handleServerRestore() {
@@ -920,10 +918,7 @@ export default function Chat() {
     if (navigator.canShare?.({ files: [file] })) {
       try { await navigator.share({ files: [file], title: mdName }); return } catch {}
     }
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url; a.download = mdName; a.click()
-    URL.revokeObjectURL(url)
+    downloadBlob(blob, mdName)
   }
 
   // ── Render ────────────────────────────────────────────────────────────────

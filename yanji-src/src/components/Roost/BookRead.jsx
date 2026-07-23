@@ -111,8 +111,9 @@ export default function BookRead({ onClose }) {
   const [upload, setUpload] = useState(null)       // 上架表单 {title,author,intro,color,shelf,chapters,fileName}
   const [saving, setSaving] = useState(false)
   const [stamps, setStamps] = useState([])         // 当前书的读讫章 [{reader,stamped_at}]
-  const [toc, setToc] = useState(null)             // 目录 [{idx,title,chars}]，首次点开懒加载
+  const [toc, setToc] = useState(null)             // 目录 [{idx,title,chars}]，打开时拉取
   const [tocOpen, setTocOpen] = useState(false)
+  const [tocErr, setTocErr] = useState('')         // 拉取异常时面板内可见（别再哑巴）
   const textRef = useRef(null)
   const annoRefs = useRef({})
   const fileRef = useRef(null)
@@ -154,11 +155,14 @@ export default function BookRead({ onClose }) {
   async function toggleToc() {
     if (tocOpen) { setTocOpen(false); return }
     setTocOpen(true)
+    setTocErr('')
     try {
       const detail = await fetchBook(cfg, active.id)
       setToc(detail.chapters || [])
-    } catch {
-      if (!toc) { setTocOpen(false); showToast('目录加载失败', 'error') } // 有旧目录就静默保留
+      if (!(detail.chapters || []).length) setTocErr('接口返回了空目录（把这行截图给涟言）')
+    } catch (e) {
+      if (!toc) setToc([]) // 保持面板打开，把错误亮出来
+      setTocErr(`目录加载失败：${e?.message || e}`)
     }
   }
 
@@ -469,7 +473,8 @@ export default function BookRead({ onClose }) {
               {tocOpen && (
                 <div className="bookread-toc">
                   {!toc && <div className="roost-empty">翻目录……</div>}
-                  {toc && !toc.length && <div className="roost-empty">目录是空的？点章节名再试一次</div>}
+                  {tocErr && <div className="roost-empty">{tocErr}</div>}
+                  {toc && !toc.length && !tocErr && <div className="roost-empty">目录是空的？点章节名再试一次</div>}
                   {toc && toc.map((c) => (
                     <button
                       key={c.idx}

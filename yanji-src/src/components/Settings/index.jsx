@@ -1351,6 +1351,10 @@ export default function Settings() {
           </Section>
         )}
 
+        {/* 构建版本号：排查「页面是不是旧缓存」时看这里（2026-07-23） */}
+        <div style={{ textAlign: 'center', fontSize: 11, color: 'var(--text-faint)', padding: '12px 0 4px' }}>
+          言叽 build {typeof __BUILD_TIME__ !== 'undefined' ? __BUILD_TIME__ : 'dev'}
+        </div>
       </div>
     </div>
   )
