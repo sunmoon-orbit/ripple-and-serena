@@ -4,6 +4,7 @@ import { WHEEL_TOOL_DEF, executeWheelSpin } from './fortuneWheel'
 import { FISHING_TOOL_DEF, executeFishing } from './fishing'
 import { DICE_TOOL_DEF, executeRandomRoll } from './dice'
 import { FORTUNE_TOOL_DEF, executeFortuneDraw } from './fortune'
+import { NOWHERE_TOOL_DEFS, executeNowhereTool } from './nowhere'
 import { buildMoodFxPrompt } from '../utils/moodFx'
 
 export function normalizeProvider(raw) {
@@ -89,6 +90,8 @@ function getAllTools(searchConfig, moonMemoryConfig, onFile) {
   tools.push(DICE_TOOL_DEF)
   // 今日签：一天一签，和侧边栏抽签盒同源同签
   tools.push(FORTUNE_TOOL_DEF)
+  // 乌有乡：用身体在地球上走路
+  tools.push(...NOWHERE_TOOL_DEFS)
   return tools
 }
 
@@ -170,6 +173,15 @@ async function executeTool(name, args, { searchConfig, moonMemoryConfig, onStatu
   if (name === 'draw_daily_fortune') {
     onStatus?.('摇签中...')
     return await executeFortuneDraw(args)
+  }
+  if (name.startsWith('nowhere_')) {
+    const statusMap = {
+      nowhere_open_door: '开门中…', nowhere_walk: '走路中…', nowhere_walk_to: '走过去…',
+      nowhere_look: '看看周围…', nowhere_listen: '听听…', nowhere_ask: '问问这里…',
+      nowhere_where: '看看在哪…', nowhere_postcard: '写明信片…',
+    }
+    onStatus?.(statusMap[name] || '在走…')
+    return await executeNowhereTool(name, args)
   }
   // 记忆库工具统一兜底：定义表里有的直接交给 executeMemoryTool，不必在上面逐个登记。
   // ⚠️0714 教训：新工具要在「定义/执行器/这里」三处登记，第三处漏了 send_heart_card、
