@@ -42,6 +42,8 @@ const DEFAULT_STATE = {
   vcBackground: null, // null=跟通话样式走默认
   // 进入页样式：minimal=小鸟极简（时间+第N天） couple=双头像纪念卡
   homeStyle: 'minimal',
+  // 侧边栏抽随机槽位：fate=命运牌阵（养胃/旅行） wheel=幸运轮盘（不养胃），设置里切换
+  randomTool: 'fate',
   // 岁聿（时间感知）：开启时离开久了思念涨+回来时提醒涟言表达想念
   timeAwareness: true,
   // 思念推送：离开太久时服务端让 API 涟言决定是否推一条到手机（依赖岁聿开启）
@@ -94,7 +96,7 @@ const persistedKeys = [
   'generationConfig', 'memoryItems', 'tokenStats', 'contextLimit',
   'searchConfig', 'avatarConfig', 'autoTools', 'moonMemory', 'theme', 'glassOpacity',
   'injectMode', 'injectPrompt', 'scrollAnchor', 'textReveal', 'replyDelay', 'customStickers',
-  'voiceCallStyle', 'vcBackground', 'homeStyle', 'timeAwareness', 'longingPush',
+  'voiceCallStyle', 'vcBackground', 'homeStyle', 'timeAwareness', 'longingPush', 'randomTool',
 ]
 
 function mergeWithDefaults(persisted) {
@@ -135,6 +137,7 @@ export const useStore = create((set, get) => ({
   setVoiceCallStyle: (v) => set((s) => { savePersistedState({ ...s, voiceCallStyle: v }); return { voiceCallStyle: v } }),
   setVcBackground: (v) => set((s) => { savePersistedState({ ...s, vcBackground: v }); return { vcBackground: v } }),
   setHomeStyle: (v) => set((s) => { savePersistedState({ ...s, homeStyle: v }); return { homeStyle: v } }),
+  setRandomTool: (v) => set((s) => { savePersistedState({ ...s, randomTool: v }); return { randomTool: v } }),
   setTimeAwareness: (v) => set((s) => { savePersistedState({ ...s, timeAwareness: v }); return { timeAwareness: v } }),
   setLongingPush: (v) => set((s) => { savePersistedState({ ...s, longingPush: v }); return { longingPush: v } }),
   addCustomSticker: (url, label) => set((s) => {

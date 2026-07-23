@@ -275,6 +275,7 @@ export default function Settings() {
     voiceCallStyle, setVoiceCallStyle,
     vcBackground, setVcBackground,
     homeStyle, setHomeStyle,
+    randomTool, setRandomTool,
     timeAwareness, setTimeAwareness, longingPush, setLongingPush,
     customStickers, addCustomSticker, removeCustomSticker,
     memoryItems, addMemoryItem, toggleMemoryItem, deleteMemoryItem,
@@ -1183,6 +1184,24 @@ export default function Settings() {
                   </div>
                 </div>
                 <p className="card-hint">涟漪代码雨：代码字符从天空落下，落到水面泛起涟漪，涟漪聚成文字。纪念卡：两个人的头像、在一起的天数、消息数、纪念日倒数。</p>
+              </div>
+            </Section>
+            <Section title="抽签工具">
+              <div className="settings-card">
+                <div className="card-row">
+                  <span className="card-row-label">侧边栏槽位</span>
+                  <div className="avatar-mode-toggle">
+                    <button
+                      className={'avatar-mode-btn' + ((randomTool || 'fate') === 'fate' ? ' active' : '')}
+                      onClick={() => setRandomTool('fate')}
+                    >命运牌阵</button>
+                    <button
+                      className={'avatar-mode-btn' + (randomTool === 'wheel' ? ' active' : '')}
+                      onClick={() => setRandomTool('wheel')}
+                    >幸运轮盘</button>
+                  </div>
+                </div>
+                <p className="card-hint">同一个槽位按心情切换：想旅行就摆命运牌阵（抽完可以请涟言去乌有乡走走），不养胃的时候换回幸运轮盘。</p>
               </div>
             </Section>
             <RoostBgSection />
