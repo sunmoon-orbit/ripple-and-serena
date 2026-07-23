@@ -4,6 +4,7 @@ import { WHEEL_TOOL_DEF, executeWheelSpin } from './fortuneWheel'
 import { FISHING_TOOL_DEF, executeFishing } from './fishing'
 import { DICE_TOOL_DEF, executeRandomRoll } from './dice'
 import { FORTUNE_TOOL_DEF, executeFortuneDraw } from './fortune'
+import { FATE_TOOL_DEF, executeFateDraw } from './fateDeck'
 import { NOWHERE_TOOL_DEFS, executeNowhereTool } from './nowhere'
 import { buildMoodFxPrompt } from '../utils/moodFx'
 
@@ -91,6 +92,8 @@ function getAllTools(searchConfig, moonMemoryConfig, onFile) {
   // 今日签：一天一签，和侧边栏抽签盒同源同签
   tools.push(FORTUNE_TOOL_DEF)
   // 乌有乡：用身体在地球上走路
+  tools.push(FATE_TOOL_DEF)
+
   tools.push(...NOWHERE_TOOL_DEFS)
   return tools
 }
@@ -176,6 +179,10 @@ async function executeTool(name, args, { searchConfig, moonMemoryConfig, onStatu
   if (name === 'draw_daily_fortune') {
     onStatus?.('摇签中...')
     return await executeFortuneDraw(args)
+  }
+  if (name === 'draw_fate_card') {
+    onStatus?.('抽牌中...')
+    return await executeFateDraw()
   }
   if (name.startsWith('nowhere_')) {
     const statusMap = {

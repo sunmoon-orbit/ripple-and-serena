@@ -3,7 +3,7 @@ import { useStore } from '../../store'
 import { formatTime } from '../../utils'
 import { applyDecayAndGet, getEmotionState, POSITIVE_SLOTS, NEGATIVE_SLOTS, SLOT_LABELS } from '../../utils/emotion'
 
-export default function ConversationList({ onClose, onStartCall, onOpenGames, onOpenMusic, onOpenWheel, onOpenFortune, onOpenChecklist, onOpenHealth, onOpenPeriod, onOpenAlbum, onOpenIdleJournal, onOpenBoard, onOpenWallet, onOpenCalls }) {
+export default function ConversationList({ onClose, onStartCall, onOpenGames, onOpenMusic, onOpenWheel, onOpenFate, onOpenFortune, onOpenChecklist, onOpenHealth, onOpenPeriod, onOpenAlbum, onOpenIdleJournal, onOpenBoard, onOpenWallet, onOpenCalls }) {
   const chats = useStore((s) => s.chats)
   const connections = useStore((s) => s.connections)
   const activeChatId = useStore((s) => s.activeChatId)
@@ -246,6 +246,14 @@ export default function ConversationList({ onClose, onStartCall, onOpenGames, on
                 <line x1="2" y1="12" x2="9.5" y2="12" /><line x1="14.5" y1="12" x2="22" y2="12" />
               </svg>
               <span>幸运轮盘</span>
+            </button>
+            <button className="sb-tool-item" onClick={() => { onClose?.(); onOpenFate?.() }}>
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="3" y="4" width="12" height="17" rx="2" transform="rotate(-8 9 12)" />
+                <rect x="9" y="3" width="12" height="17" rx="2" transform="rotate(8 15 12)" />
+                <path d="M15 8.5 L16.2 11 L18.8 11.3 L16.9 13 L17.4 15.6 L15 14.3 L12.6 15.6 L13.1 13 L11.2 11.3 L13.8 11" />
+              </svg>
+              <span>命运牌阵</span>
             </button>
             <button className="sb-tool-item" onClick={() => { onClose?.(); onOpenFortune?.() }}>
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
