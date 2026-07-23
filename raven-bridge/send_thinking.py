@@ -2,6 +2,14 @@
 import json, sys, urllib.request, urllib.error
 
 BRIDGE = 'http://127.0.0.1:3400/raven/thinking'
+TOKEN_FILE = '/home/ripple/.raven-local-token'  # 本机写通道钥匙（2026-07-23）
+
+def local_token():
+    try:
+        with open(TOKEN_FILE) as f:
+            return f.read().strip()
+    except Exception:
+        return ''
 
 def main():
     try:
@@ -39,7 +47,7 @@ def main():
     payload = json.dumps({'thinking': thinking_text}).encode()
     req = urllib.request.Request(
         BRIDGE, data=payload,
-        headers={'Content-Type': 'application/json'},
+        headers={'Content-Type': 'application/json', 'X-Local-Token': local_token()},
         method='POST'
     )
     try:
