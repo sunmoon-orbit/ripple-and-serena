@@ -111,6 +111,8 @@ export default function BookRead({ onClose }) {
   const [upload, setUpload] = useState(null)       // 上架表单 {title,author,intro,color,shelf,chapters,fileName}
   const [saving, setSaving] = useState(false)
   const [stamps, setStamps] = useState([])         // 当前书的读讫章 [{reader,stamped_at}]
+  const [toc, setToc] = useState(null)             // 目录 [{idx,title,chars}]，首次点开懒加载
+  const [tocOpen, setTocOpen] = useState(false)
   const textRef = useRef(null)
   const annoRefs = useRef({})
   const fileRef = useRef(null)
@@ -146,10 +148,23 @@ export default function BookRead({ onClose }) {
     } catch { showToast('章节加载失败', 'error') } finally { setLoading(false) }
   }, [])
 
+  // 目录跳转：章节标题列表从书籍详情接口懒加载（只有标题不含正文，一次拉全）
+  async function toggleToc() {
+    if (tocOpen) { setTocOpen(false); return }
+    setTocOpen(true)
+    if (!toc) {
+      try {
+        const detail = await fetchBook(cfg, active.id)
+        setToc(detail.chapters || [])
+      } catch { setTocOpen(false); showToast('目录加载失败', 'error') }
+    }
+  }
+
   async function openBook(book) {
     setActive(book)
     setChapterCount(book.chapter_count || 1)
     setStamps(book.stamps || [])
+    setToc(null); setTocOpen(false)
     // 优先回到本机自动进度（章+滚动位置），没有再看共享书签
     const pos = loadPos(book.id)
     const startIdx = Math.min(pos?.ch ?? book.bookmark_chapter ?? 0, (book.chapter_count || 1) - 1)
@@ -444,9 +459,26 @@ export default function BookRead({ onClose }) {
             <>
               <div className="bookread-chapter-bar">
                 <button disabled={chapter.idx <= 0} onClick={() => openChapter(active, chapter.idx - 1)}>‹ 上一章</button>
-                <span className="bookread-chapter-name">{chapter.title || `第 ${chapter.idx + 1} 章`}</span>
+                <button className="bookread-chapter-name bookread-toc-trigger" onClick={toggleToc} title="目录">
+                  {chapter.title || `第 ${chapter.idx + 1} 章`} <span className="bookread-toc-caret">{tocOpen ? '▴' : '▾'}</span>
+                </button>
                 <button disabled={chapter.idx >= chapterCount - 1} onClick={() => openChapter(active, chapter.idx + 1)}>下一章 ›</button>
               </div>
+              {tocOpen && (
+                <div className="bookread-toc">
+                  {!toc && <div className="roost-empty">翻目录……</div>}
+                  {toc && toc.map((c) => (
+                    <button
+                      key={c.idx}
+                      className={'bookread-toc-item' + (c.idx === chapter.idx ? ' active' : '')}
+                      onClick={() => { setTocOpen(false); if (c.idx !== chapter.idx) openChapter(active, c.idx) }}
+                    >
+                      <span className="bookread-toc-title">{c.title || `第 ${c.idx + 1} 章`}</span>
+                      {c.chars != null && <span className="bookread-toc-chars">{c.chars > 10000 ? (c.chars / 10000).toFixed(1) + '万字' : c.chars + '字'}</span>}
+                    </button>
+                  ))}
+                </div>
+              )}
               <div className="bookread-text" ref={textRef}>
                 {segs.map((s) =>
                   s.annos.length ? (
