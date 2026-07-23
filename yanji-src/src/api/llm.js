@@ -111,6 +111,9 @@ function formatToolsForProvider(tools, provider) {
 const TOOL_RESULT_MAX_LEN = 3000
 
 function compressToolResult(result) {
+  // 工具可能返回对象（乌有乡工具直传 JSON 就撞过）：content 必须是字符串，否则
+  // OpenAI 兼容端 400（"content should be a string"）且脏消息会存进历史反复炸
+  if (result != null && typeof result !== 'string') result = JSON.stringify(result)
   if (typeof result !== 'string' || result.length <= TOOL_RESULT_MAX_LEN) return result
   return result.slice(0, TOOL_RESULT_MAX_LEN) + '\n…[内容过长已截断]'
 }
@@ -729,7 +732,9 @@ function buildOpenAIMessages(messages, systemPrompt, dynamicContext) {
   messages.forEach((m, i) => {
     const inject = i === lastUserIdx && dynPrefix
     if (m.role === 'tool') {
-      out.push({ role: 'tool', tool_call_id: m.tool_call_id, content: m.content })
+      // 0723 前的乌有乡工具结果以对象形式落盘过，发送前必须兜底转字符串（否则整条会话永远 400）
+      const tc = typeof m.content === 'string' ? m.content : JSON.stringify(m.content ?? '')
+      out.push({ role: 'tool', tool_call_id: m.tool_call_id, content: tc })
     } else if (m.role === 'assistant' && m.tool_calls) {
       const am = { role: 'assistant', content: m.content || null, tool_calls: m.tool_calls }
       const rc = m.thinking || m.reasoning_content
@@ -751,7 +756,8 @@ function buildOpenAIMessages(messages, systemPrompt, dynamicContext) {
 function buildAnthropicMessages(messages, dynamicContext) {
   const out = messages.map((m) => {
     if (m.tool_use_id) {
-      return { role: 'user', content: [{ type: 'tool_result', tool_use_id: m.tool_use_id, content: m.content }] }
+      const tc = typeof m.content === 'string' ? m.content : JSON.stringify(m.content ?? '')
+      return { role: 'user', content: [{ type: 'tool_result', tool_use_id: m.tool_use_id, content: tc }] }
     }
     if (Array.isArray(m.content)) return { role: m.role, content: m.content }
     if (m.images?.length) {
