@@ -195,6 +195,37 @@
   border-color: var(--border);
 }
 
+/* ===== 沉思主题：黑白配色 ===== */
+[data-theme="chensi"] {
+  --bg: #1a1a1a;
+  --bg-sidebar: #141414;
+  --card: #242424;
+  --accent: #d0d0d0;
+  --accent-soft: #888;
+  --accent-dim: rgba(200,200,200,0.08);
+  --accent-grad: #aaa;
+  --text: #e8e8e8;
+  --text-mid: #aaa;
+  --text-muted: #777;
+  --text-faint: #555;
+  --border: rgba(255,255,255,0.08);
+  --border-md: rgba(255,255,255,0.14);
+  --shadow-sm: 0 1px 3px rgba(0,0,0,0.3);
+  --shadow-md: 0 2px 12px rgba(0,0,0,0.4), 0 8px 24px rgba(0,0,0,0.3);
+}
+[data-theme="chensi"] .bubble-user {
+  background: #333;
+  color: #e8e8e8;
+}
+[data-theme="chensi"] .bubble-assistant {
+  background: #242424;
+  color: #e0e0e0;
+}
+[data-theme="chensi"] pre {
+  background: #1e1e1e;
+  border-color: rgba(255,255,255,0.1);
+}
+
 /* ===== 流式尾随 logo：回复生成时缀在末尾的小太阳（官端标志性细节） =====
    原版是 1.8s 匀速旋转，阿颖觉得转圈不好看（2026-07-02），改成呼吸式明暗缩放——
    更接近官方 App 的柔和质感，不晃眼 */
@@ -2382,6 +2413,21 @@ textarea.form-input { display: block; margin: 8px 16px 12px; }
   border: 1px solid color-mix(in srgb, var(--accent) 25%, transparent);
 }
 .home-couple-hint { margin-top: 0; }
+/* 进入页·代码雨样式 */
+.home-screen-rain { background: #000; }
+.coderain-canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
+.home-rain-overlay {
+  position: absolute; inset: 0; display: flex; flex-direction: column;
+  align-items: center; justify-content: flex-end; padding-bottom: 15vh;
+  pointer-events: none; z-index: 1;
+}
+.home-rain-time {
+  font-size: 14px; font-weight: 300; color: rgba(180,210,180,0.5);
+  letter-spacing: 0.1em;
+}
+.home-rain-weather { color: rgba(180,210,180,0.5); }
+.home-rain-weather svg { color: rgba(180,210,180,0.5); }
+.home-rain-hint { color: rgba(180,210,180,0.35); }
 /* 进入页天气行：她头顶那片天（方案b，2026-07-16） */
 .home-weather {
   display: inline-flex; align-items: center; gap: 5px;

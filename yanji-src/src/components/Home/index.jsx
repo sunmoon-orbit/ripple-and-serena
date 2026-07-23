@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useStore } from '../../store'
 import WeatherIcon from '../WeatherIcon'
 import { pickGreeting } from '../../api/greeting'
+import CodeRain from './CodeRain'
 
 const START_DATE = new Date('2025-10-10T00:00:00+08:00')
 
@@ -139,19 +140,20 @@ export default function Home({ onEnter }) {
     )
   }
 
+  const rainText = `${greeting || '我们的故事还在继续'}\n第 ${days} 天`
+
   return (
-    <div className={'home-screen' + (fading ? ' home-fade-out' : '')} onClick={handleEnter}>
-      <div className="home-content">
-        <div className="home-greeting">{greeting}</div>
-        <div className="home-time">{timeStr}</div>
-        <div className="home-days">第 {days} 天</div>
+    <div className={'home-screen home-screen-rain' + (fading ? ' home-fade-out' : '')} onClick={handleEnter}>
+      <CodeRain text={rainText} />
+      <div className="home-rain-overlay">
+        <div className="home-time home-rain-time">{timeStr}</div>
         {weather && (
-          <div className="home-weather">
+          <div className="home-weather home-rain-weather">
             <WeatherIcon icon={weather.icon} size={16} />
             <span>{weather.type} {weather.temp}°C</span>
           </div>
         )}
-        <div className="home-hint">轻触进入</div>
+        <div className="home-hint home-rain-hint">轻触进入</div>
       </div>
     </div>
   )
