@@ -42,7 +42,9 @@ export default function App() {
   const [showHome, setShowHome] = useState(false)
 
   useEffect(() => {
-    const t = theme && theme !== 'default' ? theme : ''
+    // 官端槽位已被沉思替换（0723）：老存档里残留 guanduan 的自动迁到 chensi
+    const t0 = theme === 'guanduan' ? 'chensi' : theme
+    const t = t0 && t0 !== 'default' ? t0 : ''
     document.documentElement.setAttribute('data-theme', t)
     if (theme === 'glass') {
       const a = glassOpacity ?? 0.3

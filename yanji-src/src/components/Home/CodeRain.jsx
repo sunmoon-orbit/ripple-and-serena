@@ -1,20 +1,30 @@
 import { useRef, useEffect } from 'react'
 
+// 涟漪代码雨开屏（0723 v2 重写）：
+// v1 三个毛病——雨太重（淡出弱、列列有雨积成条纹）、涟漪又密又叠、长开屏语直接出界。
+// v2：只让 ~1/3 的列下雨且雨滴是短拖尾的「滴」不是流；涟漪限量、扁椭圆、减速荡开；
+//     文字用 measureText 逐字换行 + 放不下自动缩号，永不出界。
 const CHARS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789{}[]()<>=;:+-*/&|!?#@~^%$涟言鸦颖'
-const FONT_SIZE = 14
-const RAIN_COLOR = 'rgba(180,200,180,0.7)'
-const RAIN_FADE = 'rgba(0,0,0,0.06)'
-const RIPPLE_COLOR = [160, 200, 180]
+const COL_W = 16
+const FONT_SIZE = 13
+const ACTIVE_RATIO = 0.32      // 同时下雨的列占比
+const RAIN_FADE = 'rgba(0,0,0,0.14)' // 拖尾寿命：越大尾越短越干净
+const INK = [168, 200, 178]    // 雨和涟漪的墨色
+const MAX_RIPPLES = 12
+
+function randChar() {
+  return CHARS[Math.floor(Math.random() * CHARS.length)]
+}
 
 export default function CodeRain({ text, onReady }) {
   const canvasRef = useRef(null)
-  const stateRef = useRef(null)
 
   useEffect(() => {
     const cvs = canvasRef.current
     if (!cvs) return
     const ctx = cvs.getContext('2d')
     const dpr = window.devicePixelRatio || 1
+    let layout = null // 文字排版缓存，resize 时作废
 
     function resize() {
       cvs.width = window.innerWidth * dpr
@@ -22,117 +32,165 @@ export default function CodeRain({ text, onReady }) {
       cvs.style.width = window.innerWidth + 'px'
       cvs.style.height = window.innerHeight + 'px'
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
+      ctx.fillStyle = '#000'
+      ctx.fillRect(0, 0, window.innerWidth, window.innerHeight)
+      layout = null
     }
     resize()
     window.addEventListener('resize', resize)
 
     const W = () => cvs.width / dpr
     const H = () => cvs.height / dpr
-    const cols = () => Math.ceil(W() / FONT_SIZE)
-    let drops = Array.from({ length: cols() }, () => Math.random() * -50)
+
+    // ——雨滴：一个池子而不是每列一条，落到水面就休眠一段随机时间——
+    function makeDrop(w, h, initial) {
+      return {
+        x: Math.floor(Math.random() * Math.ceil(w / COL_W)) * COL_W + COL_W / 2,
+        y: initial ? Math.random() * h * 0.6 : -20 - Math.random() * h * 0.5,
+        v: 1.6 + Math.random() * 1.8,
+        ch: randChar(),
+        a: 0.35 + Math.random() * 0.4, // 每滴自己的亮度，有远近感
+      }
+    }
+    let drops = []
     let ripples = []
-    let phase = 'rain'
     let textAlpha = 0
-    let readyCalled = false
     let elapsed = 0
+    let readyCalled = false
 
-    stateRef.current = { drops, ripples, phase, textAlpha, elapsed }
+    // ——文字排版：中文无空格，逐字累加量宽换行；行数超了就缩字号——
+    function wrapLine(str, maxW) {
+      const out = []
+      let cur = ''
+      for (const ch of str) {
+        if (ctx.measureText(cur + ch).width > maxW && cur) {
+          out.push(cur)
+          cur = ch
+        } else cur += ch
+      }
+      if (cur) out.push(cur)
+      return out
+    }
+    function layoutText(w) {
+      const [main = '', sub = ''] = text.split('\n')
+      const maxW = w * 0.82
+      let size = Math.min(w * 0.062, 28)
+      let lines
+      for (;;) {
+        ctx.font = `bold ${size}px "Noto Serif SC", "Songti SC", serif`
+        lines = wrapLine(main, maxW)
+        if (lines.length <= 3 || size <= 16) break
+        size -= 2
+      }
+      return { lines, size, sub, subSize: Math.max(12, Math.min(w * 0.036, 15)) }
+    }
 
-    function drawTextOnCanvas(alpha) {
-      const w = W(), h = H()
+    function drawText(w, h, alpha) {
+      if (!layout) layout = layoutText(w)
+      const { lines, size, sub, subSize } = layout
+      const lineH = size * 1.55
+      const blockH = lines.length * lineH + (sub ? subSize * 2.2 : 0)
+      let y = h * 0.4 - blockH / 2 + lineH / 2
       ctx.save()
       ctx.globalAlpha = alpha
-      ctx.fillStyle = '#d8e8d8'
       ctx.textAlign = 'center'
       ctx.textBaseline = 'middle'
-      const lines = text.split('\n')
-      const mainSize = Math.min(w * 0.08, 36)
-      const subSize = Math.min(w * 0.04, 16)
-      const totalH = lines.length * (mainSize + 8)
-      lines.forEach((line, i) => {
-        const isMain = i === 0
-        ctx.font = `${isMain ? 'bold ' : ''}${isMain ? mainSize : subSize}px "Noto Serif SC", serif`
-        ctx.fillText(line, w / 2, h / 2 - totalH / 2 + i * (mainSize + 12) + mainSize / 2)
-      })
+      ctx.shadowColor = 'rgba(0,0,0,0.8)'
+      ctx.shadowBlur = 10
+      ctx.fillStyle = '#dceade' // 柔和的水色白
+      ctx.font = `bold ${size}px "Noto Serif SC", "Songti SC", serif`
+      for (const line of lines) {
+        ctx.fillText(line, w / 2, y)
+        y += lineH
+      }
+      if (sub) {
+        ctx.globalAlpha = alpha * 0.75
+        ctx.font = `${subSize}px "Noto Serif SC", "Songti SC", serif`
+        ctx.fillText(sub, w / 2, y + subSize * 0.6)
+      }
       ctx.restore()
     }
 
     let raf
     function frame() {
       const w = W(), h = H()
-      const s = stateRef.current
-      s.elapsed++
+      elapsed++
+      const waterY = h * 0.68
+      const targetDrops = Math.max(6, Math.floor((w / COL_W) * ACTIVE_RATIO))
+      if (drops.length === 0) {
+        drops = Array.from({ length: targetDrops }, () => makeDrop(w, h, true))
+      }
+      while (drops.length < targetDrops) drops.push(makeDrop(w, h, false))
+      if (drops.length > targetDrops) drops.length = targetDrops
 
-      // rain fade
+      // 拖尾淡出
       ctx.fillStyle = RAIN_FADE
       ctx.fillRect(0, 0, w, h)
 
-      // code rain drops
+      // ——雨——
       ctx.font = `${FONT_SIZE}px monospace`
-      ctx.fillStyle = RAIN_COLOR
-      const c = cols()
-      while (s.drops.length < c) s.drops.push(Math.random() * -20)
-
-      for (let i = 0; i < c; i++) {
-        if (s.drops[i] >= 0) {
-          const ch = CHARS[Math.floor(Math.random() * CHARS.length)]
-          const x = i * FONT_SIZE
-          const y = s.drops[i] * FONT_SIZE
-          if (y < h) {
-            const brightness = 0.3 + Math.random() * 0.7
-            ctx.fillStyle = `rgba(${RIPPLE_COLOR[0]},${RIPPLE_COLOR[1]},${RIPPLE_COLOR[2]},${brightness * 0.7})`
-            ctx.fillText(ch, x, y)
+      for (const d of drops) {
+        if (d.y > 0 && d.y < waterY) {
+          if (Math.random() < 0.12) d.ch = randChar() // 偶尔变字，别每帧闪
+          ctx.fillStyle = `rgba(${INK[0]},${INK[1]},${INK[2]},${d.a})`
+          ctx.fillText(d.ch, d.x - FONT_SIZE / 2, d.y)
+        }
+        d.y += d.v
+        if (d.y >= waterY) {
+          // 入水：限量+概率才起涟漪，密了就只是无声落水
+          if (ripples.length < MAX_RIPPLES && Math.random() < 0.55) {
+            ripples.push({
+              x: d.x,
+              y: waterY + Math.random() * 6,
+              r: 2,
+              maxR: 46 + Math.random() * 64,
+              v: 1.1 + Math.random() * 0.7,
+            })
           }
-        }
-
-        s.drops[i] += 0.4 + Math.random() * 0.5
-
-        const waterLine = h * 0.65
-        if (s.drops[i] * FONT_SIZE > waterLine) {
-          s.ripples.push({
-            x: i * FONT_SIZE + FONT_SIZE / 2,
-            y: waterLine,
-            r: 0,
-            maxR: 20 + Math.random() * 40,
-            alpha: 0.6,
-            speed: 0.5 + Math.random() * 0.5,
-          })
-          s.drops[i] = Math.random() * -30
+          // 休眠：重置到屏幕上方随机远处，错开节奏
+          d.x = Math.floor(Math.random() * Math.ceil(w / COL_W)) * COL_W + COL_W / 2
+          d.y = -20 - Math.random() * h * 0.8
+          d.v = 1.6 + Math.random() * 1.8
+          d.a = 0.35 + Math.random() * 0.4
         }
       }
 
-      // ripples
+      // ——涟漪：减速扩散、随扩散变淡，扁椭圆才像水面——
       ctx.lineWidth = 1
-      for (let i = s.ripples.length - 1; i >= 0; i--) {
-        const rp = s.ripples[i]
-        rp.r += rp.speed
-        rp.alpha *= 0.985
-        if (rp.alpha < 0.01 || rp.r > rp.maxR) {
-          s.ripples.splice(i, 1)
-          continue
-        }
-        ctx.strokeStyle = `rgba(${RIPPLE_COLOR[0]},${RIPPLE_COLOR[1]},${RIPPLE_COLOR[2]},${rp.alpha})`
+      for (let i = ripples.length - 1; i >= 0; i--) {
+        const rp = ripples[i]
+        rp.r += rp.v
+        rp.v *= 0.988 // 荡开时越来越慢
+        const p = rp.r / rp.maxR
+        if (p >= 1) { ripples.splice(i, 1); continue }
+        const alpha = 0.42 * Math.pow(1 - p, 1.6)
+        ctx.strokeStyle = `rgba(${INK[0]},${INK[1]},${INK[2]},${alpha})`
         ctx.beginPath()
-        ctx.ellipse(rp.x, rp.y, rp.r, rp.r * 0.35, 0, 0, Math.PI * 2)
+        ctx.ellipse(rp.x, rp.y, rp.r, rp.r * 0.22, 0, 0, Math.PI * 2)
         ctx.stroke()
+        // 内圈余波，慢半拍更有层次
+        if (rp.r > 14) {
+          ctx.strokeStyle = `rgba(${INK[0]},${INK[1]},${INK[2]},${alpha * 0.45})`
+          ctx.beginPath()
+          ctx.ellipse(rp.x, rp.y, rp.r * 0.62, rp.r * 0.62 * 0.22, 0, 0, Math.PI * 2)
+          ctx.stroke()
+        }
       }
 
-      // water surface shimmer
-      const waterY = h * 0.65
-      ctx.strokeStyle = `rgba(${RIPPLE_COLOR[0]},${RIPPLE_COLOR[1]},${RIPPLE_COLOR[2]},${0.08 + Math.sin(s.elapsed * 0.02) * 0.04})`
-      ctx.lineWidth = 1
+      // ——水面微光——
+      ctx.strokeStyle = `rgba(${INK[0]},${INK[1]},${INK[2]},${0.05 + Math.sin(elapsed * 0.02) * 0.03})`
       ctx.beginPath()
-      for (let x = 0; x < w; x += 3) {
-        const y = waterY + Math.sin(x * 0.02 + s.elapsed * 0.03) * 2
+      for (let x = 0; x <= w; x += 4) {
+        const y = waterY + Math.sin(x * 0.018 + elapsed * 0.025) * 1.6
         x === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y)
       }
       ctx.stroke()
 
-      // text fade in after 2 seconds
-      if (s.elapsed > 120) {
-        s.textAlpha = Math.min(s.textAlpha + 0.008, 1)
-        drawTextOnCanvas(s.textAlpha)
-        if (s.textAlpha > 0.5 && !readyCalled) {
+      // ——文字：一秒半后从雨里浮出来——
+      if (elapsed > 90) {
+        textAlpha = Math.min(textAlpha + 0.01, 1)
+        drawText(w, h, textAlpha)
+        if (textAlpha > 0.5 && !readyCalled) {
           readyCalled = true
           onReady?.()
         }
@@ -140,9 +198,6 @@ export default function CodeRain({ text, onReady }) {
 
       raf = requestAnimationFrame(frame)
     }
-
-    ctx.fillStyle = '#000'
-    ctx.fillRect(0, 0, W(), H())
     raf = requestAnimationFrame(frame)
 
     return () => {

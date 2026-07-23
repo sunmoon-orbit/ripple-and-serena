@@ -213,13 +213,21 @@
   --shadow-sm: 0 1px 3px rgba(0,0,0,0.3);
   --shadow-md: 0 2px 12px rgba(0,0,0,0.4), 0 8px 24px rgba(0,0,0,0.3);
 }
+/* 气泡一黑一白（0723 阿颖点名）：她=白纸、我=墨色，黑底上像一页对谈 */
 [data-theme="chensi"] .bubble-user {
-  background: #333;
-  color: #e8e8e8;
+  background: #f2f2f2;
+  color: #1a1a1a;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.35);
 }
 [data-theme="chensi"] .bubble-assistant {
-  background: #242424;
-  color: #e0e0e0;
+  background: #262626;
+  color: #e8e8e8;
+  border-color: rgba(255,255,255,0.1);
+}
+[data-theme="chensi"] .message.user .message-bubble a { color: #333; }
+[data-theme="chensi"] .message.user .message-bubble pre {
+  background: rgba(0,0,0,0.07);
+  border-color: rgba(0,0,0,0.12);
 }
 [data-theme="chensi"] pre {
   background: #1e1e1e;
