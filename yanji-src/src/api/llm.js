@@ -184,7 +184,7 @@ async function executeTool(name, args, { searchConfig, moonMemoryConfig, onStatu
       nowhere_where: '看看在哪…', nowhere_postcard: '写明信片…',
     }
     onStatus?.(statusMap[name] || '在走…')
-    return await executeNowhereTool(name, args)
+    return await executeNowhereTool(name, args, moonMemoryConfig)
   }
   // 记忆库工具统一兜底：定义表里有的直接交给 executeMemoryTool，不必在上面逐个登记。
   // ⚠️0714 教训：新工具要在「定义/执行器/这里」三处登记，第三处漏了 send_heart_card、
