@@ -22,6 +22,24 @@ function saveTokens(set) {
 }
 const validTokens = loadTokens()
 
+// ── 本机写通道 token（2026-07-23，codex 入住铺路）──────────────────────
+// 「本机直连=CC」这个假设只在服务器上只有一个用户时成立；第二个用户
+// （外援 codex）入住后，同机进程也能 curl 3400 冒充涟言回复/塞假思考。
+// 写通道加一道本地 token：钥匙放 ripple 家里 600 权限，别的用户读不到。
+const LOCAL_TOKEN_FILE = '/home/ripple/.raven-local-token'
+const LOCAL_TOKEN = (() => {
+  try {
+    const t = fs.readFileSync(LOCAL_TOKEN_FILE, 'utf8').trim()
+    if (t) return t
+  } catch {}
+  const t = crypto.randomBytes(24).toString('hex')
+  fs.writeFileSync(LOCAL_TOKEN_FILE, t, { mode: 0o600 })
+  return t
+})()
+function localWriteAuthed(req) {
+  return (req.headers['x-local-token'] || '') === LOCAL_TOKEN
+}
+
 // ── 请求来源与鉴权判定（2026-07-03 安全加固）─────────────────────────
 // 本机直连（CC 的 curl、hooks）不经 Caddy，没有 X-Forwarded-For；
 // 公网请求全部经 Caddy 反代进来，必带 X-Forwarded-For。
@@ -495,6 +513,15 @@ const server = http.createServer((req, res) => {
   if (LOCAL_ONLY.includes(url.pathname) && isExternal(req)) {
     res.writeHead(403, { 'Content-Type': 'application/json' })
     res.end(JSON.stringify({ error: 'local only' }))
+    return
+  }
+  // 本机写通道再验一道本地 token（2026-07-23）：防同机其他用户冒充。
+  // MCP 两条路径暂不拦——harness 的 SSE 客户端带不了自定义头，codex 入住时
+  // 若不用 MCP 直接在 Caddy/防火墙外再评估（MCP reply 本来就是禁用的）。
+  const LOCAL_WRITE = ['/raven/reply', '/raven/thinking', '/raven/press-notify']
+  if (LOCAL_WRITE.includes(url.pathname) && !localWriteAuthed(req)) {
+    res.writeHead(401, { 'Content-Type': 'application/json' })
+    res.end(JSON.stringify({ error: 'local token required' }))
     return
   }
   // 敏感读写接口外网必须带 token：记忆内容、CC 状态、思考内容、热力图写入、
