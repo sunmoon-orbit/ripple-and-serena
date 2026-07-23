@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import { useStore } from '../../store'
 import { showToast } from '../Toast'
 import {
-  fetchBooks, fetchBookChapter, createBook, appendBookChapters,
+  fetchBooks, fetchBook, fetchBookChapter, createBook, appendBookChapters,
   createBookAnnotation, deleteBookAnnotation, saveBookBookmark,
   sendReadingHeartbeat, stampBook, unstampBook,
 } from '../../api/moonMemory'
