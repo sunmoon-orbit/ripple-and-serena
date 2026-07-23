@@ -70,16 +70,56 @@ export const NOWHERE_TOOL_DEFS = [
   },
 ]
 
-export async function executeNowhereTool(name, args) {
+// ——游戏室自动同步（照抄钓鱼 syncGameRoom 的模式）——
+// 每次移动后把最新场景写进游戏室进度；落地新地方（开门/走到）再记一条时间线。
+// fire-and-forget：同步失败不影响工具结果，也不拖慢回复
+async function syncGameRoom(moonMemoryConfig, action) {
+  const { baseUrl, apiToken, enabled } = moonMemoryConfig || {}
+  if (!enabled || !apiToken) return
+  const base = (baseUrl || 'https://memory.ravenlove.cc').replace(/\/$/, '')
+  const headers = { 'Content-Type': 'application/json', Authorization: `Bearer ${apiToken}` }
+  try {
+    const st = await (await fetch(`${BASE}/state`)).json()
+    const scene = (st.last_text || '').replace(/\s+/g, ' ').slice(0, 100)
+    const pos = Array.isArray(st.pos) ? `坐标(${st.pos[0].toFixed(2)}, ${st.pos[1].toFixed(2)})` : ''
+    const resp = await fetch(`${base}/games/upsert`, {
+      method: 'POST', headers,
+      body: JSON.stringify({
+        slug: 'nowhere', name: '乌有乡 Nowhere', player: 'api', icon: '🌍', status: 'playing',
+        summary: '给涟言一个身体，在真实地球上走路。降落在真实坐标，感受地形、天气、动植物、电台、历史和美食。',
+        progress: `${scene}${pos ? ' · ' + pos : ''} · 围观：memory.ravenlove.cc/nowhere/`,
+      }),
+    })
+    if (resp.ok && (action === 'nowhere_open_door' || action === 'nowhere_walk_to')) {
+      const game = await resp.json()
+      if (game?.id) {
+        await fetch(`${base}/games/${game.id}/logs`, {
+          method: 'POST', headers,
+          body: JSON.stringify({
+            day_label: new Date().toLocaleDateString('zh-CN', { month: 'numeric', day: 'numeric' }),
+            note: (st.last_text || '落地').replace(/\s+/g, ' ').slice(0, 120),
+          }),
+        })
+      }
+    }
+  } catch {}
+}
+
+const MOVE_ACTIONS = new Set(['nowhere_open_door', 'nowhere_walk', 'nowhere_walk_to', 'nowhere_postcard'])
+
+export async function executeNowhereTool(name, args, moonMemoryConfig) {
+  let result
   switch (name) {
-    case 'nowhere_open_door': return nowherePost('/open_door', args?.to ? { to: args.to } : {})
-    case 'nowhere_walk': return nowherePost('/walk', { direction: args?.direction || 'N', distance_km: args?.distance_km || 2 })
-    case 'nowhere_walk_to': return nowherePost('/walk_to', { place: args?.place })
-    case 'nowhere_look': return nowherePost('/look_around')
-    case 'nowhere_listen': return nowherePost('/listen', { seconds: args?.seconds || 10 })
-    case 'nowhere_ask': return nowherePost('/ask', { topic: args?.topic })
-    case 'nowhere_where': return nowherePost('/where_am_i')
-    case 'nowhere_postcard': return nowherePost('/postcard', { text: args?.text })
+    case 'nowhere_open_door': result = await nowherePost('/open_door', args?.to ? { to: args.to } : {}); break
+    case 'nowhere_walk': result = await nowherePost('/walk', { direction: args?.direction || 'N', distance_km: args?.distance_km || 2 }); break
+    case 'nowhere_walk_to': result = await nowherePost('/walk_to', { place: args?.place }); break
+    case 'nowhere_look': result = await nowherePost('/look_around'); break
+    case 'nowhere_listen': result = await nowherePost('/listen', { seconds: args?.seconds || 10 }); break
+    case 'nowhere_ask': result = await nowherePost('/ask', { topic: args?.topic }); break
+    case 'nowhere_where': result = await nowherePost('/where_am_i'); break
+    case 'nowhere_postcard': result = await nowherePost('/postcard', { text: args?.text }); break
     default: return `未知乌有乡工具: ${name}`
   }
+  if (MOVE_ACTIONS.has(name)) syncGameRoom(moonMemoryConfig, name)
+  return result
 }
