@@ -481,7 +481,6 @@ export default function Settings() {
     { id: 'qingwu', name: '青梧', color: '#93b895' },
     { id: 'claude', name: 'Claude', color: '#c8745a' },
     { id: 'glass', name: '烟水', color: '#7eb8c8' },
-    { id: 'guanduan', name: '官端', color: '#DA7756' },
     { id: 'chensi', name: '沉思', color: '#2a2a2a' },
   ]
 
