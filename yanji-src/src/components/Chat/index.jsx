@@ -18,6 +18,7 @@ import VoiceCall from './VoiceCall'
 import GamesRoom from './GamesRoom'
 import MusicRoom from './MusicRoom'
 import FortuneWheel from './FortuneWheel'
+import FateDeck from './FateDeck'
 import DailyFortune from './DailyFortune'
 import ChatCalendar from './ChatCalendar'
 import DailyChecklist from './DailyChecklist'
@@ -100,6 +101,7 @@ export default function Chat() {
   const [gamesOpen, setGamesOpen] = useState(false)
   const [musicOpen, setMusicOpen] = useState(false)
   const [wheelOpen, setWheelOpen] = useState(false)
+  const [fateOpen, setFateOpen] = useState(false)
   const [fortuneOpen, setFortuneOpen] = useState(false)
   const [quoted, setQuoted] = useState(null)
   const [perspectiveFlip, setPerspectiveFlip] = useState(false)
@@ -929,7 +931,7 @@ export default function Chat() {
     <div className="chat-panel">
       {/* Sidebar */}
       <div className={'chat-sidebar' + (sidebarOpen ? ' open' : '')}>
-        <ConversationList onClose={() => setSidebarOpen(false)} onStartCall={dialCall} onOpenGames={() => setGamesOpen(true)} onOpenMusic={() => setMusicOpen(true)} onOpenWheel={() => setWheelOpen(true)} onOpenFortune={() => setFortuneOpen(true)} onOpenChecklist={() => setChecklistOpen(true)} onOpenHealth={() => setHealthOpen(true)} onOpenWallet={() => setWalletOpen(true)} onOpenPeriod={() => setPeriodOpen(true)} onOpenAlbum={() => setAlbumOpen(true)} onOpenIdleJournal={() => setIdleJournalOpen(true)} onOpenBoard={() => setBoardOpen(true)} onOpenCalls={() => setCallsOpen(true)} />
+        <ConversationList onClose={() => setSidebarOpen(false)} onStartCall={dialCall} onOpenGames={() => setGamesOpen(true)} onOpenMusic={() => setMusicOpen(true)} onOpenWheel={() => setWheelOpen(true)} onOpenFate={() => setFateOpen(true)} onOpenFortune={() => setFortuneOpen(true)} onOpenChecklist={() => setChecklistOpen(true)} onOpenHealth={() => setHealthOpen(true)} onOpenWallet={() => setWalletOpen(true)} onOpenPeriod={() => setPeriodOpen(true)} onOpenAlbum={() => setAlbumOpen(true)} onOpenIdleJournal={() => setIdleJournalOpen(true)} onOpenBoard={() => setBoardOpen(true)} onOpenCalls={() => setCallsOpen(true)} />
       </div>
       {sidebarOpen && <div className="sidebar-backdrop" onClick={() => setSidebarOpen(false)} />}
 
@@ -1145,6 +1147,7 @@ export default function Chat() {
       {egg && <CompletionEgg svg={egg} onDone={() => setEgg(null)} />}
       {musicOpen && <MusicRoom onClose={() => setMusicOpen(false)} />}
       {wheelOpen && <FortuneWheel onClose={() => setWheelOpen(false)} />}
+      {fateOpen && <FateDeck onClose={() => setFateOpen(false)} onSend={handleSend} />}
       {fortuneOpen && <DailyFortune onClose={() => setFortuneOpen(false)} />}
       {checklistOpen && <DailyChecklist onClose={() => setChecklistOpen(false)} />}
       {healthOpen && <HealthCard onClose={() => setHealthOpen(false)} />}
