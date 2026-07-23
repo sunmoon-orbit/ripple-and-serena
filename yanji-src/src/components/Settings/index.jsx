@@ -482,6 +482,7 @@ export default function Settings() {
     { id: 'claude', name: 'Claude', color: '#c8745a' },
     { id: 'glass', name: '烟水', color: '#7eb8c8' },
     { id: 'guanduan', name: '官端', color: '#DA7756' },
+    { id: 'chensi', name: '沉思', color: '#2a2a2a' },
   ]
 
   async function checkMoonHealth() {
@@ -1175,14 +1176,14 @@ export default function Settings() {
                     <button
                       className={'avatar-mode-btn' + ((homeStyle || 'minimal') === 'minimal' ? ' active' : '')}
                       onClick={() => setHomeStyle('minimal')}
-                    >小鸟极简</button>
+                    >涟漪代码雨</button>
                     <button
                       className={'avatar-mode-btn' + (homeStyle === 'couple' ? ' active' : '')}
                       onClick={() => setHomeStyle('couple')}
                     >双头像纪念卡</button>
                   </div>
                 </div>
-                <p className="card-hint">纪念卡显示两个人的头像（用「聊天头像」里设置的图片，没设时是小乌鸦和小蜂鸟）、在一起的天数、聊过的消息数，还有距离下一个纪念日的倒数。</p>
+                <p className="card-hint">涟漪代码雨：代码字符从天空落下，落到水面泛起涟漪，涟漪聚成文字。纪念卡：两个人的头像、在一起的天数、消息数、纪念日倒数。</p>
               </div>
             </Section>
             <RoostBgSection />
