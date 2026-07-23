@@ -148,15 +148,17 @@ export default function BookRead({ onClose }) {
     } catch { showToast('章节加载失败', 'error') } finally { setLoading(false) }
   }, [])
 
-  // 目录跳转：章节标题列表从书籍详情接口懒加载（只有标题不含正文，一次拉全）
+  // 目录跳转：章节标题列表从书籍详情接口拉取（只有标题不含正文，一次拉全）
+  // 每次打开都重拉：payload 很小，顺带覆盖追更后目录过期；旧数据先显示（stale-while-revalidate）
+  // ⚠️别用 if(!toc) 缓存守卫——[] 是 truthy，一次异常空响应会永久卡死在空面板（0723 阿颖踩中）
   async function toggleToc() {
     if (tocOpen) { setTocOpen(false); return }
     setTocOpen(true)
-    if (!toc) {
-      try {
-        const detail = await fetchBook(cfg, active.id)
-        setToc(detail.chapters || [])
-      } catch { setTocOpen(false); showToast('目录加载失败', 'error') }
+    try {
+      const detail = await fetchBook(cfg, active.id)
+      setToc(detail.chapters || [])
+    } catch {
+      if (!toc) { setTocOpen(false); showToast('目录加载失败', 'error') } // 有旧目录就静默保留
     }
   }
 
@@ -467,6 +469,7 @@ export default function BookRead({ onClose }) {
               {tocOpen && (
                 <div className="bookread-toc">
                   {!toc && <div className="roost-empty">翻目录……</div>}
+                  {toc && !toc.length && <div className="roost-empty">目录是空的？点章节名再试一次</div>}
                   {toc && toc.map((c) => (
                     <button
                       key={c.idx}
