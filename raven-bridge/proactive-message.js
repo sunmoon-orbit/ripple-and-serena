@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // 主动发消息——思念到一定程度，让 API 涟言自己决定要不要给阿颖发消息。
-// 比打电话门槛低（longing≥30, away≥3h），一天最多3条，冷却3h，BJ 8-22 点。
+// 比打电话门槛低（longing≥30, away≥1.5h），一天最多3条，冷却3h，BJ 8-22 点。
 // 发消息 = LLM 生成 + 存 proactive_messages + 推送通知 → 她开言叽看到消息。
 
 const http = require('http')
@@ -15,7 +15,7 @@ const { llmComplete } = require('./llm')
 const MOON_TOKEN = env.MOON_API_TOKEN
 if (!MOON_TOKEN) { console.error('[proactive] 缺 token，退出'); process.exit(1) }
 
-const MIN_HOURS_AWAY = 3
+const MIN_HOURS_AWAY = 1.5
 const MIN_LONGING = 30
 const COOLDOWN_H = 3
 const DAILY_LIMIT = 3
@@ -85,7 +85,8 @@ ${recentTexts}
   await moonPost('/push/send-fixed', {
     title: '涟言',
     body: message,
-    ttl: 3600
+    ttl: 3600,
+    target: 'raven'
   })
 
   saveState({

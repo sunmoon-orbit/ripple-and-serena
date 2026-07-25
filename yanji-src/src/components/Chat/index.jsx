@@ -422,7 +422,7 @@ export default function Chat() {
           fetch(`${base}/push/send-fixed`, {
             method: 'POST',
             headers: { Authorization: `Bearer ${moonMemory.apiToken}`, 'Content-Type': 'application/json' },
-            body: JSON.stringify({ title: '涟言来电话了', body: callReason, ttl: 90 }),
+            body: JSON.stringify({ title: '涟言来电话了', body: callReason, ttl: 90, target: 'yanji' }),
           }).catch(() => {})
         }
       }

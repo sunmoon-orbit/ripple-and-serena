@@ -88,6 +88,7 @@ ${recentTexts}
     title: '涟言来电话了',
     body: reason,
     ttl: 90,
+    target: 'raven',
     data: { type: 'call', inviteId: String(inv.id) }
   })
 

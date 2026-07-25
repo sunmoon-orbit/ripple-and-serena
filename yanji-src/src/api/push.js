@@ -154,7 +154,8 @@ export async function subscribePush(moonMemoryConfig) {
   const resp = await fetch(`${apiUrl}/push/subscribe`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiToken}` },
-    body: JSON.stringify(sub.toJSON()),
+    // app:'yanji' 自报家门——不报的话服务端按归巢算，言叽的通知会从归巢弹出来（0725）
+    body: JSON.stringify({ ...sub.toJSON(), app: 'yanji' }),
   })
   if (!resp.ok) {
     const detail = await resp.text().catch(() => '')
