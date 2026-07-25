@@ -86,7 +86,7 @@ ${recentTexts}
     title: '涟言',
     body: message,
     ttl: 3600,
-    target: 'raven'
+    target: 'yanji'
   })
 
   saveState({

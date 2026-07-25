@@ -81,7 +81,7 @@ ${context}
     return done('decline', '他想了想，这次决定不打扰')
 
   const text = decision.text.trim().slice(0, 60)
-  await moonPost('/push/send-fixed', { title: '涟言', body: text, ttl: 21600, target: 'raven' })
+  await moonPost('/push/send-fixed', { title: '涟言', body: text, ttl: 21600, target: 'yanji' })
   await moonPost('/emotion/push-mark', { lastSeen: st.lastSeen, text })
   return done('pushed', `已推：${text}`)
 }
