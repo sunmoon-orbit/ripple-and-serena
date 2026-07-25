@@ -193,14 +193,21 @@ export default function Chat() {
         const cutMsgs = prepared.slice(0, cutCount)
         try {
           const lightModel = conn.lightModel || conn.defaultModel || 'deepseek-v4-flash'
-          const newSummary = await compactMessages(cutMsgs, conn, lightModel)
+          // 把旧笔记一起喂进去，让模型重写整份而不是往后拼：
+          // 旧写法 prev + '---' + new 是只进不出的，「未了结」永远消不了项，
+          // 事情早做完了几轮之后还会被当成没做（0726 阿颖报的症状）。
+          const prev = getSummary(chat.id)
+          const newSummary = await compactMessages(cutMsgs, conn, lightModel, prev)
           if (newSummary) {
-            const prev = getSummary(chat.id)
-            const merged = prev ? prev + '\n\n---\n\n' + newSummary : newSummary
-            // keep summary from growing indefinitely (~2000 chars max)
-            setSummary(chat.id, merged.slice(-2000))
+            // 兜底截断保头不保尾：头部是实体/称呼和事件，尾部是「未了结」——
+            // 旧写法 slice(-2000) 正好反着来，先丢人名再丢事件，专留悬项
+            setSummary(chat.id, newSummary.length > 3000 ? newSummary.slice(0, 3000) : newSummary)
+          } else {
+            console.warn('[compaction] 笔记生成为空，沿用旧笔记')
           }
-        } catch {}
+        } catch (e) {
+          console.warn('[compaction] 失败，沿用旧笔记:', e?.message)
+        }
       }
 
       const merged = []

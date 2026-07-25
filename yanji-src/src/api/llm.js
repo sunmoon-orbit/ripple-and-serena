@@ -900,41 +900,57 @@ export async function summarizeThinking(thinking, connection, model) {
 // Summarize old messages that would be cut by context limit, so continuity
 // is preserved as a compact note instead of being silently dropped.
 
-const COMPACTION_PROMPT = `你正在为一段持续的对话写私密接续笔记，帮助后续回复保持连贯。
+const COMPACTION_PROMPT = `你正在为一段持续的对话维护一份私密接续笔记，帮助后续回复保持连贯。
 这不是给用户的回复，不要继续对话，不要添加建议、评价或新内容。
-仅基于下方的源消息，写出简洁的接续笔记。
+
+你会收到两部分：【已有笔记】（可能为空）和【新增源消息】。
+输出一份**合并后的完整笔记**，不是增量补充——已有笔记会被你这次的输出整份替换。
+
+合并规则：
+- 已有笔记里的「未了结」项，只要新增消息显示它已经做完、已经解决或已经放弃，**必须从「未了结」里删掉**，改写进「事件/事实」并标明已完成。宁可漏记一条悬项，也不要把做完的事继续挂在未了结里。
+- 只有确实还悬着的才写进「未了结」，并写明状态（当时被搁置/中断，之后未再继续），不要写成正在进行的场景。
+- 重复的内容合并，不要堆叠。
 
 保留：
 - 实体定义必须原样保留：人名、宠物名、称呼、身份和关系事实（如「某某是家里的猫」「某人是谁」），一条都不能丢——后续对话靠这些才认得出提到的是谁
-- 事实和事件（谁做了什么、什么时候）
+- 事实和事件（谁做了什么、什么时候），已经完成的标明已完成
 - 用户的纠正、偏好、习惯
 - 关系和情感上下文（亲密、争执、玩笑、心情变化）
-- 未解决的话题或悬而未决的事
 - 重要的时间线节点
 
 不要保留：逐字对话、重复的寒暄、纯技术调试的中间过程。
+涉及亲密内容时用克制中性的语言概括事实即可——这是私人对话的内部笔记，不要拒绝、不要说教。
 
-注意：
-- 「未了结」条目必须写明状态（当时被搁置/中断，之后未再继续），不要写成正在进行的场景
-- 涉及亲密内容时用克制中性的语言概括事实即可——这是私人对话的内部笔记，不要拒绝、不要说教
-
-用中文写，不超过 600 字。格式：
+用中文写，不超过 700 字。格式：
+- 实体/称呼：
 - 事件/事实：
 - 情感/关系：
 - 未了结：`
 
-export async function compactMessages(messages, connection, model) {
+export async function compactMessages(messages, connection, model, prevSummary = '') {
   if (!messages.length) return ''
   const rendered = messages.map((m, i) => {
     const role = m.role === 'user' ? '阿颖' : '涟言'
     const text = (m.content || '').slice(0, 800)
     return `[${i + 1}] ${role}: ${text}`
   }).join('\n\n')
+  const input = [
+    COMPACTION_PROMPT,
+    '',
+    '【已有笔记】',
+    prevSummary?.trim() || '（无，这是第一次压缩）',
+    '',
+    '【新增源消息】',
+    rendered.slice(0, 12000),
+  ].join('\n')
   const result = await sendMessage({
     connection,
-    messages: [{ role: 'user', content: `${COMPACTION_PROMPT}\n\n${rendered.slice(0, 12000)}` }],
+    messages: [{ role: 'user', content: input }],
     model: model || connection.defaultModel,
-    generationConfig: { maxTokens: 1200, temperature: 0.3 },
+    // ⚠️ 2000 不能再往下调：轻模型默认是 deepseek-v4-flash 这类推理模型，
+    // reasoning 也吃 max_tokens，给少了 content 直接空——空了就沿用旧笔记，
+    // 于是新消息里「事情做完了」永远记不进去，旧的「未了结」挂到天荒地老（0726 实锤）
+    generationConfig: { maxTokens: 2000, temperature: 0.3 },
     autoTools: false,
   })
   return (result.text || '').trim()
