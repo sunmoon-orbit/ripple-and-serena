@@ -114,6 +114,30 @@
   #theme-btn:active { opacity: .7; }
   #cal-btn { background: none; border: none; cursor: pointer; padding: 0; opacity: .7; display: flex; align-items: center; color: var(--text); }
   #cal-btn:active { opacity: 1; }
+  #move-btn { background: none; border: none; cursor: pointer; padding: 0; opacity: .7; display: flex; align-items: center; color: var(--text); }
+  #move-btn:active { opacity: 1; }
+  #move-modal {
+    position: fixed; inset: 0; background: rgba(0,0,0,.5); z-index: 200;
+    display: flex; align-items: center; justify-content: center;
+  }
+  #move-box {
+    background: var(--surface); border: 1px solid var(--border); border-radius: 16px;
+    padding: 18px; width: 330px; max-width: 90vw;
+  }
+  #move-box h3 { margin: 0 0 4px; font-size: 15px; color: var(--text); }
+  #move-box .move-sub { font-size: 12px; color: var(--text-dim); line-height: 1.6; margin-bottom: 14px; }
+  #move-box .move-row { display: flex; gap: 8px; margin-bottom: 10px; }
+  #move-box .move-row button {
+    flex: 1; padding: 10px; border-radius: 9px; border: 1px solid var(--border);
+    background: var(--bg); color: var(--text); font-size: 13px; font-family: inherit; cursor: pointer;
+  }
+  #move-box .move-row button:active { opacity: .7; }
+  #move-note { font-size: 11px; color: var(--text-dim); line-height: 1.7; margin-top: 12px; }
+  #move-status { font-size: 12px; color: var(--text-dim); min-height: 17px; margin-top: 8px; }
+  #move-close {
+    width: 100%; padding: 9px; margin-top: 12px; border-radius: 9px; border: none;
+    background: var(--border); color: var(--text); font-size: 13px; font-family: inherit; cursor: pointer;
+  }
   #cal-modal {
     position: fixed; inset: 0; background: rgba(0,0,0,.5); z-index: 200;
     display: flex; align-items: center; justify-content: center;
@@ -751,6 +775,29 @@
         <span>日</span><span>一</span><span>二</span><span>三</span><span>四</span><span>五</span><span>六</span>
       </div>
       <div id="cal-grid"></div>
+    </div>
+  </div>
+
+  <!-- 搬家：导出/导入本机数据 -->
+  <div id="move-modal" style="display:none">
+    <div id="move-box">
+      <h3>搬家</h3>
+      <div class="move-sub">
+        归巢的聊天记录、便签、待办、头像、主题这些都只存在这台手机里。
+        换设备、装 app、重装之前先导出一份，到新的地方再导进去。
+      </div>
+      <div class="move-row">
+        <button id="move-export">导出到文件</button>
+        <button id="move-import">从文件导入</button>
+      </div>
+      <input type="file" id="move-file" accept="application/json,.json" style="display:none">
+      <div id="move-status"></div>
+      <div id="move-note">
+        · 导出文件里<b>不含密码</b>，到新设备重输一次就好<br>
+        · 导入会<b>覆盖</b>本机现有数据，导完自动刷新<br>
+        · 已经装了 app 的话：可以「清除缓存」，<b>千万别卸载、别点清除数据</b>
+      </div>
+      <button id="move-close">关掉</button>
     </div>
   </div>
 
@@ -2048,6 +2095,103 @@ document.getElementById('bg-upload').addEventListener('change', (e) => {
     }
   }
   reader.readAsDataURL(file)
+  e.target.value = ''
+})
+
+// --- 搬家：导出/导入本机数据 ---
+// 归巢的聊天记录、便签、待办、头像、主题全在 localStorage 里，卸载 app 或者
+// 点「清除数据」就没了。换设备 / 从 PWA 迁到 APK 也没有别的路。所以给一条
+// 明路：导出成一个 json 文件存手机里，到新的地方再导回来。
+//
+// ⚠️ 只搬 raven- 前缀的键和 serena-avatar：memory.ravenlove.cc 这个域名下
+// 还住着拾羽等别的应用，它们共享同一份 localStorage，整份导出会把别人的
+// apikey 一起卷走。raven-token 也排除——密码到新设备重输一次，不写进文件。
+const MOVE_SKIP = new Set(['raven-token'])
+function moveIsOurKey(k) {
+  return (k.startsWith('raven-') || k === 'serena-avatar') && !MOVE_SKIP.has(k)
+}
+
+function moveStatus(msg) {
+  document.getElementById('move-status').textContent = msg || ''
+}
+
+function moveExport() {
+  const data = {}
+  for (let i = 0; i < localStorage.length; i++) {
+    const k = localStorage.key(i)
+    if (moveIsOurKey(k)) data[k] = localStorage.getItem(k)
+  }
+  const chatCount = (() => {
+    try { return (JSON.parse(data[STORAGE_KEY] || '[]') || []).length } catch { return 0 }
+  })()
+  const bundle = { v: 1, app: 'raven', at: new Date().toISOString(), data }
+  const blob = new Blob([JSON.stringify(bundle)], { type: 'application/json' })
+  const d = new Date()
+  const stamp = `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, '0')}${String(d.getDate()).padStart(2, '0')}`
+  const a = document.createElement('a')
+  a.href = URL.createObjectURL(blob)
+  a.download = `归巢搬家-${stamp}.json`
+  document.body.appendChild(a)
+  a.click()
+  document.body.removeChild(a)
+  setTimeout(() => URL.revokeObjectURL(a.href), 2000)
+  moveStatus(`导出了 ${Object.keys(data).length} 项，聊天记录 ${chatCount} 条`)
+}
+
+function moveImport(file) {
+  const reader = new FileReader()
+  reader.onload = (ev) => {
+    let bundle
+    try { bundle = JSON.parse(ev.target.result) } catch {
+      moveStatus('这个文件读不出来，确认一下是不是导出的那个 json'); return
+    }
+    if (!bundle || bundle.app !== 'raven' || !bundle.data) {
+      moveStatus('这不是归巢的搬家文件（言叽的导不进来）'); return
+    }
+    const keys = Object.keys(bundle.data).filter(moveIsOurKey)
+    if (!keys.length) { moveStatus('文件里没有可导入的内容'); return }
+    let chatCount = 0
+    try { chatCount = (JSON.parse(bundle.data[STORAGE_KEY] || '[]') || []).length } catch { }
+    const when = (bundle.at || '').slice(0, 10)
+    if (!confirm(`要导入 ${when} 导出的 ${keys.length} 项（聊天记录 ${chatCount} 条）吗？\n\n本机现有的这些数据会被覆盖，覆盖前没法撤销。`)) {
+      moveStatus('取消了'); return
+    }
+    // 先清掉本机同类键，避免旧设备残留的键混在新数据里
+    const stale = []
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i)
+      if (moveIsOurKey(k)) stale.push(k)
+    }
+    stale.forEach(k => localStorage.removeItem(k))
+    try {
+      keys.forEach(k => localStorage.setItem(k, bundle.data[k]))
+    } catch {
+      moveStatus('存不下了（多半是背景图太大），部分内容没导进来'); return
+    }
+    moveStatus('导好了，正在刷新…')
+    setTimeout(() => location.reload(), 800)
+  }
+  reader.readAsText(file)
+}
+
+document.getElementById('move-btn').addEventListener('click', () => {
+  moveStatus('')
+  document.getElementById('move-modal').style.display = 'flex'
+})
+document.getElementById('move-close').addEventListener('click', () => {
+  document.getElementById('move-modal').style.display = 'none'
+})
+document.getElementById('move-modal').addEventListener('click', e => {
+  if (e.target === document.getElementById('move-modal'))
+    document.getElementById('move-modal').style.display = 'none'
+})
+document.getElementById('move-export').addEventListener('click', moveExport)
+document.getElementById('move-import').addEventListener('click', () => {
+  document.getElementById('move-file').click()
+})
+document.getElementById('move-file').addEventListener('change', (e) => {
+  const file = e.target.files[0]
+  if (file) moveImport(file)
   e.target.value = ''
 })
 
