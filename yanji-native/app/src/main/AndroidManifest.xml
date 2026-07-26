@@ -57,11 +57,6 @@
             </intent-filter>
         </service>
 
-        <!-- 通知栏快捷回复的 BroadcastReceiver -->
-        <receiver
-            android:name=".QuickReplyReceiver"
-            android:exported="false" />
-
         <!-- 来电通知：挂断按钮 -->
         <receiver
             android:name=".CallActionReceiver"

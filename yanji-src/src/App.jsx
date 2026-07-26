@@ -1,5 +1,6 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useStore } from './store'
+import { pushNative } from './utils/nativeInbox'
 import IconNav from './components/IconNav'
 import Chat from './components/Chat'
 import Memory from './components/Memory'
@@ -40,6 +41,23 @@ export default function App() {
   const avatarSize = useStore((s) => s.avatarConfig?.size || 28)
   const [showSplash, setShowSplash] = useState(true)
   const [showHome, setShowHome] = useState(false)
+  const fromNativeRef = useRef(false)
+
+  // 原生壳送文字进来的两个入口（通知栏快捷回复 / 系统分享）。
+  // 挂在 App 上而不是 Chat 上：Chat 只在 activePanel==='chat' 时才挂载，
+  // 而这两件事随时可能发生。这里负责把她带到对话页，正文交给队列。
+  useEffect(() => {
+    const enter = (kind) => (text) => {
+      if (!text) return
+      fromNativeRef.current = true
+      setShowSplash(false)
+      setShowHome(false)          // 她已经在通知里说了话，别再拦一道进入页
+      useStore.setState({ activePanel: 'chat' })
+      pushNative({ kind, text })
+    }
+    window.__yanjiQuickReply = enter('send')   // 通知栏回复：直接发出去
+    window.__yanjiShareText = enter('draft')   // 系统分享：填进输入框，等她补一句
+  }, [])
 
   useEffect(() => {
     // 官端槽位已被沉思替换（0723）：老存档里残留 guanduan 的自动迁到 chensi
@@ -63,7 +81,9 @@ export default function App() {
 
   return (
     <>
-      {showSplash && <Splash onDone={() => { setShowSplash(false); setShowHome(true) }} />}
+      {/* 开屏动画的定时器跑完会把进入页推上来——从通知栏进来的那次要跳过，
+          否则刚被送进对话页又被盖回去 */}
+      {showSplash && <Splash onDone={() => { setShowSplash(false); setShowHome(!fromNativeRef.current) }} />}
       {showHome && <Home onEnter={() => setShowHome(false)} />}
       <div className="app-shell" style={(showSplash || showHome) ? { visibility: 'hidden', pointerEvents: 'none' } : undefined}>
         <IconNav />

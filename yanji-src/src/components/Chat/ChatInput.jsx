@@ -69,6 +69,18 @@ export default function ChatInput({ onSend, disabled, onImageAdd, images, onImag
     return () => document.removeEventListener('click', close)
   }, [historyOpen])
 
+  // 系统分享进来的文字填进输入框（不直接发——她可能还想在前面补一句）。
+  // 输入框的文字是这个组件的局部 state，只能从这儿开一个口子；
+  // 和 player.js 的 window.__yanjiMediaAction 是同一种写法。
+  useEffect(() => {
+    window.__yanjiFillInput = (t) => {
+      if (!t) return
+      setText((prev) => (prev ? prev + '\n' + t : t))
+      textareaRef.current?.focus()
+    }
+    return () => { delete window.__yanjiFillInput }
+  }, [])
+
   const searchHistory = useCallback(async (q) => {
     if (!q.trim() || !moonMemory?.enabled || !moonMemory?.apiToken) return
     setHistoryLoading(true)

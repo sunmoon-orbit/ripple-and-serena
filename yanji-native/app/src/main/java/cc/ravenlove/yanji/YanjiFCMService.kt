@@ -15,7 +15,7 @@ class YanjiFCMService : FirebaseMessagingService() {
         private const val CHANNEL_ID = "yanji_chat"
         private const val CHANNEL_CALL = "yanji_call_v2"
         const val CALL_NOTIFICATION_ID = 99
-        private const val KEY_REPLY = "key_quick_reply"
+        const val KEY_REPLY = "key_quick_reply"   // MainActivity 从 intent 里取回复文字时要用
     }
 
     override fun onNewToken(token: String) {
@@ -101,6 +101,8 @@ class YanjiFCMService : FirebaseMessagingService() {
     }
 
     private fun showNotification(title: String, body: String) {
+        val notifId = System.currentTimeMillis().toInt()
+
         val tapIntent = PendingIntent.getActivity(
             this, 0,
             Intent(this, MainActivity::class.java).apply {
@@ -109,14 +111,25 @@ class YanjiFCMService : FirebaseMessagingService() {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
-        // 通知栏直接回复
+        // 通知栏直接回复。
+        // ⚠️ 0726 改：原来指向 QuickReplyReceiver，在后台起个 HTTP 请求发给**归巢**的通道——
+        // 方向就是错的：在言叽的通知里说的话会跑进归巢，进不了言叽的对话。
+        // 言叽的对话在 WebView 的 localStorage 里、API key 也在前端，服务端根本没有一份
+        // 可写的言叽会话，所以「留在通知栏里把话发出去」这条路不存在。
+        // 改成打开 app 把这句话带进去（PendingIntent 指 Activity 一样收得到 RemoteInput），
+        // 落进正确的对话、带完整上下文、走她自己配的模型。代价是要开一次 app，认了。
         val remoteInput = RemoteInput.Builder(KEY_REPLY)
             .setLabel(getString(R.string.reply_label))
             .build()
 
-        val replyIntent = PendingIntent.getBroadcast(
-            this, 0,
-            Intent(this, QuickReplyReceiver::class.java),
+        val replyIntent = PendingIntent.getActivity(
+            this, notifId,   // requestCode 用通知 id：多条通知各带各的 extra，别被 UPDATE_CURRENT 串成一份
+            Intent(this, MainActivity::class.java).apply {
+                flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
+                putExtra("quick_reply", true)
+                putExtra("notif_id", notifId)
+            },
+            // ⚠️ 必须 MUTABLE：RemoteInput 要往 Intent 里塞她输入的文字，IMMUTABLE 就传不进来
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_MUTABLE
         )
 
@@ -127,7 +140,12 @@ class YanjiFCMService : FirebaseMessagingService() {
         ).addRemoteInput(remoteInput).build()
 
         val notification = NotificationCompat.Builder(this, CHANNEL_ID)
-            .setSmallIcon(android.R.drawable.ic_dialog_email)
+            // ⚠️ 0726 前是 android.R.drawable.ic_dialog_email（安卓自带的信封）。
+            // 以前 FCM 发的是 notification 型消息、通知由系统托盘画，这行从来没生效过；
+            // 改成 data 型之后是 app 自己画，信封才会真露出来。小图标只认 alpha 通道，
+            // 必须单色矢量剪影，不能拿 mipmap 那张彩色图。
+            .setSmallIcon(R.drawable.ic_notification)
+            .setColor(0xFF7B6FA2.toInt())   // 系统给剪影上的色，言叽默认主题的紫
             .setContentTitle(title)
             .setContentText(body)
             .setStyle(NotificationCompat.BigTextStyle().bigText(body))
@@ -138,6 +156,6 @@ class YanjiFCMService : FirebaseMessagingService() {
             .build()
 
         getSystemService(NotificationManager::class.java)
-            .notify(System.currentTimeMillis().toInt(), notification)
+            .notify(notifId, notification)
     }
 }

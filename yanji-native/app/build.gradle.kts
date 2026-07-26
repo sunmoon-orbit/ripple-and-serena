@@ -65,6 +65,6 @@ dependencies {
     implementation(platform("com.google.firebase:firebase-bom:33.7.0"))
     implementation("com.google.firebase:firebase-messaging-ktx")
 
-    // coroutines for QuickReplyReceiver
+    // coroutines：媒体通知 + 想你键小组件
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.9.0")
 }

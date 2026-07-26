@@ -58,7 +58,8 @@ class WebBridge(private val activity: MainActivity) {
     }
 
     // 拾羽记忆库 token：想你键小组件发 /press 用（她打开言叽时前端同步进来）。
-    // ⚠️ 别学 QuickReplyReceiver 读 raven_token 的样子——那个 key 从来没人写过。
+    // ⚠️ 这个 key 必须真有人写。0726 删掉的 QuickReplyReceiver 就是读了一个
+    //    从来没人写过的 raven_token，读到空串照发不误，错得悄无声息。
     @JavascriptInterface
     fun saveMoonToken(token: String) {
         if (token.isEmpty()) return

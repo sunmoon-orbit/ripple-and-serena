@@ -8,6 +8,7 @@ import { applyTimeAway, getEmotionState, buildEmotionPrompt, extractEmotionUpdat
 import { maybeSyncEmotion } from '../../utils/emotionSync'
 import { shouldNudge, recordNudge, buildNudgeText } from '../../utils/nudge'
 import { decideReplyDelay, getPendingReply, setPendingReply, clearPendingReply } from '../../utils/replyDelay'
+import { drainNative } from '../../utils/nativeInbox'
 import { pickAutoPostTrigger, markAutoPosted, postMoment } from '../../api/moments'
 import { notifyReplyReady } from '../../api/push'
 import { extractMood, stripMoodTag, stripInlineFx } from '../../utils/moodFx'
@@ -583,6 +584,21 @@ export default function Chat() {
     document.addEventListener('visibilitychange', check)
     return () => { clearInterval(t); document.removeEventListener('visibilitychange', check) }
   }, [isSending, chats, connections, generateReply])
+
+  // ── 原生壳送进来的文字：通知栏快捷回复 / 系统分享 ──────────────────────
+  useEffect(() => {
+    const take = () => {
+      for (const item of drainNative()) {
+        // instant：她刚在通知栏里说完话、正看着 app 打开，这时候还按延迟回复晾她
+        // 十几分钟就太荒唐了
+        if (item.kind === 'send') handleSend(item.text, [], { instant: true })
+        else window.__yanjiFillInput?.(item.text)
+      }
+    }
+    take()   // 本组件挂载晚于原生投递时，队列里已经有东西了
+    window.addEventListener('yanji-native-text', take)
+    return () => window.removeEventListener('yanji-native-text', take)
+  }, [handleSend])
 
   const handleEditMessage = useCallback((msg, newText) => {
     if (!newText.trim() || !activeChatId) return

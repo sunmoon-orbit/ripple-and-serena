@@ -18,6 +18,7 @@ import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
+import androidx.core.app.RemoteInput
 import androidx.core.content.ContextCompat
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
@@ -29,6 +30,12 @@ class MainActivity : AppCompatActivity() {
     private var fileCallback: ValueCallback<Array<Uri>>? = null
     private var pendingAudioPermission: PermissionRequest? = null
     lateinit var mediaHelper: MediaNotificationHelper
+
+    // 页面还没加载完时调 evaluateJavascript 等于把话说进空气里。
+    // onCreate 里就要处理的 intent（通知栏回复、系统分享）全排在这儿，
+    // onPageFinished 再一起倒出去。
+    private var pageReady = false
+    private val pendingJs = mutableListOf<String>()
 
     companion object {
         private const val FILE_CHOOSER_CODE = 1001
@@ -72,6 +79,9 @@ class MainActivity : AppCompatActivity() {
                 splash.animate().alpha(0f).setDuration(400).withEndAction {
                     splash.visibility = View.GONE
                 }.start()
+                pageReady = true
+                pendingJs.forEach { webView.evaluateJavascript(it, null) }
+                pendingJs.clear()
             }
 
             override fun shouldOverrideUrlLoading(view: WebView?, request: WebResourceRequest?): Boolean {
@@ -181,13 +191,15 @@ class MainActivity : AppCompatActivity() {
         // 启动前台常驻服务
         KeepAliveService.start(this)
 
-        // 处理来电/分享 intent
+        // 处理来电/分享/通知栏回复 intent
         handleCallAction(intent)
         handleShareIntent(intent)
+        handleQuickReply(intent)
     }
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
+        setIntent(intent)
         if (intent.action == "MEDIA_ACTION") {
             val action = intent.getStringExtra("media_action") ?: return
             webView.evaluateJavascript(
@@ -197,6 +209,49 @@ class MainActivity : AppCompatActivity() {
         }
         handleCallAction(intent)
         handleShareIntent(intent)
+        handleQuickReply(intent)
+    }
+
+    // JS 字符串字面量转义。只转引号是不够的：换行/反斜杠会让整段 JS 语法错误，
+    // 而 evaluateJavascript 的语法错误是**静默**的（没有回调就没有报错）。
+    private fun jsStr(s: String) = s
+        .replace("\\", "\\\\").replace("'", "\\'")
+        .replace("\n", "\\n").replace("\r", "\\r")
+        // U+2028/2029 在 JS 里也算换行符，会把字符串字面量拦腰截断
+        .replace("\u2028", "\\u2028").replace("\u2029", "\\u2029")
+
+    // 把一句话送进页面。页面没 ready 就排队；ready 了也可能 React 还没挂载完
+    // （onPageFinished 早于组件注册回调），所以注入的 JS 自带 15 秒轮询重试。
+    private fun callWeb(fn: String, text: String) {
+        val js = """
+            (function(){
+              var t='${jsStr(text)}', n=0;
+              (function go(){
+                if (window.$fn) { window.$fn(t); return; }
+                if (++n > 60) return;
+                setTimeout(go, 250);
+              })();
+            })()
+        """.trimIndent()
+        runOnUiThread {
+            if (pageReady) webView.evaluateJavascript(js, null) else pendingJs.add(js)
+        }
+    }
+
+    // 通知栏快捷回复：把她在通知里打的字带进 app 直接发出去。
+    // 服务端没有言叽的会话可写（对话在 localStorage、key 在前端），所以只能走这条路。
+    private fun handleQuickReply(intent: Intent?) {
+        if (intent?.getBooleanExtra("quick_reply", false) != true) return
+        val text = RemoteInput.getResultsFromIntent(intent)
+            ?.getCharSequence(YanjiFCMService.KEY_REPLY)?.toString()?.trim().orEmpty()
+        // 通知先收掉：她已经说完了，留着那条旧消息在通知栏没意义
+        val notifId = intent.getIntExtra("notif_id", -1)
+        if (notifId != -1) {
+            (getSystemService(NOTIFICATION_SERVICE) as android.app.NotificationManager).cancel(notifId)
+        }
+        intent.removeExtra("quick_reply")   // 别让转屏/重建时又发一遍
+        if (text.isEmpty()) return
+        callWeb("__yanjiQuickReply", text)
     }
 
     private fun handleCallAction(intent: Intent?) {
@@ -212,12 +267,10 @@ class MainActivity : AppCompatActivity() {
 
         if (type.startsWith("text/")) {
             val text = intent.getStringExtra(Intent.EXTRA_TEXT) ?: return
-            webView.post {
-                val escaped = text.replace("\\", "\\\\").replace("'", "\\'").replace("\n", "\\n")
-                webView.evaluateJavascript(
-                    "window.__yanjiShareText && window.__yanjiShareText('$escaped')", null
-                )
-            }
+            // ⚠️ 0726 修：原来是 webView.post + 「函数存在才调」。onCreate 里页面还一片空白，
+            // 分享进来的文字每次都掉在地上——而且前端从来就没定义过 __yanjiShareText，
+            // 短路写法让它安静了大半个月。现在走 callWeb（排队 + 重试），前端也补上了这个函数。
+            callWeb("__yanjiShareText", text)
         }
         // 图片分享后续版本支持
     }

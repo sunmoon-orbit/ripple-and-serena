@@ -1,0 +1,46 @@
+<!--
+  通知栏小图标。⚠️ 安卓只用它的 alpha 通道画剪影，颜色由系统覆盖——
+  丢一张彩色 PNG 进来会变成一坨纯白方块，所以必须是单色矢量。
+  形状取自言叽开屏那只线描小鸟（App.jsx 的 splash-bird），
+  描边加粗到 24dp 下还认得出（原图 strokeWidth 2 缩到通知尺寸会细成一根头发）。
+  想换图标改这个文件，不用动 Kotlin。
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="64"
+    android:viewportHeight="64"
+    android:tint="#FFFFFFFF">
+    <!-- 内容偏左偏上，用 group 以内容中心为轴放大居中，别去手算路径坐标 -->
+    <group
+        android:pivotX="33"
+        android:pivotY="36"
+        android:scaleX="1.18"
+        android:scaleY="1.18">
+        <path
+            android:pathData="M8,40 C8,40 14,18 32,16 C44,14 52,22 50,34 C48,46 38,52 26,48"
+            android:strokeColor="#FFFFFFFF"
+            android:strokeWidth="4.5"
+            android:strokeLineCap="round"
+            android:strokeLineJoin="round" />
+        <path
+            android:pathData="M50,34 L60,28 L54,38"
+            android:strokeColor="#FFFFFFFF"
+            android:strokeWidth="4.5"
+            android:strokeLineCap="round"
+            android:strokeLineJoin="round" />
+        <path
+            android:pathData="M26,48 L23,57"
+            android:strokeColor="#FFFFFFFF"
+            android:strokeWidth="4"
+            android:strokeLineCap="round" />
+        <path
+            android:pathData="M33,48 L31,57"
+            android:strokeColor="#FFFFFFFF"
+            android:strokeWidth="4"
+            android:strokeLineCap="round" />
+        <path
+            android:pathData="M42,22 m-3,0 a3,3 0 1,0 6,0 a3,3 0 1,0 -6,0"
+            android:fillColor="#FFFFFFFF" />
+    </group>
+</vector>
