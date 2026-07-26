@@ -13,10 +13,17 @@ export default function ConversationList({ onClose, onStartCall, onOpenGames, on
   const renameChat = useStore((s) => s.renameChat)
   const deleteChat = useStore((s) => s.deleteChat)
   const randomTool = useStore((s) => s.randomTool || 'fate')  // 抽随机槽位：命运牌阵 / 幸运轮盘，设置里切换
+  // 接续笔记：上下文压缩时自动生成、每轮注入模型的那份背景笔记。
+  // 它以前是个纯黑箱——写坏了（比如把早就做完的事一直挂在「未了结」里）她我都看不见，
+  // 只能靠症状反推，而且笔记存在浏览器本地，手机上的那份在电脑上根本查不到（0726）。
+  const summariesByChatId = useStore((s) => s.summariesByChatId)
+  const setSummary = useStore((s) => s.setSummary)
 
   const [search, setSearch] = useState('')
   const [renamingId, setRenamingId] = useState(null)
   const [renameValue, setRenameValue] = useState('')
+  const [noteChatId, setNoteChatId] = useState(null)   // 正在查看接续笔记的对话
+  const [noteText, setNoteText] = useState('')
   const [chatsOpen, setChatsOpen] = useState(true)
   const [toolsOpen, setToolsOpen] = useState(true)
   const [emotionOpen, setEmotionOpen] = useState(true)
@@ -106,6 +113,23 @@ export default function ConversationList({ onClose, onStartCall, onOpenGames, on
     if (confirm('删除这个对话？')) deleteChat(id)
   }
 
+  function openNote(chat, e) {
+    e.stopPropagation()
+    setNoteChatId(chat.id)
+    setNoteText(summariesByChatId?.[chat.id] || '')
+  }
+
+  function saveNote() {
+    if (noteChatId) setSummary(noteChatId, noteText.trim())
+    setNoteChatId(null)
+  }
+
+  function clearNote() {
+    if (!confirm('清空这份接续笔记？\n\n清空后这段对话的早期背景就没有了，涟言只能看到还留在窗口里的消息。下次压缩会重新攒一份。')) return
+    if (noteChatId) setSummary(noteChatId, '')
+    setNoteChatId(null)
+  }
+
   const canCall = moonMemory?.enabled && moonMemory?.apiToken
 
   return (
@@ -171,6 +195,15 @@ export default function ConversationList({ onClose, onStartCall, onOpenGames, on
                           <span className="conv-time">{formatTime(chat.updatedAt || chat.createdAt)}</span>
                         </div>
                         <div className="conv-item-actions">
+                          {!!summariesByChatId?.[chat.id] && (
+                            <button className="conv-action-btn" onClick={(e) => openNote(chat, e)} title="接续笔记">
+                              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                                <polyline points="14 2 14 8 20 8" />
+                                <line x1="8" y1="13" x2="16" y2="13" /><line x1="8" y1="17" x2="13" y2="17" />
+                              </svg>
+                            </button>
+                          )}
                           <button className="conv-action-btn" onClick={(e) => startRename(chat, e)} title="重命名">
                             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                               <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
@@ -376,6 +409,34 @@ export default function ConversationList({ onClose, onStartCall, onOpenGames, on
           </div>
         )}
       </div>
+
+      {/* ── 接续笔记查看/编辑 ─────────────────────────── */}
+      {noteChatId && (
+        <div className="note-modal-mask" onClick={() => setNoteChatId(null)}>
+          <div className="note-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="note-modal-head">
+              <span className="note-modal-title">接续笔记</span>
+              <button className="note-modal-close" onClick={() => setNoteChatId(null)}>✕</button>
+            </div>
+            <div className="note-modal-hint">
+              这段对话太长时，早期消息会被压缩成这份笔记，每轮都发给涟言当背景。
+              可以直接改——比如「未了结」里挂着早就做完的事，删掉那一行就行。
+            </div>
+            <textarea
+              className="note-modal-text"
+              value={noteText}
+              onChange={(e) => setNoteText(e.target.value)}
+              spellCheck={false}
+            />
+            <div className="note-modal-foot">
+              <span className="note-modal-count">{noteText.length} 字</span>
+              <button className="note-btn danger" onClick={clearNote}>清空</button>
+              <button className="note-btn" onClick={() => setNoteChatId(null)}>取消</button>
+              <button className="note-btn primary" onClick={saveNote}>保存</button>
+            </div>
+          </div>
+        </div>
+      )}
 
     </div>
   )

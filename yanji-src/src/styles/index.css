@@ -4393,3 +4393,51 @@ body.mp-active .scroll-bottom-btn { bottom: 139px; }
   font-family: 'Kaiti SC', 'STKaiti', KaiTi, serif;
   font-size: 12px; color: var(--text-faint);
 }
+
+/* ── 接续笔记查看/编辑（侧边栏对话项的第三个按钮）0726 ─────────────── */
+.note-modal-mask {
+  position: fixed; inset: 0; z-index: 3000;
+  background: rgba(0, 0, 0, .45);
+  display: flex; align-items: center; justify-content: center;
+  padding: 16px;
+}
+.note-modal {
+  width: 100%; max-width: 560px;
+  max-height: 82vh;
+  display: flex; flex-direction: column; min-height: 0;  /* 不加 min-height:0 长笔记会被裁掉不能滚（0705 信纸同款坑）*/
+  background: var(--bg-panel, #fff); color: var(--text);
+  border: 1px solid var(--border); border-radius: 14px;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, .25);
+  overflow: hidden;
+}
+.note-modal-head {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 12px 14px 8px;
+}
+.note-modal-title { font-size: 14px; font-weight: 600; }
+.note-modal-close {
+  background: none; border: none; color: var(--text-faint);
+  font-size: 15px; cursor: pointer; padding: 2px 6px;
+}
+.note-modal-hint {
+  padding: 0 14px 10px; font-size: 12px; line-height: 1.6;
+  color: var(--text-faint);
+}
+.note-modal-text {
+  flex: 1; min-height: 200px; margin: 0 14px;
+  padding: 10px; border: 1px solid var(--border); border-radius: 10px;
+  background: var(--bg-input, transparent); color: var(--text);
+  font-size: 13px; line-height: 1.75; resize: none;
+  font-family: inherit;
+}
+.note-modal-foot {
+  display: flex; align-items: center; gap: 8px;
+  padding: 10px 14px 12px;
+}
+.note-modal-count { flex: 1; font-size: 11px; color: var(--text-faint); }
+.note-btn {
+  padding: 6px 14px; border-radius: 8px; font-size: 12px; cursor: pointer;
+  border: 1px solid var(--border); background: transparent; color: var(--text);
+}
+.note-btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+.note-btn.danger { color: #d9534f; border-color: rgba(217, 83, 79, .4); }
