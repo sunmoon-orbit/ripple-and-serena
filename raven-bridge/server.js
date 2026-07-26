@@ -890,7 +890,9 @@ const server = http.createServer((req, res) => {
           url: asset?.browser_download_url || rel.html_url || '',
           note: (rel.body || '').split('\n').find(l => l.startsWith('本次更新'))?.slice(5).trim() || '',
         }
-        appLatestCache = { at: now, data }
+        // 只缓存解析成功的结果。Release 还没发布 / GitHub 限流时会拿到空壳，
+        // 把空壳缓存 30 分钟 = 刚发完新版的那半小时里谁也收不到更新提示（0726 亲历）
+        if (data.versionCode > 0) appLatestCache = { at: now, data }
         res.writeHead(200, { 'Content-Type': 'application/json' })
         res.end(JSON.stringify(data))
       })
