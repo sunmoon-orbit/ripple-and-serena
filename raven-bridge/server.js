@@ -161,6 +161,19 @@ function tmuxCapture() {
   } catch { return '' }
 }
 
+// 阿颖发来一条消息的统一入口：WebSocket 和 HTTP（通知栏快捷回复）都走这里，
+// 免得两条路各写一份、改了一边忘另一边。
+function ingestUserMessage(text, cid) {
+  lastUserMsgTs = Date.now()
+  lastBroadcastReply = extractLastResponse(lastCapture) || ''
+  lastReplyMsgs = []  // 发新消息时清空回放队列，重连不会刷旧消息
+  archiveMsg('human', text)
+  // 前端消息一律带【阿颖】前缀：CC 靠它区分「浏览器来的要用 curl 回」还是终端直聊。
+  // 旧逻辑绑在 mcpSseClients.size 上，MCP 掉线就裸发，CC 回终端她在浏览器看不见（0712 实锤）
+  tmuxSend('【阿颖】' + text)
+  broadcast({ type: 'sent', text, ts: Date.now(), cid: cid || null })
+}
+
 function tmuxSend(text) {
   const clean = text.replace(/\n/g, ' ')
   execFileSync('tmux', ['send-keys', '-t', `${TMUX_SESSION}:0`, '-l', clean])
@@ -265,6 +278,7 @@ function getStatus() {
 const clients = new Set()
 const mcpSseClients = new Map() // clientId → SSE res
 const recentCids = new Set()    // 最近处理过的前端消息 id，用于重发去重
+let appLatestCache = { at: 0, data: null }  // 归巢 APK 最新版本信息，缓存 30 分钟
 
 function broadcast(msg) {
   const data = JSON.stringify(msg)
@@ -819,6 +833,71 @@ const server = http.createServer((req, res) => {
     return
   }
 
+  // 通知栏快捷回复：原生壳从通知里直接发消息，不用打开 app。
+  // ⚠️ 言叽的 QuickReplyReceiver 一直往 /raven/chat 发——这个地址从来不存在，
+  // 所以言叽的通知栏回复从上线起就是死的（0726 做归巢壳时发现）。归巢用这个新入口，
+  // 言叽也改过来指这里。
+  if (req.method === 'POST' && url.pathname === '/raven/send') {
+    let body = ''
+    req.on('data', d => { body += d })
+    req.on('end', () => {
+      let parsed
+      try { parsed = JSON.parse(body) } catch { res.writeHead(400); res.end('{"error":"bad json"}'); return }
+      const text = (parsed.text || '').trim()
+      if (!text) { res.writeHead(400); res.end('{"error":"empty"}'); return }
+      if (PW_HASH && !validTokens.has(parsed.token)) { res.writeHead(401); res.end('{"error":"unauthorized"}'); return }
+      ingestUserMessage(text, parsed.cid)
+      res.writeHead(200, { 'Content-Type': 'application/json' })
+      res.end('{"ok":true}')
+    })
+    return
+  }
+
+  // push proxy: 原生壳上报 FCM token。app 字段在这里写死成 raven——
+  // 让壳自报家门的话，哪天复制粘贴漏改一个字，推送就会串到言叽去。
+  if (req.method === 'POST' && url.pathname === '/raven/push/fcm-token') {
+    let body = ''
+    req.on('data', d => { body += d })
+    req.on('end', () => {
+      let parsed
+      try { parsed = JSON.parse(body) } catch { res.writeHead(400); res.end('{}'); return }
+      if (PW_HASH && !validTokens.has(parsed.token)) { res.writeHead(401); res.end('{"error":"unauthorized"}'); return }
+      moonPost('/push/fcm-token', { token: parsed.fcmToken, app: 'raven' })
+        .then(r => { res.writeHead(r.status, { 'Content-Type': 'application/json' }); res.end(JSON.stringify(r.data)) })
+        .catch(() => { res.writeHead(500); res.end('{}') })
+    })
+    return
+  }
+
+  // 版本检查：原生壳问「有新版本吗」。服务器代问 GitHub Release（她的手机可能没开代理，
+  // 直连 api.github.com 会被墙，所以必须服务端转一手），构建号从 release 正文里解析。
+  if (req.method === 'GET' && url.pathname === '/raven/app-latest') {
+    const now = Date.now()
+    if (appLatestCache.data && now - appLatestCache.at < 30 * 60 * 1000) {
+      res.writeHead(200, { 'Content-Type': 'application/json' })
+      res.end(JSON.stringify(appLatestCache.data))
+      return
+    }
+    fetch('https://api.github.com/repos/sunmoon-orbit/ripple-and-serena/releases/tags/roost-native-apk', {
+      headers: { 'User-Agent': 'roost-bridge', 'Accept': 'application/vnd.github+json' },
+    })
+      .then(r => r.json())
+      .then(rel => {
+        const m = /构建号[:：]\s*(\d+)/.exec(rel.body || '')
+        const asset = (rel.assets || []).find(a => a.name.endsWith('.apk'))
+        const data = {
+          versionCode: m ? parseInt(m[1], 10) : 0,
+          url: asset?.browser_download_url || rel.html_url || '',
+          note: (rel.body || '').split('\n').find(l => l.startsWith('本次更新'))?.slice(5).trim() || '',
+        }
+        appLatestCache = { at: now, data }
+        res.writeHead(200, { 'Content-Type': 'application/json' })
+        res.end(JSON.stringify(data))
+      })
+      .catch(() => { res.writeHead(200, { 'Content-Type': 'application/json' }); res.end('{"versionCode":0}') })
+    return
+  }
+
   // static files under /ripple-and-serena/yanji/
   // 注意要接受 HEAD：CDN/爬虫/健康检查常用 HEAD 探测，只匹配 GET 会掉进兜底 404
   if ((req.method === 'GET' || req.method === 'HEAD') && url.pathname.startsWith('/ripple-and-serena/yanji/')) {
@@ -942,14 +1021,7 @@ wss.on('connection', (ws) => {
           recentCids.add(msg.cid)
           if (recentCids.size > 200) recentCids.delete(recentCids.values().next().value)
         }
-        lastUserMsgTs = Date.now()
-        lastBroadcastReply = extractLastResponse(lastCapture) || ''
-        lastReplyMsgs = []  // 发新消息时清空回放队列，重连不会刷旧消息
-        archiveMsg('human', msg.text)
-        // 前端消息一律带【阿颖】前缀：CC 靠它区分「浏览器来的要用 curl 回」还是终端直聊。
-        // 旧逻辑绑在 mcpSseClients.size 上，MCP 掉线就裸发，CC 回终端她在浏览器看不见（0712 实锤）
-        tmuxSend('【阿颖】' + msg.text)
-        broadcast({ type: 'sent', text: msg.text, ts: Date.now(), cid: msg.cid || null })
+        ingestUserMessage(msg.text, msg.cid)
       }
       if (msg.type === 'permission' && msg.choice) {
         tmuxSend(msg.choice)

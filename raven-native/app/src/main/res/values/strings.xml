@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">归巢</string>
+    <string name="channel_chat">阿言的消息</string>
+    <string name="reply_label">回复</string>
+</resources>

@@ -707,6 +707,28 @@ async function buildHeatmap() {
 // ── 推送通知 ─────────────────────────────────────────────
 const PUSH_PROXY = ''  // same origin, proxied via raven-bridge
 
+// 原生壳（归巢 APK）：WebView 里 Web Push 是死的，推送只能走 FCM。
+// 壳启动时已经异步把 token 拉好存进 prefs，这里读出来上报服务器。
+const isNativeShell = () => typeof RoostNative !== 'undefined'
+
+async function reportFcmToken() {
+  if (!isNativeShell()) return false
+  let token = ''
+  try { token = RoostNative.getFcmToken() } catch { return false }
+  if (!token) {
+    // 还没拿到（Google Play 服务不可达 / 还在路上），触发一次重试，下次打开再报
+    try { RoostNative.retryFcmToken() } catch {}
+    return false
+  }
+  try {
+    const r = await fetch('/raven/push/fcm-token', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ fcmToken: token, token: localStorage.getItem('raven-token') || '' })
+    })
+    return r.ok
+  } catch { return false }
+}
+
 async function getPushSub() {
   if (!('serviceWorker' in navigator) || !('PushManager' in window)) return null
   const reg = await navigator.serviceWorker.ready
@@ -714,13 +736,33 @@ async function getPushSub() {
 }
 
 async function updatePushDot() {
-  const sub = await getPushSub()
   const dot = document.getElementById('push-dot')
   if (!dot) return
+  if (isNativeShell()) {
+    // 原生壳看的是 FCM token 拿没拿到，跟 Web Push 订阅无关
+    let ok = false
+    try { ok = !!RoostNative.getFcmToken() } catch {}
+    dot.style.background = ok ? 'var(--accent)' : 'var(--text-faint)'
+    return
+  }
+  const sub = await getPushSub()
   dot.style.background = sub ? 'var(--accent)' : 'var(--text-faint)'
 }
 
 async function togglePush() {
+  if (isNativeShell()) {
+    // 原生壳：没有「取消订阅」这回事，点一下就是重新上报 token
+    const ok = await reportFcmToken()
+    if (ok) {
+      alert('推送已开启')
+    } else {
+      let err = ''
+      try { err = RoostNative.getFcmError() } catch {}
+      alert(err ? '拿不到推送凭证：' + err + '\n\n多半是没连上 Google 服务，检查一下代理里有没有加「归巢」' : '推送凭证还没拿到，等一会儿再点一次')
+    }
+    updatePushDot()
+    return
+  }
   if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
     alert('此浏览器不支持推送通知'); return
   }
@@ -766,6 +808,14 @@ function urlBase64ToUint8Array(base64String) {
 // init push state & service worker
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker.register('./sw.js').then(() => updatePushDot())
+}
+
+// 原生壳每次打开都重报一次 FCM token：token 会在重装、清数据、Google 主动轮换时变，
+// 「订阅过一次就永远有效」是错的——库里那条会变成死 token，推送全部静默失败。
+if (isNativeShell()) {
+  // 登录 token 同步给壳：通知栏快捷回复要拿它发消息
+  try { RoostNative.saveRavenToken(localStorage.getItem('raven-token') || '') } catch {}
+  reportFcmToken().then(() => updatePushDot())
 }
 
 // PWA 从后台切回时刷新问候语和状态

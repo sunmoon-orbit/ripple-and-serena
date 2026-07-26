@@ -1,0 +1,101 @@
+name: Build Roost Native APK
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'raven-native/**'
+      - '.github/workflows/roost-native.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: android-actions/setup-android@v3
+
+      - name: Install SDK components
+        run: sdkmanager "platforms;android-35" "build-tools;35.0.0"
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.11.1'
+
+      # 固定签名：复用言叽那把 keystore（自分发 APK 不上架 Play，两个自己的 app 共用
+      # 一把签名 key 完全正常），这样不用再去网页里加一个新 secret。alias 是 "yanji"。
+      # ⚠️ 随机签名 = 每次都是「另一个 app」，装新包会冲突，只能卸载重装 = 聊天记录清零。
+      # 所以这一步失败就必须让整个构建失败，绝不能悄悄产出一个随机签名的包。
+      - name: Restore signing keystore
+        env:
+          KS_B64: ${{ secrets.YANJI_KEYSTORE_B64 }}
+        run: |
+          if [ -z "$KS_B64" ]; then
+            echo "::error::YANJI_KEYSTORE_B64 secret 不存在。没有固定签名的包一旦装上，"
+            echo "::error::以后每次更新都得卸载重装（= 聊天记录清零），所以这里直接失败。"
+            exit 1
+          fi
+          echo "$KS_B64" | base64 -d > /tmp/roost-release.p12
+          echo "ROOST_KEYSTORE_FILE=/tmp/roost-release.p12" >> "$GITHUB_ENV"
+          echo "ROOST_KEYSTORE_PASS=android" >> "$GITHUB_ENV"
+          echo "ROOST_KEYSTORE_ALIAS=yanji" >> "$GITHUB_ENV"
+          echo "固定签名已启用（复用言叽 keystore）"
+
+      - name: Generate launcher icon
+        run: |
+          sudo apt-get update -qq && sudo apt-get install -y -qq imagemagick >/dev/null
+          for dpi in mdpi:48 hdpi:72 xhdpi:96 xxhdpi:144 xxxhdpi:192; do
+            name="${dpi%%:*}"
+            size="${dpi##*:}"
+            mkdir -p "raven-native/app/src/main/res/mipmap-${name}"
+            convert raven/home-icon-crow-512.png -resize "${size}x${size}" \
+              "raven-native/app/src/main/res/mipmap-${name}/ic_launcher.png"
+          done
+
+      - name: Build debug APK
+        working-directory: raven-native
+        run: gradle assembleDebug --no-daemon --stacktrace 2>&1 | tee /tmp/build.log
+
+      - name: Upload build log on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-log
+          path: /tmp/build.log
+
+      # ⚠️ 正文里的「构建号: N」是版本检查的数据源：raven-bridge 的 /raven/app-latest
+      # 用正则从这里解析出最新版本号返回给 app。改这行格式会让版本检查静默失效。
+      - name: Publish to Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: roost-native-apk
+          name: 归巢原生版 APK
+          body: |
+            归巢 Android 原生版（Kotlin + WebView 壳）。
+
+            构建号: ${{ github.run_number }}
+
+            本次更新 见提交记录
+
+            为什么要装它：PWA 的推送归属会在 Chrome 和归巢之间摇摆（WebAPK 重铸），
+            原生壳走 FCM，图标和归属都稳定。
+
+            安装步骤：
+            1. 老归巢里点小房子 🏠 →「导出到文件」，先把聊天记录存出来
+            2. 下载 app-debug.apk 安装，需允许「未知来源」
+            3. ⚠️ 装好后把「归巢」加进分应用代理名单，否则直连被墙
+            4. 首次打开允许通知权限，输入密码
+            5. 点小房子 →「从文件导入」，把第 1 步的文件导进来
+
+            以后更新：固定签名已启用，直接安装新包覆盖即可。
+            ⚠️ 千万别卸载、别点「清除数据」——聊天记录在 app 内部存储里，会清零。
+          files: raven-native/app/build/outputs/apk/debug/app-debug.apk
