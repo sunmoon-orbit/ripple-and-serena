@@ -954,6 +954,17 @@ const server = http.createServer((req, res) => {
       const text = (parsed.text || '').trim()
       if (!text) { res.writeHead(400); res.end('{"error":"empty"}'); return }
       if (PW_HASH && !validTokens.has(parsed.token)) { res.writeHead(401); res.end('{"error":"unauthorized"}'); return }
+      // 去重跟 WS 那条路一样：这条路（通知栏快捷回复）以前没做，重发会往 L0 写两份
+      if (parsed.cid) {
+        if (recentCids.has(parsed.cid)) {
+          broadcast({ type: 'sent', text, ts: Date.now(), cid: parsed.cid })
+          res.writeHead(200, { 'Content-Type': 'application/json' })
+          res.end('{"ok":true,"dedup":true}')
+          return
+        }
+        recentCids.add(parsed.cid)
+        if (recentCids.size > 200) recentCids.delete(recentCids.values().next().value)
+      }
       ingestUserMessage(text, parsed.cid)
       res.writeHead(200, { 'Content-Type': 'application/json' })
       res.end('{"ok":true}')

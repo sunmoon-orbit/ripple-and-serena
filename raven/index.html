@@ -1126,6 +1126,7 @@ let ws = null
 let reconnectTimer = null
 let lastWsActivity = 0
 const shownMsgIds = new Set()  // 已显示的消息 ID，防止重连后重复显示
+const shownCids = new Set()  // 已画出气泡的 cid，防止同一条消息画两遍（见 onmessage 里的 sent 分支）
 let pendingOutbox = []  // WS 断开时积压的待发消息
 const awaitingAck = new Map()  // cid → {payload, timer}，等服务端回执的消息
 
@@ -1178,7 +1179,19 @@ function connect() {
       const msg = JSON.parse(e.data)
       if (msg.type === 'terminal') renderTerminal(msg.lines)
       else if (msg.type === 'status') renderStatus(msg.data)
-      else if (msg.type === 'sent') { ackReceived(msg.cid); appendMsg(msg.text, 'user') }
+      // 自己的消息气泡是等服务端 sent 回执才画的，而同一条消息可能收到两次回执：
+      // 8 秒没等到回执 → 判定连接半开 → 关连接重发，可原来那条其实已经送到了，
+      // 服务端 recentCids 认出是重发，又回一次 sent。原来那条的回执迟到 + 重发的回执
+      // ＝ 两个一模一样的气泡（0726 阿颖遇到）。cid 就在手边，拿来去重。
+      else if (msg.type === 'sent') {
+        ackReceived(msg.cid)
+        if (msg.cid && shownCids.has(msg.cid)) return
+        if (msg.cid) {
+          shownCids.add(msg.cid)
+          if (shownCids.size > 200) shownCids.delete(shownCids.values().next().value)
+        }
+        appendMsg(msg.text, 'user')
+      }
       else if (msg.type === 'reply') {
         const alreadyShown = msg.replayed && (
           msg.id ? shownMsgIds.has(msg.id) :
