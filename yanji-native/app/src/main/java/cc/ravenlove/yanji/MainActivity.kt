@@ -226,9 +226,10 @@ class MainActivity : AppCompatActivity() {
         val js = """
             (function(){
               var t='${jsStr(text)}', n=0;
+              function say(m){ try { YanjiNative.toast(m) } catch(e) {} }
               (function go(){
-                if (window.$fn) { window.$fn(t); return; }
-                if (++n > 60) return;
+                if (window.$fn) { say('页面接住了（$fn）'); window.$fn(t); return; }
+                if (++n > 60) { say('页面里等了15秒也没有 $fn，放弃'); return; }
                 setTimeout(go, 250);
               })();
             })()
@@ -250,7 +251,14 @@ class MainActivity : AppCompatActivity() {
             (getSystemService(NOTIFICATION_SERVICE) as android.app.NotificationManager).cancel(notifId)
         }
         intent.removeExtra("quick_reply")   // 别让转屏/重建时又发一遍
-        if (text.isEmpty()) return
+        // ⚠️ 0726：这条路每一步都是静默的——取不到 RemoteInput、注入的 JS 语法错、
+        // 前端函数一直没挂上，全都一声不吭，阿颖那边只看到「好像没发过来」。
+        // 装上灯：每一步都吐一个 Toast，坏在哪一步要看得见。
+        if (text.isEmpty()) {
+            Toast.makeText(this, "言叽：没取到通知栏输入的内容", Toast.LENGTH_LONG).show()
+            return
+        }
+        Toast.makeText(this, "言叽收到：$text", Toast.LENGTH_SHORT).show()
         callWeb("__yanjiQuickReply", text)
     }
 

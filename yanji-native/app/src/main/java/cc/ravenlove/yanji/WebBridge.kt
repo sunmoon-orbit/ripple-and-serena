@@ -38,6 +38,17 @@ class WebBridge(private val activity: MainActivity) {
         activity.runOnUiThread { activity.retryFcmToken() }
     }
 
+    // 给页面一个「喊一声」的口子。通知栏快捷回复这条路上有好几段只有页面自己知道
+    // 走没走到（注入的 JS 有没有等到函数、handleSend 有没有真发出去），
+    // 出问题时全是静默的——0726 靠日志猜了三轮都没猜中。有灯才好修。
+    @JavascriptInterface
+    fun toast(msg: String) {
+        if (msg.isEmpty()) return
+        activity.runOnUiThread {
+            android.widget.Toast.makeText(activity, msg, android.widget.Toast.LENGTH_LONG).show()
+        }
+    }
+
     @JavascriptInterface
     fun updateEmotion(slotsJson: String) {
         activity.getSharedPreferences("yanji_emotion", Context.MODE_PRIVATE)

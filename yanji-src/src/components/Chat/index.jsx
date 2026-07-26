@@ -591,8 +591,13 @@ export default function Chat() {
       for (const item of drainNative()) {
         // instant：她刚在通知栏里说完话、正看着 app 打开，这时候还按延迟回复晾她
         // 十几分钟就太荒唐了
-        if (item.kind === 'send') handleSend(item.text, [], { instant: true })
-        else window.__yanjiFillInput?.(item.text)
+        if (item.kind === 'send') {
+          handleSend(item.text, [], { instant: true })
+          // 0726 装的灯：这一段以前完全静默，坏了只能靠猜（见 handleSend 上游注释）
+          try { window.YanjiNative?.toast?.('已发进对话：' + item.text) } catch {}
+        } else {
+          window.__yanjiFillInput?.(item.text)
+        }
       }
     }
     take()   // 本组件挂载晚于原生投递时，队列里已经有东西了
