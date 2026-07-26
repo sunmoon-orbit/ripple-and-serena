@@ -40,6 +40,17 @@ function localWriteAuthed(req) {
   return (req.headers['x-local-token'] || '') === LOCAL_TOKEN
 }
 
+// ── 远程 CC 取件箱（2026-07-26）────────────────────────────────────────
+// 归巢前端一直靠 tmux send-keys 把消息敲进终端里的 CC。但 `claude remote-control`
+// 那个 CC 不读终端，敲键盘等于打进空气——于是「前端聊天」和「app 聊天」变成两个人。
+//
+// 这里给不在终端里的那个 CC 开一条取件的路：送不进 tmux 的消息进这个队列，
+// 它自己来长轮询取。它取走后照常用 /raven/reply 回复，阿颖那边完全无感。
+const pendingForRemote = []
+let lastPendingPoll = 0
+// 两分钟内有人来取过件，就认为远程 CC 还醒着，消息进队列而不是报「没送到」
+function remoteListenerAlive() { return Date.now() - lastPendingPoll < 120000 }
+
 // ── 请求来源与鉴权判定（2026-07-03 安全加固）─────────────────────────
 // 本机直连（CC 的 curl、hooks）不经 Caddy，没有 X-Forwarded-For；
 // 公网请求全部经 Caddy 反代进来，必带 X-Forwarded-For。
@@ -221,8 +232,15 @@ function ingestUserMessage(text, cid) {
   // 旧逻辑绑在 mcpSseClients.size 上，MCP 掉线就裸发，CC 回终端她在浏览器看不见（0712 实锤）
   const delivered = tmuxSend('【阿颖】' + text)
   broadcast({ type: 'sent', text, ts: Date.now(), cid: cid || null })
-  // 没送到就必须说出来。消息本身已经进了 L0（上面 archiveMsg 先跑），不会丢；
-  // 但沉默地吞掉是最坏的一种失败——她会以为说完了，其实对面根本没人。
+  // 终端里没人接，但 remote-control 那个 CC 可能正醒着——先往取件箱里放，让它自己来拿。
+  if (!delivered && remoteListenerAlive()) {
+    pendingForRemote.push({ text, ts: Date.now() })
+    if (pendingForRemote.length > 50) pendingForRemote.shift()
+    console.log('[pending] 终端无人，转投远程 CC 取件箱')
+    return
+  }
+  // 两条路都没人。这时候才报错——沉默地吞掉是最坏的一种失败：
+  // 她会以为说完了，其实对面根本没人。消息本身已进 L0（archiveMsg 先跑），不会丢。
   if (!delivered) {
     const warn = {
       type: 'reply',
@@ -619,6 +637,28 @@ const server = http.createServer((req, res) => {
   if (req.method === 'GET' && url.pathname === '/raven/status') {
     res.writeHead(200, { 'Content-Type': 'application/json' })
     res.end(JSON.stringify(getStatus()))
+    return
+  }
+
+  // 远程 CC 来取件。长轮询：有货立刻给，没货就挂住最多 55 秒再空手放行，
+  // 免得它每秒 curl 一次把 CPU 和额度都烧了。只认本机钥匙头。
+  if (req.method === 'GET' && url.pathname === '/raven/pending') {
+    if (!localWriteAuthed(req)) { res.writeHead(401); res.end('{"error":"unauthorized"}'); return }
+    lastPendingPoll = Date.now()
+    const deadline = Date.now() + 55000
+    const finish = () => {
+      lastPendingPoll = Date.now()   // 收货这一刻也算「我还醒着」
+      const msgs = pendingForRemote.splice(0, pendingForRemote.length)
+      res.writeHead(200, { 'Content-Type': 'application/json' })
+      res.end(JSON.stringify({ messages: msgs }))
+    }
+    const tick = () => {
+      if (res.writableEnded) return
+      if (pendingForRemote.length || Date.now() > deadline) return finish()
+      setTimeout(tick, 500)
+    }
+    req.on('close', () => { /* 客户端撤了就别再写了，tick 靠 writableEnded 自己收手 */ })
+    tick()
     return
   }
 
