@@ -81,10 +81,13 @@ export function applyEmotionDelta(delta) {
 
 // 时间联动：阿颖离开越久，再回来时思念越浓。每条新用户消息时调用。
 // 返回 { hoursAway, added, state }，供上层决定要不要在上下文里提醒涟言"过了多久"。
-export function applyTimeAway() {
+// contactFloor：归巢/chat 窗口记的「她上次跟涟言说话」时间戳。原来只看本地 lastSeen，
+// 量的其实是「距离上次在言叽里发消息」——她在别的门里聊一整天，这边照样往上涨，
+// 一点开就读成「三天没来了」（0727 她因此把时间感知整个关掉）
+export function applyTimeAway(contactFloor = 0) {
   const state = applyDecayAndGet() // 先按时间衰减
   const now = Date.now()
-  const lastSeen = state.lastSeen || now
+  const lastSeen = Math.max(state.lastSeen || now, Number(contactFloor) || 0)
   const hoursAway = (now - lastSeen) / (1000 * 60 * 60)
   if (hoursAway >= 1) {
     // 满 1 小时起步 +3，之后每多 1 小时 +2，封顶 +45（约一天没见就思念拉满大半）

@@ -34,7 +34,7 @@ import IncomingCall from './IncomingCall'
 import AnniversaryCard from './AnniversaryCard'
 import HeartCard from './HeartCard'
 import HeartCardAlbum from './HeartCardAlbum'
-import { fetchAnniversaryToday, fetchUnseenHeartCards, markHeartCardSeen, formatWeatherLine } from '../../api/moonMemory'
+import { fetchAnniversaryToday, fetchUnseenHeartCards, markHeartCardSeen, formatWeatherLine, fetchContactLastSeen } from '../../api/moonMemory'
 import CompletionEgg, { pickEgg } from './CompletionEgg'
 
 // 情绪自动发圈：某正向情绪越阈值且过冷却时，涟言主动发条朋友圈（她在聊天时触发；
@@ -327,7 +327,13 @@ export default function Chat() {
       }
       // 情绪状态注入（动态上下文，不走缓存）。岁聿开关控制时间联动。
       const timeAwarenessOn = useStore.getState().timeAwareness !== false
-      const { hoursAway, added: longingAdded, state: emotionState } = timeAwarenessOn ? applyTimeAway() : { hoursAway: 0, added: 0, state: null }
+      // 先问服务端「她上次跟涟言说话是什么时候」（归巢和 chat 窗口也在往那一格写），
+      // 拿来当下限。取不到就退回只看本地——网络不好不该让她凭空多出几小时的「离开」
+      let contactFloor = 0
+      if (timeAwarenessOn && moonMemory?.apiToken) {
+        try { contactFloor = await fetchContactLastSeen({ baseUrl: moonMemory.baseUrl, apiToken: moonMemory.apiToken }) } catch { /* 静默 */ }
+      }
+      const { hoursAway, added: longingAdded, state: emotionState } = timeAwarenessOn ? applyTimeAway(contactFloor) : { hoursAway: 0, added: 0, state: null }
       dynParts.push(buildEmotionPrompt(emotionState || getEmotionState()))
       if (timeAwarenessOn && hoursAway >= 2) {
         const h = Math.round(hoursAway)

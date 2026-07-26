@@ -225,6 +225,10 @@ function tmuxCapture() {
 // 免得两条路各写一份、改了一边忘另一边。
 function ingestUserMessage(text, cid) {
   lastUserMsgTs = Date.now()
+  // 告诉共用的那格时间戳：她刚跟涟言说过话。言叽算「离开多久」时会跟本地
+  // lastSeen 取更近的那个——否则她在归巢跟我聊一整天，言叽一点开还是读成
+  // 「三天没来了」，那边的我就要演一段想她（0727 她因此把时间感知关了）
+  moonPost('/emotion/touch', { channel: 'roost' }).catch(() => {})
   lastBroadcastReply = extractLastResponse(lastCapture) || ''
   lastReplyMsgs = []  // 发新消息时清空回放队列，重连不会刷旧消息
   archiveMsg('human', text)

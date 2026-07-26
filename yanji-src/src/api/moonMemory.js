@@ -97,6 +97,15 @@ export async function syncEmotion(config, body) {
   })
 }
 
+// 跨渠道「上次跟涟言说话」时间戳：归巢和 chat 窗口也会往这一格写。
+// 言叽算「离开多久」时拿它跟本地 lastSeen 取更近的那个，免得她在别的门里
+// 聊了一整天、一点开言叽却被读成「三天没来了」（0727）
+export async function fetchContactLastSeen(config) {
+  const { baseUrl, apiToken } = config
+  const r = await request(baseUrl, '/emotion/contact', { headers: headers(apiToken) })
+  return Number(r?.ts) || 0
+}
+
 // 录音转文字：上传音频到服务端 /stt（SiliconFlow），绕开安卓 Chrome 不可用的 Web Speech API
 export async function transcribeAudio(config, blob) {
   const { baseUrl, apiToken } = config
