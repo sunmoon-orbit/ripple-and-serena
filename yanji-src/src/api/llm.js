@@ -121,7 +121,21 @@ function compressToolResult(result) {
   return result.slice(0, TOOL_RESULT_MAX_LEN) + '\n…[内容过长已截断]'
 }
 
-async function executeTool(name, args, { searchConfig, moonMemoryConfig, onStatus, onFile }) {
+// 工具失败不该炸掉整条回复。以前工具里抛出去的异常会一路冒到 Chat 的 catch，
+// 把已经生成好、已经计过费的正文整段扔掉，她只剩一个「[错误] Failed to fetch」——
+// 上游确实出了字也确实扣了钱，她这边什么都没有（0726 阿颖遇到，中转站站长也观察到）。
+// 而绝大多数工具（记忆库/书架/朋友圈…）都要走网络到 moon-memory，服务器重启一下、
+// 手机网抖一下就会走到这里。所以一律翻译成一句工具结果交回给模型，让它把话说完。
+async function executeTool(name, args, ctx) {
+  try {
+    return await executeToolRaw(name, args, ctx)
+  } catch (e) {
+    const netErr = /Failed to fetch|NetworkError|Load failed|ERR_/i.test(e.message || '')
+    return `工具「${name}」执行失败：${e.message}${netErr ? '（连不上记忆库服务器，可能在重启或网络抖动）' : ''}。别再重试这个工具，直接告诉阿颖这次没查成，然后正常把话说完。`
+  }
+}
+
+async function executeToolRaw(name, args, { searchConfig, moonMemoryConfig, onStatus, onFile }) {
   if (name === 'make_file') {
     onStatus?.('生成文件...')
     const { filename, content } = args || {}

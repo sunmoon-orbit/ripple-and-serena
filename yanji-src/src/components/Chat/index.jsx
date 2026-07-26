@@ -164,6 +164,10 @@ export default function Chat() {
 
     setIsSending(true)
 
+    // 声明在 try 外面：出错时 catch 要能拿到已经流出来的正文，把它抢救下来（见下面的 catch）
+    let fullText = ''
+    let fullThinking = ''
+
     try {
       const allMsgs = getMessages(chat.id).filter((m) => !m.streaming && !m.sys)
       // 旧消息的图片降级为占位文本：base64 图片占大量 token，留在历史里每轮都触发缓存重写
@@ -343,8 +347,6 @@ export default function Chat() {
 
       const dynamicContext = dynParts.join('\n\n')
 
-      let fullText = ''
-      let fullThinking = ''
       const genFiles = [] // make_file 工具生成的文件，挂到助手消息上渲染成卡片
 
       const result = await sendMessage({
@@ -463,7 +465,21 @@ export default function Chat() {
         store.renameChat(chat.id, short || '新对话')
       }
     } catch (e) {
-      removeLastEmptyAssistant(chat.id)
+      // 上游已经出了字（也已经计过费）却在收尾阶段抛错——流被掐断、工具连不上都算——
+      // 以前一律把这条助手消息删掉，她只看到「[错误] Failed to fetch」：钱花了、话没了
+      // （0726 阿颖遇到）。有正文就留下并标「没说完就断线了」，没正文才删。
+      const salvaged = stripCallTag(stripNegTag(stripMoodTag(stripEmotionTag(fullText)))).trim()
+      if (salvaged && !hidden) {
+        updateMessage(chat.id, assistantId, {
+          content: salvaged,
+          thinking: fullThinking || undefined,
+          streaming: false,
+          interrupted: true,
+          toolCalls: undefined,
+        })
+      } else {
+        removeLastEmptyAssistant(chat.id)
+      }
       // 主动开口（nudge）这类隐藏触发失败时静默退场：本来就是涟言自己要说话，
       // 没说成不该留一条永久的错误气泡吓人（2026-07-11 阿颖遇到 Failed to fetch 残留）
       if (hidden) {
