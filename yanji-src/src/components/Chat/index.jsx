@@ -356,6 +356,9 @@ export default function Chat() {
         searchConfig,
         moonMemoryConfig: moonMemory,
         autoTools,
+        // 缓存粘性路由键：同一个对话永远发同一个值，中转站才会把它粘在同一个后端
+        // 节点上，缓存才读得回来（不带的话只写不读，写还按 1.25 倍计费）
+        cacheKey: chat.id,
         onChunk: (chunk) => {
           fullText += chunk
           // 流式过程中剥离 <es>/<mood>/<neg>/[call:] 标签，不让阿颖看到内部状态

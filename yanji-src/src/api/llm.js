@@ -302,6 +302,7 @@ export async function sendMessage({
   onStatus,
   onToolCall,
   onFile,
+  cacheKey,
 }) {
   if (!connection) throw new Error('未选择连接')
   const provider = normalizeProvider(connection.provider)
@@ -314,11 +315,11 @@ export async function sendMessage({
   if (hasTools) {
     return await callWithTools({
       connection, messages, systemPrompt, dynamicContext, model: usedModel, generationConfig,
-      tools, provider, searchConfig, moonMemoryConfig, onChunk, onThinking, onStatus, onToolCall, onFile,
+      tools, provider, searchConfig, moonMemoryConfig, onChunk, onThinking, onStatus, onToolCall, onFile, cacheKey,
     })
   }
   return await callStream({
-    connection, messages, systemPrompt, dynamicContext, model: usedModel, generationConfig, provider, onChunk, onThinking,
+    connection, messages, systemPrompt, dynamicContext, model: usedModel, generationConfig, provider, onChunk, onThinking, cacheKey,
   })
 }
 
@@ -346,7 +347,7 @@ function stripFakeToolResult(text) {
 
 async function callWithTools({
   connection, messages, systemPrompt, dynamicContext, model, generationConfig,
-  tools, provider, searchConfig, moonMemoryConfig, onChunk, onThinking, onStatus, onToolCall, onFile,
+  tools, provider, searchConfig, moonMemoryConfig, onChunk, onThinking, onStatus, onToolCall, onFile, cacheKey,
 }) {
   const { temperature = 0.7, maxTokens = 4096 } = generationConfig || {}
   const safeTemp = provider === 'anthropic' ? Math.min(temperature, 1) : Math.min(temperature, 2)
@@ -363,6 +364,10 @@ async function callWithTools({
       const url = buildApiUrl(connection.baseUrl, 'openai')
       const bodyMsgs = buildOpenAIMessages(convo, systemPrompt, iter === 0 ? dynamicContext : undefined)
       const body = { model, messages: bodyMsgs }
+      // 粘性路由键：中转站背后是一堆后端节点，不带这个字段同一个对话可能每轮
+      // 落到不同节点上——缓存写在 A 读不到，于是「只写不读」，写还按 1.25 倍收钱。
+      // 用每个对话一个稳定 id（不是全局固定），不同对话不互相挤同一个节点。（0726）
+      if (cacheKey) body.user = cacheKey
       if (isReasoningModel(model)) {
         body.max_completion_tokens = maxTokens
       } else {
@@ -446,6 +451,7 @@ async function callWithTools({
       // buildAnthropicMessages 保证注入永远在断点后，不影响缓存命中
       const bodyMsgs = buildAnthropicMessages(convo, dynamicContext)
       const body = { model, max_tokens: maxTokens, messages: bodyMsgs, tools: formattedTools, temperature: safeTemp }
+      if (cacheKey) body.metadata = { user_id: cacheKey } // 粘性路由，见上面 openai 分支的注释
       if (systemPrompt?.trim()) {
         body.system = [{ type: 'text', text: systemPrompt, cache_control: { type: 'ephemeral', ttl: '1h' } }]
       }
@@ -526,7 +532,7 @@ async function callWithTools({
 
 // ─── Streaming (no tools) ───────────────────────────────────────────────────
 
-async function callStream({ connection, messages, systemPrompt, dynamicContext, model, generationConfig, provider, onChunk, onThinking }) {
+async function callStream({ connection, messages, systemPrompt, dynamicContext, model, generationConfig, provider, onChunk, onThinking, cacheKey }) {
   const { temperature = 0.7, maxTokens = 4096 } = generationConfig || {}
   const safeTemp = provider === 'anthropic' ? Math.min(temperature, 1) : Math.min(temperature, 2)
 
@@ -534,6 +540,7 @@ async function callStream({ connection, messages, systemPrompt, dynamicContext, 
     const url = buildApiUrl(connection.baseUrl, 'openai')
     const bodyMsgs = buildOpenAIMessages(messages, systemPrompt, dynamicContext)
     const body = { model, messages: bodyMsgs, stream: true, stream_options: { include_usage: true } }
+    if (cacheKey) body.user = cacheKey // 粘性路由
     if (isReasoningModel(model)) {
       body.max_completion_tokens = maxTokens
     } else {
@@ -542,7 +549,7 @@ async function callStream({ connection, messages, systemPrompt, dynamicContext, 
     const hdrs = { 'Content-Type': 'application/json', Authorization: 'Bearer ' + connection.apiKey }
     let resp = await fetch(url, { method: 'POST', headers: hdrs, body: JSON.stringify(body) })
     if (!resp.ok && resp.status === 400) {
-      delete body.stream_options; delete body.temperature; delete body.max_tokens
+      delete body.stream_options; delete body.temperature; delete body.max_tokens; delete body.user
       body.max_completion_tokens = body.max_completion_tokens || maxTokens
       resp = await fetch(url, { method: 'POST', headers: hdrs, body: JSON.stringify(body) })
     }
@@ -572,6 +579,7 @@ async function callStream({ connection, messages, systemPrompt, dynamicContext, 
     // 3-7 及 4 系列以上（opus-4-8 / sonnet-4-6 / haiku-4-5，未来 opus-5-x 等）都支持 extended thinking
     const isThinkingModel = (model || '').includes('3-7') || /claude-[a-z]+-([4-9]|\d{2,})/.test(model || '')
     const body = { model, max_tokens: maxTokens, messages: bodyMsgs, stream: true }
+    if (cacheKey) body.metadata = { user_id: cacheKey } // 粘性路由
     if (systemPrompt?.trim()) {
       body.system = [{ type: 'text', text: systemPrompt, cache_control: { type: 'ephemeral', ttl: '1h' } }]
     }
