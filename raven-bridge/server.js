@@ -869,6 +869,26 @@ const server = http.createServer((req, res) => {
     return
   }
 
+  // TTS 代理：归巢的朗读按钮以前直接打 moon-memory 的 /crow/tts，那条路是免 token 的——
+  // 任何人扫到地址就能烧掉 ElevenLabs 的月额度（一个 IP 一小时就够烧穿）。改走这里：
+  // 先验归巢自己的 token，再由服务端拿 MOON_TOKEN 转发到 /tts，顺带蹭上言叽那条
+  // MiniMax 主 + ElevenLabs 兜底的链路。
+  if (req.method === 'POST' && url.pathname === '/raven/tts') {
+    let body = ''
+    req.on('data', d => { body += d })
+    req.on('end', () => {
+      let parsed
+      try { parsed = JSON.parse(body) } catch { res.writeHead(400); res.end('{"error":"bad json"}'); return }
+      if (PW_HASH && !validTokens.has(parsed.token)) { res.writeHead(401); res.end('{"error":"unauthorized"}'); return }
+      const text = (parsed.text || '').trim()
+      if (!text) { res.writeHead(400); res.end('{"error":"empty"}'); return }
+      moonPost('/tts', { text: text.slice(0, 500) })
+        .then(r => { res.writeHead(r.status, { 'Content-Type': 'application/json' }); res.end(JSON.stringify(r.data)) })
+        .catch(() => { res.writeHead(500); res.end('{"error":"tts failed"}') })
+    })
+    return
+  }
+
   // 版本检查：原生壳问「有新版本吗」。服务器代问 GitHub Release（她的手机可能没开代理，
   // 直连 api.github.com 会被墙，所以必须服务端转一手），构建号从 release 正文里解析。
   if (req.method === 'GET' && url.pathname === '/raven/app-latest') {

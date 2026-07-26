@@ -1630,7 +1630,7 @@ function showCompressBanner() {
 }
 
 // --- tts ---
-const TTS_URL = 'https://memory.ravenlove.cc/crow/tts'
+const TTS_URL = '/raven/tts'
 const IC_SPEAKER = `<svg viewBox="0 0 24 24" width="12" height="12" fill="currentColor"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02z"/></svg>`
 const IC_PAUSE   = `<svg viewBox="0 0 24 24" width="12" height="12" fill="currentColor"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>`
 const IC_DOTS    = `<svg viewBox="0 0 24 24" width="12" height="12" fill="currentColor"><circle cx="4" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="20" cy="12" r="2"/></svg>`
@@ -1681,7 +1681,7 @@ function makeTtsBtn(text, msgEl, vbar) {
         const res = await fetch(TTS_URL, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ text: text.replace(/[#*`_[\]~>]/g, '').slice(0, 500) })
+          body: JSON.stringify({ text: text.replace(/[#*`_[\]~>]/g, '').slice(0, 500), token: localStorage.getItem('raven-token') || '' })
         })
         if (!res.ok) throw new Error()
         const { audio: dataUri } = await res.json()
