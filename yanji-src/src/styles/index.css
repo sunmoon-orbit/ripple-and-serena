@@ -4441,3 +4441,12 @@ body.mp-active .scroll-bottom-btn { bottom: 139px; }
 }
 .note-btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
 .note-btn.danger { color: #d9534f; border-color: rgba(217, 83, 79, .4); }
+
+/* 触屏设备没有 hover：那排操作按钮原本是 .conv-item:hover 才显示的，
+   手机上一碰整行就直接切进对话、侧边栏还收起来了，等于永远点不到。
+   （0726 加接续笔记按钮时才发现重命名/删除在手机上也一直是这样） */
+@media (hover: none) {
+  .conv-item-actions { display: flex; }
+  .conv-item-title { padding-right: 78px; }
+  .conv-action-btn { width: 26px; height: 26px; }   /* 手指比鼠标粗，放大一点 */
+}
