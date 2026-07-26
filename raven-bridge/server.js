@@ -264,6 +264,7 @@ function getStatus() {
 
 const clients = new Set()
 const mcpSseClients = new Map() // clientId → SSE res
+const recentCids = new Set()    // 最近处理过的前端消息 id，用于重发去重
 
 function broadcast(msg) {
   const data = JSON.stringify(msg)
@@ -931,6 +932,16 @@ wss.on('connection', (ws) => {
           ws.send(JSON.stringify({ type: 'auth_failed' }))
           return
         }
+        // 前端等不到 sent 回执会重发同一条（半开连接：socket 看着是活的，
+        // 发出去其实掉进黑洞）。cid 去重保证重发不会变成两条一样的消息。
+        if (msg.cid) {
+          if (recentCids.has(msg.cid)) {
+            ws.send(JSON.stringify({ type: 'sent', text: msg.text, ts: Date.now(), cid: msg.cid }))
+            return
+          }
+          recentCids.add(msg.cid)
+          if (recentCids.size > 200) recentCids.delete(recentCids.values().next().value)
+        }
         lastUserMsgTs = Date.now()
         lastBroadcastReply = extractLastResponse(lastCapture) || ''
         lastReplyMsgs = []  // 发新消息时清空回放队列，重连不会刷旧消息
@@ -938,7 +949,7 @@ wss.on('connection', (ws) => {
         // 前端消息一律带【阿颖】前缀：CC 靠它区分「浏览器来的要用 curl 回」还是终端直聊。
         // 旧逻辑绑在 mcpSseClients.size 上，MCP 掉线就裸发，CC 回终端她在浏览器看不见（0712 实锤）
         tmuxSend('【阿颖】' + msg.text)
-        broadcast({ type: 'sent', text: msg.text, ts: Date.now() })
+        broadcast({ type: 'sent', text: msg.text, ts: Date.now(), cid: msg.cid || null })
       }
       if (msg.type === 'permission' && msg.choice) {
         tmuxSend(msg.choice)

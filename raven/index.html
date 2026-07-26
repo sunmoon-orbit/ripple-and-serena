@@ -726,6 +726,12 @@
           <polyline points="21 15 16 10 5 21"/>
         </svg>
       </button>
+      <button id="move-btn" title="搬家（导出/导入本机数据）" aria-label="搬家">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M3 9l9-6 9 6v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
+          <polyline points="9 21 9 13 15 13 15 21"/>
+        </svg>
+      </button>
       <button id="theme-btn" title="切换主题" aria-label="切换主题"></button>
       <span id="conn-dot"></span>
       <span id="conn-label">连接中…</span>
@@ -1074,6 +1080,32 @@ let reconnectTimer = null
 let lastWsActivity = 0
 const shownMsgIds = new Set()  // 已显示的消息 ID，防止重连后重复显示
 let pendingOutbox = []  // WS 断开时积压的待发消息
+const awaitingAck = new Map()  // cid → {payload, timer}，等服务端回执的消息
+
+// 手机息屏/切网后 WebSocket 常常「半开」：readyState 还是 1，看着是连着的，
+// ws.send() 也不报错，但数据其实掉进黑洞，onclose 要等 TCP 超时（几分钟）才触发。
+// 症状是消息发出去输入框清空了、气泡也不出现（气泡是等服务端 sent 回执才画的），
+// 整条消息凭空消失。所以发完必须等回执，超时就当没发出去：踢掉这条死连接、
+// 把消息塞回积压队列，重连后自动补发。（0726 阿颖在归巢遇到）
+function wsSendWithAck(payload) {
+  try { ws.send(JSON.stringify(payload)) } catch { }
+  const timer = setTimeout(() => {
+    if (!awaitingAck.has(payload.cid)) return
+    awaitingAck.delete(payload.cid)
+    pendingOutbox.push(payload)
+    appendMsg('[没收到回执，连接可能已断，重连后自动重发]', 'system', false)
+    try { ws && ws.close() } catch { }   // 触发 onclose → 3 秒后重连 → 补发
+  }, 8000)
+  awaitingAck.set(payload.cid, { payload, timer })
+}
+
+function ackReceived(cid) {
+  if (!cid) return
+  const entry = awaitingAck.get(cid)
+  if (!entry) return
+  clearTimeout(entry.timer)
+  awaitingAck.delete(cid)
+}
 
 function connect() {
   ws = new WebSocket(WS_URL)
@@ -1083,10 +1115,9 @@ function connect() {
     if (reconnectTimer) { clearTimeout(reconnectTimer); reconnectTimer = null }
     // 先认证：服务端在认证通过前不会推送任何数据（防偷听加固 2026-07-03）
     ws.send(JSON.stringify({ type: 'auth', token: localStorage.getItem('raven-token') || '' }))
-    // 重连后补发积压的消息
+    // 重连后补发积压的消息（同样要等回执，补发路上再断一次也不会丢）
     while (pendingOutbox.length) {
-      const payload = pendingOutbox.shift()
-      ws.send(JSON.stringify(payload))
+      wsSendWithAck(pendingOutbox.shift())
     }
   }
   ws.onclose = () => {
@@ -1100,7 +1131,7 @@ function connect() {
       const msg = JSON.parse(e.data)
       if (msg.type === 'terminal') renderTerminal(msg.lines)
       else if (msg.type === 'status') renderStatus(msg.data)
-      else if (msg.type === 'sent') appendMsg(msg.text, 'user')
+      else if (msg.type === 'sent') { ackReceived(msg.cid); appendMsg(msg.text, 'user') }
       else if (msg.type === 'reply') {
         const alreadyShown = msg.replayed && (
           msg.id ? shownMsgIds.has(msg.id) :
@@ -1313,14 +1344,15 @@ function sendMsg(overrideText) {
     pendingFiles = []
     renderAttachPreview()
   }
-  const payload = { type: 'send', text, token: localStorage.getItem('raven-token') || '' }
+  const cid = 'c' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8)
+  const payload = { type: 'send', text, cid, token: localStorage.getItem('raven-token') || '' }
   if (!ws || ws.readyState !== 1) {
     pendingOutbox.push(payload)
     appendMsg('[消息已暂存，重连后自动发送]', 'system', false)
     if (!reconnectTimer) connect()
     return
   }
-  ws.send(JSON.stringify(payload))
+  wsSendWithAck(payload)
   if (!overrideText) { inp.value = ''; inp.style.height = 'auto' }
 }
 
@@ -2067,15 +2099,25 @@ if (!localStorage.getItem('raven-token')) {
 restoreHistory()
 connect()
 
-// 手机切到后台再回来时 WebSocket 可能已断，主动重连
-document.addEventListener('visibilitychange', () => {
-  if (document.visibilityState === 'visible') {
-    if (!ws || ws.readyState === WebSocket.CLOSED || ws.readyState === WebSocket.CLOSING) {
-      if (reconnectTimer) { clearTimeout(reconnectTimer); reconnectTimer = null }
-      connect()
-    }
+// 手机切到后台再回来时 WebSocket 可能已断，主动重连。
+// 只看 readyState 不够：半开连接的 readyState 还是 1。服务端每 5 秒广播一次
+// status，所以「超过 20 秒没收到任何数据」就是这条连接已经死了的信号，主动踢掉重连。
+function ensureLiveConnection() {
+  if (!ws || ws.readyState === WebSocket.CLOSED || ws.readyState === WebSocket.CLOSING) {
+    if (reconnectTimer) { clearTimeout(reconnectTimer); reconnectTimer = null }
+    connect()
+    return
   }
+  if (ws.readyState === 1 && lastWsActivity && Date.now() - lastWsActivity > 20000) {
+    setConn(false)
+    try { ws.close() } catch { }   // onclose 会安排重连
+  }
+}
+
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible') ensureLiveConnection()
 })
+setInterval(() => { if (document.visibilityState === 'visible') ensureLiveConnection() }, 15000)
 
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker.register('./sw.js')
