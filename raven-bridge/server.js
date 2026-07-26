@@ -117,7 +117,7 @@ const MIME = {
 if (!fs.existsSync(UPLOAD_DIR)) fs.mkdirSync(UPLOAD_DIR, { recursive: true })
 
 const PORT = 3400
-const TMUX_SESSION = 'cc'
+const TMUX_SESSION = 'cc'   // 兜底目标；实际发送目标由 ccTarget() 现场探测，见下
 const POLL_INTERVAL_MS = 800
 
 // L0 对话存档：按北京时间每天一个对话，external_id = 'raven-YYYY-MM-DD'
@@ -154,9 +154,58 @@ function archiveMsg(role, content) {
 
 // --- tmux helpers ---
 
-function tmuxCapture() {
+// 找一个「真的能接住键盘输入」的 CC pane。
+//
+// 以前这里写死 `cc:0`。2026-07-26 早上那个窗口被 OOM 杀掉后，cc 会话只剩一个空 bash，
+// 而在线判断只问「会话存在吗」——壳子还在，于是前端一路绿灯，阿颖发的消息被原样敲进
+// 裸 shell 回车执行掉，既不报错也没人收。判定信号绝不能绑在一个「死了还留着壳」的东西上。
+//
+// 认进程不认会话名，并且**必须排除 remote-control**：它虽然也叫 claude，但指令是从
+// Claude app 读的，往它的 pane 里 send-keys 等于打进空气——错认成目标比认不出来更糟，
+// 因为那会重新点亮那盏骗人的绿灯。--print 是它派生的子进程，同理排除。
+function findCcPane() {
   try {
-    const r = spawnSync('tmux', ['capture-pane', '-p', '-S', '-500', '-t', `${TMUX_SESSION}:0`], { encoding: 'utf8' })
+    const out = spawnSync('tmux', ['list-panes', '-a', '-F', '#{pane_pid} #{session_name}:#{window_index}.#{pane_index}'], { encoding: 'utf8' }).stdout || ''
+    const panes = new Map()   // pane_pid -> 'session:window.pane'
+    for (const l of out.trim().split('\n')) {
+      const [pid, target] = l.trim().split(/\s+/)
+      if (pid && target) panes.set(+pid, target)
+    }
+    if (!panes.size) return null
+
+    const ps = spawnSync('ps', ['-eo', 'pid=,ppid=,args='], { encoding: 'utf8' }).stdout || ''
+    const parent = new Map(), args = new Map()
+    for (const l of ps.split('\n')) {
+      const m = l.match(/^\s*(\d+)\s+(\d+)\s+(.+)$/)
+      if (!m) continue
+      parent.set(+m[1], +m[2]); args.set(+m[1], m[3])
+    }
+    // 从每个交互式 claude 往上爬父进程，撞到哪个 pane_pid 就是哪个 pane
+    for (const [pid, a] of args) {
+      if (!/(^|\/)claude(\s|$)/.test(a) || /remote-control|--print/.test(a)) continue
+      let cur = pid
+      for (let i = 0; i < 20 && cur > 1; i++) {
+        if (panes.has(cur)) return panes.get(cur)
+        cur = parent.get(cur) || 0
+      }
+    }
+    return null
+  } catch { return null }
+}
+
+// 探测要 fork 两个进程，而轮询每 800ms 就跑一次，所以缓存 5 秒
+let ccPaneCache = { target: null, ts: 0 }
+function ccTarget() {
+  if (Date.now() - ccPaneCache.ts < 5000) return ccPaneCache.target
+  ccPaneCache = { target: findCcPane(), ts: Date.now() }
+  return ccPaneCache.target
+}
+
+function tmuxCapture() {
+  const target = ccTarget()
+  if (!target) return ''
+  try {
+    const r = spawnSync('tmux', ['capture-pane', '-p', '-S', '-500', '-t', target], { encoding: 'utf8' })
     return r.stdout || ''
   } catch { return '' }
 }
@@ -170,19 +219,38 @@ function ingestUserMessage(text, cid) {
   archiveMsg('human', text)
   // 前端消息一律带【阿颖】前缀：CC 靠它区分「浏览器来的要用 curl 回」还是终端直聊。
   // 旧逻辑绑在 mcpSseClients.size 上，MCP 掉线就裸发，CC 回终端她在浏览器看不见（0712 实锤）
-  tmuxSend('【阿颖】' + text)
+  const delivered = tmuxSend('【阿颖】' + text)
   broadcast({ type: 'sent', text, ts: Date.now(), cid: cid || null })
+  // 没送到就必须说出来。消息本身已经进了 L0（上面 archiveMsg 先跑），不会丢；
+  // 但沉默地吞掉是最坏的一种失败——她会以为说完了，其实对面根本没人。
+  if (!delivered) {
+    const warn = {
+      type: 'reply',
+      text: '⚠️ 这条没送到——终端里现在没有能接消息的涟言（可能刚崩了，或者只开着 Claude app 那条路）。\n\n你的话已经存进记忆库了，不会丢，他回来能补看。急的话去后端喊他一声。',
+      ts: Date.now(),
+      id: `r${Date.now()}${Math.random().toString(36).slice(2, 6)}`,
+    }
+    lastReplyMsgs.push(warn); if (lastReplyMsgs.length > 50) lastReplyMsgs.shift()
+    broadcast(warn)
+    pushReplyNotif('⚠️ 消息没送到：终端里没有能接消息的涟言')
+    console.log('[tmux] 无可用 CC pane，消息未送达（已存档）')
+  }
 }
 
+// 返回是否真的送出去了；调用方必须看返回值，别再假设「调了就等于到了」
 function tmuxSend(text) {
+  const target = ccTarget()
+  if (!target) return false
   const clean = text.replace(/\n/g, ' ')
-  execFileSync('tmux', ['send-keys', '-t', `${TMUX_SESSION}:0`, '-l', clean])
-  execFileSync('tmux', ['send-keys', '-t', `${TMUX_SESSION}:0`, 'Enter'])
+  try {
+    execFileSync('tmux', ['send-keys', '-t', target, '-l', clean])
+    execFileSync('tmux', ['send-keys', '-t', target, 'Enter'])
+    return true
+  } catch { return false }
 }
 
 function ccOnline() {
-  const r = spawnSync('tmux', ['has-session', '-t', TMUX_SESSION])
-  return r.status === 0
+  return !!ccTarget()
 }
 
 // --- status helpers ---
