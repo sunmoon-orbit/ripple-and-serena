@@ -66,7 +66,11 @@ class RoostFCMService : FirebaseMessagingService() {
         ).addRemoteInput(remoteInput).build()
 
         val notification = NotificationCompat.Builder(this, CHANNEL_ID)
-            .setSmallIcon(android.R.drawable.ic_dialog_email)
+            // ⚠️ 首版误用了 android.R.drawable.ic_dialog_email（安卓自带的信封），
+            // 通知栏上根本不像归巢。小图标只认 alpha 通道，必须是单色剪影，
+            // 塞彩色 PNG 会变成一坨白块——所以是矢量 drawable，不是 mipmap 那张图。
+            .setSmallIcon(R.drawable.ic_notification)
+            .setColor(0xFFC4A882.toInt())   // 系统给剪影上的色，归巢的暖金
             .setContentTitle(title)
             .setContentText(body)
             .setStyle(NotificationCompat.BigTextStyle().bigText(body))

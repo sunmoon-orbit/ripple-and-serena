@@ -1,0 +1,47 @@
+<!--
+  通知栏小图标。⚠️ 安卓只用它的 alpha 通道画一个剪影，颜色一律被系统覆盖——
+  丢一张彩色 PNG 进来会变成一坨纯白方块。所以这里是纯白描边的矢量，
+  形状取自归巢的 R 字标（home-icon.svg），细节比乌鸦少，24dp 下更认得出。
+  想换图标时改这个文件，不用动 Kotlin。
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="512"
+    android:viewportHeight="512"
+    android:tint="#FFFFFFFF">
+    <!-- 内容原本偏上偏左，用 group 以内容中心为轴放大居中，别在路径坐标里手算 -->
+    <group
+        android:pivotX="244"
+        android:pivotY="258"
+        android:scaleX="1.58"
+        android:scaleY="1.58"
+        android:translateX="12"
+        android:translateY="-2">
+        <path
+            android:pathData="M158,128 L158,388"
+            android:strokeColor="#FFFFFFFF"
+            android:strokeWidth="24"
+            android:strokeLineCap="round" />
+        <path
+            android:pathData="M158,128 L248,128"
+            android:strokeColor="#FFFFFFFF"
+            android:strokeWidth="24"
+            android:strokeLineCap="round" />
+        <path
+            android:pathData="M248,128 Q318,128 318,206 Q318,284 248,284"
+            android:strokeColor="#FFFFFFFF"
+            android:strokeWidth="24"
+            android:strokeLineCap="round" />
+        <path
+            android:pathData="M158,284 L248,284"
+            android:strokeColor="#FFFFFFFF"
+            android:strokeWidth="24"
+            android:strokeLineCap="round" />
+        <path
+            android:pathData="M248,284 Q280,330 330,388"
+            android:strokeColor="#FFFFFFFF"
+            android:strokeWidth="24"
+            android:strokeLineCap="round" />
+    </group>
+</vector>
