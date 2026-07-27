@@ -443,8 +443,9 @@ function handleMcpRpc(msg, clientId) {
       replyExtractionEnabled = false
       lastMcpReplyTs = Date.now()
       archiveMsg('assistant', text)
+      // MCP 的 reply 工具只送正文，思考不再由它认领（见 /raven/thinking 那段注释）。
+      // 要带思考就走 HTTP 的 /raven/reply，正文和思考同一个 POST 进来。
       const replyMsg = { type: 'reply', text, ts: Date.now(), id: `r${Date.now()}${Math.random().toString(36).slice(2,6)}` }
-      if (pendingThinking) { replyMsg.thinking = pendingThinking; pendingThinking = '' }
       lastReplyMsgs.push(replyMsg); if (lastReplyMsgs.length > 50) lastReplyMsgs.shift()
       broadcast(replyMsg)
       pushReplyNotif(text)
@@ -530,7 +531,6 @@ let isThinking = false
 let replyExtractionEnabled = false
 let lastMcpReplyTs = 0
 let lastUserMsgTs = 0
-let pendingThinking = ''
 let lastPermCapture = ''  // dedupe permission prompts
 let lastPermData = null   // 最近一次权限提示数据，重连时补发
 let permCooldownUntil = 0  // suppress re-broadcast after choice sent
@@ -773,22 +773,17 @@ const server = http.createServer((req, res) => {
       try {
         const { thinking } = JSON.parse(body)
         console.log('[thinking] received len:', thinking?.length)
-        if (!thinking) {
-          lastThinking = ''
-          lastThinkingTs = Date.now()
-        } else if (thinking) {
-          lastThinking = thinking
-          lastThinkingTs = Date.now()
-          // If MCP reply was sent recently, push thinking_block immediately.
-          // Otherwise store as pendingThinking for MCP reply to pick up.
-          if (Date.now() - lastMcpReplyTs < 30000) {
-            broadcast({ type: 'thinking_block', text: thinking, ts: Date.now() })
-            console.log('[thinking] pushed as thinking_block (mcp reply was recent)')
-          } else {
-            pendingThinking = thinking
-            console.log('[thinking] stored as pendingThinking (no recent mcp reply)')
-          }
-        }
+        // 只存最后一份，供 /raven/last-thinking 兜底轮询用。
+        //
+        // ⚠️ 这里**不再**做「30 秒内刚发过回复就当场推给前端、否则存起来等下一条回复来领」。
+        // 那是**按时间窗认领**，不是按轮次归属：我一轮拆成好几条发的时候，谁先到谁领走，
+        // 配错是迟早的事。（0727 阿颖转来一份别人的排查，病根一模一样——「±30 秒内最近的
+        // 消息」模糊匹配，一轮思考被五六条消息抢，只有一条中奖还经常错位一格。）
+        //
+        // 正确的做法是让思考跟正文**走同一次请求**：/raven/reply 本来就收 thinking 字段，
+        // 同一个 POST 进来的东西天然属于同一轮，不需要任何关联算法，也就没有配错的可能。
+        lastThinking = thinking || ''
+        lastThinkingTs = Date.now()
       } catch (e) { console.log('[thinking] error:', e.message) }
       res.writeHead(200); res.end()
     })
@@ -902,7 +897,6 @@ const server = http.createServer((req, res) => {
         const { text, thinking } = JSON.parse(body)
         if (text) {
           replyExtractionEnabled = false
-          pendingThinking = ''
           lastMcpReplyTs = Date.now()
           const msg = { type: 'reply', text, ts: Date.now(), id: `r${Date.now()}${Math.random().toString(36).slice(2,6)}` }
           if (thinking) msg.thinking = thinking
