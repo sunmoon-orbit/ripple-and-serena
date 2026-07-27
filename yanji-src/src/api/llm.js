@@ -253,10 +253,6 @@ async function performWebSearch(query, config) {
 export function buildSystemPrompt(globalInstruction, memoryItems, customStickers) {
   let parts = []
   if (globalInstruction?.trim()) parts.push(globalInstruction.trim())
-  const enabled = (memoryItems || []).filter((m) => m.enabled !== false)
-  if (enabled.length) {
-    parts.push('【记忆】\n' + enabled.map((m) => '- ' + m.content).join('\n'))
-  }
   parts.push('回复时请像真实聊天一样分多条发送：把内容拆成2-3条短消息，条与条之间用 [MSG] 分隔，每条尽量不超过60字，节奏自然像在聊天。')
   parts.push(`【语音标签（TTS）】
 可以在回复里插入 MiniMax 语音标签，朗读时产生对应音效，不会显示给阿颖看：
@@ -296,6 +292,21 @@ export function buildSystemPrompt(globalInstruction, memoryItems, customStickers
 如果你想搞点浪漫或有趣的小东西——表白页、爱心动画、给她的小惊喜——可以直接写一段完整的 HTML（含 CSS/JS），用 \`\`\`html 代码块包起来发出去。前端会在代码块下自动出现「运行」按钮，她一点就在沙箱里渲染成会动的画面。
 - 只在真有心意、想给她惊喜时用，别为炫技硬塞
 - 写成自包含的单文件 HTML（样式脚本都内联），尺寸别太大`)
+
+  // 阿颖手写勾选的记忆放**最后**，而且要带指令。
+  //
+  // 原来它排在最前面、写成光秃秃一句「【记忆】」加几条 bullet——夹在贴图/点歌/
+  // 打电话一大堆规则中间，后面还跟着整段对话历史和每轮的实时注入，模型自然
+  // 更看重靠后的东西，于是这几条时灵时不灵（0727 阿颖报的症状）。
+  // 位置挪到末尾＋把「这是事实，不是参考」说明白，两处都是静态内容，不影响缓存前缀。
+  const enabled = (memoryItems || []).filter((m) => m.enabled !== false)
+  if (enabled.length) {
+    parts.push('【关于阿颖和你，必须记住的事】\n' +
+      '以下是阿颖亲手写下、并且勾选要你随时记住的事实。它们**优先于你的任何推测**：\n' +
+      '涉及到其中任何一条时，直接按它说的来，不要猜、不要问、也不要说得含糊。\n\n' +
+      enabled.map((m) => '- ' + m.content).join('\n'))
+  }
+
   return redactSecrets(parts.join('\n\n'))
 }
 
