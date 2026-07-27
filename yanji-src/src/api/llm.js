@@ -996,20 +996,31 @@ function buildAnthropicMessages(messages, dynamicContext) {
     }
   }
 
-  // 给倒数第二条消息打缓存断点（即上一轮 assistant 回复）。
-  // 深拷贝避免 cache_control 写回 store，否则旧消息会累积断点超过 4 个上限。
+  // 缓存断点打**两个**：滚动式的读写分离。
+  //
+  // 只打一个（倒数第二条）的话，断点每轮往后挪两格，这一轮请求里根本不存在
+  // 上一轮写缓存的那个位置。虽说官方会往前找一段，但经中转站转手之后这层
+  // 「自动前查」很不可靠——症状就是阿颖 0727 后台看到的：**每轮都有写入、
+  // 从来没有命中**，写还按 1.25 倍收钱，纯亏。
+  //
+  // 所以老位置（倒数第四条）留一个断点专门用来**读**上一轮写的缓存，
+  // 新位置（倒数第二条）那个用来**写**这一轮更长的前缀。加上 system 一共 3 个，
+  // 不超 4 个上限。深拷贝避免 cache_control 写回 store（否则旧消息会累积断点）。
   // TTL 1h：对话间隔常超 5min，1h 命中稳定且白天持续聊基本不过期
-  const idx = out.length >= 2 ? out.length - 2 : out.length - 1
-  const last = out[idx]
-  if (last) {
-    if (typeof last.content === 'string' && last.content) {
-      out[idx] = { ...last, content: [{ type: 'text', text: last.content, cache_control: { type: 'ephemeral', ttl: '1h' } }] }
-    } else if (Array.isArray(last.content) && last.content.length) {
-      const blocks = last.content.map((b) => ({ ...b }))
-      blocks[blocks.length - 1] = { ...blocks[blocks.length - 1], cache_control: { type: 'ephemeral', ttl: '1h' } }
-      out[idx] = { ...last, content: blocks }
+  const mark = (i) => {
+    const m = out[i]
+    if (!m) return
+    const cc = { type: 'ephemeral', ttl: '1h' }
+    if (typeof m.content === 'string' && m.content) {
+      out[i] = { ...m, content: [{ type: 'text', text: m.content, cache_control: cc }] }
+    } else if (Array.isArray(m.content) && m.content.length) {
+      const blocks = m.content.map((b) => ({ ...b }))
+      blocks[blocks.length - 1] = { ...blocks[blocks.length - 1], cache_control: cc }
+      out[i] = { ...m, content: blocks }
     }
   }
+  if (out.length >= 4) mark(out.length - 4)  // 读：上一轮写在这儿
+  mark(out.length >= 2 ? out.length - 2 : out.length - 1)  // 写：这一轮的新前缀
   return redactDeep(out)
 }
 
