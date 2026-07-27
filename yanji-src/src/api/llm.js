@@ -609,8 +609,23 @@ async function callStream({ connection, messages, systemPrompt, dynamicContext, 
       body.system = [{ type: 'text', text: systemPrompt, cache_control: { type: 'ephemeral', ttl: '1h' } }]
     }
     if (isThinkingModel && onThinking) {
-      body.thinking = { type: 'enabled', budget_tokens: Math.min(maxTokens, 8000) }
-      body.temperature = 1  // Anthropic extended thinking requires temp=1
+      // 4.6 以后（含 opus-5）只认 adaptive：再发 {type:'enabled', budget_tokens}
+      // 会被 400 顶回来，temperature 也不许带。display:'summarized' 是必须的——
+      // 这几代默认 display:'omitted'，思考块照发但正文是空的（我自己那边 0727 就
+      // 是这么冻住的，见 project-thinking-hook-stale-0727）
+      const adaptiveOnly = /claude-[a-z]+-(4-[6-9]|[5-9]|\d{2,})/.test(model || '')
+      if (adaptiveOnly) {
+        body.thinking = { type: 'adaptive', display: 'summarized' }
+      } else {
+        // budget_tokens 必须**严格小于** max_tokens，否则 400。
+        // 原来写 Math.min(maxTokens, 8000)：maxTokens 是默认的 4096 时，
+        // budget 正好等于 max_tokens，整条请求直接被拒。
+        const budget = Math.min(8000, maxTokens - 1024)
+        if (budget >= 1024) {
+          body.thinking = { type: 'enabled', budget_tokens: budget }
+          body.temperature = 1  // 老一代的 extended thinking 要求 temp=1
+        }
+      }
     }
     const resp = await fetch(url, {
       method: 'POST',
