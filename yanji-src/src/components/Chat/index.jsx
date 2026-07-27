@@ -171,9 +171,16 @@ export default function Chat() {
     try {
       const allMsgs = getMessages(chat.id).filter((m) => !m.streaming && !m.sys)
       // 旧消息的图片降级为占位文本：base64 图片占大量 token，留在历史里每轮都触发缓存重写
+      //
+      // 降级的**分界线也要锚点式量化**（和 applyContextLimit 同一个道理）：
+      // 写成 `i >= len - 4` 的话，界线每来一条消息就往后挪一格，某条带图消息
+      // 被降级的那一轮，缓存前缀就在那个位置断一次——发过几张图就断几次。
+      // 按 step 对齐后，界线每 4 条才动一次，几张图一起降级＝只断一次。
       const IMG_KEEP_RECENT = 4
-      const prepared = allMsgs.map((m, i, arr) => {
-        const keepImages = i >= arr.length - IMG_KEEP_RECENT
+      const imgStep = IMG_KEEP_RECENT
+      const imgKeepFrom = Math.max(0, Math.floor((allMsgs.length - IMG_KEEP_RECENT) / imgStep) * imgStep)
+      const prepared = allMsgs.map((m, i) => {
+        const keepImages = i >= imgKeepFrom
         const baseContent = !keepImages && m.images?.length && !m.content ? '[图片]' : m.content
         let c = baseContent
         if (m.quote) {
