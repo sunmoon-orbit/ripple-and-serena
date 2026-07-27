@@ -380,6 +380,8 @@ async function callWithTools({
   let convo = [...messages]
   let finalText = ''
   let usage = { promptTokens: 0, completionTokens: 0, totalTokens: 0 }
+  // 已经边生成边吐给 UI 了就别在末尾再整段推一次，否则气泡里会出现两份
+  let streamedOut = false
 
   for (let iter = 0; iter < 6; iter++) {
     onStatus?.(iter === 0 ? '思考中...' : '继续思考...')
@@ -475,7 +477,11 @@ async function callWithTools({
       // 每次迭代都传 dynamicContext：工具循环后续步骤不再丢失注入内容；
       // buildAnthropicMessages 保证注入永远在断点后，不影响缓存命中
       const bodyMsgs = buildAnthropicMessages(convo, dynamicContext)
-      const body = { model, max_tokens: maxTokens, messages: bodyMsgs, tools: formattedTools, temperature: safeTemp }
+      // ⚠️ 必须流式。非流式的话，模型思考那几十秒里这条连接一个字节都不吐，
+      // 中转站/代理/CDN 很容易按「空闲连接」把它掐掉——上游其实已经生成完并计了费，
+      // 前端拿到的却是 Failed to fetch（0727 阿颖报的「后台有输出但前端报错」）。
+      // 流式之后 SSE 一直有事件流过，连接不会被判死，她也能边看边等。
+      const body = { model, max_tokens: maxTokens, messages: bodyMsgs, tools: formattedTools, temperature: safeTemp, stream: true }
       if (cacheKey) body.metadata = { user_id: cacheKey } // 粘性路由，见上面 openai 分支的注释
       if (systemPrompt?.trim()) {
         body.system = [{ type: 'text', text: systemPrompt, cache_control: { type: 'ephemeral', ttl: '1h' } }]
@@ -493,12 +499,12 @@ async function callWithTools({
         body: JSON.stringify(body),
       })
       if (!resp.ok) throw new Error('Anthropic ' + resp.status + ': ' + (await resp.text()).slice(0, 200))
-      const data = await resp.json()
+      const data = await streamAnthropicBlocks(resp, (t) => { streamedOut = true; onChunk?.(t) }, onThinking)
       if (data.usage) {
         // Anthropic 的 input_tokens 不含缓存部分，归一化成总输入便于算命中率
-        const cr = data.usage.cache_read_input_tokens || 0
-        const cw = data.usage.cache_creation_input_tokens || 0
-        accUsage(usage, { p: (data.usage.input_tokens || 0) + cr + cw, c: data.usage.output_tokens, cached: cr, cacheWrite: cw })
+        const cr = data.usage.cachedTokens || 0
+        const cw = data.usage.cacheWriteTokens || 0
+        accUsage(usage, { p: data.usage.promptTokens, c: data.usage.completionTokens, cached: cr, cacheWrite: cw })
       }
       const toolBlocks = data.content?.filter((b) => b.type === 'tool_use') || []
       if (toolBlocks.length) {
@@ -551,7 +557,7 @@ async function callWithTools({
     break
   }
 
-  onChunk?.(finalText)
+  if (!streamedOut) onChunk?.(finalText)
   return { text: finalText, usage }
 }
 
@@ -687,6 +693,75 @@ async function callStream({ connection, messages, systemPrompt, dynamicContext, 
   }
 
   throw new Error('不支持的 provider: ' + provider)
+}
+
+// Anthropic 流式 + 工具调用：把 SSE 事件还原成一条完整的 message.content 块数组，
+// 形状跟非流式返回的 data.content 一模一样，工具循环那边不用改判断逻辑。
+// 文本增量边收边吐给 UI；tool_use 的入参是分片的 JSON 字符串，要攒齐了再 parse。
+async function streamAnthropicBlocks(resp, onText, onThinking) {
+  const reader = resp.body.getReader()
+  const decoder = new TextDecoder()
+  const blocks = []
+  const usage = { promptTokens: 0, completionTokens: 0, cachedTokens: 0, cacheWriteTokens: 0 }
+  let buf = ''
+
+  const handleLine = (line) => {
+    if (!line.startsWith('data: ')) return
+    const raw = line.slice(6)
+    if (raw === '[DONE]') return
+    let json
+    try { json = JSON.parse(raw) } catch { return }
+
+    if (json.type === 'message_start') {
+      const u = json.message?.usage
+      if (u) {
+        usage.cachedTokens = u.cache_read_input_tokens || 0
+        usage.cacheWriteTokens = u.cache_creation_input_tokens || 0
+        usage.promptTokens = (u.input_tokens || 0) + usage.cachedTokens + usage.cacheWriteTokens
+      }
+      return
+    }
+    if (json.type === 'content_block_start') {
+      const b = json.content_block || {}
+      blocks[json.index] = b.type === 'tool_use'
+        ? { type: 'tool_use', id: b.id, name: b.name, input: {}, _json: '' }
+        : { ...b }
+      return
+    }
+    if (json.type === 'content_block_delta') {
+      const b = blocks[json.index]
+      const d = json.delta || {}
+      if (!b) return
+      if (d.type === 'text_delta') { b.text = (b.text || '') + d.text; onText?.(d.text) }
+      else if (d.type === 'thinking_delta') { b.thinking = (b.thinking || '') + d.thinking; onThinking?.(d.thinking) }
+      else if (d.type === 'signature_delta') { b.signature = (b.signature || '') + d.signature }
+      else if (d.type === 'input_json_delta') { b._json += d.partial_json || '' }
+      return
+    }
+    if (json.type === 'content_block_stop') {
+      const b = blocks[json.index]
+      if (b?.type === 'tool_use') {
+        try { b.input = b._json ? JSON.parse(b._json) : {} } catch { b.input = {} }
+        delete b._json
+      }
+      return
+    }
+    if (json.type === 'message_delta' && json.usage?.output_tokens != null) {
+      usage.completionTokens = json.usage.output_tokens
+    }
+  }
+
+  while (true) {
+    const { done, value } = await reader.read()
+    if (done) break
+    buf += decoder.decode(value, { stream: true })
+    const lines = buf.split('\n')
+    buf = lines.pop()  // 末尾可能是半行，留到下一轮
+    for (const l of lines) handleLine(l)
+  }
+  if (buf) handleLine(buf)
+
+  return { content: blocks.filter(Boolean), usage }
 }
 
 async function streamSSE(resp, parseLine, onChunk, extractUsage) {
