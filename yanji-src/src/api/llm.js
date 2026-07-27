@@ -390,7 +390,10 @@ async function callWithTools({
     if (provider === 'openai') {
       const url = buildApiUrl(connection.baseUrl, 'openai')
       const bodyMsgs = buildOpenAIMessages(convo, systemPrompt, iter === 0 ? dynamicContext : undefined)
-      const body = { model, messages: bodyMsgs }
+      // 流式：非流式请求在模型思考的几十秒里一个字节都不发，中转站/代理会把它
+      // 当空闲连接掐掉——上游照样出字照样计费，前端只看见 Failed to fetch。
+      // （Anthropic 分支同款坑已在 233ac5c 修过，这条是同一个病）
+      const body = { model, messages: bodyMsgs, stream: true, stream_options: { include_usage: true } }
       // 粘性路由键：中转站背后是一堆后端节点，不带这个字段同一个对话可能每轮
       // 落到不同节点上——缓存写在 A 读不到，于是「只写不读」，写还按 1.25 倍收钱。
       // 用每个对话一个稳定 id（不是全局固定），不同对话不互相挤同一个节点。（0726）
@@ -411,7 +414,8 @@ async function callWithTools({
           if (!resp.ok && resp.status === 400) errText = await resp.text()
         }
         if (!resp.ok && resp.status === 400) {
-          delete body.temperature; delete body.max_tokens
+          // stream_options 是后加的，老一点的中转站不认；temperature/max_tokens 同理
+          delete body.stream_options; delete body.temperature; delete body.max_tokens
           body.max_completion_tokens = body.max_completion_tokens || maxTokens
           resp = await fetch(url, { method: 'POST', headers: hdrs, body: JSON.stringify(body) })
           if (!resp.ok) errText = await resp.text()
@@ -419,13 +423,12 @@ async function callWithTools({
         if (!resp.ok) throw new Error('OpenAI ' + resp.status + ': ' + (errText || '').slice(0, 200))
       }
       if (!resp.ok) throw new Error('OpenAI ' + resp.status + ': ' + (await resp.text()).slice(0, 200))
-      const data = await resp.json()
+      const data = await streamOpenAIMessage(resp, (t) => { streamedOut = true; onChunk?.(t) }, onThinking)
       if (data.usage) accUsage(usage, {
-        p: data.usage.prompt_tokens, c: data.usage.completion_tokens,
         // OpenAI 官方: prompt_tokens_details.cached_tokens；DeepSeek: prompt_cache_hit_tokens
-        cached: data.usage.prompt_tokens_details?.cached_tokens ?? data.usage.prompt_cache_hit_tokens,
+        p: data.usage.promptTokens, c: data.usage.completionTokens, cached: data.usage.cachedTokens,
       })
-      const msg = data.choices[0].message
+      const msg = data.message
       if (msg.tool_calls?.length) {
         onToolCall?.(msg.tool_calls.map((t) => t.function.name))
         const aMsg = { role: 'assistant', content: msg.content || '', tool_calls: msg.tool_calls }
@@ -438,7 +441,7 @@ async function callWithTools({
           try {
             args = JSON.parse(tc.function.arguments || '{}')
           } catch (e) {
-            const truncated = data.choices[0].finish_reason === 'length'
+            const truncated = data.finish_reason === 'length'
             convo.push({
               role: 'tool', tool_call_id: tc.id,
               content: `工具参数 JSON 解析失败${truncated ? '（输出被 max_tokens 截断）' : ''}: ${e.message}。请把内容大幅精简后重试，或拆成多个更小的文件。`,
@@ -467,7 +470,7 @@ async function callWithTools({
         }
       }
       finalText = stripFakeToolResult(msg.content || '')
-      if (msg.reasoning_content) onThinking?.(msg.reasoning_content)
+      // reasoning_content 已经在流里边收边吐了，这里不能再整段推一次（会出现两份思考）
       break
     }
 
@@ -693,6 +696,78 @@ async function callStream({ connection, messages, systemPrompt, dynamicContext, 
   }
 
   throw new Error('不支持的 provider: ' + provider)
+}
+
+// OpenAI 流式 + 工具调用：把 SSE 增量还原成 choices[0] 那个形状（message / finish_reason），
+// 工具循环那边不用改判断逻辑。tool_calls 的 arguments 是分片字符串，按 index 攒。
+//
+// 文本要过一道闸：有些中转站模型不走 tool_calls 字段，而是把工具调用 JSON 直接混在
+// 正文里（下游的 extractTextToolCall 就是为它们兜的底）。真吐给 UI 的话，阿颖会先看见
+// 一坨 {"name":...} 再被最终结果换掉。所以碰到 `{"` 开头的疑似 JSON 就把后面的话全扣住
+// 不发——反正气泡最终落的是 finalText，扣住的部分不会丢。
+async function streamOpenAIMessage(resp, onText, onThinking) {
+  const reader = resp.body.getReader()
+  const decoder = new TextDecoder()
+  const msg = { role: 'assistant', content: '' }
+  const toolCalls = []
+  const usage = { promptTokens: 0, completionTokens: 0, cachedTokens: 0 }
+  let finishReason = null
+  let buf = ''
+  let pending = ''   // 还没放行的正文
+  let gated = false  // 撞上疑似 JSON 后就一直扣着
+
+  const flushText = () => {
+    if (gated) return
+    const at = pending.search(/\{\s*"/)
+    if (at === -1) { if (pending) { onText?.(pending); pending = '' } return }
+    if (at > 0) onText?.(pending.slice(0, at))
+    pending = pending.slice(at)
+    gated = true
+  }
+
+  const handleLine = (line) => {
+    if (!line.startsWith('data: ')) return
+    const raw = line.slice(6)
+    if (raw === '[DONE]') return
+    let json
+    try { json = JSON.parse(raw) } catch { return }
+
+    if (json.usage) {
+      usage.promptTokens = json.usage.prompt_tokens || 0
+      usage.completionTokens = json.usage.completion_tokens || 0
+      usage.cachedTokens = json.usage.prompt_tokens_details?.cached_tokens ?? json.usage.prompt_cache_hit_tokens ?? 0
+    }
+    const ch = json.choices?.[0]
+    if (!ch) return
+    if (ch.finish_reason) finishReason = ch.finish_reason
+    const d = ch.delta || {}
+    if (d.reasoning_content) {
+      msg.reasoning_content = (msg.reasoning_content || '') + d.reasoning_content
+      onThinking?.(d.reasoning_content)
+    }
+    if (d.content) { msg.content += d.content; pending += d.content; flushText() }
+    for (const tc of d.tool_calls || []) {
+      const i = tc.index ?? 0
+      const slot = toolCalls[i] || (toolCalls[i] = { id: '', type: 'function', function: { name: '', arguments: '' } })
+      if (tc.id) slot.id = tc.id
+      if (tc.function?.name) slot.function.name += tc.function.name
+      if (tc.function?.arguments) slot.function.arguments += tc.function.arguments
+    }
+  }
+
+  while (true) {
+    const { done, value } = await reader.read()
+    if (done) break
+    buf += decoder.decode(value, { stream: true })
+    const lines = buf.split('\n')
+    buf = lines.pop()
+    for (const l of lines) handleLine(l)
+  }
+  if (buf) handleLine(buf)
+
+  const filled = toolCalls.filter(Boolean)
+  if (filled.length) msg.tool_calls = filled
+  return { message: msg, finish_reason: finishReason, usage }
 }
 
 // Anthropic 流式 + 工具调用：把 SSE 事件还原成一条完整的 message.content 块数组，
