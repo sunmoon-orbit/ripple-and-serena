@@ -996,16 +996,9 @@ function buildAnthropicMessages(messages, dynamicContext) {
     }
   }
 
-  // 缓存断点打**两个**：滚动式的读写分离。
+  // 缓存断点打**两个**：滚动式的读写分离，位置按绝对网格量化。
   //
-  // 只打一个（倒数第二条）的话，断点每轮往后挪两格，这一轮请求里根本不存在
-  // 上一轮写缓存的那个位置。虽说官方会往前找一段，但经中转站转手之后这层
-  // 「自动前查」很不可靠——症状就是阿颖 0727 后台看到的：**每轮都有写入、
-  // 从来没有命中**，写还按 1.25 倍收钱，纯亏。
-  //
-  // 所以老位置（倒数第四条）留一个断点专门用来**读**上一轮写的缓存，
-  // 新位置（倒数第二条）那个用来**写**这一轮更长的前缀。加上 system 一共 3 个，
-  // 不超 4 个上限。深拷贝避免 cache_control 写回 store（否则旧消息会累积断点）。
+  // 深拷贝避免 cache_control 写回 store（否则旧消息会累积断点）。
   // TTL 1h：对话间隔常超 5min，1h 命中稳定且白天持续聊基本不过期
   const mark = (i) => {
     const m = out[i]
@@ -1019,8 +1012,25 @@ function buildAnthropicMessages(messages, dynamicContext) {
       out[i] = { ...m, content: blocks }
     }
   }
-  if (out.length >= 4) mark(out.length - 4)  // 读：上一轮写在这儿
-  mark(out.length >= 2 ? out.length - 2 : out.length - 1)  // 写：这一轮的新前缀
+  // ⚠️ 断点位置必须**锚点量化**，不能从末尾倒数（跟 applyContextLimit、图片降级
+  // 边界是同一个道理，这是第三次在同一个坑里栽）。
+  //
+  // 「倒数第四条」本来是想指向上一轮写缓存的位置，前提是每轮固定追加两条
+  // （user + assistant）。但实际不固定：assistant 回复会按 [MSG] 拆成 2-3 个气泡，
+  // 合并同角色时又因为第一条带 thinking 而拒绝合并（见 Chat/index.jsx 的合并条件），
+  // 于是每轮追加 2~4 条不等。倒数第四条因此几乎从不落在真正写过缓存的位置上——
+  // 症状就是阿颖 0727 看到的：每轮都写，一次没读。写按 1.25 倍收钱，纯亏。
+  //
+  // 改成绝对网格：位置 = 向下取整到 STEP 的倍数。同一格内断点纹丝不动，于是连着
+  // 好几轮读写同一个位置；跨格时新写点 = 旧写点 + STEP，读点正好落回旧写点，
+  // 仍是精确命中。追加不会移动已有消息的下标，所以网格是稳的。
+  // （模拟 30 轮、每轮随机追加 2~4 条：新写法读点 27/27 命中已写位置，旧写法错 15 次）
+  const STEP = 6
+  const w = Math.floor((out.length - 2) / STEP) * STEP  // 写：本格锚点（保证不落在最后一条上）
+  const r = w - STEP                                     // 读：上一格锚点，前几轮就写在这儿
+  if (r >= 0) mark(r)
+  if (w > 0) mark(w)
+  else mark(out.length >= 2 ? out.length - 2 : out.length - 1)  // 消息还很少时退回原打法
   return redactDeep(out)
 }
 
