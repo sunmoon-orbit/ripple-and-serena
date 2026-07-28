@@ -7,7 +7,14 @@
 - 本地 `cd yanji-src && npm run build` 只更新服务器本地的 `yanji/`（即 `memory.ravenlove.cc/...` 那个入口），**阿颖看不到**
 - 改完言叽，**最后一步必须**：`git add yanji-src/ yanji/ && git commit && git push origin main`，GitHub Actions（yanji-build.yml）会重新构建部署
 - 跟阿颖说「做好了」之前，先确认已 push
-- 验证：`curl -s https://sunmoon-orbit.github.io/ripple-and-serena/yanji/index.html | grep -o 'assets/index-[A-Za-z0-9_]*\.js'` 对比本地 build 的 hash 是否一致
+- ⚠️ **验证方法（0727 更正，原来写的是错的）**：GitHub Actions 会在云端**重新构建**，产出的 hash 跟本地 build 的 hash **本来就不一样**，拿两个 hash 对比永远对不上，会误判成「没部署」。
+  正确做法是 **grep 线上压缩包里这次改动特有的字符串**：
+  ```bash
+  U=$(curl -s https://sunmoon-orbit.github.io/ripple-and-serena/yanji/index.html | grep -o 'assets/index-[A-Za-z0-9_-]*\.js')
+  curl -s "https://sunmoon-orbit.github.io/ripple-and-serena/yanji/$U" | grep -c "这次改动里的某个中文串"
+  ```
+  中文串（提示词、UI 文案、注释里的错误信息）压缩后原样保留，是最好的指纹。
+  或者比 `git show origin/main:yanji/index.html` 和线上 index.html —— 那两个才是同源的。
 
 ## 乌鸦贴图工具
 
