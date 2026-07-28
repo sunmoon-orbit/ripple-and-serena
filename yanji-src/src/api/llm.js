@@ -485,7 +485,11 @@ async function callWithTools({
       // 前端拿到的却是 Failed to fetch（0727 阿颖报的「后台有输出但前端报错」）。
       // 流式之后 SSE 一直有事件流过，连接不会被判死，她也能边看边等。
       const body = { model, max_tokens: maxTokens, messages: bodyMsgs, tools: formattedTools, temperature: safeTemp, stream: true }
-      if (cacheKey) body.metadata = { user_id: cacheKey } // 粘性路由，见上面 openai 分支的注释
+      // ⚠️ 这里**绝对不要**加 metadata:{user_id}。openai 分支那个 body.user 是好的，
+      // 但 Anthropic 原生格式的 metadata 会让阿颖用的中转站（goodreamapi）直接 503
+      // 「生成失败，重roll」。0728 服务器实测：不带 metadata 3/3 成功且缓存精确命中，
+      // 带 metadata 3/3 硬失败。它同时解释了「缓存只写不读」（每次重roll换后端节点）、
+      // 偶发 503、以及首字 4 秒后断流。粘性路由的好意在这家中转站上是反效果。
       if (systemPrompt?.trim()) {
         body.system = [{ type: 'text', text: systemPrompt, cache_control: { type: 'ephemeral', ttl: '1h' } }]
       }
@@ -613,7 +617,7 @@ async function callStream({ connection, messages, systemPrompt, dynamicContext, 
     // 3-7 及 4 系列以上（opus-4-8 / sonnet-4-6 / haiku-4-5，未来 opus-5-x 等）都支持 extended thinking
     const isThinkingModel = (model || '').includes('3-7') || /claude-[a-z]+-([4-9]|\d{2,})/.test(model || '')
     const body = { model, max_tokens: maxTokens, messages: bodyMsgs, stream: true }
-    if (cacheKey) body.metadata = { user_id: cacheKey } // 粘性路由
+    // ⚠️ 同上：Anthropic 原生格式禁止加 metadata:{user_id}，中转站会 503（0728 实测）
     if (systemPrompt?.trim()) {
       body.system = [{ type: 'text', text: systemPrompt, cache_control: { type: 'ephemeral', ttl: '1h' } }]
     }
