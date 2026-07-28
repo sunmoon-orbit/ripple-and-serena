@@ -79,6 +79,11 @@ function stripCallTag(t) {
   return (t || '').replace(/\[call:[^\]]+\]/gi, '').trimEnd()
 }
 
+// 流被中途掐断的错误特征。⚠️ Chrome 里 `TypeError: network error` 和 `Failed to fetch`
+// 不是一回事：前者是响应体读到一半断了（上游已经在生成、也已经计费），后者是压根没连上。
+// 两种都值得自动重试一次，因为上一次请求已经把缓存写好了，重试是读缓存，几乎不要钱。
+const MID_STREAM_CUT_RE = /network ?error|failed to fetch|load failed|connection closed|terminated|ECONNRESET/i
+
 // 双语通话（阿颖 2026-07-14 提议）：她说中文、涟言用英文回（英文嗓音更好听），
 // 字幕给英文原文+中文翻译。藏在 injected 字段随通话消息下发，挂断后自然失效。
 // ⚠️[译:] 是新方括号标签，已同步进 TTS 清洗（VoiceCall.stripForTts + MessageBubble.playTts，0709 规矩）
@@ -157,7 +162,11 @@ export default function Chat() {
 
   // ── Generate ─────────────────────────────────────────────────────────────
   // 真正调模型生成回复：handleSend 秒回路径直接调；延迟回复到点后由 ticker 调
-  const generateReply = useCallback(async (chat, conn, { titleText, hidden, voicemail } = {}) => {
+  // 断线自动重试要在 catch 里回调自己，用 ref 拿最新的那份（直接引用 const 会被 eslint
+  // 的 exhaustive-deps 追着跑，也容易在依赖变化时抓到旧闭包）
+  const generateReplyRef = useRef(null)
+
+  const generateReply = useCallback(async (chat, conn, { titleText, hidden, voicemail, retried } = {}) => {
     // Add placeholder assistant message（voicemail=未接来电转的语音留言，气泡默认以语音条形态出现）
     const assistantId = uuid()
     addMessage(chat.id, { id: assistantId, role: 'assistant', content: '', streaming: true, voicemail: voicemail || undefined })
@@ -490,6 +499,25 @@ export default function Chat() {
           interrupted: true,
           toolCalls: undefined,
         })
+      } else if (MID_STREAM_CUT_RE.test(e.message || '') && !retried && !hidden) {
+        // 一个字都没出来就断线：上游其实已经在生成（钱也已经计了），是连接被中途掐断。
+        // 自动重试一次——刚才那次请求已经把缓存写进去了（阿颖 0728 的截图：写入 16511 tokens），
+        // 重试正好命中读缓存，几乎不要钱，比让她看一个光秃秃的 [错误] 再手动重发划算。
+        // 只重一次，避免上游真挂了的时候无限烧钱。
+        removeLastEmptyAssistant(chat.id)
+        setStatus('断线了，正在重试…')
+        await new Promise((r) => setTimeout(r, 800))
+        return generateReplyRef.current?.(chat, conn, { titleText, hidden, voicemail, retried: true })
+      } else if (fullThinking && !hidden) {
+        // 重试也没成/或不是断线：正文虽然空，但思考已经出来了（钱花在这儿了）。
+        // 留下来给她看，别只剩一个 [错误]（0728 阿颖：输出 1302 tokens 全在思考里）。
+        updateMessage(chat.id, assistantId, {
+          content: '（这轮的话还没说出口就断了，思考留在上面）',
+          thinking: fullThinking,
+          streaming: false,
+          interrupted: true,
+          toolCalls: undefined,
+        })
       } else {
         removeLastEmptyAssistant(chat.id)
       }
@@ -522,6 +550,7 @@ export default function Chat() {
     }
   }, [connections, globalInstruction, memoryItems,
       generationConfig, searchConfig, moonMemory, autoTools, customStickers])
+  generateReplyRef.current = generateReply
 
   // ── Send ─────────────────────────────────────────────────────────────────
   const handleSend = useCallback(async (text, images, opts = {}) => {
