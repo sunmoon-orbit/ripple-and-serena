@@ -84,6 +84,26 @@ class MainActivity : AppCompatActivity() {
                 pendingJs.clear()
             }
 
+            // 断网兜底（0729 加）。在这之前连不上就是**一片白屏**，看不出是没网、
+            // 服务器挂了、还是 app 坏了。
+            // ⚠️ 只认主文档失败：isForMainFrame 不判的话，随便一张图片 404 都会
+            // 把整个页面顶掉，正常用着用着就跳到「连不上」去了。
+            override fun onReceivedError(
+                view: WebView?, request: WebResourceRequest?, error: WebResourceError?
+            ) {
+                super.onReceivedError(view, request, error)
+                if (request?.isForMainFrame != true) return
+                showOffline(error?.description?.toString())
+            }
+
+            override fun onReceivedHttpError(
+                view: WebView?, request: WebResourceRequest?, response: WebResourceResponse?
+            ) {
+                super.onReceivedHttpError(view, request, response)
+                if (request?.isForMainFrame != true) return
+                showOffline("HTTP ${response?.statusCode}")
+            }
+
             override fun shouldOverrideUrlLoading(view: WebView?, request: WebResourceRequest?): Boolean {
                 val url = request?.url?.toString() ?: return false
                 if (url.startsWith("https://sunmoon-orbit.github.io/") ||
@@ -195,6 +215,9 @@ class MainActivity : AppCompatActivity() {
         handleCallAction(intent)
         handleShareIntent(intent)
         handleQuickReply(intent)
+
+        // 全屏来电权限（安卓14+）。延后 3 秒：先让她看到 app 起来，别一点图标就被踹进设置页
+        webView.postDelayed({ promptFullScreenIntentPermission() }, 3000)
     }
 
     override fun onNewIntent(intent: Intent) {
@@ -262,10 +285,51 @@ class MainActivity : AppCompatActivity() {
         callWeb("__yanjiQuickReply", text)
     }
 
+    private fun showOffline(detail: String?) {
+        val hash = if (detail.isNullOrBlank()) "" else "#" + Uri.encode(detail)
+        webView.loadUrl("file:///android_asset/offline.html$hash")
+    }
+
+    // 来电：answer=她按了接听（收掉通知）；incoming=全屏 intent 把 app 拉起来了。
+    // ⚠️ 光有 setFullScreenIntent 不够：Activity 默认起在锁屏**后面**，屏幕也不会亮。
+    // showWhenLocked + turnScreenOn 这两下才是「屏幕黑着突然整屏亮起来」的真正来源。
     private fun handleCallAction(intent: Intent?) {
-        if (intent?.getStringExtra("call_action") == "answer") {
+        val action = intent?.getStringExtra("call_action") ?: return
+        if (action == "answer") {
             (getSystemService(NOTIFICATION_SERVICE) as android.app.NotificationManager)
                 .cancel(YanjiFCMService.CALL_NOTIFICATION_ID)
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
+            setShowWhenLocked(true)
+            setTurnScreenOn(true)
+            // 没设密码锁的话顺手把锁屏收掉；有密码锁的系统会忽略这句，她解锁后才进来
+            (getSystemService(KEYGUARD_SERVICE) as android.app.KeyguardManager)
+                .requestDismissKeyguard(this, null)
+        }
+        intent.removeExtra("call_action")   // 别让转屏/重建时再亮一次屏
+    }
+
+    // 安卓 14 起「全屏通知」是单独一项权限，只有系统认定的通话/闹钟类 app 默认给，
+    // 我们这种侧载的 app 装上就是**关的**——而且关着的时候 setFullScreenIntent 会
+    // **静默降级成普通横幅**，不报错。所以必须主动check并把她送到那一页去开。
+    private fun promptFullScreenIntentPermission() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.UPSIDE_DOWN_CAKE) return
+        val nm = getSystemService(NOTIFICATION_SERVICE) as android.app.NotificationManager
+        if (nm.canUseFullScreenIntent()) return
+
+        Toast.makeText(this, "涟言来电还不能在锁屏弹出：设置 → 应用 → 言叽 → 全屏通知", Toast.LENGTH_LONG).show()
+
+        // 每次启动都提醒（Toast 便宜），但只主动跳一次设置页，免得天天弹她一脸
+        val prefs = getSharedPreferences("yanji_fsi", Context.MODE_PRIVATE)
+        if (prefs.getBoolean("jumped", false)) return
+        prefs.edit().putBoolean("jumped", true).apply()
+        try {
+            startActivity(Intent(
+                android.provider.Settings.ACTION_MANAGE_APP_USE_FULL_SCREEN_INTENT,
+                Uri.parse("package:$packageName")
+            ))
+        } catch (_: Exception) {
+            // 部分国产 ROM 没有这个设置页，跳不过去就算了，Toast 已经说清楚路径
         }
     }
 

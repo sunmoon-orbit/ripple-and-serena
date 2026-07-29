@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<!--
+  断网兜底页（0729 加）。在这之前服务器一挂、或手机没网，言叽点开就是一片白屏——
+  分不清是断网、服务器炸了、还是 app 坏了。这页只做一件事：把「连不上」说出来。
+  ⚠️ 打包在 apk 里，所以它自己不依赖任何网络资源（没有外链字体/图片/CDN）。
+-->
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>言叽</title>
+<style>
+  :root { color-scheme: light; }
+  html, body { height: 100%; margin: 0; }
+  body {
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    gap: 18px; padding: 32px;
+    background: #F4F2FA; color: #7B6FA2;
+    font-family: system-ui, -apple-system, "PingFang SC", "Noto Sans CJK SC", sans-serif;
+    text-align: center;
+  }
+  .bird { font-size: 44px; line-height: 1; }
+  h1 { font-size: 19px; font-weight: 600; margin: 0; }
+  p  { font-size: 14px; line-height: 1.7; margin: 0; opacity: .72; max-width: 19em; }
+  button {
+    margin-top: 6px; padding: 11px 30px;
+    font-size: 15px; font-family: inherit; color: #fff;
+    background: #7B6FA2; border: 0; border-radius: 999px;
+  }
+  button:active { opacity: .75; }
+  .hint { font-size: 12px; opacity: .5; }
+</style>
+</head>
+<body>
+  <div class="bird">🐦‍⬛</div>
+  <h1>连不上言叽</h1>
+  <p>可能是手机没网，也可能是服务器暂时不在。<br>不是你的对话丢了——那些都还在本机存着。</p>
+  <button id="retry">重新连接</button>
+  <p class="hint" id="detail"></p>
+
+<script>
+  var URL_ = 'https://sunmoon-orbit.github.io/ripple-and-serena/yanji/';
+  document.getElementById('retry').addEventListener('click', function () {
+    location.href = URL_;
+  });
+  // 原生层把失败原因塞在 hash 里（?e=... 会被当成 URL 的一部分丢掉，用 hash 稳）
+  var e = decodeURIComponent((location.hash || '').slice(1));
+  if (e) document.getElementById('detail').textContent = e;
+</script>
+</body>
+</html>

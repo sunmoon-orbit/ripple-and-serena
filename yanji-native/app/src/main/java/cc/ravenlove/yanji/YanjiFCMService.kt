@@ -81,6 +81,18 @@ class YanjiFCMService : FirebaseMessagingService() {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
+        // 全屏来电（0729 加）：锁屏时把整个界面拉起来，微信语音来电那种效果。
+        // ⚠️ 这里**不能复用 answerIntent**——它带 call_action=answer，屏幕一亮就等于自动接听了。
+        // 单开一个 incoming：只负责把 app 拉到前台，响铃卡片由前端自己弹（它本来就在轮询 invite）。
+        val fullScreenIntent = PendingIntent.getActivity(
+            this, 3,
+            Intent(this, MainActivity::class.java).apply {
+                flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
+                putExtra("call_action", "incoming")
+            },
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+
         val notification = NotificationCompat.Builder(this, CHANNEL_CALL)
             .setSmallIcon(android.R.drawable.ic_menu_call)
             .setContentTitle(title)
@@ -90,6 +102,9 @@ class YanjiFCMService : FirebaseMessagingService() {
             .setAutoCancel(true)
             .setTimeoutAfter(90_000)
             .setContentIntent(answerIntent)
+            // 第二个参数 true = 高优先级，允许打断当前界面/点亮锁屏。
+            // 系统在「屏幕锁着或息屏」时走全屏，「正在用手机」时自动降级成横幅——不会抢她正在做的事。
+            .setFullScreenIntent(fullScreenIntent, true)
             .addAction(android.R.drawable.ic_menu_call, "接听", answerIntent)
             .addAction(android.R.drawable.ic_menu_close_clear_cancel, "挂断", declineIntent)
             .setPriority(NotificationCompat.PRIORITY_MAX)
