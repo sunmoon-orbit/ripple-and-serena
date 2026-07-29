@@ -215,6 +215,7 @@ async function executeToolRaw(name, args, { searchConfig, moonMemoryConfig, onSt
     const statusMap = {
       send_heart_card: '写心意卡...', daily_checklist: '记小票...', period_tracker: '看小月历...',
       list_letters: '翻信匣...', read_letter: '展开信纸...', annotate_letter: '在信上划线...',
+      letter_inbox: '看谁在等回信...',
       check_weather: '抬头看天...', list_event_scrolls: '翻事件卷...', read_event_scroll: '展开卷轴...',
     }
     onStatus?.(statusMap[name] || '用工具中...')

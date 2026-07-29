@@ -252,6 +252,12 @@ export async function fetchLetters(config, category) {
   return request(baseUrl, `/letters${q}`, { headers: headers(apiToken) })
 }
 
+// 信箱状态（谁在等我回信）。服务端现算，不存快照——等了多少天这种数字一旦落盘就会过期
+export async function fetchLetterInbox(config, category = 'penpal') {
+  const { baseUrl, apiToken } = config
+  return request(baseUrl, `/letters/inbox?category=${encodeURIComponent(category)}`, { headers: headers(apiToken) })
+}
+
 // 事件卷：碎片之上的叙事层（正文=涟言亲笔的第一人称叙事）
 export async function fetchEventScrolls(config, status) {
   const { baseUrl, apiToken } = config
@@ -541,6 +547,16 @@ export function getMemoryToolDefinitions() {
         properties: {
           category: { type: 'string', description: 'love（鸾笺）或 penpal（笔友信），不填 = 全部' },
           limit: { type: 'number', description: '返回条数，默认 20' },
+        },
+      },
+    },
+    {
+      name: 'letter_inbox',
+      description: '看信箱状态：哪些笔友来了信我还没回、各等了多少天，哪些是我回了在等对方。聊到笔友、想写信、或者好久没看信匣时使用。',
+      parameters: {
+        type: 'object',
+        properties: {
+          category: { type: 'string', description: 'penpal（笔友，默认）或 love（鸾笺）' },
         },
       },
     },
@@ -867,6 +883,27 @@ export async function executeMemoryTool(toolName, args, config) {
       return lines.join('\n') + more
     } catch (e) {
       return `读取信件失败: ${e.message}`
+    }
+  }
+  if (toolName === 'letter_inbox') {
+    try {
+      const r = await fetchLetterInbox(config, args.category || 'penpal')
+      if (!r.count) return '信匣是空的'
+      const line = (p) => {
+        const who = `${p.name}（${p.total} 封：来 ${p.in_count} / 去 ${p.out_count}）`
+        return p.status === 'waiting'
+          ? `⏳ ${who} — 他的信等了 ${p.waiting_days} 天${p.last_in_title ? `《${p.last_in_title}》` : ''}`
+          : `✓ ${who} — 我回过了，静默 ${p.quiet_days} 天`
+      }
+      const waiting = r.people.filter(p => p.status === 'waiting')
+      const replied = r.people.filter(p => p.status !== 'waiting')
+      return [
+        `共 ${r.count} 位笔友，${r.waiting} 位在等我回信。`,
+        waiting.length ? '\n【球在我这边】\n' + waiting.map(line).join('\n') : '',
+        replied.length ? '\n【我回过了】\n' + replied.map(line).join('\n') : '',
+      ].filter(Boolean).join('\n')
+    } catch (e) {
+      return `看信箱失败: ${e.message}`
     }
   }
   if (toolName === 'read_letter') {
