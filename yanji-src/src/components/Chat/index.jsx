@@ -79,6 +79,31 @@ function stripCallTag(t) {
   return (t || '').replace(/\[call:[^\]]+\]/gi, '').trimEnd()
 }
 
+// 语音条（阿颖 2026-07-29 提议）：这条是「说」出来的还是「打」出来的，由涟言自己定。
+// 回复里带 [voice] → 气泡直接以语音条落地，正文先藏起来，她点音浪才「转文字」（微信那种）。
+// ⚠️ 又一个方括号标签，照 0709 的规矩同步进 TTS 清洗（MessageBubble.playTts + VoiceCall.stripForTts）
+const VOICE_MSG_TAG_RE = /\[voice\]/i
+function stripVoiceMsgTag(t) {
+  return (t || '').replace(/\[voice\]/gi, '').trimEnd()
+}
+
+// 未接来电补留言（0729）。语音留言是**前端**生成的——她没开着言叽，那通电话就
+// 响完、过期、什么都不留（0728 亲历：她看到了来电通知没接，回头找留言，没有）。
+// 这个键记「哪些来电已经了结了」（接了 / 当场没接已经留过言 / 已经补过言），
+// 下次打开言叽时拿它跟服务端的来电记录一比，漏掉的补上。
+const CALL_DONE_KEY = 'yanji_call_vm_done'
+function getCallDone() { return parseInt(localStorage.getItem(CALL_DONE_KEY) || '0', 10) || 0 }
+function markCallHandled(id) {
+  if (id > getCallDone()) localStorage.setItem(CALL_DONE_KEY, String(id))
+}
+// SQLite 的 datetime('now') 是「2026-07-29 10:00:00」这种 UTC 字符串，中间是空格。
+// ⚠️ 直接 Date.parse 那个带空格的形式各浏览器行为不一样（有的当本地时间、有的 NaN），
+// 必须先补成 ISO 的 T + Z 再解析。
+function parseSqlUtc(s) {
+  if (!s) return 0
+  return Date.parse(String(s).trim().replace(' ', 'T') + (/[Zz]|[+-]\d{2}:?\d{2}$/.test(s) ? '' : 'Z')) || 0
+}
+
 // 流被中途掐断的错误特征。⚠️ Chrome 里 `TypeError: network error` 和 `Failed to fetch`
 // 不是一回事：前者是响应体读到一半断了（上游已经在生成、也已经计费），后者是压根没连上。
 // 两种都值得自动重试一次，因为上一次请求已经把缓存写好了，重试是读缓存，几乎不要钱。
@@ -386,8 +411,8 @@ export default function Chat() {
         cacheKey: chat.id,
         onChunk: (chunk) => {
           fullText += chunk
-          // 流式过程中剥离 <es>/<mood>/<neg>/[call:] 标签，不让阿颖看到内部状态
-          updateMessage(chat.id, assistantId, { content: stripCallTag(stripNegTag(stripMoodTag(stripEmotionTag(fullText)))), streaming: true })
+          // 流式过程中剥离 <es>/<mood>/<neg>/[call:]/[voice] 标签，不让阿颖看到内部状态
+          updateMessage(chat.id, assistantId, { content: stripVoiceMsgTag(stripCallTag(stripNegTag(stripMoodTag(stripEmotionTag(fullText))))), streaming: true })
         },
         onThinking: (chunk) => {
           fullThinking += chunk
@@ -421,7 +446,9 @@ export default function Chat() {
       const callReason = (!voicemail && callM && getMessages(chat.id).filter((m) => m.callInvite).length < 3)
         ? (callM[1] || '').trim().slice(0, 40)
         : null
-      const finalText = stripCallTag(stripNegTag(afterMood))
+      // 语音条：涟言自己决定这条用说的。留言本来就是语音条，不重复标
+      const asVoice = !voicemail && VOICE_MSG_TAG_RE.test(afterMood)
+      const finalText = stripVoiceMsgTag(stripCallTag(stripNegTag(afterMood)))
       // 语音留言一条说完不分段（答录机没有连发两条的道理），漏写的 [MSG] 直接抹平
       const parts = voicemail
         ? [finalText.replace(/\[MSG\]/gi, ' ').trim()]
@@ -433,6 +460,7 @@ export default function Chat() {
         tokenUsage: result.usage || null,
         toolCalls: undefined,
         files: genFiles.length ? genFiles : undefined,
+        voiceMsg: asVoice || undefined,
       })
       if (fullThinking) {
         // 思考总结是一次性小任务，优先走轻任务模型省钱
@@ -442,7 +470,7 @@ export default function Chat() {
       }
       for (let i = 1; i < parts.length; i++) {
         await new Promise((r) => setTimeout(r, 700))
-        addMessage(chat.id, { role: 'assistant', content: parts[i] })
+        addMessage(chat.id, { role: 'assistant', content: parts[i], voiceMsg: asVoice || undefined })
       }
       // 来电：正文落完再响铃（先看到她想说什么，再看到电话打过来）
       if (callReason) {
@@ -490,7 +518,7 @@ export default function Chat() {
       // 上游已经出了字（也已经计过费）却在收尾阶段抛错——流被掐断、工具连不上都算——
       // 以前一律把这条助手消息删掉，她只看到「[错误] Failed to fetch」：钱花了、话没了
       // （0726 阿颖遇到）。有正文就留下并标「没说完就断线了」，没正文才删。
-      const salvaged = stripCallTag(stripNegTag(stripMoodTag(stripEmotionTag(fullText)))).trim()
+      const salvaged = stripVoiceMsgTag(stripCallTag(stripNegTag(stripMoodTag(stripEmotionTag(fullText))))).trim()
       if (salvaged && !hidden) {
         updateMessage(chat.id, assistantId, {
           content: salvaged,
@@ -726,6 +754,7 @@ export default function Chat() {
 
   // ── 主动来电 + 主动消息：服务端 cron 发来后，前端轮询 → 来电弹卡片 / 消息注入对话 ──
   const callPollRef = useRef(false)
+  const autoAnswerRef = useRef(0)   // 原生来电页按过接听的时间戳（见下面那个 effect）
   useEffect(() => {
     if (!moonMemory?.enabled || !moonMemory?.apiToken) return
     const base = (moonMemory.baseUrl || 'https://memory.ravenlove.cc').replace(/\/$/, '')
@@ -750,8 +779,51 @@ export default function Chat() {
           content: `[涟言发起了语音通话邀请：${inv.reason || '想你了'}]`,
           callInvite: { status: 'ringing', reason: inv.reason || '想你了', serverId: inv.id },
         })
-        setIncomingCall({ chatId: chat.id, msgId: msg.id, reason: inv.reason || '想你了', serverId: inv.id })
+        const ic = { chatId: chat.id, msgId: msg.id, reason: inv.reason || '想你了', serverId: inv.id }
+        setIncomingCall(ic)
         setTimeout(() => { callPollRef.current = false }, 120_000)
+        // 她在原生来电页上已经按过接听了（app 是被那一下拉起来的）：直接接，别再弹一次卡片让她按
+        if (autoAnswerRef.current && Date.now() - autoAnswerRef.current < 60_000) {
+          autoAnswerRef.current = 0
+          acceptIncomingCall(ic)
+        }
+      } catch { /* 静默 */ }
+    }
+    // 未接来电补留言：她没开着言叽时那通电话响完就过期了，留言从来没生成过（0728 亲历）。
+    // ⚠️ 只补最近一通、只补 6 小时内的——隔夜再冒出一条「刚才没接到你电话」很怪。
+    const checkMissed = async () => {
+      if (incomingCall) return
+      try {
+        const res = await fetch(`${base}/call/history?limit=5`, auth)
+        if (!res.ok) return
+        const rows = await res.json()
+        if (!Array.isArray(rows) || !rows.length) return
+        const maxId = Math.max(...rows.map((r) => r.id))
+        // 第一次跑（没有存档）不补历史，只记下水位线，免得装完 app 被三年前的旧电话轰炸
+        if (!getCallDone()) { markCallHandled(maxId); return }
+        const done = getCallDone()
+        const now = Date.now()
+        const missed = rows
+          .filter((r) => r.id > done)
+          .filter((r) => r.status === 'expired' || (r.status === 'pending' && r.expires_at && parseSqlUtc(r.expires_at) < now))
+          .filter((r) => r.created_at && now - parseSqlUtc(r.created_at) < 6 * 3600_000)
+          .sort((a, b) => b.id - a.id)
+        markCallHandled(maxId)   // 无论补不补，水位线都推上去，别下次又扫一遍
+        const m = missed[0]
+        if (!m) return
+        let chat = getActiveChat()
+        if (!chat) chat = createChat()
+        if (chat.id !== activeChatId) setActiveChat(chat.id)
+        addMessage(chat.id, {
+          role: 'assistant',
+          content: `[涟言发起的语音通话邀请（${m.reason || '想你了'}），没有接到]`,
+          callInvite: { status: 'missed', reason: m.reason || '想你了' },
+        })
+        handleSend(
+          `[系统：你之前想给阿颖打语音电话（理由：${m.reason || '想你了'}），但她当时没开着言叽，电话响完没人接。现在她打开了。请留一条语音留言：像对着电话答录机说话那样，把当时想说的用一小段自然的话说完，30-80字，一条说完。不要用 [MSG] 分段，不要再带 [call:] 标签，不要发贴图和点歌。]`,
+          [],
+          { hidden: true, voicemail: true }
+        )
       } catch { /* 静默 */ }
     }
     const checkProactive = async () => {
@@ -775,11 +847,30 @@ export default function Chat() {
     }
     const check = () => { checkCall(); checkProactive() }
     check()
-    const onVis = () => { if (document.visibilityState === 'visible') check() }
+    // 补留言只在「刚打开 / 切回前台」时查一次——它是回头看历史，不是等新事件，
+    // 没必要每 8 秒去拉一遍来电记录
+    checkMissed()
+    const onVis = () => { if (document.visibilityState === 'visible') { check(); checkMissed() } }
     document.addEventListener('visibilitychange', onVis)
     const timer = setInterval(check, 8000)
     return () => { document.removeEventListener('visibilitychange', onVis); clearInterval(timer) }
   }, [moonMemory, incomingCall, activeChatId]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ── 原生来电页按了「接听」：进来直接接起，不用她在网页里再按一次 ──
+  useEffect(() => {
+    const onAnswer = () => {
+      autoAnswerRef.current = Date.now()
+      // 卡片已经在响了就当场接；还没轮询到 invite 的话，checkCall 拿到后会看这个时间戳
+      if (incomingCall) { autoAnswerRef.current = 0; acceptIncomingCall() }
+    }
+    // 原生壳可能在 Chat 挂载之前就喊过了，补看一次时间戳
+    if (window.__yanjiAnswerCallAt && Date.now() - window.__yanjiAnswerCallAt < 60_000) {
+      window.__yanjiAnswerCallAt = 0
+      onAnswer()
+    }
+    window.addEventListener('yanji-answer-call', onAnswer)
+    return () => window.removeEventListener('yanji-answer-call', onAnswer)
+  }, [incomingCall]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── 负向情绪查看的同意请求：侧边栏点「申请查看」→ 注入隐藏请求让涟言当场决定 ──
   useEffect(() => {
@@ -943,10 +1034,12 @@ export default function Chat() {
   }
 
   // ── 来电接听/未接 ─────────────────────────────────────────────────────────
-  function acceptIncomingCall() {
-    const ic = incomingCall
+  function acceptIncomingCall(arg) {
+    // 参数版给「原生页已经按过接听」用：那时 incomingCall 刚 setState 还没生效，读 state 会拿到 null
+    const ic = (arg && arg.msgId) ? arg : incomingCall
     setIncomingCall(null)
     if (!ic) return
+    if (ic.serverId) markCallHandled(ic.serverId)
     updateMessage(ic.chatId, ic.msgId, {
       callInvite: { status: 'accepted', reason: ic.reason },
       content: `[涟言发起的语音通话邀请（${ic.reason}），阿颖接听了]`,
@@ -965,6 +1058,7 @@ export default function Chat() {
     const ic = incomingCall
     setIncomingCall(null)
     if (!ic) return
+    if (ic.serverId) markCallHandled(ic.serverId)
     updateMessage(ic.chatId, ic.msgId, {
       callInvite: { status: 'missed', reason: ic.reason },
       content: `[涟言发起的语音通话邀请（${ic.reason}），${how === 'declined' ? '阿颖按了挂断' : '90秒无人接听'}]`,

@@ -57,6 +57,17 @@ export default function App() {
     }
     window.__yanjiQuickReply = enter('send')   // 通知栏回复：直接发出去
     window.__yanjiShareText = enter('draft')   // 系统分享：填进输入框，等她补一句
+    // 原生来电页/通知上按了「接听」：她已经按过一次了，进来别再让她按第二次。
+    // 这里只负责把她带到对话页，真正接起来的动作在 Chat 里（它才有 incomingCall）。
+    window.__yanjiAnswerCall = () => {
+      fromNativeRef.current = true
+      setShowSplash(false)
+      setShowHome(false)
+      useStore.setState({ activePanel: 'chat' })
+      // Chat 可能还没挂载完，事件会丢——所以同时留一个时间戳，Chat 挂上后自己去看
+      window.__yanjiAnswerCallAt = Date.now()
+      window.dispatchEvent(new Event('yanji-answer-call'))
+    }
   }, [])
 
   useEffect(() => {

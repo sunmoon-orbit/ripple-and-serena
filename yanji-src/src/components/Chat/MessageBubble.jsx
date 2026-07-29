@@ -370,7 +370,14 @@ export default function MessageBubble({ msg, onEdit, onQuote, onDelete, isLast }
   const [editing, setEditing] = useState(false)
   const [replyDlUrl, setReplyDlUrl] = useState(null)
   const [ttsState, setTtsState] = useState('idle') // idle | loading | playing
-  const [voiceMode, setVoiceMode] = useState(!!msg.voicemail) // 语音条模式：正文隐藏，显示音浪；语音留言默认就是语音条
+  // 语音条模式：正文隐藏，显示音浪。语音留言、以及涟言自己决定「用说的」那条（[voice] 标签），
+  // 一落地就是语音条。
+  const isVoiceMsg = !!msg.voicemail || !!msg.voiceMsg
+  const [voiceMode, setVoiceMode] = useState(isVoiceMsg)
+  // 转文字（微信那种：点一下音浪，文字在语音条**下面**展开，而不是把语音条换掉）。
+  // ⚠️ 这里不需要真的做语音识别——正文本来就在 msg.content 里，"转"只是把它显出来。
+  // 那 350ms 的「转文字中」纯粹是手感：瞬间蹦出来反而不像转出来的。
+  const [transcript, setTranscript] = useState('idle') // idle | loading | done
   const [ttsDuration, setTtsDuration] = useState(0)
   const audioRef = useRef(null) // 缓存的 Audio，重播不再重新合成
 
@@ -398,6 +405,7 @@ export default function MessageBubble({ msg, onEdit, onQuote, onDelete, isLast }
           .replace(/\[music:[^\]]+\]/g, '')          // 点歌标签不朗读
           .replace(/\[sticker:[^\]]+\]/g, '')        // 贴图标签不朗读（否则被念成 sticker:文件名）
           .replace(/\[call:[^\]]+\]/gi, '')          // 来电标签不朗读（0709 教训：新方括号标签同步进清洗）
+          .replace(/\[voice\]/gi, '')                // 语音条标签不朗读（0729，同上条规矩）
           .replace(/\[译[:：][\s\S]*?\]/g, '')       // 双语翻译标签不朗读（嘴上只念英文，翻译是给眼睛的）
           .replace(/\[MSG\]/gi, ' ')                 // 漏拆的分段符不朗读（否则被念成英文 MSG）
           .replace(VOICE_TAG_RE, (m, t) => (t.toLowerCase() === 'laughter' ? '(laughs)' : '(breath)'))
@@ -429,11 +437,19 @@ export default function MessageBubble({ msg, onEdit, onQuote, onDelete, isLast }
     }
   }, [msg.content, moonMemory, ttsState, stopTts])
 
-  // 点音浪区：退出语音条，切回文字
+  // 点音浪区。两种消息两种行为，是有意的：
+  // - 本来就是语音的（留言 / 涟言用说的）→ 没有「原文视图」可回，就在下面展开转文字
+  // - 只是她点了朗读的文字消息 → 切回文字本体（老行为）
   const exitVoiceMode = useCallback(() => {
+    if (isVoiceMsg) {
+      if (transcript !== 'idle') { setTranscript('idle'); return }
+      setTranscript('loading')
+      setTimeout(() => setTranscript('done'), 350)
+      return
+    }
     stopTts()
     setVoiceMode(false)
-  }, [stopTts])
+  }, [stopTts, isVoiceMsg, transcript])
 
   const fmtDur = (s) => `${Math.floor(s / 60)}:${String(Math.round(s % 60)).padStart(2, '0')}`
   const [editText, setEditText] = useState(msg.content)
@@ -572,21 +588,31 @@ export default function MessageBubble({ msg, onEdit, onQuote, onDelete, isLast }
               </span>
             </div>
           ) : voiceMode ? (
-            <div className={`voice-bar${ttsState === 'playing' ? ' playing' : ''}${msg.voicemail ? ' vb-voicemail' : ''}`}>
-              <button className="vb-play" onClick={playTts} aria-label={ttsState === 'playing' ? '暂停' : '播放'}>
-                {ttsState === 'loading' ? (
-                  <svg viewBox="0 0 24 24" width="12" height="12" fill="currentColor"><circle cx="4" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="20" cy="12" r="2"/></svg>
-                ) : ttsState === 'playing' ? (
-                  <svg viewBox="0 0 24 24" width="12" height="12" fill="currentColor"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>
-                ) : (
-                  <svg viewBox="0 0 24 24" width="12" height="12" fill="currentColor"><polygon points="5,3 19,12 5,21"/></svg>
-                )}
-              </button>
-              <div className="vb-wave" onClick={exitVoiceMode} title="点击切回文字">
-                {Array.from({ length: 8 }).map((_, i) => <div key={i} className="vb-bar" />)}
+            <div className="vb-wrap">
+              <div className={`voice-bar${ttsState === 'playing' ? ' playing' : ''}${msg.voicemail ? ' vb-voicemail' : ''}`}>
+                <button className="vb-play" onClick={playTts} aria-label={ttsState === 'playing' ? '暂停' : '播放'}>
+                  {ttsState === 'loading' ? (
+                    <svg viewBox="0 0 24 24" width="12" height="12" fill="currentColor"><circle cx="4" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="20" cy="12" r="2"/></svg>
+                  ) : ttsState === 'playing' ? (
+                    <svg viewBox="0 0 24 24" width="12" height="12" fill="currentColor"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>
+                  ) : (
+                    <svg viewBox="0 0 24 24" width="12" height="12" fill="currentColor"><polygon points="5,3 19,12 5,21"/></svg>
+                  )}
+                </button>
+                <div
+                  className="vb-wave"
+                  onClick={exitVoiceMode}
+                  title={isVoiceMsg ? (transcript === 'idle' ? '点击转文字' : '点击收起文字') : '点击切回文字'}
+                >
+                  {Array.from({ length: 8 }).map((_, i) => <div key={i} className="vb-bar" />)}
+                </div>
+                <span className="vb-time">{ttsDuration ? fmtDur(ttsDuration) : '…'}</span>
+                {msg.voicemail && <span className="vb-vm-label">留言</span>}
               </div>
-              <span className="vb-time">{ttsDuration ? fmtDur(ttsDuration) : '…'}</span>
-              {msg.voicemail && <span className="vb-vm-label">留言</span>}
+              {transcript === 'loading' && <div className="vb-transcript vb-tr-loading">转文字中…</div>}
+              {transcript === 'done' && (
+                <div className="vb-transcript">{renderAssistantContent(msg.content, false, false)}</div>
+              )}
             </div>
           ) : (
             renderAssistantContent(msg.content, isStreaming, textReveal !== false && (isStreaming || freshRevealRef.current))

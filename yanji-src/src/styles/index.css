@@ -2508,6 +2508,17 @@ textarea.form-input { display: block; margin: 8px 16px 12px; }
 @keyframes vb-bounce { 0%,100% { transform: scaleY(.4) } 50% { transform: scaleY(1) } }
 .vb-time { font-size: 11px; color: var(--text-muted); flex-shrink: 0; min-width: 24px; text-align: right; }
 
+/* 转文字（0729）：微信那种——文字在语音条**下面**展开，语音条留在原地 */
+.vb-wrap { display: flex; flex-direction: column; gap: 8px; }
+.vb-transcript {
+  font-size: 14px; line-height: 1.6;
+  padding-top: 8px; border-top: 1px dashed var(--border);
+  animation: vb-tr-in .22s ease;
+}
+.vb-tr-loading { color: var(--text-muted); font-size: 12.5px; animation: vb-tr-blink 1s ease-in-out infinite; }
+@keyframes vb-tr-in { from { opacity: 0; transform: translateY(-3px) } to { opacity: 1; transform: none } }
+@keyframes vb-tr-blink { 0%,100% { opacity: .45 } 50% { opacity: .9 } }
+
 /* 用户语音消息：复用助手 .voice-bar 同款波形，橙色气泡上换白色配色（与文字气泡统一）。
    不带播放（自己说的不用听），点一下整条在语音条 / 文字之间切换。 */
 .user-vb { cursor: pointer; }

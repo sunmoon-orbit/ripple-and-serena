@@ -45,6 +45,7 @@ function stripForTts(text) {
     .replace(/\[sticker:[^\]]+\]/g, '')
     .replace(/\[call:[^\]]+\]/gi, '')
     .replace(/\[endcall\]/gi, '')
+    .replace(/\[voice\]/gi, '')          // 语音条标签（0729）：通话里本来就是说话，标签别被念出来
     .replace(/\[译[:：][\s\S]*?\]/g, '') // 双语翻译标签兜底：正常已被 splitTranslation 摘走，这里防漏
     .replace(/!\[[^\]]*\]\([^)]*\)/g, '')
     .replace(/\[([^\]]*)\]\([^)]*\)/g, '$1')
