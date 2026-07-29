@@ -82,13 +82,15 @@ class YanjiFCMService : FirebaseMessagingService() {
         )
 
         // 全屏来电（0729 加）：锁屏时把整个界面拉起来，微信语音来电那种效果。
-        // ⚠️ 这里**不能复用 answerIntent**——它带 call_action=answer，屏幕一亮就等于自动接听了。
-        // 单开一个 incoming：只负责把 app 拉到前台，响铃卡片由前端自己弹（它本来就在轮询 invite）。
+        // ⚠️ 不能复用 answerIntent——它带 call_action=answer，屏幕一亮就等于自动接听了。
+        // 0729 二版：原来指 MainActivity，亮屏后进的是**上次停在哪儿的网页**，要等 WebView
+        // 加载完 + 轮询到 invite 才弹响铃卡片。改指 CallActivity——原生页，屏幕亮起的
+        // 那一瞬间画面就已经是通话界面了。
         val fullScreenIntent = PendingIntent.getActivity(
             this, 3,
-            Intent(this, MainActivity::class.java).apply {
-                flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
-                putExtra("call_action", "incoming")
+            Intent(this, CallActivity::class.java).apply {
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+                putExtra(CallActivity.EXTRA_REASON, body)
             },
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )

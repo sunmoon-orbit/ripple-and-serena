@@ -42,6 +42,22 @@
             </intent-filter>
         </activity>
 
+        <!-- 原生来电页（0729）：全屏 intent 直接拉起它，不等 WebView 加载。
+             ⚠️ showWhenLocked/turnScreenOn 必须写在 manifest 上——系统冷启动这个
+             Activity 时还没跑到我们的代码，光在 onCreate 里设来不及亮屏。
+             taskAffinity="" + excludeFromRecents：来电页自成一个任务栈，挂断后不会
+             在最近任务里留一张卡片，也不会和言叽主界面串在一起。 -->
+        <activity
+            android:name=".CallActivity"
+            android:exported="false"
+            android:launchMode="singleInstance"
+            android:taskAffinity=""
+            android:excludeFromRecents="true"
+            android:showWhenLocked="true"
+            android:turnScreenOn="true"
+            android:configChanges="orientation|screenSize|keyboard|keyboardHidden"
+            android:theme="@style/Theme.Yanji.Call" />
+
         <!-- 前台常驻服务 -->
         <service
             android:name=".KeepAliveService"

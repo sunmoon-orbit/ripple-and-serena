@@ -298,6 +298,9 @@ class MainActivity : AppCompatActivity() {
         if (action == "answer") {
             (getSystemService(NOTIFICATION_SERVICE) as android.app.NotificationManager)
                 .cancel(YanjiFCMService.CALL_NOTIFICATION_ID)
+            // 她在原生来电页/通知上已经按过一次接听了，进来不该再让她按第二次。
+            // 前端收到这一声就自动接起当前那通（拿不到就等轮询到 invite 再自动接，见前端）。
+            callWeb("__yanjiAnswerCall", "native")
         }
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
             setShowWhenLocked(true)

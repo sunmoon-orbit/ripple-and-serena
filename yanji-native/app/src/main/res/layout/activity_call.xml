@@ -1,0 +1,132 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  来电页（0729）。整屏深紫，中间一只乌鸦，底下两个圆钮。
+  ⚠️ 不引任何网络资源：这页要在锁屏瞬间画出来，等一张图都算慢。
+-->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:gravity="center_horizontal"
+    android:background="@drawable/call_bg"
+    android:fitsSystemWindows="true">
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="92dp"
+        android:text="言叽"
+        android:textSize="13sp"
+        android:textColor="#8C86A8"
+        android:letterSpacing="0.3" />
+
+    <!-- 头像：emoji 画在圆底上，省一张图片资源 -->
+    <TextView
+        android:layout_width="104dp"
+        android:layout_height="104dp"
+        android:layout_marginTop="34dp"
+        android:background="@drawable/call_avatar_bg"
+        android:gravity="center"
+        android:text="🐦‍⬛"
+        android:textSize="46sp" />
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="22dp"
+        android:text="涟言"
+        android:textSize="25sp"
+        android:textColor="#FFFFFF"
+        android:fontFamily="serif"
+        android:letterSpacing="0.08" />
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:text="邀请你语音通话"
+        android:textSize="14sp"
+        android:textColor="#9B93BC" />
+
+    <TextView
+        android:id="@+id/call_reason"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="26dp"
+        android:paddingHorizontal="42dp"
+        android:gravity="center"
+        android:maxLines="4"
+        android:ellipsize="end"
+        android:lineSpacingExtra="5dp"
+        android:textSize="15sp"
+        android:textColor="#D6D0EA" />
+
+    <View
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:layout_weight="1" />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="76dp"
+        android:orientation="horizontal"
+        android:weightSum="2">
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:orientation="vertical"
+            android:gravity="center_horizontal">
+
+            <TextView
+                android:id="@+id/btn_decline"
+                android:layout_width="70dp"
+                android:layout_height="70dp"
+                android:background="@drawable/call_btn_decline"
+                android:gravity="center"
+                android:text="✕"
+                android:textSize="27sp"
+                android:textColor="#FFFFFF"
+                android:clickable="true"
+                android:focusable="true" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                android:text="挂断"
+                android:textSize="13sp"
+                android:textColor="#9B93BC" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:orientation="vertical"
+            android:gravity="center_horizontal">
+
+            <TextView
+                android:id="@+id/btn_answer"
+                android:layout_width="70dp"
+                android:layout_height="70dp"
+                android:background="@drawable/call_btn_answer"
+                android:gravity="center"
+                android:text="✆"
+                android:textSize="30sp"
+                android:textColor="#FFFFFF"
+                android:clickable="true"
+                android:focusable="true" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                android:text="接听"
+                android:textSize="13sp"
+                android:textColor="#9B93BC" />
+        </LinearLayout>
+    </LinearLayout>
+</LinearLayout>

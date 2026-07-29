@@ -6,4 +6,10 @@
         <item name="android:windowDrawsSystemBarBackgrounds">true</item>
         <item name="android:windowLightStatusBar">true</item>
     </style>
+
+    <!-- 来电页是深色底，状态栏图标得反过来用白的，不然锁屏亮起时上面一排字看不见 -->
+    <style name="Theme.Yanji.Call" parent="Theme.Yanji">
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:windowBackground">@drawable/call_bg</item>
+    </style>
 </resources>
