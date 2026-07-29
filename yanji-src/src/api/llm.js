@@ -732,6 +732,27 @@ async function callStream({ connection, messages, systemPrompt, dynamicContext, 
 // 正文里（下游的 extractTextToolCall 就是为它们兜的底）。真吐给 UI 的话，阿颖会先看见
 // 一坨 {"name":...} 再被最终结果换掉。所以碰到 `{"` 开头的疑似 JSON 就把后面的话全扣住
 // 不发——反正气泡最终落的是 finalText，扣住的部分不会丢。
+// ── 中转站的终止哨兵漏进正文（0729）──
+// 标准 SSE 用 `data: [DONE]` 整行做终止符，三个解析器都按整行匹配丢掉了。但阿颖新换的
+// 按次渠道会**把它当正文**塞进 delta 里发下来，于是 `[done]` 跟着话一起显示出来。
+//
+// 判据（不是我们的锅）：思考总结那条调用**根本不带 system prompt**——summarizeThinking
+// 只发一条 user 消息——却同样冒 [done]。所以不可能是我们教给模型的那套方括号标签
+// （[MSG]/[breath]/[voice]/[music:]/[call]/[sticker:]/[glow] 都写在 system 里）被模仿。
+// 是链路带来的。上游不归我们管，就在入口剥掉：正文、朗读、落盘、导出一处都不留。
+const SENTINEL_RE = /\[\s*\/?\s*(?:DONE|Done|done)\s*\]/g
+function stripSentinel(s) {
+  return typeof s === 'string' ? s.replace(SENTINEL_RE, '') : s
+}
+// 流式还有一层麻烦：哨兵可能被 TCP 拆成 `[do` + `ne]` 两个增量，逐块 replace 抓不到。
+// 所以末尾像半个哨兵的部分先扣住不发，等下一块拼齐再判断。返回 [可放行, 继续攒着]。
+// 误伤的只是正常方括号标签开头的一两个字符，下一个增量就放行，看不出来。
+function releaseSentinelSafe(s) {
+  const t = stripSentinel(s)
+  const m = t.match(/\[[A-Za-z/\s]{0,4}$/)
+  return m ? [t.slice(0, m.index), t.slice(m.index)] : [t, '']
+}
+
 async function streamOpenAIMessage(resp, onText, onThinking) {
   const reader = resp.body.getReader()
   const decoder = new TextDecoder()
@@ -746,8 +767,16 @@ async function streamOpenAIMessage(resp, onText, onThinking) {
   const flushText = () => {
     if (gated) return
     const at = pending.search(/\{\s*"/)
-    if (at === -1) { if (pending) { onText?.(pending); pending = '' } return }
-    if (at > 0) onText?.(pending.slice(0, at))
+    if (at === -1) {
+      const [out, hold] = releaseSentinelSafe(pending)
+      pending = hold
+      if (out) onText?.(out)
+      return
+    }
+    if (at > 0) {
+      const out = stripSentinel(pending.slice(0, at))
+      if (out) onText?.(out)
+    }
     pending = pending.slice(at)
     gated = true
   }
@@ -794,6 +823,7 @@ async function streamOpenAIMessage(resp, onText, onThinking) {
 
   const filled = toolCalls.filter(Boolean)
   if (filled.length) msg.tool_calls = filled
+  msg.content = stripSentinel(msg.content)   // 气泡最终落的是这个，被拆开的哨兵在这里补剥
   return { message: msg, finish_reason: finishReason, usage }
 }
 
@@ -834,7 +864,7 @@ async function streamAnthropicBlocks(resp, onText, onThinking) {
       const b = blocks[json.index]
       const d = json.delta || {}
       if (!b) return
-      if (d.type === 'text_delta') { b.text = (b.text || '') + d.text; onText?.(d.text) }
+      if (d.type === 'text_delta') { b.text = (b.text || '') + d.text; onText?.(stripSentinel(d.text)) }
       else if (d.type === 'thinking_delta') { b.thinking = (b.thinking || '') + d.thinking; onThinking?.(d.thinking) }
       else if (d.type === 'signature_delta') { b.signature = (b.signature || '') + d.signature }
       else if (d.type === 'input_json_delta') { b._json += d.partial_json || '' }
@@ -863,6 +893,7 @@ async function streamAnthropicBlocks(resp, onText, onThinking) {
   }
   if (buf) handleLine(buf)
 
+  for (const b of blocks) if (b && typeof b.text === 'string') b.text = stripSentinel(b.text)
   return { content: blocks.filter(Boolean), usage }
 }
 
@@ -872,6 +903,7 @@ async function streamSSE(resp, parseLine, onChunk, extractUsage) {
   let fullText = ''
   let usage = null
   let buf = ''  // SSE 事件可能被 TCP 分包截断，跨 read 缓冲半行避免 JSON 解析失败丢数据
+  let pendingOut = ''  // 末尾疑似半个 [done] 哨兵，攒着等下一块拼齐
 
   const handleLine = (line) => {
     if (!line.startsWith('data: ')) return
@@ -887,7 +919,10 @@ async function streamSSE(resp, parseLine, onChunk, extractUsage) {
       if (text) {
         const cleaned = text.replace(/([一-鿿＀-￯]),/g, '$1，').replace(/,([一-鿿＀-￯])/g, '，$1')
         fullText += cleaned
-        onChunk?.(cleaned)
+        pendingOut += cleaned
+        const [out, hold] = releaseSentinelSafe(pendingOut)
+        pendingOut = hold
+        if (out) onChunk?.(out)
       }
     } catch {}
   }
@@ -901,10 +936,11 @@ async function streamSSE(resp, parseLine, onChunk, extractUsage) {
     for (const line of lines) handleLine(line)
   }
   if (buf) handleLine(buf)
+  if (pendingOut) onChunk?.(pendingOut)  // 流真的到此为止，扣住的那点是正常文本，放行
   if (usage) {
     usage.totalTokens = (usage.promptTokens || 0) + (usage.completionTokens || 0)
   }
-  return { text: fullText, usage }
+  return { text: stripSentinel(fullText), usage }
 }
 
 // ─── Message format helpers ─────────────────────────────────────────────────
@@ -1131,7 +1167,7 @@ export async function summarizeThinking(thinking, connection, model) {
     autoTools: false,
     // 不传 onThinking → Anthropic 不开 extended thinking；其它推理模型的 reasoning_content 直接丢弃
   })
-  const out = (result.text || '')
+  const out = stripSentinel(result.text || '')
     .replace(/<\/?[a-zA-Z_][\w:-]*>/g, '')
     .trim()
     .replace(/^["「『]|["」』]$/g, '')
