@@ -252,6 +252,14 @@ function ConnectionCard({ conn, onSave, onDelete, onActivate, isActive }) {
             <label className="form-label">轻任务模型</label>
             <input className="form-input" value={form.lightModel || ''} onChange={(e) => setForm({ ...form, lightModel: e.target.value })} placeholder="可选：填模型名，如 deepseek-chat（发圈/评论/总结用它省钱）" />
           </div>
+          {/* 留空 = 回退到主模型。按次计费的渠道下这一栏空着最贵：自动发圈、朋友圈评论、
+              上下文压缩这些后台小任务，每跑一次都按主模型的全价扣一次请求。 */}
+          <div className="form-row">
+            <label className="form-label"></label>
+            {form.lightModel?.trim()
+              ? <p className="card-hint" style={{ margin: 0 }}>后台小任务（自动发圈、朋友圈评论、上下文压缩、思考总结）走这个模型。带图识图仍走主模型。</p>
+              : <p className="card-hint" style={{ margin: 0, color: 'var(--danger, #c0563f)' }}>⚠️ 这栏空着，后台小任务会用主模型跑。如果主模型是按次计费的渠道，每次自动发圈、每条评论、每次上下文压缩都按一次完整请求扣费——填个便宜模型名进来。</p>}
+          </div>
           <div className="form-row form-actions">
             <button className="btn-sm btn-ghost" onClick={() => setEditing(false)}>取消</button>
             <button className="btn-sm btn-primary" onClick={save}>保存</button>
@@ -930,17 +938,18 @@ export default function Settings() {
                     {contextLimit.mode === 'rounds' && (
                       <div className="card-row">
                         <span className="card-row-label">最大轮数</span>
-                        <input className="form-input form-input-sm" type="number" min="10" max="200" value={contextLimit.maxRounds ?? 50} onChange={(e) => setContextLimit({ maxRounds: Number(e.target.value) })} />
+                        <input className="form-input form-input-sm" type="number" min="10" max="500" value={contextLimit.maxRounds ?? 150} onChange={(e) => setContextLimit({ maxRounds: Number(e.target.value) })} />
                       </div>
                     )}
                     {contextLimit.mode === 'tokens' && (
                       <div className="card-row">
                         <span className="card-row-label">最大 Tokens</span>
-                        <input className="form-input form-input-sm" type="number" min="1000" max="200000" step="1000" value={contextLimit.maxTokens ?? 30000} onChange={(e) => setContextLimit({ maxTokens: Number(e.target.value) })} />
+                        <input className="form-input form-input-sm" type="number" min="1000" max="400000" step="1000" value={contextLimit.maxTokens ?? 120000} onChange={(e) => setContextLimit({ maxTokens: Number(e.target.value) })} />
                       </div>
                     )}
                   </>
                 )}
+                <p className="card-hint">超出的旧消息不会直接丢掉，会先压缩成一份接续笔记再注入。但压缩总归有损，而且压缩本身还要多花一次轻模型调用——所以这个数字调大是划算的，尤其在按次计费的渠道下（输入长度不影响价钱）。调小只在模型上下文窗口装不下时才有必要。</p>
               </div>
             </Section>
             <Section title="延迟回复">

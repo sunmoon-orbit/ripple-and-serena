@@ -14,7 +14,9 @@ const DEFAULT_STATE = {
   generationConfig: { temperature: 0.7, maxTokens: 4096 },
   memoryItems: [],
   tokenStats: {},
-  contextLimit: { mode: 'rounds', maxRounds: 50, maxTokens: 30000 },
+  // 0729 上调：50 轮 → 150 轮。按次计费的渠道下输入长度不要钱，裁得越狠越亏——
+  // 裁掉的每一段还要额外烧一次轻模型调用去压缩，压完还是不如原文准。
+  contextLimit: { mode: 'rounds', maxRounds: 150, maxTokens: 120000, v: 2 },
   searchConfig: { provider: null, apiKey: null },
   avatarConfig: { mode: 'icon', userImage: null, assistantImage: null, shape: 'circle', size: 28 },
   autoTools: true,
@@ -60,6 +62,16 @@ function loadPersistedState() {
     // 迁移：旧版默认 mode:'none' 改为 mode:'rounds'
     if (parsed.contextLimit?.mode === 'none') {
       parsed.contextLimit = { ...parsed.contextLimit, mode: 'rounds' }
+    }
+    // 迁移 v2（0729）：把旧的 50 轮 / 30000 token 抬到 150 轮 / 120000。
+    // 只做一次（打 v:2 的戳），之后她自己调低的值不会被再次覆盖。
+    if (parsed.contextLimit && (parsed.contextLimit.v || 0) < 2) {
+      parsed.contextLimit = {
+        ...parsed.contextLimit,
+        maxRounds: Math.max(parsed.contextLimit.maxRounds || 0, 150),
+        maxTokens: Math.max(parsed.contextLimit.maxTokens || 0, 120000),
+        v: 2,
+      }
     }
     // 清扫上次会话残留的 streaming 消息：placeholder 一入队就落盘，如果之后页面被杀
     // 或请求挂死（断网/中转站无超时），streaming:true 会永久留在 localStorage，

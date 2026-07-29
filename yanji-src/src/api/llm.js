@@ -322,6 +322,18 @@ export function buildSystemPrompt(globalInstruction, memoryItems, customStickers
 
 // ─── Main send function ─────────────────────────────────────────────────────
 
+// 工具调用的节奏。只在真挂了工具的时候追加（Dream/发圈那些 autoTools:false 的路径不用看这段）。
+//
+// ⚠️ 0729 起阿颖用的是**按次计费**渠道：一次请求固定 16 点，跟输入输出长度无关。
+// 而每一轮工具调用都是一次独立的 API 请求——一次回复里并行查三个工具算一次，
+// 分三轮一个一个试就是三次 48 点。所以「想清楚一次查完」在这里是真金白银。
+const TOOL_BATCH_PROMPT = `【查东西的时候一次查完】
+要用工具查资料时，先把这一轮需要的都想齐，然后**在同一条回复里一次性把它们全发出去**，
+不要查一个、看一眼结果、再决定查下一个。
+- 比如她提到一本书和一个笔友：同时发 list_books 和 letter_inbox，别分两轮
+- 只有当后一步真的依赖前一步的结果时（比如先拿到 id 才能读正文），才允许再开一轮
+- 拿不准要不要查的，宁可顺手一起查了，也别为它单开一轮`
+
 export async function sendMessage({
   connection,
   messages,
@@ -349,7 +361,8 @@ export async function sendMessage({
 
   if (hasTools) {
     return await callWithTools({
-      connection, messages, systemPrompt, dynamicContext, model: usedModel, generationConfig,
+      connection, messages, systemPrompt: systemPrompt ? systemPrompt + '\n\n' + TOOL_BATCH_PROMPT : TOOL_BATCH_PROMPT,
+      dynamicContext, model: usedModel, generationConfig,
       tools, provider, searchConfig, moonMemoryConfig, onChunk, onThinking, onStatus, onToolCall, onFile, cacheKey,
     })
   }
