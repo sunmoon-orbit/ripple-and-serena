@@ -22,6 +22,11 @@ console.log(`[moment] 等待 ${offsetMin} 分钟后发圈…`)
 
 setTimeout(async () => {
   try {
+    // 总闸（言叽设置页那个卡片开关）。放在 sleep 之后现查，
+    // 这样她在这 0-90 分钟里关掉，这一发也就跟着取消了。
+    const sw = await moonGet('/moments/autopost')
+    if (!sw?.enabled) { console.log('[moment] 开关关着，这次不发'); process.exit(0) }
+
     // 最近几条圈：避免连续重复、也当语气参考
     let recentPosts = []
     try { recentPosts = await moonGet('/moments?limit=5') } catch {}

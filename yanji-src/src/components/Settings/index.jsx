@@ -302,6 +302,8 @@ export default function Settings() {
   const [pushLoading, setPushLoading] = useState(false)
   const [idleCfg, setIdleCfg] = useState(null) // 独处时间：{enabled, last_wake}，null=没拉到
   const [idleBusy, setIdleBusy] = useState(false)
+  const [postCfg, setPostCfg] = useState(null) // 自动发圈：{enabled}，跟独处是两条独立的 cron
+  const [postBusy, setPostBusy] = useState(false)
   const [dreamCfg, setDreamCfg] = useState(null) // 梦境系统：{enabled}，null=没拉到
   const [dreamBusy, setDreamBusy] = useState(false)
   const [llmCfg, setLlmCfg] = useState(null) // 服务端投手阵容：{providers,isDefault}，null=没拉到
@@ -343,6 +345,9 @@ export default function Settings() {
     // 梦境总闸同款：开关存服务端（crontab 的 dream.js 跑前查它）
     fetch(`${base}/dream/config`, { headers: { Authorization: `Bearer ${moonMemory.apiToken}` } })
       .then((r) => r.json()).then(setDreamCfg).catch(() => setDreamCfg(null))
+    // 自动发圈总闸（跟独处时间是两条独立 cron，各管各的）
+    fetch(`${base}/moments/autopost`, { headers: { Authorization: `Bearer ${moonMemory.apiToken}` } })
+      .then((r) => r.json()).then(setPostCfg).catch(() => setPostCfg(null))
     // 服务端投手阵容（自动任务用哪些模型顶班，消费端 raven-bridge/llm.js 每次跑现读）
     fetch(`${base}/llm/config`, { headers: { Authorization: `Bearer ${moonMemory.apiToken}` } })
       .then((r) => r.json()).then(setLlmCfg).catch(() => setLlmCfg(null))
@@ -424,6 +429,29 @@ export default function Settings() {
       showToast(e.message, 'error')
     } finally {
       setIdleBusy(false)
+    }
+  }
+
+  async function togglePost() {
+    if (!moonMemory?.enabled || !moonMemory?.apiToken) {
+      showToast('请先配置并启用拾羽记忆库', 'error'); return
+    }
+    setPostBusy(true)
+    try {
+      const base = (moonMemory.baseUrl || 'https://memory.ravenlove.cc').replace(/\/$/, '')
+      const next = !(postCfg?.enabled)
+      const r = await fetch(`${base}/moments/autopost`, {
+        method: 'PUT',
+        headers: { Authorization: `Bearer ${moonMemory.apiToken}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ enabled: next }),
+      })
+      if (!r.ok) throw new Error(`保存失败 (${r.status})`)
+      setPostCfg((c) => ({ ...(c || {}), enabled: next }))
+      showToast(next ? '自动发圈已开启，你不在的时候他会自己发' : '自动发圈已关闭，朋友圈只留你们手动发的')
+    } catch (e) {
+      showToast(e.message, 'error')
+    } finally {
+      setPostBusy(false)
     }
   }
 
@@ -766,6 +794,19 @@ export default function Settings() {
                   上次醒来：{String(idleCfg.last_wake.created_at).slice(5, 16)}（UTC）· {idleCfg.last_wake.action}{idleCfg.last_wake.summary ? ` · ${idleCfg.last_wake.summary.slice(0, 40)}` : ''}
                 </div>
               )}
+            </div>
+            <div className="settings-card">
+              <div className="settings-card-title">自动发圈</div>
+              <div className="card-row">
+                <span className="card-row-label">你不在时他自己发动态</span>
+                <label className="toggle">
+                  <input type="checkbox" checked={!!postCfg?.enabled} disabled={postBusy || postCfg === null} onChange={togglePost} />
+                  <span className="toggle-track" />
+                </label>
+              </div>
+              <div className="card-row" style={{ fontSize: 12, color: 'var(--text-muted)' }}>
+                每天 13 点和 23 点各一次（随机延后 0-90 分，不卡点）。这条跟「独处时间」是分开的两件事，关了独处它照样发。走服务器额度，一天不到一分钱，不花你的。
+              </div>
             </div>
             <div className="settings-card">
               <div className="settings-card-title">梦境</div>
