@@ -28,6 +28,18 @@ export function stripInlineFx(text) {
     .replace(new RegExp(`\\[\\/?(?:${FX_TAGS})\\]`, 'gi'), '')     // 落单/没闭合的残标签直接去掉
 }
 
+// 朗读/通话字幕前的兜底（2026-07-31 阿颖玩 RP 时发现）：
+// 上面那些 replace 都是**逐个点名**的（[glow]/[breath]/[music:]/[voice]…），
+// 但模型在 RP 里会自己发明没教过的英文语气标签——[sigh]、[laughs softly]、
+// [whispers]、[soft tone]——点名清单全漏，于是原样显示在通话字幕上、原样念出来。
+// 这里统一收口：走到这一步还剩的「纯英文方括号」一律当语气标签剥掉。
+// ⚠️必须放在 markdown 链接/图片处理**之后**，否则会把 [文字](url) 的文字部分吃掉。
+// 只作用于语音链路（字幕+TTS），文字气泡不动——那里剥掉反而丢信息。
+export function stripEnglishTags(text) {
+  if (!text || text.indexOf('[') === -1) return text
+  return text.replace(/\[[A-Za-z][A-Za-z0-9 '’,.\-]{0,24}\]/g, '')
+}
+
 // ── 情绪皮肤：隐藏 <mood> 标签，像 <es> 一样不显示，改变整屏氛围 ──────────────
 export const MOODS = [
   { id: 'warm', label: '暖', hint: '温柔、贴心、被爱意包着的时刻' },

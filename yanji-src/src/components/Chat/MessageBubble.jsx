@@ -5,7 +5,7 @@ import { formatTime, splitTranslation } from '../../utils'
 import { useStore } from '../../store'
 import { synthesizeSpeech } from '../../api/moonMemory'
 import MusicCard from './MusicCard'
-import { applyInlineFx, stripInlineFx } from '../../utils/moodFx'
+import { applyInlineFx, stripInlineFx, stripEnglishTags } from '../../utils/moodFx'
 import { showToast } from '../Toast'
 
 marked.setOptions({
@@ -401,7 +401,7 @@ export default function MessageBubble({ msg, onEdit, onQuote, onDelete, isLast }
       try {
         // 语音标签直接转成 MiniMax 认的圆括号形式（圆括号不在下面的符号清理名单里）。
         // ⚠️别再用 __VTAG__ 哨兵保护——下面的清理会剥掉下划线，哨兵残骸 VTAGbreath 会被逐字朗读
-        const plainText = stripInlineFx(msg.content) // 情绪特效标签只留正文（否则 glow/shake 被念成英文）
+        const plainText = stripEnglishTags(stripInlineFx(msg.content) // 情绪特效标签只留正文（否则 glow/shake 被念成英文）
           .replace(/\[music:[^\]]+\]/g, '')          // 点歌标签不朗读
           .replace(/\[sticker:[^\]]+\]/g, '')        // 贴图标签不朗读（否则被念成 sticker:文件名）
           .replace(/\[call:[^\]]+\]/gi, '')          // 来电标签不朗读（0709 教训：新方括号标签同步进清洗）
@@ -410,7 +410,9 @@ export default function MessageBubble({ msg, onEdit, onQuote, onDelete, isLast }
           .replace(/\[MSG\]/gi, ' ')                 // 漏拆的分段符不朗读（否则被念成英文 MSG）
           .replace(VOICE_TAG_RE, (m, t) => (t.toLowerCase() === 'laughter' ? '(laughs)' : '(breath)'))
           .replace(/!\[[^\]]*\]\([^)]*\)/g, '')   // 图片（贴图）整体去掉
-          .replace(/\[([^\]]*)\]\([^)]*\)/g, '$1') // 链接只读文字
+          .replace(/\[([^\]]*)\]\([^)]*\)/g, '$1')) // 链接只读文字
+          // ↑ 到这里收口：上面全是逐个点名的标签，模型在 RP 里自己发明的
+          //   [sigh]/[laughs softly] 之类没人管，会被下面这行剥成裸英文念出来
           .replace(/[#*`>_~\[\]]/g, '')
           .slice(0, 500)
         const config = { baseUrl: moonMemory.baseUrl, apiToken: moonMemory.apiToken }

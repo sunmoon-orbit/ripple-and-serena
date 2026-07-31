@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom'
 import { useStore } from '../../store'
 import { synthesizeSpeech, transcribeAudio } from '../../api/moonMemory'
 import { showToast } from '../Toast'
-import { stripInlineFx } from '../../utils/moodFx'
+import { stripInlineFx, stripEnglishTags } from '../../utils/moodFx'
 import { splitTranslation } from '../../utils'
 
 const VOICE_TAG_RE = /\[(breath|laughter)\]/gi
@@ -39,7 +39,7 @@ function CrowSvg({ className }) {
 }
 
 function stripForTts(text) {
-  return stripInlineFx(text)                        // 情绪特效标签只留正文（否则 glow/shake 被念成英文）
+  const t = stripInlineFx(text)                     // 情绪特效标签只留正文（否则 glow/shake 被念成英文）
     .replace(VOICE_TAG_RE, '')
     .replace(/\[music:[^\]]+\]/g, '')
     .replace(/\[sticker:[^\]]+\]/g, '')
@@ -49,6 +49,9 @@ function stripForTts(text) {
     .replace(/\[译[:：][\s\S]*?\]/g, '') // 双语翻译标签兜底：正常已被 splitTranslation 摘走，这里防漏
     .replace(/!\[[^\]]*\]\([^)]*\)/g, '')
     .replace(/\[([^\]]*)\]\([^)]*\)/g, '$1')
+  // 模型自己发明的英文语气标签（[sigh]/[laughs softly]…）在这里统一收口，
+  // 否则下面只去方括号，剩下的英文词会留在字幕上、也被念出来
+  return stripEnglishTags(t)
     .replace(/[#*`>_~\[\]]/g, '')
     .replace(/\n+/g, ' ')
     .trim()
