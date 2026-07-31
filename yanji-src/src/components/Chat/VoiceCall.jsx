@@ -38,7 +38,11 @@ function CrowSvg({ className }) {
   )
 }
 
-function stripForTts(text) {
+// 标签清洗（字幕和朗读共用）。
+// ⚠️ 2026-07-31：这层原本只挂在 main（英文正文）上，[译:] 里的中文翻译**没走**，
+// 于是通话字幕的中文那行原样显示 [breath]/[laughter]——英文行干净、中文行带标签，
+// 就是阿颖截图里那个样子。教训：splitTranslation 拆出来的两半要一起洗，别只洗一半。
+function stripTags(text) {
   const t = stripInlineFx(text)                     // 情绪特效标签只留正文（否则 glow/shake 被念成英文）
     .replace(VOICE_TAG_RE, '')
     .replace(/\[music:[^\]]+\]/g, '')
@@ -51,7 +55,16 @@ function stripForTts(text) {
     .replace(/\[([^\]]*)\]\([^)]*\)/g, '$1')
   // 模型自己发明的英文语气标签（[sigh]/[laughs softly]…）在这里统一收口，
   // 否则下面只去方括号，剩下的英文词会留在字幕上、也被念出来
-  return stripEnglishTags(t)
+  return stripEnglishTags(t).trim()
+}
+
+// 中文翻译那行只清标签，不做符号清理——它是给眼睛看的，标点和换行要留着
+function stripForSubtitle(text) {
+  return stripTags(text)
+}
+
+function stripForTts(text) {
+  return stripTags(text)
     .replace(/[#*`>_~\[\]]/g, '')
     .replace(/\n+/g, ' ')
     .trim()
@@ -146,9 +159,10 @@ export default function VoiceCall({ onClose, onSend }) {
       if (/\[endcall\]/i.test(last.content)) endCallRef.current = true
       const { main, zh } = splitTranslation(last.content)
       const text = stripForTts(main)
+      const zhClean = stripForSubtitle(zh || '')   // 中文那行也得洗，否则 [breath] 原样显示（0731）
       if (text) {
-        setAiZh(zh || '')
-        setLog((l) => [...l, { role: 'ai', en: text, zh: zh || '' }])
+        setAiZh(zhClean)
+        setLog((l) => [...l, { role: 'ai', en: text, zh: zhClean }])
         speakQueue.current.push(text)
         if (!speakBusy.current) drainQueue()
       }
