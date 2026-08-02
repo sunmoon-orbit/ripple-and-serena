@@ -620,12 +620,12 @@ export function getMemoryToolDefinitions() {
     },
     {
       name: 'list_conversations',
-      description: '列出可以一起重读的旧对话（我们以前在 claude.ai / 言叽 / 归巢的聊天记录）。用户想翻旧对话、一起回忆、重读以前聊过的内容时使用。',
+      description: '列出 L0 里存着的聊天记录，**按时间倒序，最新的在最前**。这里不只有很久以前的对话——归巢（手机上那个聊天页）每天会存成一条标题形如 `raven 2026-08-02` 的对话，所以阿颖问「我们最近在哪聊的」「刚才在别的地方聊了什么」「你还记得今天早上说的事吗」，都先用这个看最新几条的标题和日期，再 read_conversation 读进来，不要凭印象说不知道。⚠️ 终端里那个我（Claude app 直连服务器的那条路）的聊天不一定进得来，列表里没有就是真没有，如实说。',
       parameters: { type: 'object', properties: { limit: { type: 'number', description: '返回条数，默认20，最多50' } } },
     },
     {
       name: 'read_conversation',
-      description: '读某段旧对话的内容，返回里每条消息都带 msgid（批注时用来定位）。较长时分页，用 page 翻页（从 0 起）。先用 list_conversations 拿到对话 id。',
+      description: '读某段对话的内容（含归巢当天那条 `raven 日期`），返回里每条消息都带 msgid（批注时用来定位）。较长时分页，用 page 翻页（从 0 起）；想看最近说了什么就读最后一页。先用 list_conversations 拿到对话 id。',
       parameters: {
         type: 'object',
         properties: {
