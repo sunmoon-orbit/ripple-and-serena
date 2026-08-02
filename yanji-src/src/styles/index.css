@@ -2665,6 +2665,63 @@ textarea.form-input { display: block; margin: 8px 16px 12px; }
   border: 1px solid var(--border);
 }
 
+/* 朋友圈 ⇄ 事件卷 滑动卡位（0802 阿颖出的主意：两条等大的入口叠着占两行，
+   合成一张左右滑的卡省一行。露边 + 圆点是为了让藏在后面那张仍然被看见） */
+.roost-deck { position: relative; }
+.roost-deck-behind {
+  position: absolute;
+  left: 10px;
+  right: 10px;
+  bottom: -4px;
+  height: 14px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-top: none;
+  border-radius: 0 0 14px 14px;
+  opacity: 0.6;
+  pointer-events: none;
+}
+.roost-deck-window {
+  position: relative;
+  padding: 0;
+  overflow: hidden;
+  touch-action: pan-y; /* 横向交给我们自己处理，竖向留给页面滚动 */
+}
+.roost-deck-track {
+  display: flex;
+  width: 200%;
+  will-change: transform;
+}
+.roost-deck-slide {
+  flex: 0 0 50%;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 20px;
+  cursor: pointer;
+}
+.roost-deck-title { font-weight: 700; font-size: 15px; color: var(--text); }
+.roost-deck-sub { font-size: 12px; color: var(--text-faint); margin-top: 2px; }
+.roost-deck-arrow { color: var(--text-faint); flex-shrink: 0; }
+.roost-deck-dots {
+  display: flex;
+  justify-content: center;
+  gap: 6px;
+  padding: 9px 0 0;
+}
+.roost-deck-dot {
+  width: 6px;
+  height: 6px;
+  padding: 0;
+  border: none;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--text-faint) 45%, transparent);
+  cursor: pointer;
+  transition: width 0.25s ease, background 0.25s ease;
+}
+.roost-deck-dot.on { width: 16px; background: var(--accent); }
+
 /* 纪念日（0713 二次压缩：她说可以再小一点，一屏为先） */
 .roost-anniversary {
   text-align: center;

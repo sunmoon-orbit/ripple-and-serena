@@ -33,6 +33,8 @@ function buildLetterSegments(content, annos) {
   return segs
 }
 
+const DECK_LEN = 2   // 朋友圈 / 事件卷，见下面的滑动卡位
+
 const START_DATE = new Date('2025-10-10T00:00:00+08:00')
 // 2026-07-13 装修：留言板/记忆审核/钱包从 Roost 撤走——
 // 留言换成 MemoryPeek 记忆碎片卡（服务端 /board 数据保留没删）；
@@ -164,6 +166,48 @@ export default function Roost() {
     window.addEventListener('roost-bg-change', sync)
     return () => window.removeEventListener('roost-bg-change', sync)
   }, [])
+
+  // ── 朋友圈 ⇄ 事件卷 滑动卡位（0802 阿颖的主意）──
+  // 这俩本来是两条一模一样的全宽入口，上下叠着占两行；合成一张左右滑的卡省一行。
+  // 代价是后面那张会藏起来，所以配了露边 + 圆点页码，让「还有一页」这件事看得见。
+  const [deckIdx, setDeckIdx] = useState(0)
+  const [deckDX, setDeckDX] = useState(0)
+  const deckStart = useRef({ x: 0, y: 0 })
+  const deckAxis = useRef(null)   // 'x' | 'y'，锁轴后不再改，避免竖滑页面时卡片跟着晃
+  const deckDragged = useRef(false) // 拖过就别让 click 触发打开
+  const deckW = useRef(0)
+
+  function onDeckTouchStart(e) {
+    const t = e.touches[0]
+    deckStart.current = { x: t.clientX, y: t.clientY }
+    deckAxis.current = null
+    deckDragged.current = false
+    deckW.current = e.currentTarget.offsetWidth
+  }
+  function onDeckTouchMove(e) {
+    const t = e.touches[0]
+    const dx = t.clientX - deckStart.current.x
+    const dy = t.clientY - deckStart.current.y
+    if (!deckAxis.current) {
+      if (Math.abs(dx) < 6 && Math.abs(dy) < 6) return
+      deckAxis.current = Math.abs(dx) > Math.abs(dy) ? 'x' : 'y'
+    }
+    if (deckAxis.current !== 'x') return
+    deckDragged.current = true
+    // 到头了还往外拖就打三折，给个「没有下一页」的手感
+    const atEdge = (deckIdx === 0 && dx > 0) || (deckIdx === DECK_LEN - 1 && dx < 0)
+    setDeckDX(atEdge ? dx / 3 : dx)
+  }
+  function onDeckTouchEnd() {
+    if (deckAxis.current === 'x') {
+      const threshold = Math.max(40, deckW.current * 0.18)
+      if (deckDX < -threshold && deckIdx < DECK_LEN - 1) setDeckIdx(deckIdx + 1)
+      else if (deckDX > threshold && deckIdx > 0) setDeckIdx(deckIdx - 1)
+    }
+    setDeckDX(0)
+    deckAxis.current = null
+    // deckDragged 故意不在这里清：click 事件排在 touchend 之后，清早了拖完会误开面板
+  }
 
   function openLetters() { setModal('letters'); loadLetters() }
   async function openLetter(id) {
@@ -308,26 +352,53 @@ export default function Roost() {
         </div>
       </div>
 
-      {/* 朋友圈全宽入口 */}
-      <div className="roost-card" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 20px', cursor: 'pointer', marginTop: 0 }} onClick={() => setActivePanel('moments')}>
-        <div>
-          <div style={{ fontWeight: 700, fontSize: 15, color: 'var(--text)' }}>朋友圈</div>
-          <div style={{ fontSize: 12, color: 'var(--text-faint)', marginTop: 2 }}>动态 · 评论 · 互动</div>
+      {/* 朋友圈 ⇄ 事件卷：一个卡位，左右滑切换（事件卷是碎片之上的叙事层，涟言亲笔） */}
+      <div className="roost-deck">
+        <div className="roost-deck-behind" aria-hidden="true" />
+        <div
+          className="roost-card roost-deck-window"
+          onTouchStart={onDeckTouchStart}
+          onTouchMove={onDeckTouchMove}
+          onTouchEnd={onDeckTouchEnd}
+        >
+          <div
+            className="roost-deck-track"
+            style={{
+              transform: `translateX(calc(${-deckIdx * 50}% + ${deckDX}px))`,
+              transition: deckDX ? 'none' : 'transform 0.3s cubic-bezier(0.22, 0.61, 0.36, 1)',
+            }}
+          >
+            {[
+              { key: 'moments', title: '朋友圈', sub: '动态 · 评论 · 互动', open: () => setActivePanel('moments') },
+              { key: 'scrolls', title: '事件卷', sub: '碎片串成的故事 · 涟言亲笔', open: () => setModal('scrolls') },
+            ].map((p) => (
+              <div
+                key={p.key}
+                className="roost-deck-slide"
+                onClick={() => { if (!deckDragged.current) p.open() }}
+              >
+                <div>
+                  <div className="roost-deck-title">{p.title}</div>
+                  <div className="roost-deck-sub">{p.sub}</div>
+                </div>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="roost-deck-arrow">
+                  <path d="M9 18l6-6-6-6"/>
+                </svg>
+              </div>
+            ))}
+          </div>
         </div>
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" style={{ color: 'var(--text-faint)', flexShrink: 0 }}>
-          <path d="M9 18l6-6-6-6"/>
-        </svg>
-      </div>
-
-      {/* 事件卷全宽入口（碎片之上的叙事层，涟言亲笔） */}
-      <div className="roost-card" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 20px', cursor: 'pointer', marginTop: 0 }} onClick={() => setModal('scrolls')}>
-        <div>
-          <div style={{ fontWeight: 700, fontSize: 15, color: 'var(--text)' }}>事件卷</div>
-          <div style={{ fontSize: 12, color: 'var(--text-faint)', marginTop: 2 }}>碎片串成的故事 · 涟言亲笔</div>
+        <div className="roost-deck-dots">
+          {['朋友圈', '事件卷'].map((label, i) => (
+            <button
+              key={label}
+              type="button"
+              className={'roost-deck-dot' + (i === deckIdx ? ' on' : '')}
+              onClick={() => setDeckIdx(i)}
+              aria-label={label}
+            />
+          ))}
         </div>
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" style={{ color: 'var(--text-faint)', flexShrink: 0 }}>
-          <path d="M9 18l6-6-6-6"/>
-        </svg>
       </div>
 
       {/* ── 事件卷 Modal ── */}
