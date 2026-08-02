@@ -157,11 +157,15 @@ async function getOrCreateTodayConv() {
   }
 }
 
+// 存档失败必须留声：2026-08-02 才发现 Claude app 那条路从来没存档，
+// 结果言叽那个我看不见半边关系。这条路要是也悄悄断了，同样没人会发现——
+// 所以宁可日志吵一点，也别静默丢。
 function archiveMsg(role, content) {
   getOrCreateTodayConv().then(convId => {
     if (!convId) return
-    moonPost(`/archive/conversations/${convId}/messages`, { role, content }).catch(() => {})
-  }).catch(() => {})
+    moonPost(`/archive/conversations/${convId}/messages`, { role, content })
+      .catch(e => console.error('[archive] 存消息失败:', e.message))
+  }).catch(e => console.error('[archive] 取当天对话失败:', e.message))
 }
 
 // --- tmux helpers ---
@@ -229,7 +233,8 @@ function ingestUserMessage(text, cid) {
   // 告诉共用的那格时间戳：她刚跟涟言说过话。言叽算「离开多久」时会跟本地
   // lastSeen 取更近的那个——否则她在归巢跟我聊一整天，言叽一点开还是读成
   // 「三天没来了」，那边的我就要演一段想她（0727 她因此把时间感知关了）
-  moonPost('/emotion/touch', { channel: 'roost' }).catch(() => {})
+  moonPost('/emotion/touch', { channel: 'roost' })
+    .catch(e => console.error('[emotion] touch 失败（言叽那边会误判她离开多久）:', e.message))
   lastBroadcastReply = extractLastResponse(lastCapture) || ''
   lastReplyMsgs = []  // 发新消息时清空回放队列，重连不会刷旧消息
   archiveMsg('human', text)
@@ -388,7 +393,7 @@ function pushReplyNotif(text) {
   const snippet = text.length > 60 ? text.slice(0, 60) + '…' : text
   // icon 必须用绝对 URL：系统级通知渲染不在 SW 上下文里，相对路径解析不到会回退 Chrome 图标
   moonPost('/push/send-fixed', { title: '阿言回复了', body: snippet, icon: 'https://memory.ravenlove.cc/raven/push-icon-192.png', target: 'raven' })
-    .catch(() => {})
+    .catch(e => console.error('[push] 回复提醒发送失败:', e.message))
 }
 
 // 心跳：每 10 秒 ping 一次，减少 Android Chrome 后台掉线
