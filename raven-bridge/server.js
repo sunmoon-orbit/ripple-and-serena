@@ -271,8 +271,12 @@ function tmuxSend(text) {
   } catch { return false }
 }
 
+// 在线 = 「这条消息有人会收到」，不是「终端里有没有 CC」。
+// 0726 修的是骗人的绿灯（空壳 bash 也算在线）；这里补的是反过来那盏骗人的灰灯：
+// 我跑在 claude remote-control 上时终端里没有 CC，灯是灰的，可消息明明能靠
+// 取件队列送达（阿颖照发照回）。两分钟内有人来取过件，就是真的有人在。
 function ccOnline() {
-  return !!ccTarget()
+  return !!ccTarget() || remoteListenerAlive()
 }
 
 // --- status helpers ---
