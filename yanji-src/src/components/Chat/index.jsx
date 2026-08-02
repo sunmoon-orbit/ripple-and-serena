@@ -1,6 +1,6 @@
 import { useState, useCallback, useRef, useEffect } from 'react'
 import { createPortal } from 'react-dom'
-import { useStore } from '../../store'
+import { useStore, buildBackupJson, restoreFromBackupJson } from '../../store'
 import { sendMessage, summarizeThinking, normalizeProvider, BUILTIN_MODELS, buildSystemPrompt, compactMessages, buildSummaryInjection } from '../../api/llm'
 import { uuid } from '../../utils'
 import { downloadBlob } from '../../utils/download'
@@ -123,7 +123,7 @@ export default function Chat() {
     createChat, setActiveChat, getActiveConnection, getActiveChat, getMessages,
     addMessage, updateMessage, removeLastEmptyAssistant, truncateMessagesFrom, touchChat, deleteMessage,
     recordTokenUsage, updateChatModel, updateChatConnection, applyContextLimit,
-    getSummary, setSummary,
+    getSummary, setSummary, bigReady,
   } = store
 
   const [sidebarOpen, setSidebarOpen] = useState(false)
@@ -731,6 +731,9 @@ export default function Chat() {
   // 命中就往当前对话注入一条隐藏伪用户消息，走正常回复管道现场决定说什么。
   const nudgeGuardRef = useRef(false)
   useEffect(() => {
+    // 等聊天记录从 IndexedDB 读回来再判：没读回来时最后一条消息是空的，会直接跳过判断，
+    // 而那次跳过又把 60 秒的防抖锁点上了，等于这次打开永远不会主动开口
+    if (!bigReady) return
     const tryNudge = () => {
       if (document.visibilityState !== 'visible') return
       if (nudgeGuardRef.current) return // 一次可见期内只判一次，防 visibilitychange 抖动
@@ -750,7 +753,7 @@ export default function Chat() {
     tryNudge()
     document.addEventListener('visibilitychange', tryNudge)
     return () => document.removeEventListener('visibilitychange', tryNudge)
-  }, [handleSend])
+  }, [handleSend, bigReady])
 
   // ── 主动来电 + 主动消息：服务端 cron 发来后，前端轮询 → 来电弹卡片 / 消息注入对话 ──
   const callPollRef = useRef(false)
@@ -909,7 +912,9 @@ export default function Chat() {
 // ── Backup / Restore ─────────────────────────────────────────────────────
   async function handleBackupExport() {
     setBgMenuOpen(false)
-    const raw = localStorage.getItem('llm_hub_state_v1') || '{}'
+    // 聊天记录已经搬去 IndexedDB 了，不能再直接读 localStorage——那样导出的备份没有对话
+    const raw = buildBackupJson()
+    if (!raw) { showToast('聊天记录还在读取中，等一秒再备份', 'error'); return }
     const moonMemory = useStore.getState().moonMemory || {}
     if (moonMemory?.apiToken) {
       try {
@@ -948,8 +953,7 @@ export default function Chat() {
       if (r.status === 404) { showToast('服务器上还没有备份', 'error'); return }
       if (!r.ok) throw new Error(`(${r.status})`)
       const text = await r.text()
-      JSON.parse(text)
-      localStorage.setItem('llm_hub_state_v1', text)
+      await restoreFromBackupJson(text)
       showToast('已从服务器恢复，正在刷新…', 'success')
       setTimeout(() => window.location.reload(), 800)
     } catch (e) {
@@ -961,11 +965,11 @@ export default function Chat() {
     const file = e.target.files?.[0]
     if (!file) return
     const reader = new FileReader()
-    reader.onload = (ev) => {
+    reader.onload = async (ev) => {
       try {
         JSON.parse(ev.target.result) // validate JSON
         if (!window.confirm('导入会覆盖当前所有对话记录，确定吗？')) return
-        localStorage.setItem('llm_hub_state_v1', ev.target.result)
+        await restoreFromBackupJson(ev.target.result)
         window.location.reload()
       } catch { showToast('文件格式不对，请选 yanji 导出的 JSON', 'error') }
     }

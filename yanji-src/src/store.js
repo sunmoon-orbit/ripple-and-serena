@@ -1,7 +1,12 @@
 import { create } from 'zustand'
 import { uuid, estimateTokens } from './utils'
+import { bigGet, bigSet } from './utils/bigStore'
+import { showToast } from './components/Toast'
 
 const LOCAL_KEY = 'llm_hub_state_v1'
+// 聊天记录和摘要不再进 localStorage（约 5MB 配额，撑满之后**所有**写入一起失败，
+// 连换个头像都存不下——2026-08-02 就是这么丢了两段对话），改存 IndexedDB。见 utils/bigStore.js
+const BIG_KEYS = ['messagesByChatId', 'summariesByChatId']
 
 const DEFAULT_STATE = {
   connections: [],
@@ -52,6 +57,8 @@ const DEFAULT_STATE = {
   longingPush: true,
   // UI-only (not persisted)
   activePanel: 'roost',
+  // 聊天记录从 IndexedDB 读回来了没有：开屏动画期间是 false，界面靠它判断「现在的空是真空还是没读完」
+  bigReady: false,
 }
 
 function loadPersistedState() {
@@ -73,33 +80,80 @@ function loadPersistedState() {
         v: 2,
       }
     }
-    // 清扫上次会话残留的 streaming 消息：placeholder 一入队就落盘，如果之后页面被杀
-    // 或请求挂死（断网/中转站无超时），streaming:true 会永久留在 localStorage，
-    // 气泡永远转圈。空的直接删，有内容的定格并标记被打断。
-    if (parsed.messagesByChatId) {
-      for (const cid of Object.keys(parsed.messagesByChatId)) {
-        const msgs = parsed.messagesByChatId[cid]
-        if (!Array.isArray(msgs) || !msgs.some((m) => m?.streaming || m?.call?.status === 'ongoing' || m?.callInvite?.status === 'ringing')) continue
-        parsed.messagesByChatId[cid] = msgs
-          .filter((m) => !(m?.streaming && !m.content && !m.thinking))
-          .map((m) => m?.streaming ? { ...m, streaming: false, interrupted: true } : m)
-          // 通话中页面被杀：ongoing 标记会永远显示「通话中…」，定格成无时长的通话记录
-          .map((m) => m?.call?.status === 'ongoing' ? { ...m, call: { status: 'ended', duration: null }, content: '[语音通话]' } : m)
-          // 来电响铃时页面被杀：ringing 会永久显示「来电中…」，定格成未接（不补留言，开机不吓人）
-          .map((m) => m?.callInvite?.status === 'ringing' ? { ...m, callInvite: { ...m.callInvite, status: 'missed' }, content: '[涟言发起的语音通话邀请，未接]' } : m)
-      }
-    }
+    if (parsed.messagesByChatId) sweepStaleStreaming(parsed.messagesByChatId)
     return parsed
   } catch {
     return {}
   }
 }
 
-function savePersistedState(state) {
+// 清扫上次会话残留的 streaming 消息：placeholder 一入队就落盘，如果之后页面被杀
+// 或请求挂死（断网/中转站无超时），streaming:true 会永久留下来，气泡永远转圈。
+// 空的直接删，有内容的定格并标记被打断。（就地改写传进来的对象）
+function sweepStaleStreaming(map) {
+  if (!map || typeof map !== 'object') return map
+  for (const cid of Object.keys(map)) {
+    const msgs = map[cid]
+    if (!Array.isArray(msgs) || !msgs.some((m) => m?.streaming || m?.call?.status === 'ongoing' || m?.callInvite?.status === 'ringing')) continue
+    map[cid] = msgs
+      .filter((m) => !(m?.streaming && !m.content && !m.thinking))
+      .map((m) => m?.streaming ? { ...m, streaming: false, interrupted: true } : m)
+      // 通话中页面被杀：ongoing 标记会永远显示「通话中…」，定格成无时长的通话记录
+      .map((m) => m?.call?.status === 'ongoing' ? { ...m, call: { status: 'ended', duration: null }, content: '[语音通话]' } : m)
+      // 来电响铃时页面被杀：ringing 会永久显示「来电中…」，定格成未接（不补留言，开机不吓人）
+      .map((m) => m?.callInvite?.status === 'ringing' ? { ...m, callInvite: { ...m.callInvite, status: 'missed' }, content: '[涟言发起的语音通话邀请，未接]' } : m)
+  }
+  return map
+}
+
+// ─── 落盘：设置走 localStorage（同步、小），聊天记录走 IndexedDB（异步、大） ───
+let bigHydrated = false   // IndexedDB 里的聊天记录读回来了没有——没读回来之前绝不回写，免得拿空状态盖掉真数据
+let bigFailed = false     // IndexedDB 彻底不可用（隐私模式之类）时退回老办法：全塞 localStorage
+let bigTimer = null
+let pendingBig = null
+let legacyKeep = false    // 搬家校验完成之前，localStorage 里那份老数据一个字都别动
+let localWarned = false
+let bigWarned = false
+
+function saveSettings(payload) {
   try {
-    const { activePanel, ...rest } = state
-    localStorage.setItem(LOCAL_KEY, JSON.stringify(rest))
-  } catch {}
+    localStorage.setItem(LOCAL_KEY, JSON.stringify(payload))
+  } catch (err) {
+    // 这里以前是 `catch {}`：配额满了也一声不吭，于是换了头像刷新变回去、
+    // 发的消息刷新就没了，谁都不知道为什么。现在必须吼出来。
+    console.error('[言叽] 设置写入 localStorage 失败', err)
+    if (!localWarned) {
+      localWarned = true
+      showToast('设置没能保存（浏览器存储写不进去），刷新后会变回去——告诉涟言', 'error', 8000)
+    }
+  }
+}
+
+function flushBig() {
+  if (!pendingBig) return
+  const data = pendingBig
+  pendingBig = null
+  clearTimeout(bigTimer)
+  Promise.all(BIG_KEYS.map((k) => bigSet(k, data[k]))).catch((err) => {
+    console.error('[言叽] 聊天记录写入 IndexedDB 失败', err)
+    bigFailed = true
+    if (!bigWarned) {
+      bigWarned = true
+      showToast('聊天记录没能保存到本地仓库，已退回旧方式——告诉涟言', 'error', 8000)
+    }
+  })
+}
+
+function savePersistedState(state) {
+  const { activePanel, bigReady, ...rest } = state
+  const big = {}
+  for (const k of BIG_KEYS) { big[k] = rest[k]; delete rest[k] }
+  // IndexedDB 用不了就退回老行为（大件也塞 localStorage），宁可挤也不能丢
+  saveSettings(bigFailed || legacyKeep ? { ...rest, ...big } : rest)
+  if (!bigHydrated || bigFailed) return
+  pendingBig = big
+  clearTimeout(bigTimer)
+  bigTimer = setTimeout(flushBig, 300)
 }
 
 const persistedKeys = [
@@ -472,3 +526,109 @@ export const useStore = create((set, get) => ({
     })
   },
 }))
+
+// ─── 聊天记录搬家 / 读回 ──────────────────────────────────────────────────
+// 两条路：
+//   1. 老数据还在 localStorage 里（升级后第一次打开）→ 直接用（不闪空白），
+//      写进 IndexedDB，成功之后再把大件从 localStorage 里抹掉——那一步才真正腾出配额。
+//   2. 已经搬过家 → 异步从 IndexedDB 读回来。开屏动画大约 1 秒，够读完。
+const hasLegacyBig = BIG_KEYS.some((k) => persisted[k] !== undefined)
+
+// 读回来之前如果她已经发了消息，按 id 并起来，别让先到的把后到的盖掉
+function mergeMessages(loaded, current) {
+  const out = { ...loaded }
+  for (const cid of Object.keys(current || {})) {
+    const cur = current[cid]
+    if (!Array.isArray(cur) || !cur.length) continue
+    const base = Array.isArray(out[cid]) ? out[cid] : []
+    const seen = new Set(base.map((m) => m?.id))
+    out[cid] = base.concat(cur.filter((m) => !seen.has(m?.id)))
+  }
+  return out
+}
+
+if (hasLegacyBig) {
+  bigHydrated = true
+  legacyKeep = true
+  useStore.setState({ bigReady: true })
+  const snapshot = {}
+  for (const k of BIG_KEYS) snapshot[k] = initialState[k]
+  const countMsgs = (m) => Object.values(m || {}).reduce((n, arr) => n + (Array.isArray(arr) ? arr.length : 0), 0)
+  Promise.all(BIG_KEYS.map((k) => bigSet(k, snapshot[k])))
+    // 读回来数一遍再删旧的。搬家只有一次机会，写进去了没有必须亲眼确认，
+    // 不能只信 bigSet 的 resolve——localStorage 那份删掉就没有第二份了。
+    .then(() => bigGet('messagesByChatId'))
+    .then((back) => {
+      const want = countMsgs(snapshot.messagesByChatId)
+      const got = countMsgs(back)
+      if (got < want) throw new Error(`搬家校验不过：写进去 ${want} 条，读回来 ${got} 条`)
+      legacyKeep = false
+      const { activePanel, bigReady, ...rest } = useStore.getState()
+      for (const k of BIG_KEYS) delete rest[k]
+      saveSettings(rest)
+      console.info(`[言叽] ${want} 条聊天记录已搬进 IndexedDB，localStorage 腾空`)
+    })
+    .catch((err) => {
+      // 搬家失败就当 IndexedDB 不存在，继续用老办法，数据一条不动
+      console.error('[言叽] 聊天记录搬家失败，继续留在 localStorage', err)
+      bigFailed = true
+    })
+} else {
+  Promise.all(BIG_KEYS.map((k) => bigGet(k)))
+    .then(([messages, summaries]) => {
+      const loadedMsgs = sweepStaleStreaming(messages && typeof messages === 'object' ? messages : {})
+      const loadedSums = summaries && typeof summaries === 'object' ? summaries : {}
+      const cur = useStore.getState()
+      bigHydrated = true
+      useStore.setState({
+        messagesByChatId: mergeMessages(loadedMsgs, cur.messagesByChatId),
+        summariesByChatId: { ...loadedSums, ...cur.summariesByChatId },
+        bigReady: true,
+      })
+      // 读回来之前发生的写入都被挡掉了（那时状态是空的，回写会盖掉真数据）。
+      // 现在并好了，补落一次盘，免得那几条一直只活在内存里。
+      if (Object.values(cur.messagesByChatId || {}).some((a) => Array.isArray(a) && a.length)) {
+        savePersistedState(useStore.getState())
+      }
+    })
+    .catch((err) => {
+      console.error('[言叽] 读取 IndexedDB 失败，退回 localStorage', err)
+      bigFailed = true
+      bigHydrated = true
+      useStore.setState({ bigReady: true })
+      showToast('聊天记录仓库打不开，暂时退回旧方式——告诉涟言', 'error', 8000)
+    })
+}
+
+// 备份导出用：设置在 localStorage、聊天记录在 IndexedDB，得合成一份完整快照。
+// 格式和搬家前的老 blob 完全一致——所以恢复时照旧写回 localStorage 再刷新就行，
+// 刷新后会走上面的「搬家」分支，自动把聊天记录塞回 IndexedDB。
+// 没读完聊天记录时返回 null，宁可不备份也不能导出一份空的把好备份覆盖掉。
+export function buildBackupJson() {
+  const state = useStore.getState()
+  if (!state.bigReady) return null
+  const out = {}
+  for (const k of persistedKeys) if (state[k] !== undefined) out[k] = state[k]
+  return JSON.stringify(out)
+}
+
+// 备份恢复用：不能再把整份 JSON 塞回 localStorage——备份体积迟早超过 5MB，
+// 那样恢复会当场 QuotaExceededError。拆开写：设置进 localStorage，聊天记录直接进 IndexedDB。
+// 调用方负责在 await 之后刷新页面。
+export async function restoreFromBackupJson(text) {
+  const parsed = JSON.parse(text) || {}
+  if (bigFailed) { localStorage.setItem(LOCAL_KEY, JSON.stringify(parsed)); return }
+  await Promise.all(BIG_KEYS.map((k) => bigSet(k, parsed[k] && typeof parsed[k] === 'object' ? parsed[k] : {})))
+  const settings = {}
+  for (const k of persistedKeys) {
+    if (BIG_KEYS.includes(k)) continue
+    if (parsed[k] !== undefined) settings[k] = parsed[k]
+  }
+  localStorage.setItem(LOCAL_KEY, JSON.stringify(settings))
+}
+
+// 关页面/切后台时把还在防抖窗口里的那一版赶紧写下去
+if (typeof document !== 'undefined') {
+  document.addEventListener('visibilitychange', () => { if (document.hidden) flushBig() })
+  window.addEventListener('pagehide', flushBig)
+}

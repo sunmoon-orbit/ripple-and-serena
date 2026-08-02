@@ -10,6 +10,7 @@ export default function MessageList({ messages, status, onEdit, onQuote, onDelet
   const prevChatId = useRef('__mount__')
   const [showBtn, setShowBtn] = useState(false)
   const scrollAnchor = useStore((s) => s.scrollAnchor)
+  const bigReady = useStore((s) => s.bigReady)
   // 官端滚动模型用：记住最后一条用户消息 id，出现新的才触发置顶（undefined=首次挂载）
   const lastUserIdRef = useRef(undefined)
   const anchorChatRef = useRef(activeChatId)
@@ -38,6 +39,15 @@ export default function MessageList({ messages, status, onEdit, onQuote, onDelet
       return () => clearTimeout(t)
     }
   }, [activeChatId, scrollToBottom])
+
+  // 聊天记录是从 IndexedDB 异步读回来的（2026-08-02 搬家之后），读回来那一刻列表才真正
+  // 长出内容——上面那个「首次挂载跳到底」当时跳的是空列表，所以读完要再跳一次。
+  useEffect(() => {
+    if (!bigReady) return
+    requestAnimationFrame(() => requestAnimationFrame(() => scrollToBottom('auto')))
+    const t = setTimeout(() => scrollToBottom('auto'), 260)
+    return () => clearTimeout(t)
+  }, [bigReady, scrollToBottom])
 
   // 新消息处理。两种滚动模型：
   // - 跟随模式（旧）：贴着底部就跟随滚动，否则不打扰
