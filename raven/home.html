@@ -385,7 +385,7 @@ html, body { min-height: 100%; background: var(--bg); color: var(--text); font-f
     <!-- memory fragment -->
     <div class="card wide" id="mem-card">
       <div class="mem-header">
-        <div class="mem-label">记忆碎片</div>
+        <div class="mem-label" id="mem-label">记忆碎片</div>
         <button id="mem-refresh" onclick="loadMemory()" title="换一条">↻</button>
       </div>
       <div id="mem-date">—</div>
@@ -621,21 +621,66 @@ async function loadStatus() {
   } catch {}
 }
 
-// random memory
+let todayMemories = null
+let todayMemoryIndex = 0
+
+function renderMemory(d, yearsAgo = 0) {
+  document.getElementById('mem-label').textContent = yearsAgo ? '岁岁今朝' : '记忆碎片'
+  const date = d.created_at ? new Date(d.created_at).toLocaleDateString('zh-CN', { year: 'numeric', month: 'long', day: 'numeric' }) : ''
+  document.getElementById('mem-date').textContent = yearsAgo ? `${yearsAgo} 年前的今天${date ? ' · ' + date : ''}` : date
+
+  let text
+  if (d.kind === 'conversation') {
+    text = d.title || '一段旧日对话'
+    if (d.message_count != null) text += ` · ${d.message_count} 条消息`
+  } else {
+    const raw = d.content || ''
+    text = raw.replace(/【[^】]*】/g, '').trim()
+  }
+  document.getElementById('mem-content').textContent = text.slice(0, 200) + (text.length > 200 ? '…' : '')
+
+  const tags = (d.tags || '').split(',').map(t => t.trim()).filter(Boolean).slice(0, 5)
+  const tagsEl = document.getElementById('mem-tags')
+  tagsEl.replaceChildren(...tags.map(t => {
+    const el = document.createElement('span')
+    el.className = 'mem-tag'
+    el.textContent = t
+    return el
+  }))
+}
+
+async function loadRandomMemory() {
+  const d = await fetch('/raven/memory-random', { headers: authHeaders() }).then(r => r.json())
+  if (d.error) throw new Error(d.error)
+  renderMemory(d)
+}
+
+// 先翻往年今日；空日子占绝大多数，安静退回随机碎片才是正常路径。
 async function loadMemory() {
   const btn = document.getElementById('mem-refresh')
   btn.style.opacity = '0.3'
   btn.classList.remove('spinning'); void btn.offsetWidth; btn.classList.add('spinning')
   try {
-    const d = await fetch('/raven/memory-random', { headers: authHeaders() }).then(r => r.json())
-    if (d.error) return
-    const date = d.created_at ? new Date(d.created_at).toLocaleDateString('zh-CN', { year: 'numeric', month: 'long', day: 'numeric' }) : ''
-    document.getElementById('mem-date').textContent = date
-    const raw = d.content || ''
-    const cleaned = raw.replace(/【[^】]*】/g, '').trim()
-    document.getElementById('mem-content').textContent = cleaned.slice(0, 200) + (cleaned.length > 200 ? '…' : '')
-    const tags = (d.tags || '').split(',').map(t => t.trim()).filter(Boolean)
-    document.getElementById('mem-tags').innerHTML = tags.slice(0,5).map(t => `<span class="mem-tag">${t}</span>`).join('')
+    if (todayMemories?.length) {
+      if (todayMemories.length > 1) todayMemoryIndex = (todayMemoryIndex + 1) % todayMemories.length
+      const item = todayMemories[todayMemoryIndex]
+      renderMemory(item, item.years_ago)
+      return
+    }
+
+    if (todayMemories === null) {
+      try {
+        const d = await fetch('/raven/on-this-day', { headers: authHeaders() }).then(r => r.json())
+        todayMemories = d.count > 0 && Array.isArray(d.items) ? d.items : []
+      } catch { todayMemories = [] }
+      if (todayMemories.length) {
+        const item = todayMemories[0]
+        renderMemory(item, item.years_ago)
+        return
+      }
+    }
+
+    await loadRandomMemory()
   } catch {
     document.getElementById('mem-content').textContent = '加载失败，稍后再试'
   } finally {

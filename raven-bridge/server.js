@@ -636,7 +636,7 @@ const server = http.createServer((req, res) => {
   }
   // 敏感读写接口外网必须带 token：记忆内容、CC 状态、思考内容、热力图写入、
   // 上传、push 订阅（不拦的话外人能把自己的推送端点订阅进来偷收通知）
-  const TOKEN_REQUIRED = ['/raven/status', '/raven/last-thinking', '/raven/memory-random', '/raven/memory-count', '/raven/activity', '/raven/upload', '/raven/push/subscribe', '/raven/push/unsubscribe', '/raven/usage']
+  const TOKEN_REQUIRED = ['/raven/status', '/raven/last-thinking', '/raven/memory-random', '/raven/on-this-day', '/raven/memory-count', '/raven/activity', '/raven/upload', '/raven/push/subscribe', '/raven/push/unsubscribe', '/raven/usage']
   if (TOKEN_REQUIRED.includes(url.pathname) && !externalAuthed(req, url)) {
     res.writeHead(401, { 'Content-Type': 'application/json' })
     res.end(JSON.stringify({ error: 'unauthorized' }))
@@ -812,6 +812,22 @@ const server = http.createServer((req, res) => {
         const pick = items[Math.floor(Math.random() * items.length)]
         res.writeHead(200, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' })
         res.end(JSON.stringify({ id: pick.id, content: pick.content, tags: pick.tags, created_at: pick.created_at, importance: pick.importance, layer: pick.layer }))
+      })
+      .catch(() => { res.writeHead(500); res.end('{}') })
+    return
+  }
+
+  // 正常请求不带 date，让服务端认北京时间；只给手工验收的 MM-DD 留调试口，
+  // 免得把任意查询串原样转发后悄悄改变 shared 范围。
+  if (req.method === 'GET' && url.pathname === '/raven/on-this-day') {
+    const date = url.searchParams.get('date')
+    const moonPath = /^\d{2}-\d{2}$/.test(date || '')
+      ? `/memories/on-this-day?date=${encodeURIComponent(date)}`
+      : '/memories/on-this-day'
+    moonGet(moonPath)
+      .then(data => {
+        res.writeHead(200, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' })
+        res.end(JSON.stringify(data))
       })
       .catch(() => { res.writeHead(500); res.end('{}') })
     return
