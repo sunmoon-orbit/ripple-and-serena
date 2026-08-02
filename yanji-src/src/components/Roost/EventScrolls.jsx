@@ -26,7 +26,13 @@ export default function EventScrolls({ onClose }) {
 
   useEffect(() => { load() }, [load])
 
+  // 卷底下那串碎片原来是纯文本，显示前 200 字加个「…」却点不开
+  // （0802 阿颖问「是设计还是 bug」——是 bug，省略号在明示还有下文）。
+  // 现在点一条就地展开全文，再点收起；后端 readEvent 已经把正文一起带下来了。
+  const [openFrag, setOpenFrag] = useState(null)
+
   const open = async (id) => {
+    setOpenFrag(null)
     try { setDetail(await fetchEventScroll(cfg, id)) } catch (e) { setError(e.message) }
   }
 
@@ -51,12 +57,26 @@ export default function EventScrolls({ onClose }) {
               {detail.links?.length > 0 && (
                 <div style={{ marginTop: 18, borderTop: '1px dashed var(--border)', paddingTop: 12 }}>
                   <div style={{ fontSize: 12, color: 'var(--text-faint)', marginBottom: 8 }}>卷上挂着的碎片（时间正序）</div>
-                  {detail.links.map((l) => (
-                    <div key={l.id} style={{ fontSize: 12.5, color: 'var(--text-dim)', padding: '6px 0', borderBottom: '1px solid var(--border)' }}>
-                      <span style={{ color: 'var(--text-faint)' }}>{fmtDay(new Date(l.created_at).getTime() || l.created_at)} · {l.type}{l.archived ? ' · 已归档' : ''}</span>
-                      <div style={{ marginTop: 2 }}>{l.excerpt}…</div>
-                    </div>
-                  ))}
+                  {detail.links.map((l) => {
+                    const full = l.content || l.excerpt || ''
+                    const truncated = full.length > (l.excerpt || '').length
+                    const expanded = openFrag === l.id
+                    return (
+                      <div
+                        key={l.id}
+                        onClick={() => setOpenFrag(expanded ? null : l.id)}
+                        style={{ fontSize: 12.5, color: 'var(--text-dim)', padding: '6px 0', borderBottom: '1px solid var(--border)', cursor: truncated ? 'pointer' : 'default' }}
+                      >
+                        <span style={{ color: 'var(--text-faint)' }}>
+                          {fmtDay(new Date(l.created_at).getTime() || l.created_at)} · {l.type}{l.archived ? ' · 已归档' : ''}
+                          {truncated && <span style={{ marginLeft: 6 }}>{expanded ? '收起 ▴' : '展开 ▾'}</span>}
+                        </span>
+                        <div style={{ marginTop: 2, whiteSpace: expanded ? 'pre-wrap' : 'normal', lineHeight: expanded ? 1.75 : 1.5 }}>
+                          {expanded ? full : (l.excerpt || '') + (truncated ? '…' : '')}
+                        </div>
+                      </div>
+                    )
+                  })}
                 </div>
               )}
             </div>
