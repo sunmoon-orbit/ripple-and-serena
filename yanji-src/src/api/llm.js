@@ -776,6 +776,7 @@ async function streamOpenAIMessage(resp, onText, onThinking) {
   let buf = ''
   let pending = ''   // 还没放行的正文
   let gated = false  // 撞上疑似 JSON 后就一直扣着
+  let dropped = 0    // 解析失败被丢弃的 SSE 事件数
 
   const flushText = () => {
     if (gated) return
@@ -799,7 +800,7 @@ async function streamOpenAIMessage(resp, onText, onThinking) {
     const raw = line.slice(6)
     if (raw === '[DONE]') return
     let json
-    try { json = JSON.parse(raw) } catch { return }
+    try { json = JSON.parse(raw) } catch { dropped++; warnBadEvent(raw); return }
 
     if (json.usage) {
       usage.promptTokens = json.usage.prompt_tokens || 0
@@ -836,8 +837,20 @@ async function streamOpenAIMessage(resp, onText, onThinking) {
 
   const filled = toolCalls.filter(Boolean)
   if (filled.length) msg.tool_calls = filled
-  msg.content = stripSentinel(msg.content)   // 气泡最终落的是这个，被拆开的哨兵在这里补剥
+  msg.content = stripSentinel(msg.content) + badEventNote(dropped)   // 气泡最终落的是这个，被拆开的哨兵在这里补剥
   return { message: msg, finish_reason: finishReason, usage }
+}
+
+// ─── SSE 坏事件记账 ─────────────────────────────────────────────────────────
+// 这三处解析以前都是 `catch {}` / `catch { return }`：中转站吐一个畸形事件，
+// 那一段文字或那次工具调用就凭空消失了，前端还把残缺回复当成功落盘存进历史。
+// 现在记账 + 控制台告警，收尾时在正文末尾明说「这条不完整」——
+// 宁可气泡丑一点，也别让她把缺字的回复当成涟言的原话。
+function warnBadEvent(raw) {
+  console.warn('[言叽] SSE 事件解析失败，已丢弃：', String(raw).slice(0, 200))
+}
+function badEventNote(n) {
+  return n > 0 ? `\n\n> ⚠️ 传输中有 ${n} 个数据包没解析出来，这条回复可能缺字或漏了工具调用。` : ''
 }
 
 // Anthropic 流式 + 工具调用：把 SSE 事件还原成一条完整的 message.content 块数组，
@@ -849,13 +862,14 @@ async function streamAnthropicBlocks(resp, onText, onThinking) {
   const blocks = []
   const usage = { promptTokens: 0, completionTokens: 0, cachedTokens: 0, cacheWriteTokens: 0 }
   let buf = ''
+  let dropped = 0    // 解析失败被丢弃的 SSE 事件数
 
   const handleLine = (line) => {
     if (!line.startsWith('data: ')) return
     const raw = line.slice(6)
     if (raw === '[DONE]') return
     let json
-    try { json = JSON.parse(raw) } catch { return }
+    try { json = JSON.parse(raw) } catch { dropped++; warnBadEvent(raw); return }
 
     if (json.type === 'message_start') {
       const u = json.message?.usage
@@ -886,7 +900,10 @@ async function streamAnthropicBlocks(resp, onText, onThinking) {
     if (json.type === 'content_block_stop') {
       const b = blocks[json.index]
       if (b?.type === 'tool_use') {
-        try { b.input = b._json ? JSON.parse(b._json) : {} } catch { b.input = {} }
+        // 攒齐的入参 JSON 解析不了 → 以前静默变成 {}，工具就带着一手空参数被调用了。
+        // 参数照旧兜底成 {}（让工具自己报错给模型看，能自我纠正），但账要记上。
+        try { b.input = b._json ? JSON.parse(b._json) : {} }
+        catch { b.input = {}; dropped++; warnBadEvent(`tool_use[${b.name}] 入参：${b._json}`) }
         delete b._json
       }
       return
@@ -907,6 +924,7 @@ async function streamAnthropicBlocks(resp, onText, onThinking) {
   if (buf) handleLine(buf)
 
   for (const b of blocks) if (b && typeof b.text === 'string') b.text = stripSentinel(b.text)
+  if (dropped) blocks.push({ type: 'text', text: badEventNote(dropped) })
   return { content: blocks.filter(Boolean), usage }
 }
 
@@ -917,6 +935,7 @@ async function streamSSE(resp, parseLine, onChunk, extractUsage) {
   let usage = null
   let buf = ''  // SSE 事件可能被 TCP 分包截断，跨 read 缓冲半行避免 JSON 解析失败丢数据
   let pendingOut = ''  // 末尾疑似半个 [done] 哨兵，攒着等下一块拼齐
+  let dropped = 0      // 解析失败被丢弃的 SSE 事件数
 
   const handleLine = (line) => {
     if (!line.startsWith('data: ')) return
@@ -937,7 +956,10 @@ async function streamSSE(resp, parseLine, onChunk, extractUsage) {
         pendingOut = hold
         if (out) onChunk?.(out)
       }
-    } catch {}
+    } catch {
+      dropped++
+      warnBadEvent(data)
+    }
   }
 
   while (true) {
@@ -953,7 +975,7 @@ async function streamSSE(resp, parseLine, onChunk, extractUsage) {
   if (usage) {
     usage.totalTokens = (usage.promptTokens || 0) + (usage.completionTokens || 0)
   }
-  return { text: stripSentinel(fullText), usage }
+  return { text: stripSentinel(fullText) + badEventNote(dropped), usage }
 }
 
 // ─── Message format helpers ─────────────────────────────────────────────────

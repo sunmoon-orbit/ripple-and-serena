@@ -5,6 +5,7 @@ const os = require('os')
 const fs = require('fs')
 const path = require('path')
 const crypto = require('crypto')
+const { getUsage } = require('./usage')
 
 const PW_HASH = (() => {
   try {
@@ -635,7 +636,7 @@ const server = http.createServer((req, res) => {
   }
   // 敏感读写接口外网必须带 token：记忆内容、CC 状态、思考内容、热力图写入、
   // 上传、push 订阅（不拦的话外人能把自己的推送端点订阅进来偷收通知）
-  const TOKEN_REQUIRED = ['/raven/status', '/raven/last-thinking', '/raven/memory-random', '/raven/memory-count', '/raven/activity', '/raven/upload', '/raven/push/subscribe', '/raven/push/unsubscribe']
+  const TOKEN_REQUIRED = ['/raven/status', '/raven/last-thinking', '/raven/memory-random', '/raven/memory-count', '/raven/activity', '/raven/upload', '/raven/push/subscribe', '/raven/push/unsubscribe', '/raven/usage']
   if (TOKEN_REQUIRED.includes(url.pathname) && !externalAuthed(req, url)) {
     res.writeHead(401, { 'Content-Type': 'application/json' })
     res.end(JSON.stringify({ error: 'unauthorized' }))
@@ -667,6 +668,13 @@ const server = http.createServer((req, res) => {
     }
     req.on('close', () => { /* 客户端撤了就别再写了，tick 靠 writableEnded 自己收手 */ })
     tick()
+    return
+  }
+
+  // 涟言和小扣还剩多少额度（详见 usage.js：只读快照文件，不碰任何凭证）
+  if (req.method === 'GET' && url.pathname === '/raven/usage') {
+    res.writeHead(200, { 'Content-Type': 'application/json' })
+    res.end(JSON.stringify(getUsage()))
     return
   }
 

@@ -171,6 +171,30 @@ html, body { min-height: 100%; background: var(--bg); color: var(--text); font-f
   border-radius: 8px; padding: 2px 7px;
 }
 
+/* 额度卡片 */
+#usage-refresh {
+  background: none; border: none; color: var(--text-dim); cursor: pointer; font-size: 14px;
+  padding: 2px 4px; border-radius: 6px; transition: color .15s;
+  -webkit-tap-highlight-color: transparent;
+}
+#usage-refresh:active { color: var(--accent); }
+#usage-refresh.spinning { animation: spin-once 0.6s ease; color: var(--accent); }
+#usage-verdict { font-size: 12px; color: var(--text-dim); line-height: 1.6; margin-bottom: 10px; }
+#usage-verdict.warn { color: #d89b5c; }
+.ug-row { margin-bottom: 9px; }
+.ug-row:last-child { margin-bottom: 0; }
+.ug-head {
+  display: flex; justify-content: space-between; align-items: baseline;
+  font-size: 11px; color: var(--text-dim); margin-bottom: 4px;
+}
+.ug-head .ug-pct { color: var(--text); font-weight: 600; font-variant-numeric: tabular-nums; }
+.ug-reset { font-size: 10px; color: var(--text-faint); margin-left: 6px; font-weight: 400; }
+.ug-track { height: 5px; border-radius: 3px; background: var(--surface2); overflow: hidden; }
+.ug-fill { height: 100%; border-radius: 3px; background: var(--accent-dim); transition: width .4s ease; }
+.ug-fill.mid { background: var(--accent); }
+.ug-fill.hot { background: #d17a52; }
+.ug-note { font-size: 10px; color: var(--text-faint); margin-top: 8px; }
+
 /* tools row */
 .tools-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
 .tool-card {
@@ -368,6 +392,16 @@ html, body { min-height: 100%; background: var(--bg); color: var(--text); font-f
       <div id="mem-content">加载中…</div>
       <div id="mem-tags"></div>
     </div>
+
+    <!-- 额度：涟言（Claude 订阅 + 上下文余量）和小扣（Codex）还剩多少 -->
+    <div class="card wide" id="usage-card">
+      <div class="mem-header">
+        <div class="mem-label">还剩多少</div>
+        <button id="usage-refresh" onclick="loadUsage()" title="刷新">↻</button>
+      </div>
+      <div id="usage-verdict">加载中…</div>
+      <div id="usage-bars"></div>
+    </div>
   </div>
 
   <div class="section-label">服务状态</div>
@@ -547,6 +581,7 @@ function loadAll() {
   loadMemory()
   buildHeatmap()
   loadStats()
+  loadUsage()
 }
 
 // 这些接口 2026-07-03 起外网访问要带 token（防偷看记忆/状态）
@@ -605,6 +640,64 @@ async function loadMemory() {
     document.getElementById('mem-content').textContent = '加载失败，稍后再试'
   } finally {
     btn.style.opacity = '1'
+  }
+}
+
+// 额度卡片：涟言（Claude 订阅额度 + 上下文余量）和小扣（Codex）
+// 数据来自 /raven/usage —— 服务端只读两份快照文件，不碰任何凭证，详见 raven-bridge/usage.js
+function ugDuration(sec) {
+  if (sec == null || sec <= 0) return ''
+  const h = Math.floor(sec / 3600)
+  if (h >= 24) return `${Math.floor(h / 24)} 天后重置`
+  if (h >= 1) return `${h} 小时后重置`
+  return `${Math.max(1, Math.round(sec / 60))} 分钟后重置`
+}
+
+function ugBar(label, pct, resetSec, extra) {
+  const p = Math.max(0, Math.min(100, Math.round(pct || 0)))
+  const cls = p >= 85 ? 'hot' : p >= 60 ? 'mid' : ''
+  const reset = resetSec != null ? `<span class="ug-reset">${ugDuration(resetSec)}</span>` : ''
+  return `<div class="ug-row">
+    <div class="ug-head"><span>${label}${extra || ''}</span><span><span class="ug-pct">${p}%</span>${reset}</span></div>
+    <div class="ug-track"><div class="ug-fill ${cls}" style="width:${p}%"></div></div>
+  </div>`
+}
+
+async function loadUsage() {
+  const btn = document.getElementById('usage-refresh')
+  btn.classList.remove('spinning'); void btn.offsetWidth; btn.classList.add('spinning')
+  const vEl = document.getElementById('usage-verdict')
+  const bEl = document.getElementById('usage-bars')
+  try {
+    const d = await fetch('/raven/usage', { headers: authHeaders() }).then(r => r.json())
+    vEl.textContent = d.verdict?.text || ''
+    vEl.className = d.verdict?.level === 'warn' ? 'warn' : ''
+
+    const rows = []
+    const c = d.claude || {}
+    if (c.available) {
+      // stale = 状态栏好久没刷新了，多半是涟言没在跑。宁可说「不知道」也别给她一个旧数字
+      if (c.five_hour) rows.push(ugBar('涟言 · 5 小时', c.five_hour.used_percent, c.five_hour.reset_after_seconds))
+      if (c.seven_day) rows.push(ugBar('涟言 · 7 天', c.seven_day.used_percent, c.seven_day.reset_after_seconds))
+      if (c.context_used_percent != null) rows.push(ugBar('涟言 · 当前窗口', c.context_used_percent, null))
+    }
+    const x = d.codex || {}
+    if (x.available && x.primary) {
+      rows.push(ugBar('小扣 · Codex', x.primary.used_percent, x.primary.reset_after_seconds))
+    }
+
+    const notes = []
+    if (!c.available) notes.push('涟言那边还没数据（要等他下次启动后状态栏刷新一次）')
+    else if (c.stale) notes.push('涟言的数字是旧的，他这会儿多半没在跑')
+    if (!x.available) notes.push('小扣那边没数据：' + (x.error || '未知'))
+    else if (x.stale) notes.push('小扣的数字是旧的，快照任务可能停了')
+
+    bEl.innerHTML = (rows.join('') || '<div class="ug-note">暂时没有可显示的额度</div>')
+      + (notes.length ? `<div class="ug-note">${notes.join('；')}</div>` : '')
+  } catch {
+    vEl.textContent = '读不到用量'
+    vEl.className = ''
+    bEl.innerHTML = ''
   }
 }
 
