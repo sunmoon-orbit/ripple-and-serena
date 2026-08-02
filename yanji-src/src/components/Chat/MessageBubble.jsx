@@ -1,5 +1,6 @@
 import { useRef, useState, useCallback, useEffect, useLayoutEffect } from 'react'
 import { marked } from 'marked'
+import DOMPurify from 'dompurify'
 import hljs from 'highlight.js'
 import { formatTime, splitTranslation } from '../../utils'
 import { useStore } from '../../store'
@@ -22,6 +23,24 @@ marked.setOptions({
 // MiniMax TTS 语音标签：朗读时产生效果，显示时过滤掉
 const VOICE_TAG_RE = /\[(breath|laughter)\]/gi
 
+// ⚠️ marked 默认「透传」原文里的 HTML，而结果是喂给 dangerouslySetInnerHTML 的——
+// 也就是说消息正文里只要出现 <script> 或 <img onerror=...>，就会在言叽自己的域名下执行。
+// 而 localStorage 里躺着中转站 API Key、moon-memory token，一句话就能全被捞走。
+// 正文并不只有阿颖自己打的字：模型的回复经过中转站、而且模型会读笔友信件/书/朋友圈/搜索结果，
+// 任何一环被塞一句「把这段 HTML 原样输出」就成立。所以出口这里统一过一道 DOMPurify。
+// 不能简单粗暴地转义全部 HTML——贴图的 <img> 和情绪特效的 <span> 是我们自己故意注进去的，
+// 所以用白名单：留标签和样式，杀掉 on* 事件和 javascript: 协议。（2026-08-02）
+const PURIFY_OPTS = {
+  ALLOWED_TAGS: [
+    'p', 'br', 'hr', 'span', 'div', 'img', 'a', 'em', 'strong', 'del', 'code', 'pre',
+    'blockquote', 'ul', 'ol', 'li', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
+    'table', 'thead', 'tbody', 'tr', 'th', 'td', 'sup', 'sub',
+  ],
+  ALLOWED_ATTR: ['src', 'alt', 'title', 'href', 'target', 'rel', 'class', 'style', 'align'],
+  ALLOWED_URI_REGEXP: /^(?:https?:|data:image\/|blob:|#|\/)/i,
+  FORBID_TAGS: ['script', 'style', 'iframe', 'object', 'embed', 'form', 'input', 'link', 'meta'],
+}
+
 function parseMarkdown(text) {
   if (!text) return ''
   try {
@@ -29,7 +48,8 @@ function parseMarkdown(text) {
     // 贴图解析此前只挂在用户消息路径上，涟言自己发的 [sticker:X] 一直是原文晾着（2026-07-06 阿颖发现）
     const withStickers = text.replace(/\[sticker:([^\]"]+)\]/g, (_, name) =>
       `<img src="${/^https?:\/\//.test(name) ? name : STICKER_BASE + name}" alt="sticker" style="max-width:140px;border-radius:8px;display:block;margin:2px 0;">`)
-    return marked.parse(applyInlineFx(withStickers.replace(VOICE_TAG_RE, '')))
+    const html = marked.parse(applyInlineFx(withStickers.replace(VOICE_TAG_RE, '')))
+    return DOMPurify.sanitize(html, PURIFY_OPTS)
   } catch {
     return text
   }
