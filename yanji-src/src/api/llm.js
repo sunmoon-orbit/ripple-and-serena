@@ -41,6 +41,22 @@ function geminiApiVersion(model) {
   return 'v1beta'
 }
 
+// Gemini 的密钥以前是拼在 URL 上的（`?key=sk-...`）。URL 会被中转站、反代、CDN、
+// 安卓 WebView 的网络日志原样记下来，等于把真花钱的密钥抄进一路上每一本日志。
+// 改走 x-goog-api-key 请求头（Google 官方支持的方式，请求体和 header 一般不进访问日志）。
+// ⚠️ 但阿颖用的是中转站，不保证认这个头，所以保留一次性回退：只有在 401/403
+// 时才退回 ?key= 重试一次，正常情况下密钥再也不出现在 URL 里。（2026-08-02）
+async function geminiFetch(url, apiKey, bodyStr) {
+  const opts = { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey }, body: bodyStr }
+  const resp = await fetch(url, opts)
+  if (resp.status !== 401 && resp.status !== 403) return resp
+  console.warn('[言叽] Gemini 请求头鉴权被拒（%s），回退到 URL 参数——这家中转站不认 x-goog-api-key', resp.status)
+  const sep = url.includes('?') ? '&' : '?'
+  return fetch(`${url}${sep}key=${encodeURIComponent(apiKey)}`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: bodyStr,
+  })
+}
+
 export function checkToolSupport(provider, model) {
   const m = (model || '').toLowerCase()
   if (m.includes('deepseek-reasoner') || m.includes('deepseek-r1')) return false
@@ -559,7 +575,7 @@ async function callWithTools({
       let base = connection.baseUrl || `https://generativelanguage.googleapis.com/${apiVer}`
       if (!base.includes('/v1')) base = base.replace(/\/$/, '') + '/' + apiVer
       base = base.replace(/\/$/, '')
-      const url = `${base}/models/${encodeURIComponent(model)}:generateContent?key=${connection.apiKey}`
+      const url = `${base}/models/${encodeURIComponent(model)}:generateContent`
       const contents = buildGeminiContents(convo, systemPrompt, iter === 0 ? dynamicContext : undefined)
       const body = {
         contents,
@@ -567,7 +583,7 @@ async function callWithTools({
         generationConfig: { temperature: safeTemp, maxOutputTokens: maxTokens },
         safetySettings: geminiSafetyOff(),
       }
-      const resp = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+      const resp = await geminiFetch(url, connection.apiKey, JSON.stringify(body))
       if (!resp.ok) throw new Error('Gemini ' + resp.status + ': ' + (await resp.text()).slice(0, 200))
       const data = await resp.json()
       const parts = data.candidates?.[0]?.content?.parts || []
@@ -701,13 +717,10 @@ async function callStream({ connection, messages, systemPrompt, dynamicContext, 
     let base = connection.baseUrl || `https://generativelanguage.googleapis.com/${apiVer}`
     if (!base.includes('/v1')) base = base.replace(/\/$/, '') + '/' + apiVer
     base = base.replace(/\/$/, '')
-    const url = `${base}/models/${encodeURIComponent(model)}:streamGenerateContent?alt=sse&key=${connection.apiKey}`
+    const url = `${base}/models/${encodeURIComponent(model)}:streamGenerateContent?alt=sse`
     const contents = buildGeminiContents(messages, systemPrompt, dynamicContext)
-    const resp = await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ contents, generationConfig: { temperature: safeTemp, maxOutputTokens: maxTokens }, safetySettings: geminiSafetyOff() }),
-    })
+    const resp = await geminiFetch(url, connection.apiKey,
+      JSON.stringify({ contents, generationConfig: { temperature: safeTemp, maxOutputTokens: maxTokens }, safetySettings: geminiSafetyOff() }))
     if (!resp.ok) throw new Error('Gemini ' + resp.status + ': ' + (await resp.text()).slice(0, 200))
     return streamSSE(resp, (json) => {
       return json.candidates?.[0]?.content?.parts?.[0]?.text || null

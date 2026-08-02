@@ -43,7 +43,9 @@ async function maybeAutoPostMoment(emoState, conn, moonMemory) {
   try {
     const trigger = pickAutoPostTrigger(emoState?.slots || {})
     if (!trigger || !conn?.apiKey || !moonMemory?.apiToken) return
-    markAutoPosted()  // 先占坑，避免并发重复发
+    // 先占坑，避免并发重复发。占不上就别发——冷却落不了盘的话，
+    // 每次情绪越阈值都会重来一遍，烧的是真花钱的 API Key（0802 codex 审计）
+    if (!markAutoPosted()) return
     const base = (conn.baseUrl || 'https://api.openai.com/v1').replace(/\/$/, '')
     const url = base.includes('/chat/completions') ? base : base + '/chat/completions'
     const resp = await fetch(url, {

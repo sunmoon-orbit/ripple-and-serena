@@ -210,15 +210,18 @@ async function stashFile(filename, content, mime) {
   const { id } = await r.json()
   return `${base}/files/dl/${id}`
 }
-function previewGenFile(f) {
-  const url = fileBlobUrl(f)
-  window.open(url, '_blank')
-  setTimeout(() => URL.revokeObjectURL(url), 60000)
-}
+// ⚠️ 这里以前是 `window.open(URL.createObjectURL(new Blob([html], {type:'text/html'})))`。
+// **blob: URL 继承创建它的页面的 origin** —— 也就是说预览一个 .html 文件，里面的
+// <script> 是在言叽自己的域名下跑的，能直接读 localStorage 里的中转站 API Key。
+// 而 make_file 的内容是模型写的，模型又会读笔友信件/书/朋友圈/搜索结果，
+// 一句间接注入就能让它生成一个带偷钥匙脚本的 html，等阿颖点「预览」。
+// 改成和「运行」按钮同一套：sandbox iframe + srcdoc，**不给 allow-same-origin**，
+// 里面的代码碰不到我们的存储。（2026-08-02，codex 交叉审计发现）
 function GenFileCard({ file }) {
   const isHtml = /\.html?$/i.test(file.filename)
   const [dlUrl, setDlUrl] = useState(null)
   const [stashing, setStashing] = useState(false)
+  const [preview, setPreview] = useState(false)
   const handleDownload = async () => {
     if (dlUrl) return // 已有链接，让 <a> 的默认行为处理
     setStashing(true)
@@ -236,6 +239,7 @@ function GenFileCard({ file }) {
     setStashing(false)
   }
   return (
+    <>
     <div className="msg-file-card">
       <span className="msg-file-icon">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
@@ -247,7 +251,7 @@ function GenFileCard({ file }) {
         <span className="msg-file-name">{file.filename}</span>
         <span className="msg-file-size">{(file.content.length / 1024).toFixed(1)} KB</span>
       </div>
-      {isHtml && <button className="msg-file-btn" onClick={() => previewGenFile(file)}>预览</button>}
+      {isHtml && <button className="msg-file-btn" onClick={() => setPreview((v) => !v)}>{preview ? '收起' : '预览'}</button>}
       {dlUrl
         ? <a className="msg-file-btn" href={dlUrl} style={{textDecoration:'none'}}>下载</a>
         : <button className="msg-file-btn" onClick={handleDownload} disabled={stashing}>
@@ -255,6 +259,16 @@ function GenFileCard({ file }) {
           </button>
       }
     </div>
+    {isHtml && preview && (
+      <iframe
+        className="code-run-frame"
+        sandbox="allow-scripts allow-modals"
+        loading="lazy"
+        srcDoc={file.content}
+        title={file.filename}
+      />
+    )}
+    </>
   )
 }
 

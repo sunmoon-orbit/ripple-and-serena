@@ -82,7 +82,15 @@ function loadPersistedState() {
     }
     if (parsed.messagesByChatId) sweepStaleStreaming(parsed.messagesByChatId)
     return parsed
-  } catch {
+  } catch (err) {
+    // ⚠️ 这里以前是 `catch { return {} }`：localStorage 读不到 / JSON 坏了 / 迁移代码抛错，
+    // 一律当成「全新安装」。可是 localStorage 里那份数据往往还**好好躺着**，
+    // 而空状态一旦被回写，就把连接、API Key、设置真的抹掉了——读失败变成了写破坏。
+    // 现在：认下这次读失败，冻结所有写入（宁可这次不保存，也不能覆盖唯一的副本），
+    // 并且明明白白告诉她，而不是让她对着空空的设置页以为自己号没了。
+    loadFailed = true
+    console.error('[言叽] 读取本地设置失败，已冻结写入以免覆盖原数据', err)
+    setTimeout(() => showToast('本地设置读取失败，已暂停保存以免覆盖原数据——先别改设置，告诉涟言', 'error', 12000), 1200)
     return {}
   }
 }
@@ -114,8 +122,12 @@ let pendingBig = null
 let legacyKeep = false    // 搬家校验完成之前，localStorage 里那份老数据一个字都别动
 let localWarned = false
 let bigWarned = false
+let loadFailed = false    // 开机读 localStorage 就失败了——冻结写入，别拿空状态盖掉可能还完好的原数据
+const deletedBeforeHydrate = new Set()  // hydrate 之前被删掉的对话 id，合并时要重新扣掉（见 deleteChat）
 
 function saveSettings(payload) {
+  // 读失败过就绝不写：那份读不出来的数据可能是完好的，覆盖了就真没了
+  if (loadFailed) return
   try {
     localStorage.setItem(LOCAL_KEY, JSON.stringify(payload))
   } catch (err) {
@@ -297,6 +309,10 @@ export const useStore = create((set, get) => ({
     })
   },
   deleteChat: (id) => {
+    // 墓碑：IndexedDB 还没读回来就删掉的对话，要记一笔。否则 hydrate 时
+    // mergeMessages 拿库里那份旧数据当底、只增不减，被删的对话会原地复活
+    // （0802 codex 审计发现的竞态；窗口很短但删除被撤销这种事一次都不能有）
+    if (!bigHydrated) deletedBeforeHydrate.add(id)
     set((s) => {
       const chats = s.chats.filter((c) => c.id !== id)
       const messagesByChatId = { ...s.messagesByChatId }
@@ -580,6 +596,8 @@ if (hasLegacyBig) {
       const loadedSums = summaries && typeof summaries === 'object' ? summaries : {}
       const cur = useStore.getState()
       bigHydrated = true
+      // 读回来之前删掉的对话，从库里那份旧数据上再扣一次——不然「只增不减」的合并会让它复活
+      for (const id of deletedBeforeHydrate) { delete loadedMsgs[id]; delete loadedSums[id] }
       useStore.setState({
         messagesByChatId: mergeMessages(loadedMsgs, cur.messagesByChatId),
         summariesByChatId: { ...loadedSums, ...cur.summariesByChatId },

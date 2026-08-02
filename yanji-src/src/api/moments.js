@@ -91,16 +91,31 @@ const TRIGGERS = [
 ]
 
 export function pickAutoPostTrigger(slots) {
+  let last = memLastAutoPost
   try {
-    const last = JSON.parse(localStorage.getItem(AUTOPOST_KEY) || '{}').lastAt || 0
-    if (Date.now() - last < AUTOPOST_COOLDOWN) return null
+    last = Math.max(last, JSON.parse(localStorage.getItem(AUTOPOST_KEY) || '{}').lastAt || 0)
   } catch {}
+  if (Date.now() - last < AUTOPOST_COOLDOWN) return null
   for (const t of TRIGGERS) {
     if ((slots[t.slot] || 0) >= t.min) return t
   }
   return null
 }
 
+// 内存里也存一份冷却时间戳：localStorage 万一写不进去（配额/隐私模式/WebView 存储异常），
+// 至少本次会话内不会反复触发。返回值告诉调用方「坑到底占上没有」。
+let memLastAutoPost = 0
+
 export function markAutoPosted() {
-  try { localStorage.setItem(AUTOPOST_KEY, JSON.stringify({ lastAt: Date.now() })) } catch {}
+  memLastAutoPost = Date.now()
+  try {
+    localStorage.setItem(AUTOPOST_KEY, JSON.stringify({ lastAt: memLastAutoPost }))
+    return true
+  } catch (err) {
+    // ⚠️ 这里以前是 `catch {}`：占坑失败也一声不吭，调用方照样往下发。
+    // 后果不是「少发一条朋友圈」，是**每次情绪越阈值都重新发一遍**——
+    // 烧的是阿颖真花钱的 API Key，还会往记忆库里灌重复动态。
+    console.error('[言叽] 自动发圈冷却写入失败，本次不发', err)
+    return false
+  }
 }
