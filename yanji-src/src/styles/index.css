@@ -1233,6 +1233,22 @@ textarea.form-input { display: block; margin: 8px 16px 12px; }
   border-bottom-left-radius: 3px;
   box-shadow: var(--shadow-sm);
 }
+/* 纯贴图/纯图片的消息不套气泡（0802）：微信 QQ 都是直接甩一张图，
+   包一层带背景和阴影的壳会让表情包看着像被裱起来了。
+   判定在 MessageBubble.jsx 的 isBareMedia()，只有一个字正文都会退回普通气泡。 */
+.message-bubble.bubble-bare {
+  background: none;
+  border: none;
+  box-shadow: none;
+  padding: 0;
+  border-radius: 0;
+}
+.bubble-bare .bubble-images { margin-bottom: 0; }
+/* 不裹气泡了就可以放大一点，贴图 140 → 160，照片 180 → 220 */
+.bubble-bare .bubble-img { max-width: 220px; max-height: 220px; }
+.bubble-bare img[alt="sticker"] { max-width: 160px !important; }
+.bubble-bare .bubble-markdown img { max-width: 200px; max-height: 200px; margin: 0; }
+
 .bubble-text { white-space: pre-wrap; word-break: break-word; }
 
 /* Attachment chip in user bubble */

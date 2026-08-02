@@ -393,9 +393,32 @@ const UserIcon = () => (
   </svg>
 )
 
+// 一条消息如果只有贴图/图片、没有正文，就别拿气泡裹着——微信 QQ 都是直接甩一张图。
+// 0802 阿颖开着冰箱想起来的。判定必须严：只要还有一个字，或者带着语音/通话/思考/附件，
+// 就仍旧是普通气泡，否则会把有正文的消息也扒光。
+const STICKER_TAG_RE = /\[sticker:[^\]]+\]/g
+const LONE_MD_IMG_RE = /^!\[[^\]]*\]\([^)]+\)$/
+function isBareMedia(msg) {
+  if (!msg) return false
+  if (msg.call || msg.voice || msg.voicemail || msg.voiceMsg || msg.streaming) return false
+  if (msg.files?.length || msg.attachments?.length || msg.thinking || msg.quote) return false
+  const text = typeof msg.content === 'string' ? msg.content : ''
+  const hasImages = msg.images?.length > 0
+  const stripped = text.replace(STICKER_TAG_RE, '').trim()
+  // 只有图片附件、一句话都没写
+  if (hasImages && !text.trim()) return true
+  // 正文除了贴图标签什么都不剩
+  if (!hasImages && STICKER_TAG_RE.test(text) && !stripped) { STICKER_TAG_RE.lastIndex = 0; return true }
+  STICKER_TAG_RE.lastIndex = 0
+  // 整条就是一个 markdown 图片（涟言发图常走这个写法）
+  if (!hasImages && LONE_MD_IMG_RE.test(text.trim())) return true
+  return false
+}
+
 export default function MessageBubble({ msg, onEdit, onQuote, onDelete, isLast }) {
   const isUser = msg.role === 'user'
   const isStreaming = msg.streaming
+  const bare = isBareMedia(msg)
   // [错误] 气泡（请求失败落盘的）：给一个删除钮，能从记录里刷掉
   const isErrorMsg = !isUser && typeof msg.content === 'string' && msg.content.startsWith('[错误]')
   const { avatarConfig, moonMemory, textReveal } = useStore()
@@ -543,7 +566,7 @@ export default function MessageBubble({ msg, onEdit, onQuote, onDelete, isLast }
             <span className="msg-quote-text">{msg.quote.content}</span>
           </div>
         )}
-        <div className={`message-bubble ${isUser ? 'bubble-user' : 'bubble-assistant'}${isStreaming ? ' streaming' : ''}`}>
+        <div className={`message-bubble ${isUser ? 'bubble-user' : 'bubble-assistant'}${isStreaming ? ' streaming' : ''}${bare && !editing ? ' bubble-bare' : ''}`}>
           {isUser ? (
             editing ? (
               <div className="msg-edit-wrap">
