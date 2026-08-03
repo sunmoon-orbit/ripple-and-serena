@@ -7,6 +7,7 @@ import { showToast } from '../Toast'
 import { uuid } from '../../utils'
 import { subscribePush, unsubscribePush, getSubscription, isNativeApp, subscribeNativePush, unsubscribeNativePush, getNativePushToken } from '../../api/push'
 import { DELAY_MODES } from '../../utils/replyDelay'
+import { DEFAULT_RINGTONE_ID, RINGTONES, playRingtone } from '../../utils/ringtones'
 
 function Section({ title, children }) {
   return (
@@ -14,6 +15,39 @@ function Section({ title, children }) {
       <h3 className="settings-section-title">{title}</h3>
       {children}
     </div>
+  )
+}
+
+function RingtoneSection({ value, onChange }) {
+  const stopPreviewRef = useRef(null)
+  useEffect(() => () => stopPreviewRef.current?.(), [])
+
+  function preview(id) {
+    stopPreviewRef.current?.()
+    stopPreviewRef.current = playRingtone(id)
+  }
+
+  return (
+    <Section title="来电铃声">
+      <div className="settings-card">
+        {RINGTONES.map((item) => (
+          <label className="ringtone-option" key={item.id}>
+            <input
+              type="radio"
+              name="incoming-ringtone"
+              value={item.id}
+              checked={(value || DEFAULT_RINGTONE_ID) === item.id}
+              onChange={() => onChange(item.id)}
+            />
+            <span className="ringtone-copy">
+              <span className="ringtone-name">{item.name}</span>
+              <span className="ringtone-description">{item.description}</span>
+            </span>
+            <button type="button" className="btn-sm btn-ghost ringtone-preview" onClick={(event) => { event.preventDefault(); preview(item.id) }}>▶ 试听</button>
+          </label>
+        ))}
+      </div>
+    </Section>
   )
 }
 
@@ -285,6 +319,7 @@ export default function Settings() {
     homeStyle, setHomeStyle,
     randomTool, setRandomTool,
     timeAwareness, setTimeAwareness, longingPush, setLongingPush,
+    ringtone, setRingtone,
     customStickers, addCustomSticker, removeCustomSticker,
     memoryItems, addMemoryItem, toggleMemoryItem, deleteMemoryItem,
   } = store
@@ -1255,6 +1290,7 @@ export default function Settings() {
               </div>
             </Section>
             <RoostBgSection />
+            <RingtoneSection value={ringtone} onChange={setRingtone} />
             <Section title="语音通话样式">
               <div className="settings-card">
                 <div className="card-row">

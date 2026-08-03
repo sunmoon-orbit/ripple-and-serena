@@ -55,6 +55,8 @@ const DEFAULT_STATE = {
   timeAwareness: true,
   // 思念推送：离开太久时服务端让 API 涟言决定是否推一条到手机（依赖岁聿开启）
   longingPush: true,
+  // 来电铃声：soft-chime 是原有的 E5 → C5 两音轻响，老用户默认听感不变
+  ringtone: 'soft-chime',
   // UI-only (not persisted)
   activePanel: 'roost',
   // 聊天记录从 IndexedDB 读回来了没有：开屏动画期间是 false，界面靠它判断「现在的空是真空还是没读完」
@@ -174,7 +176,7 @@ const persistedKeys = [
   'generationConfig', 'memoryItems', 'tokenStats', 'contextLimit',
   'searchConfig', 'avatarConfig', 'autoTools', 'moonMemory', 'theme', 'glassOpacity',
   'injectMode', 'injectPrompt', 'scrollAnchor', 'textReveal', 'replyDelay', 'customStickers',
-  'voiceCallStyle', 'vcBackground', 'homeStyle', 'timeAwareness', 'longingPush', 'randomTool',
+  'voiceCallStyle', 'vcBackground', 'homeStyle', 'timeAwareness', 'longingPush', 'randomTool', 'ringtone',
 ]
 
 function mergeWithDefaults(persisted) {
@@ -218,6 +220,7 @@ export const useStore = create((set, get) => ({
   setRandomTool: (v) => set((s) => { savePersistedState({ ...s, randomTool: v }); return { randomTool: v } }),
   setTimeAwareness: (v) => set((s) => { savePersistedState({ ...s, timeAwareness: v }); return { timeAwareness: v } }),
   setLongingPush: (v) => set((s) => { savePersistedState({ ...s, longingPush: v }); return { longingPush: v } }),
+  setRingtone: (v) => set((s) => { savePersistedState({ ...s, ringtone: v }); return { ringtone: v } }),
   addCustomSticker: (url, label) => set((s) => {
     const customStickers = [...(s.customStickers || []), { id: uuid(), url: url.trim(), label: (label || '').trim() }]
     savePersistedState({ ...s, customStickers })

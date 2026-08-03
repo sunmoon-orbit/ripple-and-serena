@@ -1012,6 +1012,19 @@ textarea.form-input { display: block; margin: 8px 16px 12px; }
 .card-row:last-child { border-bottom: none; }
 .card-row-label { font-size: 13px; color: var(--text); flex: 1; }
 
+/* 来电铃声：整行可选，试听按钮保持独立，方便手机上单手操作 */
+.ringtone-option {
+  display: flex; align-items: center; gap: 12px; padding: 11px 16px;
+  border-bottom: 1px solid var(--border); cursor: pointer;
+}
+.ringtone-option:last-child { border-bottom: none; }
+.ringtone-option:hover { background: rgba(150,140,180,0.04); }
+.ringtone-option input { accent-color: var(--accent); flex-shrink: 0; }
+.ringtone-copy { display: flex; flex: 1; min-width: 0; flex-direction: column; gap: 2px; }
+.ringtone-name { font-size: 13px; color: var(--text); }
+.ringtone-description { font-size: 11px; color: var(--text-muted); }
+.ringtone-preview { flex-shrink: 0; }
+
 /* toggle */
 .toggle { display: inline-flex; align-items: center; cursor: pointer; }
 .toggle input { display: none; }

@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useStore } from '../../store'
+import { playRingtone } from '../../utils/ringtones'
 
 // 来电响铃时长：90 秒没接自动转语音留言（对齐 callhome 的 expiry 设计）
 const RING_SECONDS = 90
@@ -18,51 +19,16 @@ const CrowIcon = () => (
 )
 
 export default function IncomingCall({ reason, onAccept, onMiss }) {
-  const { avatarConfig } = useStore()
+  const { avatarConfig, ringtone } = useStore()
   const avatarImg = avatarConfig?.mode === 'image' && avatarConfig?.assistantImage
   const avatarRadius = avatarConfig?.shape === 'square' ? '14px' : '50%'
   const [left, setLeft] = useState(RING_SECONDS)
   const missedRef = useRef(false)
 
-  // 铃声：WebAudio 两音轻响（叮-咚），比系统铃声温柔；失败静默（自动播放策略等）
+  // 来电铃声仍只用 WebAudio 合成；播放模块统一兜住自动播放策略和设备能力差异。
   useEffect(() => {
-    let ctx = null
-    let ringTimer = null
-    try {
-      ctx = new (window.AudioContext || window.webkitAudioContext)()
-      ctx.resume().catch(() => {})
-      const ring = () => {
-        try {
-          const t = ctx.currentTime
-          ;[659.25, 523.25].forEach((freq, i) => {
-            const osc = ctx.createOscillator()
-            const gain = ctx.createGain()
-            osc.type = 'sine'
-            osc.frequency.value = freq
-            gain.gain.setValueAtTime(0, t + i * 0.22)
-            gain.gain.linearRampToValueAtTime(0.1, t + i * 0.22 + 0.04)
-            gain.gain.exponentialRampToValueAtTime(0.001, t + i * 0.22 + 0.9)
-            osc.connect(gain)
-            gain.connect(ctx.destination)
-            osc.start(t + i * 0.22)
-            osc.stop(t + i * 0.22 + 1)
-          })
-        } catch { /* 静默 */ }
-      }
-      ring()
-      ringTimer = setInterval(ring, 2800)
-    } catch { /* 没有 WebAudio 也不影响接听 */ }
-    // 震动（安卓 Chrome 支持；不支持的环境静默跳过）
-    const vibrate = () => { try { navigator.vibrate?.([280, 180, 280]) } catch { /* 静默 */ } }
-    vibrate()
-    const vibTimer = setInterval(vibrate, 2800)
-    return () => {
-      clearInterval(ringTimer)
-      clearInterval(vibTimer)
-      try { navigator.vibrate?.(0) } catch { /* 静默 */ }
-      try { ctx?.close() } catch { /* 静默 */ }
-    }
-  }, [])
+    return playRingtone(ringtone, { loop: true, vibrate: true })
+  }, [ringtone])
 
   // 90 秒倒计时，到点算未接
   useEffect(() => {
