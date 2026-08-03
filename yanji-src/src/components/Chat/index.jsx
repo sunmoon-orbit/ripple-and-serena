@@ -917,6 +917,11 @@ export default function Chat() {
     // 聊天记录已经搬去 IndexedDB 了，不能再直接读 localStorage——那样导出的备份没有对话
     const raw = buildBackupJson()
     if (!raw) { showToast('聊天记录还在读取中，等一秒再备份', 'error'); return }
+    // 备份里带着全部密钥（连接 key / 搜索 key / 拾羽 token）——服务器那份存在
+    // data/yanji-backups/，不进 git 也不外传，换设备靠它一键拉回来。
+    // 但落到手机上的那份是密钥唯一能跑出服务器的路（分享菜单一勾就进网盘/聊天软件），
+    // 而它跟原件在同一台设备上，本来就不算异地备份。所以 0803 起：
+    // 服务器备份成功就到此为止，本地文件只在服务器这条路走不通时兜底。
     const moonMemory = useStore.getState().moonMemory || {}
     if (moonMemory?.apiToken) {
       try {
@@ -929,9 +934,12 @@ export default function Chat() {
         if (!r.ok) throw new Error(`(${r.status})`)
         const d = await r.json()
         showToast(`已备份到服务器 ✓ (${(d.size / 1024 / 1024).toFixed(1)}MB)`, 'success')
+        return
       } catch (e) {
-        showToast(`服务器备份失败 ${e.message}，尝试本地下载…`, 'error')
+        showToast(`服务器备份失败 ${e.message}，改存到本地兜底…`, 'error')
       }
+    } else {
+      showToast('没配拾羽连接，只能存本地——这份带着密钥，别外发', 'error', 8000)
     }
     const filename = `yanji-backup-${new Date().toISOString().slice(0,10)}.json`
     const blob = new Blob([raw], { type: 'application/json;charset=utf-8' })
