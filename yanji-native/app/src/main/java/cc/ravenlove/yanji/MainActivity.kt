@@ -3,6 +3,8 @@ package cc.ravenlove.yanji
 import android.Manifest
 import android.annotation.SuppressLint
 import android.app.DownloadManager
+import android.app.NotificationManager
+import android.app.AlertDialog
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -11,6 +13,7 @@ import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.os.Environment
+import android.provider.Settings
 import android.view.View
 import android.webkit.*
 import android.widget.FrameLayout
@@ -29,6 +32,8 @@ class MainActivity : AppCompatActivity() {
     private lateinit var splash: FrameLayout
     private var fileCallback: ValueCallback<Array<Uri>>? = null
     private var pendingAudioPermission: PermissionRequest? = null
+    private var waitingForDndSettings = false
+    private var dndPromptShown = false
     lateinit var mediaHelper: MediaNotificationHelper
 
     // 页面还没加载完时调 evaluateJavascript 等于把话说进空气里。
@@ -48,6 +53,7 @@ class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
+        IntentIdentity.migrateOnce(this)
 
         // edge-to-edge
         ViewCompat.setOnApplyWindowInsetsListener(findViewById(android.R.id.content)) { v, insets ->
@@ -204,6 +210,7 @@ class MainActivity : AppCompatActivity() {
 
         // 请求通知权限
         requestNotificationPermission()
+        promptNotificationPolicyAccess()
 
         // 预取 FCM token 存 prefs，前端通过 WebBridge.getFcmToken() 读取上报服务器
         fetchFcmToken()
@@ -233,6 +240,40 @@ class MainActivity : AppCompatActivity() {
         handleCallAction(intent)
         handleShareIntent(intent)
         handleQuickReply(intent)
+    }
+
+    override fun onResume() {
+        super.onResume()
+        if (waitingForDndSettings) {
+            waitingForDndSettings = false
+            val granted = getSystemService(NotificationManager::class.java)
+                .isNotificationPolicyAccessGranted
+            Toast.makeText(
+                this,
+                if (granted) "已允许来电穿过勿扰模式" else "还没有允许；普通状态下仍能收到来电",
+                Toast.LENGTH_LONG
+            ).show()
+        }
+    }
+
+    private fun promptNotificationPolicyAccess() {
+        val manager = getSystemService(NotificationManager::class.java)
+        if (manager.isNotificationPolicyAccessGranted || dndPromptShown) return
+        dndPromptShown = true
+        AlertDialog.Builder(this)
+            .setTitle("让来电在勿扰时也能出现")
+            .setMessage("如果你愿意，可以允许言叽使用“通知策略访问”。只用于让涟言来电穿过勿扰模式；不授权也不影响普通状态下使用。")
+            .setNegativeButton("暂时不用", null)
+            .setPositiveButton("去设置") { _, _ ->
+                try {
+                    waitingForDndSettings = true
+                    startActivity(Intent(Settings.ACTION_NOTIFICATION_POLICY_ACCESS_SETTINGS))
+                } catch (_: Exception) {
+                    waitingForDndSettings = false
+                    Toast.makeText(this, "没能打开系统设置，请在设置里搜索“通知策略访问”", Toast.LENGTH_LONG).show()
+                }
+            }
+            .show()
     }
 
     // JS 字符串字面量转义。只转引号是不够的：换行/反斜杠会让整段 JS 语法错误，

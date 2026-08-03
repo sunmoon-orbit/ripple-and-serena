@@ -39,6 +39,7 @@ export default function App() {
   const theme = useStore((s) => s.theme)
   const glassOpacity = useStore((s) => s.glassOpacity ?? 0.3)
   const avatarSize = useStore((s) => s.avatarConfig?.size || 28)
+  const ringtone = useStore((s) => s.ringtone)
   const [showSplash, setShowSplash] = useState(true)
   const [showHome, setShowHome] = useState(false)
   const fromNativeRef = useRef(false)
@@ -89,6 +90,12 @@ export default function App() {
   useEffect(() => {
     document.documentElement.style.setProperty('--avatar-size', `${avatarSize}px`)
   }, [avatarSize])
+
+  // 开机也抄一次：她可能在装新包之前就选好了铃声，只靠 setRingtone 同步的话，
+  // 除非她再点一次选项，原生端永远停在默认的「檐下晚风」。
+  useEffect(() => {
+    try { window.YanjiNative?.saveRingtone?.(ringtone || 'soft-chime') } catch { /* 网页版没这个桥 */ }
+  }, [ringtone])
 
   return (
     <>

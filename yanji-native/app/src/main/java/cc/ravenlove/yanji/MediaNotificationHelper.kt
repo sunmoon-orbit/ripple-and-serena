@@ -111,8 +111,8 @@ class MediaNotificationHelper(private val context: Context) {
 
     private fun showNotification(title: String, artist: String, playing: Boolean) {
         val contentIntent = PendingIntent.getActivity(
-            context, 0,
-            Intent(context, MainActivity::class.java),
+            context, IntentIdentity.REQUEST_MEDIA_OPEN,
+            Intent(context, MainActivity::class.java).apply { action = IntentIdentity.ACTION_MEDIA_OPEN },
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
         val playPauseAction = if (playing) {

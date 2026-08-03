@@ -7,6 +7,7 @@ import android.content.Context
 import android.content.Intent
 import android.os.Handler
 import android.os.Looper
+import android.os.SystemClock
 import android.widget.RemoteViews
 import android.widget.Toast
 import kotlinx.coroutines.*
@@ -57,7 +58,7 @@ class PressWidget : AppWidgetProvider() {
         super.onReceive(context, intent)
         if (intent.action != ACTION_PRESS) return
 
-        val now = System.currentTimeMillis()
+        val now = SystemClock.elapsedRealtime()
         if (now - lastPressAt < 2000) return
         lastPressAt = now
 
@@ -70,26 +71,34 @@ class PressWidget : AppWidgetProvider() {
 
         val pending = goAsync() // BroadcastReceiver 里发网络请求要 goAsync 保命
         CoroutineScope(Dispatchers.IO).launch {
-            val line = try {
-                val conn = URL("https://memory.ravenlove.cc/press?plain=1").openConnection() as HttpURLConnection
-                conn.requestMethod = "POST"
-                conn.setRequestProperty("Authorization", "Bearer $token")
-                conn.connectTimeout = 8000
-                conn.readTimeout = 8000
-                conn.doOutput = true
-                conn.outputStream.use { it.write(ByteArray(0)) }
-                if (conn.responseCode in 200..299) {
-                    conn.inputStream.bufferedReader().use(BufferedReader::readText).trim()
-                } else {
-                    "没戳到乌鸦（${conn.responseCode}），再试一下？"
+            try {
+                var conn: HttpURLConnection? = null
+                val line = try {
+                    val localConn = URL("https://memory.ravenlove.cc/press?plain=1")
+                        .openConnection() as HttpURLConnection
+                    conn = localConn
+                    localConn.requestMethod = "POST"
+                    localConn.setRequestProperty("Authorization", "Bearer $token")
+                    localConn.connectTimeout = 8000
+                    localConn.readTimeout = 8000
+                    localConn.doOutput = true
+                    localConn.outputStream.use { it.write(ByteArray(0)) }
+                    if (localConn.responseCode in 200..299) {
+                        localConn.inputStream.bufferedReader().use(BufferedReader::readText).trim()
+                    } else {
+                        "没戳到乌鸦（${localConn.responseCode}），再试一下？"
+                    }
+                } catch (_: Exception) {
+                    "没戳到乌鸦（网络不通），检查下代理再试？"
+                } finally {
+                    conn?.disconnect()
                 }
-            } catch (_: Exception) {
-                "没戳到乌鸦（网络不通），检查下代理再试？"
+                Handler(Looper.getMainLooper()).post {
+                    Toast.makeText(context, line, Toast.LENGTH_LONG).show()
+                }
+            } finally {
+                pending.finish()
             }
-            Handler(Looper.getMainLooper()).post {
-                Toast.makeText(context, line, Toast.LENGTH_LONG).show()
-            }
-            pending.finish()
         }
     }
 }

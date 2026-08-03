@@ -80,6 +80,18 @@ class WebBridge(private val activity: MainActivity) {
             .apply()
     }
 
+    // 铃声选择存在网页端的 localStorage 里，锁屏来电的 CallActivity 读不到——
+    // 所以设置页每次改铃声都往这儿抄一份，原生端只认 yanji_native/ringtone。
+    // 上面 saveMoonToken 的教训反过来同样成立：这个 key 必须真有人读（CallActivity.startRinging）。
+    @JavascriptInterface
+    fun saveRingtone(id: String) {
+        if (id.isEmpty()) return
+        activity.getSharedPreferences("yanji_native", Context.MODE_PRIVATE)
+            .edit()
+            .putString("ringtone", id)
+            .apply()
+    }
+
     // blob: 下载兜底：DownloadManager 只认 http/https，备份导出这类 blob: URL
     // 由 MainActivity 注入的 JS 把内容读成 base64 送回来，原生写进 Download 目录（0723）
     @JavascriptInterface

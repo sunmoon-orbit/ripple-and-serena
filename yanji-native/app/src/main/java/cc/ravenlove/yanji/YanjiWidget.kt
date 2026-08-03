@@ -25,9 +25,11 @@ class YanjiWidget : AppWidgetProvider() {
             views.setTextViewText(R.id.widget_date, "${date.replace("-", ".")} · 今日${card.level}")
             views.setTextViewText(R.id.widget_detail, "宜 ${card.yi.take(2).joinToString(" · ")}  ✦ ${card.lucky}")
 
-            val intent = Intent(context, MainActivity::class.java)
+            val intent = Intent(context, MainActivity::class.java).apply {
+                action = IntentIdentity.ACTION_WIDGET_OPEN
+            }
             val pi = PendingIntent.getActivity(
-                context, 0, intent,
+                context, IntentIdentity.REQUEST_WIDGET_OPEN, intent,
                 PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
             )
             views.setOnClickPendingIntent(R.id.widget_root, pi)

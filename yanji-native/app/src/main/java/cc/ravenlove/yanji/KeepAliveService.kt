@@ -48,8 +48,8 @@ class KeepAliveService : Service() {
 
     private fun buildNotification(): Notification {
         val pendingIntent = PendingIntent.getActivity(
-            this, 0,
-            Intent(this, MainActivity::class.java),
+            this, IntentIdentity.REQUEST_SERVICE_OPEN,
+            Intent(this, MainActivity::class.java).apply { action = IntentIdentity.ACTION_SERVICE_OPEN },
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
         return NotificationCompat.Builder(this, CHANNEL_ID)

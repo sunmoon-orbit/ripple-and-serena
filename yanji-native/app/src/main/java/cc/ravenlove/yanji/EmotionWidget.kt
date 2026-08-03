@@ -24,9 +24,11 @@ class EmotionWidget : AppWidgetProvider() {
             views.setTextViewText(R.id.emotion_label, dominant.label)
             views.setTextViewText(R.id.emotion_sub, dominant.sub)
 
-            val intent = Intent(context, MainActivity::class.java)
+            val intent = Intent(context, MainActivity::class.java).apply {
+                action = IntentIdentity.ACTION_EMOTION_OPEN
+            }
             val pi = PendingIntent.getActivity(
-                context, 1, intent,
+                context, IntentIdentity.REQUEST_EMOTION_OPEN, intent,
                 PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
             )
             views.setOnClickPendingIntent(R.id.emotion_widget_root, pi)

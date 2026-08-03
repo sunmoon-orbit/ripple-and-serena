@@ -37,6 +37,18 @@ import HeartCardAlbum from './HeartCardAlbum'
 import { fetchAnniversaryToday, fetchUnseenHeartCards, markHeartCardSeen, formatWeatherLine, fetchContactLastSeen } from '../../api/moonMemory'
 import CompletionEgg, { pickEgg } from './CompletionEgg'
 
+// 同一对话的压缩共用一个 Promise，后来的生成不再发第二份轻模型请求。
+const compactionJobs = new Map()
+
+// 这个判据只用来挡「轻模型的拒答文案/报错」——0711 那次就是拒答文案直接进了她眼前。
+// ⚠️ 故意不比冒号、也不要求四个全中：模型爱给标题加粗、爱把「：」打成半角，
+// 全等匹配会把一份好笔记判死，症状是压缩永远不成功、且没有任何报错。
+// 拒答文案一个标题都命不中，三个就够区分了。
+function looksLikeCompactionSummary(text) {
+  return ['实体/称呼', '事件/事实', '情感/关系', '未了结']
+    .filter((heading) => text.includes(heading)).length >= 3
+}
+
 // 情绪自动发圈：某正向情绪越阈值且过冷却时，涟言主动发条朋友圈（她在聊天时触发；
 // 离开时的自动发圈由服务端 cron 负责，见 moments-autopost.js）。失败静默，绝不打断聊天。
 async function maybeAutoPostMoment(emoState, conn, moonMemory) {
@@ -125,7 +137,7 @@ export default function Chat() {
     createChat, setActiveChat, getActiveConnection, getActiveChat, getMessages,
     addMessage, updateMessage, removeLastEmptyAssistant, truncateMessagesFrom, touchChat, deleteMessage,
     recordTokenUsage, updateChatModel, updateChatConnection, applyContextLimit,
-    getSummary, setSummary, bigReady,
+    getSummary, commitCompaction, bigReady,
   } = store
 
   const [sidebarOpen, setSidebarOpen] = useState(false)
@@ -235,26 +247,48 @@ export default function Chat() {
       })
       const limited = applyContextLimit(prepared)
 
-      // context compaction: summarize messages that got cut, merge with prior summary
+      // context compaction: 只合并游标之后新被裁掉的消息
       const cutCount = prepared.length - limited.length
       if (cutCount > 0) {
-        const cutMsgs = prepared.slice(0, cutCount)
-        try {
-          const lightModel = conn.lightModel || conn.defaultModel || 'deepseek-v4-flash'
-          // 把旧笔记一起喂进去，让模型重写整份而不是往后拼：
-          // 旧写法 prev + '---' + new 是只进不出的，「未了结」永远消不了项，
-          // 事情早做完了几轮之后还会被当成没做（0726 阿颖报的症状）。
-          const prev = getSummary(chat.id)
-          const newSummary = await compactMessages(cutMsgs, conn, lightModel, prev)
-          if (newSummary) {
-            // 兜底截断保头不保尾：头部是实体/称呼和事件，尾部是「未了结」——
-            // 旧写法 slice(-2000) 正好反着来，先丢人名再丢事件，专留悬项
-            setSummary(chat.id, newSummary.length > 3000 ? newSummary.slice(0, 3000) : newSummary)
-          } else {
-            console.warn('[compaction] 笔记生成为空，沿用旧笔记')
+        const boundaryId = allMsgs[cutCount - 1]?.id
+        const currentChat = useStore.getState().chats.find((c) => c.id === chat.id)
+        const hasCursorField = currentChat && Object.prototype.hasOwnProperty.call(currentChat, 'compactedThrough')
+        const prev = getSummary(chat.id)
+
+        // 旧版有笔记却没游标：认领当前裁剪边界，不清空、不重压真实旧对话。
+        if (!hasCursorField && prev && boundaryId) {
+          commitCompaction(chat.id, prev, boundaryId, currentChat.compactionVersion || 0)
+        } else {
+          const cursorId = currentChat?.compactedThrough || null
+          const cursorIdx = cursorId ? allMsgs.findIndex((m) => m.id === cursorId) : -1
+          const start = cursorIdx >= 0 ? cursorIdx + 1 : 0
+          const cutMsgs = prepared.slice(start, cutCount)
+
+          if (cutMsgs.length && boundaryId) {
+            let job = compactionJobs.get(chat.id)
+            if (!job) {
+              job = (async () => {
+                try {
+                  const lightModel = conn.lightModel || conn.defaultModel || 'deepseek-v4-flash'
+                  const newSummary = await compactMessages(cutMsgs, conn, lightModel, prev)
+                  // 空文、拒答或上游错误文案都不能落进她看得见的接续笔记。
+                  if (!newSummary || !looksLikeCompactionSummary(newSummary)) {
+                    console.warn('[compaction] 返回内容不是有效笔记，沿用旧笔记')
+                    return
+                  }
+                  const safeSummary = newSummary.length > 3000 ? newSummary.slice(0, 3000) : newSummary
+                  commitCompaction(chat.id, safeSummary, boundaryId, currentChat?.compactionVersion || 0)
+                } catch (e) {
+                  console.warn('[compaction] 失败，沿用旧笔记:', e?.message)
+                }
+              })()
+              compactionJobs.set(chat.id, job)
+              job.finally(() => {
+                if (compactionJobs.get(chat.id) === job) compactionJobs.delete(chat.id)
+              })
+            }
+            await job
           }
-        } catch (e) {
-          console.warn('[compaction] 失败，沿用旧笔记:', e?.message)
         }
       }
 

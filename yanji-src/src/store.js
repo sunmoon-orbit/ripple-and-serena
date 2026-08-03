@@ -220,7 +220,13 @@ export const useStore = create((set, get) => ({
   setRandomTool: (v) => set((s) => { savePersistedState({ ...s, randomTool: v }); return { randomTool: v } }),
   setTimeAwareness: (v) => set((s) => { savePersistedState({ ...s, timeAwareness: v }); return { timeAwareness: v } }),
   setLongingPush: (v) => set((s) => { savePersistedState({ ...s, longingPush: v }); return { longingPush: v } }),
-  setRingtone: (v) => set((s) => { savePersistedState({ ...s, ringtone: v }); return { ringtone: v } }),
+  // 锁屏来电是原生 CallActivity 放的铃，它读不到 localStorage——
+  // 每次改铃声都往原生 SharedPreferences 抄一份，否则她选的铃声只在开着言叽时听得到。
+  setRingtone: (v) => set((s) => {
+    savePersistedState({ ...s, ringtone: v })
+    try { window.YanjiNative?.saveRingtone?.(v) } catch { /* 网页版没有这个桥，忽略 */ }
+    return { ringtone: v }
+  }),
   addCustomSticker: (url, label) => set((s) => {
     const customStickers = [...(s.customStickers || []), { id: uuid(), url: url.trim(), label: (label || '').trim() }]
     savePersistedState({ ...s, customStickers })
@@ -288,6 +294,9 @@ export const useStore = create((set, get) => ({
       model: model || conn.defaultModel || '',
       createdAt: Date.now(),
       updatedAt: Date.now(),
+      // null 表示还没压缩过；老对话则连这个字段都没有，用于区分迁移。
+      compactedThrough: null,
+      compactionVersion: 0,
     }
     set((st) => {
       const chats = [chat, ...st.chats]
@@ -367,23 +376,37 @@ export const useStore = create((set, get) => ({
   },
   updateMessage: (chatId, msgId, patch) => {
     set((s) => {
-      const msgs = (s.messagesByChatId[chatId] || []).map((m) =>
+      const oldMsgs = s.messagesByChatId[chatId] || []
+      const msgs = oldMsgs.map((m) =>
         m.id === msgId ? { ...m, ...patch } : m
       )
       const messagesByChatId = { ...s.messagesByChatId, [chatId]: msgs }
+      const chat = s.chats.find((c) => c.id === chatId)
+      const cursorIdx = chat?.compactedThrough ? oldMsgs.findIndex((m) => m.id === chat.compactedThrough) : -1
+      const changedIdx = oldMsgs.findIndex((m) => m.id === msgId)
+      const invalidates = cursorIdx >= 0 && changedIdx >= 0 && changedIdx <= cursorIdx
+      const chats = invalidates ? s.chats.map((c) => c.id === chatId ? { ...c, compactedThrough: null, compactionVersion: (c.compactionVersion || 0) + 1 } : c) : s.chats
+      const summariesByChatId = invalidates ? { ...s.summariesByChatId, [chatId]: '' } : s.summariesByChatId
       // 流式期间跳过落盘：每个 chunk 全量 JSON.stringify + setItem 会让长回复明显卡顿，
       // 最终 streaming:false 的更新会正常持久化
-      if (!patch.streaming) savePersistedState({ ...s, messagesByChatId })
-      return { messagesByChatId }
+      if (!patch.streaming || invalidates) savePersistedState({ ...s, messagesByChatId, chats, summariesByChatId })
+      return { messagesByChatId, chats, summariesByChatId }
     })
   },
   // 删除单条消息（目前只给 [错误] 气泡的删除钮用）
   deleteMessage: (chatId, msgId) => {
     set((s) => {
-      const msgs = (s.messagesByChatId[chatId] || []).filter((m) => m.id !== msgId)
+      const oldMsgs = s.messagesByChatId[chatId] || []
+      const chat = s.chats.find((c) => c.id === chatId)
+      const cursorIdx = chat?.compactedThrough ? oldMsgs.findIndex((m) => m.id === chat.compactedThrough) : -1
+      const deletedIdx = oldMsgs.findIndex((m) => m.id === msgId)
+      const invalidates = cursorIdx >= 0 && deletedIdx >= 0 && deletedIdx <= cursorIdx
+      const msgs = oldMsgs.filter((m) => m.id !== msgId)
       const messagesByChatId = { ...s.messagesByChatId, [chatId]: msgs }
-      savePersistedState({ ...s, messagesByChatId })
-      return { messagesByChatId }
+      const chats = invalidates ? s.chats.map((c) => c.id === chatId ? { ...c, compactedThrough: null, compactionVersion: (c.compactionVersion || 0) + 1 } : c) : s.chats
+      const summariesByChatId = invalidates ? { ...s.summariesByChatId, [chatId]: '' } : s.summariesByChatId
+      savePersistedState({ ...s, messagesByChatId, chats, summariesByChatId })
+      return { messagesByChatId, chats, summariesByChatId }
     })
   },
   truncateMessagesFrom: (chatId, msgId) => {
@@ -392,8 +415,13 @@ export const useStore = create((set, get) => ({
       const idx = msgs.findIndex((m) => m.id === msgId)
       const truncated = idx >= 0 ? msgs.slice(0, idx) : msgs
       const messagesByChatId = { ...s.messagesByChatId, [chatId]: truncated }
-      savePersistedState({ ...s, messagesByChatId })
-      return { messagesByChatId }
+      const chat = s.chats.find((c) => c.id === chatId)
+      const cursorIdx = chat?.compactedThrough ? msgs.findIndex((m) => m.id === chat.compactedThrough) : -1
+      const invalidates = idx >= 0 && cursorIdx >= 0 && idx <= cursorIdx
+      const chats = invalidates ? s.chats.map((c) => c.id === chatId ? { ...c, compactedThrough: null, compactionVersion: (c.compactionVersion || 0) + 1 } : c) : s.chats
+      const summariesByChatId = invalidates ? { ...s.summariesByChatId, [chatId]: '' } : s.summariesByChatId
+      savePersistedState({ ...s, messagesByChatId, chats, summariesByChatId })
+      return { messagesByChatId, chats, summariesByChatId }
     })
   },
   removeLastEmptyAssistant: (chatId) => {
@@ -447,8 +475,24 @@ export const useStore = create((set, get) => ({
   setSummary: (chatId, summary) => {
     set((s) => {
       const summariesByChatId = { ...s.summariesByChatId, [chatId]: summary }
-      savePersistedState({ ...s, summariesByChatId })
-      return { summariesByChatId }
+      // 手动清空后下次从头重建，与界面上的提示保持一致。
+      const chats = summary ? s.chats : s.chats.map((c) => c.id === chatId
+        ? { ...c, compactedThrough: null, compactionVersion: (c.compactionVersion || 0) + 1 }
+        : c)
+      savePersistedState({ ...s, summariesByChatId, chats })
+      return { summariesByChatId, chats }
+    })
+  },
+  // 笔记和游标同一次进 store；失败路径不调这个 action，游标也不会前移。
+  commitCompaction: (chatId, summary, compactedThrough, expectedVersion = 0) => {
+    set((s) => {
+      const chat = s.chats.find((c) => c.id === chatId)
+      // 压缩等模型时历史可能被编辑；版本变了就丢弃旧结果，不让它把 dirty 状态覆盖回去。
+      if (!chat || (chat.compactionVersion || 0) !== expectedVersion) return {}
+      const summariesByChatId = { ...s.summariesByChatId, [chatId]: summary }
+      const chats = s.chats.map((c) => c.id === chatId ? { ...c, compactedThrough } : c)
+      savePersistedState({ ...s, summariesByChatId, chats })
+      return { summariesByChatId, chats }
     })
   },
 

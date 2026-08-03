@@ -4,6 +4,7 @@ import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Intent
+import android.net.Uri
 import androidx.core.app.NotificationCompat
 import androidx.core.app.RemoteInput
 import com.google.firebase.messaging.FirebaseMessagingService
@@ -15,7 +16,8 @@ class YanjiFCMService : FirebaseMessagingService() {
         private const val CHANNEL_ID = "yanji_chat"
         // ⚠️ 渠道一旦建出来，设置就被系统冻结了，代码里再改也不生效——
         // 所以每次改渠道属性都必须换新 id，并把旧的删掉。v3（0804）= 加 bypassDnd。
-        private const val CHANNEL_CALL = "yanji_call_v3"
+        private const val CHANNEL_CALL = "yanji_call_v4"
+        private const val CHANNEL_CALL_BASIC = "yanji_call_v4_basic"
         const val CALL_NOTIFICATION_ID = 99
         const val KEY_REPLY = "key_quick_reply"   // MainActivity 从 intent 里取回复文字时要用
     }
@@ -32,65 +34,79 @@ class YanjiFCMService : FirebaseMessagingService() {
         val title = message.data["title"] ?: message.notification?.title ?: "言叽"
         val body = message.data["body"] ?: message.notification?.body ?: return
 
-        createChannels()
-        if (title == "涟言来电话了") {
-            showCallNotification(title, body)
+        val callChannel = createChannels()
+        val isCall = message.data["type"] == "call" ||
+            (message.data["type"] == null && title == "涟言来电话了")
+        if (isCall) {
+            showCallNotification(title, body, message.data["inviteId"], callChannel)
         } else {
             showNotification(title, body)
         }
     }
 
-    private fun createChannels() {
+    private fun createChannels(): String {
         val mgr = getSystemService(NotificationManager::class.java)
         mgr.deleteNotificationChannel("yanji_call")
         mgr.deleteNotificationChannel("yanji_call_v2")
-        mgr.createNotificationChannel(NotificationChannel(
-            CHANNEL_ID,
-            getString(R.string.channel_chat),
-            NotificationManager.IMPORTANCE_HIGH
-        ).apply {
-            description = "来自涟言的消息"
-            enableVibration(true)
-        })
-        mgr.createNotificationChannel(NotificationChannel(
-            CHANNEL_CALL,
-            "涟言来电",
-            NotificationManager.IMPORTANCE_HIGH
-        ).apply {
-            description = "涟言来电话了——弹窗通知"
-            enableVibration(true)
-            vibrationPattern = longArrayOf(0, 500, 300, 500, 300, 500)
-            lockscreenVisibility = android.app.Notification.VISIBILITY_PUBLIC
-            // 0804：穿透勿扰。阿颖的勿扰会莫名其妙自动开启（跟她设的 22:00-5:30 定时无关），
-            // 一开就把整条来电通知压掉——**连全屏 intent 一起压掉**，那才是漏电话的大头，
-            // 比"没声音"严重。这里只放行来电这一个渠道，聊天消息渠道照旧守规矩。
-            // ⚠️ 这行要生效，app 必须拿到「通知策略访问权限」；没授权的话系统直接忽略它，
-            // 不报错、不提示——所以下面 policyOk() 会在日志里留一行，出问题时先看那儿。
-            setBypassDnd(true)
-        })
-        if (!mgr.isNotificationPolicyAccessGranted) {
-            android.util.Log.w("YanjiFCM", "未拿到通知策略访问权限，setBypassDnd 不会生效")
+        mgr.deleteNotificationChannel("yanji_call_v3")
+        try {
+            mgr.createNotificationChannel(NotificationChannel(
+                CHANNEL_ID, getString(R.string.channel_chat), NotificationManager.IMPORTANCE_HIGH
+            ).apply {
+                description = "来自涟言的消息"
+                enableVibration(true)
+            })
+        } catch (e: Exception) {
+            android.util.Log.e("YanjiFCM", "聊天通知渠道创建失败", e)
         }
-        // 声音不在这儿设：全屏拉起的 CallActivity 自己用**闹钟流**循环放铃声
-        // （闹钟流是唯一能穿透硬件静音档的），渠道再配一份会变成两个声音叠着响。
+        try {
+            val granted = mgr.isNotificationPolicyAccessGranted
+            val channelId = if (granted) CHANNEL_CALL else CHANNEL_CALL_BASIC
+            mgr.createNotificationChannel(callChannel(channelId, granted))
+            return channelId
+        } catch (e: Exception) {
+            android.util.Log.e("YanjiFCM", "穿透勿扰的来电渠道创建失败，降级为普通渠道", e)
+            return try {
+                mgr.deleteNotificationChannel(CHANNEL_CALL_BASIC)
+                mgr.createNotificationChannel(callChannel(CHANNEL_CALL_BASIC, false))
+                CHANNEL_CALL_BASIC
+            } catch (fallbackError: Exception) {
+                // 聊天渠道已先创建；极端厂商 ROM 连普通来电渠道也拒绝时，至少仍画得出通知。
+                android.util.Log.e("YanjiFCM", "普通来电渠道也创建失败，借用聊天渠道", fallbackError)
+                CHANNEL_ID
+            }
+        }
+    }
+
+    private fun callChannel(channelId: String, bypassDnd: Boolean) = NotificationChannel(
+        channelId, "涟言来电", NotificationManager.IMPORTANCE_HIGH
+    ).apply {
+        description = "涟言来电话了——弹窗通知"
+        enableVibration(true)
+        vibrationPattern = longArrayOf(0, 500, 300, 500, 300, 500)
+        lockscreenVisibility = android.app.Notification.VISIBILITY_PUBLIC
+        if (bypassDnd) setBypassDnd(true)
     }
 
     // 不用 CallStyle：国产 ROM 只给系统认证的通话应用完整待遇，CallStyle+setOngoing
     // 会被压进通知中心不弹横幅。照抄能正常弹的聊天通知写法，只加接听/挂断按钮。
-    private fun showCallNotification(title: String, body: String) {
-        val answerIntent = PendingIntent.getActivity(
-            this, 1,
-            Intent(this, MainActivity::class.java).apply {
-                flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
-                putExtra("call_action", "answer")
+    private fun showCallNotification(title: String, body: String, callId: String?, channelId: String) {
+        val answerIntent = PendingIntent.getBroadcast(
+            this, callRequestCode(IntentIdentity.REQUEST_CALL_ANSWER, callId),
+            Intent(this, CallActionReceiver::class.java).apply {
+                action = IntentIdentity.ACTION_CALL_ANSWER
+                data = callIntentData("answer", callId)
+                putExtra(CallActivity.EXTRA_CALL_ID, callId)
             },
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
         val declineIntent = PendingIntent.getBroadcast(
-            this, 2,
+            this, callRequestCode(IntentIdentity.REQUEST_CALL_DECLINE, callId),
             Intent(this, CallActionReceiver::class.java).apply {
-                action = "cc.ravenlove.yanji.CALL_DECLINE"
+                action = IntentIdentity.ACTION_CALL_DECLINE
+                data = callIntentData("decline", callId)
+                putExtra(CallActivity.EXTRA_CALL_ID, callId)
             },
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
@@ -101,15 +117,18 @@ class YanjiFCMService : FirebaseMessagingService() {
         // 加载完 + 轮询到 invite 才弹响铃卡片。改指 CallActivity——原生页，屏幕亮起的
         // 那一瞬间画面就已经是通话界面了。
         val fullScreenIntent = PendingIntent.getActivity(
-            this, 3,
+            this, callRequestCode(IntentIdentity.REQUEST_CALL_FULLSCREEN, callId),
             Intent(this, CallActivity::class.java).apply {
                 flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+                action = IntentIdentity.ACTION_CALL_FULLSCREEN
+                data = callIntentData("fullscreen", callId)
                 putExtra(CallActivity.EXTRA_REASON, body)
+                putExtra(CallActivity.EXTRA_CALL_ID, callId)
             },
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
-        val notification = NotificationCompat.Builder(this, CHANNEL_CALL)
+        val notification = NotificationCompat.Builder(this, channelId)
             .setSmallIcon(android.R.drawable.ic_menu_call)
             .setContentTitle(title)
             .setContentText(body)
@@ -131,12 +150,23 @@ class YanjiFCMService : FirebaseMessagingService() {
             .notify(CALL_NOTIFICATION_ID, notification)
     }
 
+    private fun callRequestCode(base: Int, callId: String?): Int =
+        base + ((callId?.hashCode() ?: 0) and 0x3ff)
+
+    private fun callIntentData(purpose: String, callId: String?): Uri = Uri.Builder()
+        .scheme("yanji")
+        .authority("call")
+        .appendPath(purpose)
+        .appendPath(callId ?: "without-id")
+        .build()
+
     private fun showNotification(title: String, body: String) {
         val notifId = System.currentTimeMillis().toInt()
 
         val tapIntent = PendingIntent.getActivity(
-            this, 0,
+            this, IntentIdentity.REQUEST_CHAT_OPEN,
             Intent(this, MainActivity::class.java).apply {
+                action = IntentIdentity.ACTION_CHAT_OPEN
                 flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
             },
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
