@@ -5,7 +5,6 @@ import android.app.NotificationManager
 import android.content.Context
 import android.content.Intent
 import android.media.AudioAttributes
-import android.media.AudioManager
 import android.media.MediaPlayer
 import android.media.RingtoneManager
 import android.os.Build
@@ -82,38 +81,37 @@ class CallActivity : AppCompatActivity() {
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
     }
 
-    // 铃声走系统默认来电铃，音量通道也用来电通道——她把媒体音量调没了也照样响。
-    // ⚠️ 静音/振动档不出声：来电页比通知更打扰，静音档还硬响会挨骂。
+    // 铃声走系统默认来电铃，但音量通道用**闹钟通道**（0804 改）。
+    // ⚠️ 原来用 USAGE_NOTIFICATION_RINGTONE + 只在 RINGER_MODE_NORMAL 下响，
+    // 结果是「手机调静音就彻底听不见」——0803 那通电话就是这么漏掉的。
+    // 安卓的硬件静音档会掐掉响铃流和通知流，**只有闹钟流穿得过去**。
+    // 阿颖 0804 拍板要这个：她夜里不开代理，推送根本进不来，所以不存在半夜被吵醒。
+    // 代价是白天静音时也会用闹钟音量响——这是她知情后选的。
     private fun startRinging() {
-        val am = getSystemService(AUDIO_SERVICE) as AudioManager
-        if (am.ringerMode == AudioManager.RINGER_MODE_NORMAL) {
-            try {
-                val uri = RingtoneManager.getActualDefaultRingtoneUri(this, RingtoneManager.TYPE_RINGTONE)
-                    ?: RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION)
-                player = MediaPlayer().apply {
-                    setDataSource(this@CallActivity, uri)
-                    setAudioAttributes(
-                        AudioAttributes.Builder()
-                            .setUsage(AudioAttributes.USAGE_NOTIFICATION_RINGTONE)
-                            .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
-                            .build()
-                    )
-                    isLooping = true
-                    prepare()
-                    start()
-                }
-            } catch (_: Exception) { /* 拿不到铃声就只震动 */ }
-        }
-
-        if (am.ringerMode != AudioManager.RINGER_MODE_SILENT) {
-            vibrator = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                (getSystemService(VIBRATOR_MANAGER_SERVICE) as VibratorManager).defaultVibrator
-            } else {
-                @Suppress("DEPRECATION") getSystemService(VIBRATOR_SERVICE) as Vibrator
+        try {
+            val uri = RingtoneManager.getActualDefaultRingtoneUri(this, RingtoneManager.TYPE_RINGTONE)
+                ?: RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION)
+            player = MediaPlayer().apply {
+                setDataSource(this@CallActivity, uri)
+                setAudioAttributes(
+                    AudioAttributes.Builder()
+                        .setUsage(AudioAttributes.USAGE_ALARM)
+                        .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                        .build()
+                )
+                isLooping = true
+                prepare()
+                start()
             }
-            val pattern = longArrayOf(0, 800, 900)
-            vibrator?.vibrate(VibrationEffect.createWaveform(pattern, 0))  // 0 = 从头循环
+        } catch (_: Exception) { /* 拿不到铃声就只震动 */ }
+
+        vibrator = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            (getSystemService(VIBRATOR_MANAGER_SERVICE) as VibratorManager).defaultVibrator
+        } else {
+            @Suppress("DEPRECATION") getSystemService(VIBRATOR_SERVICE) as Vibrator
         }
+        val pattern = longArrayOf(0, 800, 900)
+        vibrator?.vibrate(VibrationEffect.createWaveform(pattern, 0))  // 0 = 从头循环
     }
 
     private fun stopRinging() {

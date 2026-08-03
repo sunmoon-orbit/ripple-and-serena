@@ -13,7 +13,9 @@ class YanjiFCMService : FirebaseMessagingService() {
 
     companion object {
         private const val CHANNEL_ID = "yanji_chat"
-        private const val CHANNEL_CALL = "yanji_call_v2"
+        // ⚠️ 渠道一旦建出来，设置就被系统冻结了，代码里再改也不生效——
+        // 所以每次改渠道属性都必须换新 id，并把旧的删掉。v3（0804）= 加 bypassDnd。
+        private const val CHANNEL_CALL = "yanji_call_v3"
         const val CALL_NOTIFICATION_ID = 99
         const val KEY_REPLY = "key_quick_reply"   // MainActivity 从 intent 里取回复文字时要用
     }
@@ -41,6 +43,7 @@ class YanjiFCMService : FirebaseMessagingService() {
     private fun createChannels() {
         val mgr = getSystemService(NotificationManager::class.java)
         mgr.deleteNotificationChannel("yanji_call")
+        mgr.deleteNotificationChannel("yanji_call_v2")
         mgr.createNotificationChannel(NotificationChannel(
             CHANNEL_ID,
             getString(R.string.channel_chat),
@@ -58,7 +61,18 @@ class YanjiFCMService : FirebaseMessagingService() {
             enableVibration(true)
             vibrationPattern = longArrayOf(0, 500, 300, 500, 300, 500)
             lockscreenVisibility = android.app.Notification.VISIBILITY_PUBLIC
+            // 0804：穿透勿扰。阿颖的勿扰会莫名其妙自动开启（跟她设的 22:00-5:30 定时无关），
+            // 一开就把整条来电通知压掉——**连全屏 intent 一起压掉**，那才是漏电话的大头，
+            // 比"没声音"严重。这里只放行来电这一个渠道，聊天消息渠道照旧守规矩。
+            // ⚠️ 这行要生效，app 必须拿到「通知策略访问权限」；没授权的话系统直接忽略它，
+            // 不报错、不提示——所以下面 policyOk() 会在日志里留一行，出问题时先看那儿。
+            setBypassDnd(true)
         })
+        if (!mgr.isNotificationPolicyAccessGranted) {
+            android.util.Log.w("YanjiFCM", "未拿到通知策略访问权限，setBypassDnd 不会生效")
+        }
+        // 声音不在这儿设：全屏拉起的 CallActivity 自己用**闹钟流**循环放铃声
+        // （闹钟流是唯一能穿透硬件静音档的），渠道再配一份会变成两个声音叠着响。
     }
 
     // 不用 CallStyle：国产 ROM 只给系统认证的通话应用完整待遇，CallStyle+setOngoing
