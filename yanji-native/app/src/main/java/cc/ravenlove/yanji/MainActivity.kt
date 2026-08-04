@@ -34,6 +34,8 @@ class MainActivity : AppCompatActivity() {
     private var pendingAudioPermission: PermissionRequest? = null
     private var waitingForDndSettings = false
     private var dndPromptShown = false
+    private var pendingCallChannelProblem: String? = null
+    private var channelProblemPromptScheduled = false
     lateinit var mediaHelper: MediaNotificationHelper
 
     // 页面还没加载完时调 evaluateJavascript 等于把话说进空气里。
@@ -211,6 +213,7 @@ class MainActivity : AppCompatActivity() {
         // 请求通知权限
         requestNotificationPermission()
         promptNotificationPolicyAccess()
+        loadCallChannelProblem()
 
         // 预取 FCM token 存 prefs，前端通过 WebBridge.getFcmToken() 读取上报服务器
         fetchFcmToken()
@@ -254,6 +257,36 @@ class MainActivity : AppCompatActivity() {
                 Toast.LENGTH_LONG
             ).show()
         }
+        scheduleCallChannelProblemPrompt()
+    }
+
+    // 来电渠道的体检结果（0804）。YanjiFCMService 每次建完渠道会把系统读回来的真实状态
+    // 存进 prefs（正常时是 null），后台服务不能弹 UI，所以由这里代为转达。
+    // 延迟 6 秒＋要求窗口有焦点：3 秒那会儿可能正被全屏通知权限的设置页盖着，
+    // 别让两条提示叠在一起；被盖住就不弹，等下一次 onResume 再排。
+    private fun loadCallChannelProblem() {
+        pendingCallChannelProblem = getSharedPreferences(
+            YanjiFCMService.DIAGNOSTICS_PREFS, Context.MODE_PRIVATE
+        ).getString(YanjiFCMService.CALL_CHANNEL_PROBLEM, null)
+        scheduleCallChannelProblemPrompt()
+    }
+
+    private fun scheduleCallChannelProblemPrompt() {
+        if (pendingCallChannelProblem == null || channelProblemPromptScheduled) return
+        channelProblemPromptScheduled = true
+        webView.postDelayed({
+            channelProblemPromptScheduled = false
+            if (!hasWindowFocus()) return@postDelayed
+            val problem = pendingCallChannelProblem ?: return@postDelayed
+            pendingCallChannelProblem = null
+            getSharedPreferences(YanjiFCMService.DIAGNOSTICS_PREFS, Context.MODE_PRIVATE)
+                .edit().remove(YanjiFCMService.CALL_CHANNEL_PROBLEM).apply()
+            Toast.makeText(
+                this,
+                "$problem。可以去系统设置里的“通知”找到“涟言来电”调整。",
+                Toast.LENGTH_LONG
+            ).show()
+        }, 6000)
     }
 
     private fun promptNotificationPolicyAccess() {
@@ -465,7 +498,26 @@ class MainActivity : AppCompatActivity() {
 
     override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
-        if (requestCode == AUDIO_PERM_CODE) {
+        // 通知权限被拒之后要有交代（0804）。原来这里只处理录音权限，
+        // POST_NOTIFICATIONS 被拒是**静默**的：消息和来电通知从此都不出现，
+        // 而系统那个授权弹窗一旦拒过两次就不会再弹，她也没有第二个入口回去开。
+        if (requestCode == NOTIFICATION_PERM_CODE &&
+            (grantResults.isEmpty() || grantResults[0] != PackageManager.PERMISSION_GRANTED)) {
+            AlertDialog.Builder(this)
+                .setTitle("还没有打开通知")
+                .setMessage("这样会收不到消息和来电提醒。你可以现在去通知设置打开，也可以以后再改。")
+                .setNegativeButton("知道了", null)
+                .setPositiveButton("去通知设置") { _, _ ->
+                    try {
+                        startActivity(Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).apply {
+                            putExtra(Settings.EXTRA_APP_PACKAGE, packageName)
+                        })
+                    } catch (_: Exception) {
+                        Toast.makeText(this, "没能打开通知设置，请在系统设置里找到言叽", Toast.LENGTH_LONG).show()
+                    }
+                }
+                .show()
+        } else if (requestCode == AUDIO_PERM_CODE) {
             val req = pendingAudioPermission
             pendingAudioPermission = null
             if (grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED) {

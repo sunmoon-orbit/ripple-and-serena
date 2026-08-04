@@ -20,6 +20,8 @@ class YanjiFCMService : FirebaseMessagingService() {
         private const val CHANNEL_CALL_BASIC = "yanji_call_v4_basic"
         const val CALL_NOTIFICATION_ID = 99
         const val KEY_REPLY = "key_quick_reply"   // MainActivity 从 intent 里取回复文字时要用
+        const val DIAGNOSTICS_PREFS = "yanji_diagnostics"
+        const val CALL_CHANNEL_PROBLEM = "call_channel_problem"
     }
 
     override fun onNewToken(token: String) {
@@ -46,9 +48,7 @@ class YanjiFCMService : FirebaseMessagingService() {
 
     private fun createChannels(): String {
         val mgr = getSystemService(NotificationManager::class.java)
-        mgr.deleteNotificationChannel("yanji_call")
-        mgr.deleteNotificationChannel("yanji_call_v2")
-        mgr.deleteNotificationChannel("yanji_call_v3")
+        cleanLegacyCallChannelsOnce(mgr)
         try {
             mgr.createNotificationChannel(NotificationChannel(
                 CHANNEL_ID, getString(R.string.channel_chat), NotificationManager.IMPORTANCE_HIGH
@@ -63,19 +63,60 @@ class YanjiFCMService : FirebaseMessagingService() {
             val granted = mgr.isNotificationPolicyAccessGranted
             val channelId = if (granted) CHANNEL_CALL else CHANNEL_CALL_BASIC
             mgr.createNotificationChannel(callChannel(channelId, granted))
+            recordCallChannelProblem(mgr, channelId, granted)
             return channelId
         } catch (e: Exception) {
             android.util.Log.e("YanjiFCM", "穿透勿扰的来电渠道创建失败，降级为普通渠道", e)
             return try {
-                mgr.deleteNotificationChannel(CHANNEL_CALL_BASIC)
                 mgr.createNotificationChannel(callChannel(CHANNEL_CALL_BASIC, false))
+                recordCallChannelProblem(mgr, CHANNEL_CALL_BASIC, false)
                 CHANNEL_CALL_BASIC
             } catch (fallbackError: Exception) {
                 // 聊天渠道已先创建；极端厂商 ROM 连普通来电渠道也拒绝时，至少仍画得出通知。
                 android.util.Log.e("YanjiFCM", "普通来电渠道也创建失败，借用聊天渠道", fallbackError)
+                getSharedPreferences(DIAGNOSTICS_PREFS, android.content.Context.MODE_PRIVATE)
+                    .edit().putString(CALL_CHANNEL_PROBLEM, "系统没能创建来电通知渠道").apply()
                 CHANNEL_ID
             }
         }
+    }
+
+    // 删旧渠道只做一次（0804）。原来这三行直接写在 createChannels() 里，
+    // 而 createChannels() 每收到**一条消息**就跑一遍——等于把 delete/recreate 当「重置渠道」用。
+    // 它并不重置：同 id 重建会恢复删除前的设置，系统设置里「已删除的通知类别」计数还会一直涨。
+    private fun cleanLegacyCallChannelsOnce(mgr: NotificationManager) {
+        val prefs = getSharedPreferences("yanji_channels", android.content.Context.MODE_PRIVATE)
+        if (prefs.getBoolean("legacy_call_cleaned", false)) return
+        try {
+            mgr.deleteNotificationChannel("yanji_call")
+            mgr.deleteNotificationChannel("yanji_call_v2")
+            mgr.deleteNotificationChannel("yanji_call_v3")
+            prefs.edit().putBoolean("legacy_call_cleaned", true).apply()
+        } catch (e: Exception) {
+            android.util.Log.e("YanjiFCM", "旧来电通知渠道清理失败", e)
+        }
+    }
+
+    // 建完读回系统里的真实状态（0804）。createNotificationChannel() 返回 void，
+    // 传进去 IMPORTANCE_HIGH **不代表**系统采纳了：同 id 的旧设置会被恢复，她也可能自己关掉。
+    // 从前这里直接 return channelId，等于默认自己请求的就生效了——
+    // 于是「通知在、屏不亮」这一类问题永远查不出来。后台服务里不能弹 UI，先存起来，
+    // MainActivity 下次打开时读出来告诉她。
+    private fun recordCallChannelProblem(
+        mgr: NotificationManager,
+        channelId: String,
+        policyAccessGranted: Boolean
+    ) {
+        val actual = mgr.getNotificationChannel(channelId)
+        val problem = when {
+            actual == null -> "系统里没有找到来电通知渠道"
+            actual.importance == NotificationManager.IMPORTANCE_NONE -> "来电通知渠道被关掉了"
+            actual.importance < NotificationManager.IMPORTANCE_HIGH -> "来电通知渠道不是高优先级，可能不会亮屏提醒"
+            policyAccessGranted && !actual.canBypassDnd() -> "来电通知渠道还不能穿过勿扰模式"
+            else -> null
+        }
+        getSharedPreferences(DIAGNOSTICS_PREFS, android.content.Context.MODE_PRIVATE)
+            .edit().putString(CALL_CHANNEL_PROBLEM, problem).apply()
     }
 
     private fun callChannel(channelId: String, bypassDnd: Boolean) = NotificationChannel(
