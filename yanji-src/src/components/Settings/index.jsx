@@ -8,6 +8,7 @@ import { uuid } from '../../utils'
 import { subscribePush, unsubscribePush, getSubscription, isNativeApp, subscribeNativePush, unsubscribeNativePush, getNativePushToken } from '../../api/push'
 import { DELAY_MODES } from '../../utils/replyDelay'
 import { DEFAULT_RINGTONE_ID, RINGTONES, playRingtone } from '../../utils/ringtones'
+import { squareDownscale } from '../../utils/squareDownscale'
 
 function Section({ title, children }) {
   return (
@@ -158,6 +159,47 @@ function AvatarUpload({ label, value, onChange, shape }) {
         {value
           ? <img src={value} alt={label} className="avatar-preview" style={{ borderRadius: radius }} />
           : <div className="avatar-preview avatar-preview-empty" style={{ borderRadius: radius }}>
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="8" r="4" /><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7" />
+              </svg>
+            </div>}
+        <label className="btn-sm btn-ghost avatar-upload-btn">
+          {value ? '更换' : '上传'}
+          <input type="file" accept="image/*" style={{ display: 'none' }} onChange={handleFile} />
+        </label>
+        {value && (
+          <button className="btn-sm btn-ghost danger" onClick={() => onChange(null)}>移除</button>
+        )}
+      </div>
+    </div>
+  )
+}
+
+// 来电头像要过 WebBridge 抄进原生的 filesDir，再在 104dp 的圆里显示，
+// 所以存之前先居中裁方 + 缩到 512（见 squareDownscale 里的说明）。
+function CallAvatarUpload({ value, onChange }) {
+  function handleFile(e) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    const reader = new FileReader()
+    reader.onload = async (ev) => {
+      try {
+        onChange(await squareDownscale(ev.target.result))
+        showToast('已更新来电头像', 'success')
+      } catch (err) {
+        showToast('处理失败：' + err.message, 'error')
+      }
+    }
+    reader.onerror = () => showToast('读文件失败', 'error')
+    reader.readAsDataURL(file)
+  }
+  return (
+    <div className="avatar-upload-row">
+      <span className="card-row-label">来电时显示的图</span>
+      <div className="avatar-upload-area">
+        {value
+          ? <img src={value} alt="来电头像" className="avatar-preview" style={{ borderRadius: '50%' }} />
+          : <div className="avatar-preview avatar-preview-empty" style={{ borderRadius: '50%' }}>
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
                 <circle cx="12" cy="8" r="4" /><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7" />
               </svg>
@@ -1251,6 +1293,30 @@ export default function Settings() {
                     />
                   </>
                 )}
+              </div>
+            </Section>
+            <Section title="来电头像">
+              <div className="settings-card">
+                <div className="card-row">
+                  <span className="card-row-label">锁屏来电页中间那张图</span>
+                  <div className="avatar-mode-toggle">
+                    <button
+                      className={'avatar-mode-btn' + ((avatarConfig?.callAvatarMode || 'follow') === 'follow' ? ' active' : '')}
+                      onClick={() => setAvatarConfig({ callAvatarMode: 'follow' })}
+                    >跟随助手头像</button>
+                    <button
+                      className={'avatar-mode-btn' + (avatarConfig?.callAvatarMode === 'custom' ? ' active' : '')}
+                      onClick={() => setAvatarConfig({ callAvatarMode: 'custom' })}
+                    >单独设一张</button>
+                  </div>
+                </div>
+                {avatarConfig?.callAvatarMode === 'custom' && (
+                  <CallAvatarUpload
+                    value={avatarConfig.callAvatarImage}
+                    onChange={(img) => setAvatarConfig({ callAvatarImage: img })}
+                  />
+                )}
+                <p className="card-hint">两个都没有图时，用内置的那张渡鸦照。只对装了言叽 app 的手机有效，网页版没有锁屏来电页。</p>
               </div>
             </Section>
             <Section title="进入页样式">

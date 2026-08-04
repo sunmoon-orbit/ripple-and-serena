@@ -6,6 +6,9 @@ import android.content.Context
 import android.content.BroadcastReceiver
 import android.content.IntentFilter
 import android.content.Intent
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
+import android.graphics.drawable.Drawable
 import android.media.AudioAttributes
 import android.media.MediaPlayer
 import android.media.RingtoneManager
@@ -17,9 +20,13 @@ import android.os.VibrationEffect
 import android.os.Vibrator
 import android.os.VibratorManager
 import android.view.WindowManager
+import android.view.View
+import android.widget.ImageView
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
+import androidx.core.graphics.drawable.RoundedBitmapDrawableFactory
+import java.io.File
 
 /**
  * 原生来电页（0729 加）。
@@ -78,7 +85,97 @@ class CallActivity : AppCompatActivity() {
         findViewById<TextView>(R.id.call_reason).text =
             intent.getStringExtra(EXTRA_REASON)?.takeIf { it.isNotBlank() } ?: "想你了"
         startRinging()
+        // 放在 startRinging 之后：解码是在主线程干的。叫醒她的是声音不是头像，
+        // 这个顺序不能倒过来——一张图再慢也不该挡住铃响。
+        showCallAvatar()
         timeout.postDelayed({ dismiss() }, RING_MS)
+    }
+
+    // 顺序固定：设置头像文件 -> 内置渡鸦照 -> XML 里的 emoji。
+    // 头像只影响装饰；任何文件、解码或内存异常都不能妨碍来电页继续工作。
+    private fun showCallAvatar() {
+        val image = findViewById<ImageView>(R.id.call_avatar)
+        val fallback = findViewById<TextView>(R.id.call_avatar_fallback)
+        image.visibility = View.GONE
+        fallback.visibility = View.VISIBLE
+        val targetPx = (104 * resources.displayMetrics.density).toInt().coerceAtLeast(1)
+        val fileDrawable = safelyLoadAvatar("设置头像") {
+            decodeAvatarFile(File(filesDir, "call_avatar.png"), targetPx)
+        }
+        val drawable = fileDrawable ?: safelyLoadAvatar("内置头像") {
+            decodeAvatarResource(R.drawable.call_avatar_default, targetPx)
+        }
+        if (drawable != null) {
+            try {
+                image.setImageDrawable(drawable)
+                image.visibility = View.VISIBLE
+                fallback.visibility = View.GONE
+            } catch (e: Exception) {
+                android.util.Log.w("YanjiCall", "来电头像显示失败，改用 emoji", e)
+            } catch (_: OutOfMemoryError) {
+                android.util.Log.w("YanjiCall", "来电头像显示内存不足，改用 emoji")
+            }
+        }
+    }
+
+    private inline fun safelyLoadAvatar(label: String, decode: () -> Bitmap?): Drawable? {
+        return try {
+            val bitmap = decode() ?: return null
+            RoundedBitmapDrawableFactory.create(resources, bitmap).apply {
+                setCircular(true)
+            }
+        } catch (e: Exception) {
+            android.util.Log.w("YanjiCall", "$label 加载失败，继续降级", e)
+            null
+        } catch (_: OutOfMemoryError) {
+            android.util.Log.w("YanjiCall", "$label 加载内存不足，继续降级")
+            null
+        }
+    }
+
+    private fun decodeAvatarFile(file: File, targetPx: Int): Bitmap? {
+        if (!file.isFile) return null
+        val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+        BitmapFactory.decodeFile(file.absolutePath, bounds)
+        if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return null
+        val options = BitmapFactory.Options().apply {
+            inSampleSize = avatarSampleSize(bounds.outWidth, bounds.outHeight, targetPx)
+        }
+        return cropAndScaleAvatar(BitmapFactory.decodeFile(file.absolutePath, options), targetPx)
+    }
+
+    private fun decodeAvatarResource(resourceId: Int, targetPx: Int): Bitmap? {
+        val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+        BitmapFactory.decodeResource(resources, resourceId, bounds)
+        if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return null
+        val options = BitmapFactory.Options().apply {
+            inSampleSize = avatarSampleSize(bounds.outWidth, bounds.outHeight, targetPx)
+        }
+        return cropAndScaleAvatar(BitmapFactory.decodeResource(resources, resourceId, options), targetPx)
+    }
+
+    private fun avatarSampleSize(width: Int, height: Int, targetPx: Int): Int {
+        var sample = 1
+        val squareSide = minOf(width, height)
+        while (squareSide / (sample * 2) >= targetPx) sample *= 2
+        return sample
+    }
+
+    private fun cropAndScaleAvatar(source: Bitmap?, targetPx: Int): Bitmap? {
+        source ?: return null
+        val side = minOf(source.width, source.height)
+        val square = Bitmap.createBitmap(
+            source,
+            (source.width - side) / 2,
+            (source.height - side) / 2,
+            side,
+            side
+        )
+        if (square !== source) source.recycle()
+        if (side == targetPx) return square
+        val scaled = Bitmap.createScaledBitmap(square, targetPx, targetPx, true)
+        if (scaled !== square) square.recycle()
+        return scaled
     }
 
     private fun showOverLockscreen() {

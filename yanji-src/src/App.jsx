@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useStore } from './store'
 import { pushNative } from './utils/nativeInbox'
+import { squareDownscale } from './utils/squareDownscale'
 import IconNav from './components/IconNav'
 import Chat from './components/Chat'
 import Memory from './components/Memory'
@@ -40,6 +41,7 @@ export default function App() {
   const glassOpacity = useStore((s) => s.glassOpacity ?? 0.3)
   const avatarSize = useStore((s) => s.avatarConfig?.size || 28)
   const ringtone = useStore((s) => s.ringtone)
+  const avatarConfig = useStore((s) => s.avatarConfig)
   const [showSplash, setShowSplash] = useState(true)
   const [showHome, setShowHome] = useState(false)
   const fromNativeRef = useRef(false)
@@ -96,6 +98,28 @@ export default function App() {
   useEffect(() => {
     try { window.YanjiNative?.saveRingtone?.(ringtone || 'soft-chime') } catch { /* 网页版没这个桥 */ }
   }, [ringtone])
+
+  // 来电头像同理：锁屏来电页是原生画的，读不到 localStorage，所以每次变了都抄一份过去。
+  // 「选哪张」的判断全在这儿，原生端只认一个 filesDir/call_avatar.png——
+  // 传空串＝删掉那个文件，让它自己降到内置的渡鸦照。
+  useEffect(() => {
+    if (!window.YanjiNative?.saveCallAvatar) return
+    let cancelled = false
+    const src = avatarConfig?.callAvatarMode === 'custom'
+      ? avatarConfig?.callAvatarImage
+      : avatarConfig?.assistantImage
+    const push = (dataUrl) => {
+      if (cancelled) return
+      // 剥掉 data:image/xxx;base64, 前缀，桥那边收裸 base64
+      const b64 = typeof dataUrl === 'string' ? dataUrl.replace(/^data:[^,]*,/, '') : ''
+      try { window.YanjiNative.saveCallAvatar(b64 || '') } catch { /* 桥挂了就维持原样，不该因为一张头像报错 */ }
+    }
+    if (!src) { push('') ; return }
+    // 助手头像是原尺寸存的（聊天里那个上传口不缩），照搬过去可能撞原生 4MB 上限，
+    // 而且超限是**静默忽略**的，症状就是「设了但来电页没变」。所以这里统一再缩一次。
+    squareDownscale(src).then(push).catch(() => push(src))
+    return () => { cancelled = true }
+  }, [avatarConfig?.callAvatarMode, avatarConfig?.callAvatarImage, avatarConfig?.assistantImage])
 
   return (
     <>

@@ -4,7 +4,11 @@ import android.appwidget.AppWidgetManager
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
+import android.util.Base64
+import android.util.Log
 import android.webkit.JavascriptInterface
+import java.io.File
+import java.util.concurrent.Executors
 
 class WebBridge(private val activity: MainActivity) {
 
@@ -92,6 +96,52 @@ class WebBridge(private val activity: MainActivity) {
             .apply()
     }
 
+    // 来电页必须在 WebView 起来前就能读到头像，所以网页端把设置里的头像抄到 filesDir。
+    // 解码和落盘都放在线程里；先写临时文件再 rename，来电页不会撞见半张图。
+    @JavascriptInterface
+    fun saveCallAvatar(base64: String) {
+        avatarWriter.execute {
+            val target = File(activity.filesDir, "call_avatar.png")
+            val temporary = File(activity.filesDir, "call_avatar.png.tmp")
+            try {
+                if (base64.isEmpty()) {
+                    if (temporary.exists() && !temporary.delete()) {
+                        Log.w("YanjiCall", "清理来电头像临时文件失败")
+                    }
+                    if (target.exists() && !target.delete()) {
+                        Log.w("YanjiCall", "清除来电头像失败")
+                    }
+                    return@execute
+                }
+
+                // 正常约定是裸 base64；也兼容误传的 data:image/...;base64, 前缀。
+                val payload = base64.substringAfter(',', base64)
+                if (payload.length > MAX_CALL_AVATAR_BASE64_CHARS) {
+                    Log.w("YanjiCall", "来电头像 base64 超过 4MB，已忽略")
+                    return@execute
+                }
+                val bytes = Base64.decode(payload, Base64.DEFAULT)
+                temporary.outputStream().use { output ->
+                    output.write(bytes)
+                    output.flush()
+                    // 写成 getFD() 而不是 .fd：全大写的 Java getter 转 Kotlin 属性名有歧义，
+                    // 这边没有编译器，猜错的代价是一整轮 CI，用方法调用最稳。
+                    output.getFD().sync()
+                }
+                if (!temporary.renameTo(target)) {
+                    Log.w("YanjiCall", "来电头像临时文件替换失败")
+                    temporary.delete()
+                }
+            } catch (e: Exception) {
+                Log.w("YanjiCall", "保存来电头像失败，保留原头像", e)
+                temporary.delete()
+            } catch (e: OutOfMemoryError) {
+                Log.w("YanjiCall", "来电头像解码内存不足，已忽略")
+                temporary.delete()
+            }
+        }
+    }
+
     // blob: 下载兜底：DownloadManager 只认 http/https，备份导出这类 blob: URL
     // 由 MainActivity 注入的 JS 把内容读成 base64 送回来，原生写进 Download 目录（0723）
     @JavascriptInterface
@@ -133,5 +183,10 @@ class WebBridge(private val activity: MainActivity) {
                 activity.sendBroadcast(intent)
             }
         }
+    }
+
+    companion object {
+        private const val MAX_CALL_AVATAR_BASE64_CHARS = 4 * 1024 * 1024
+        private val avatarWriter = Executors.newSingleThreadExecutor()
     }
 }

@@ -23,7 +23,12 @@ const DEFAULT_STATE = {
   // 裁掉的每一段还要额外烧一次轻模型调用去压缩，压完还是不如原文准。
   contextLimit: { mode: 'rounds', maxRounds: 150, maxTokens: 120000, v: 2 },
   searchConfig: { provider: null, apiKey: null },
-  avatarConfig: { mode: 'icon', userImage: null, assistantImage: null, shape: 'circle', size: 28 },
+  // callAvatarMode/callAvatarImage 只管原生锁屏来电页那个圆头像，跟聊天里的 mode 无关：
+  // 'follow' = 用助手头像，'custom' = 用单独传的那张（她可能想聊天一张、来电一张）。
+  avatarConfig: {
+    mode: 'icon', userImage: null, assistantImage: null, shape: 'circle', size: 28,
+    callAvatarMode: 'follow', callAvatarImage: null,
+  },
   autoTools: true,
   moonMemory: {
     enabled: false,
