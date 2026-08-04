@@ -350,10 +350,10 @@ export default function Settings() {
   const store = useStore()
   const {
     connections, activeConnectionId, tokenStats, moonMemory, theme, glassOpacity, avatarConfig, scrollAnchor,
-    globalInstruction, generationConfig, contextLimit, searchConfig, autoTools, injectMode, injectPrompt,
+    globalInstruction, generationConfig, contextLimit, searchConfig, autoTools, imageDescriptions, injectMode, injectPrompt,
     addConnection, updateConnection, deleteConnection, setActiveConnection,
     setGlobalInstruction, setGenerationConfig, setContextLimit, setSearchConfig,
-    setAutoTools, setMoonMemory, setTheme, setGlassOpacity, setAvatarConfig, setScrollAnchor,
+    setAutoTools, setImageDescriptions, setMoonMemory, setTheme, setGlassOpacity, setAvatarConfig, setScrollAnchor,
     setInjectMode, setInjectPrompt, replyDelay, setReplyDelay,
     textReveal, setTextReveal,
     voiceCallStyle, setVoiceCallStyle,
@@ -691,72 +691,86 @@ export default function Settings() {
 
         {/* ── Connections ──────────────────────────────────────── */}
         {tab === 'connections' && (
-          <Section title="API 连接">
-            {connections.map((conn) => (
-              <ConnectionCard
-                key={conn.id}
-                conn={conn}
-                isActive={conn.id === activeConnectionId}
-                onSave={(id, patch) => updateConnection(id, patch)}
-                onDelete={deleteConnection}
-                onActivate={setActiveConnection}
-              />
-            ))}
-            {!addingConn && (
-              <button className="btn-sm btn-ghost btn-add-conn" onClick={() => setAddingConn(true)}>
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
-                  <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
-                </svg>
-                添加连接
-              </button>
+          <>
+            <Section title="API 连接">
+              {connections.map((conn) => (
+                <ConnectionCard
+                  key={conn.id}
+                  conn={conn}
+                  isActive={conn.id === activeConnectionId}
+                  onSave={(id, patch) => updateConnection(id, patch)}
+                  onDelete={deleteConnection}
+                  onActivate={setActiveConnection}
+                />
+              ))}
+              {!addingConn && (
+                <button className="btn-sm btn-ghost btn-add-conn" onClick={() => setAddingConn(true)}>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+                    <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
+                  </svg>
+                  添加连接
+                </button>
             )}
-            {addingConn && (
-              <div className="settings-card">
-                <div className="settings-card-title">新连接</div>
-                <div className="form-row">
-                  <label className="form-label">名称</label>
-                  <input className="form-input" value={newConn.name} onChange={(e) => setNewConn({ ...newConn, name: e.target.value })} placeholder="连接名称" />
-                </div>
-                <div className="form-row">
-                  <label className="form-label">Provider</label>
-                  <select className="filter-select" value={newConn.provider} onChange={(e) => setNewConn({ ...newConn, provider: e.target.value, defaultModel: '' })}>
-                    <option value="openai">OpenAI / 兼容</option>
-                    <option value="anthropic">Anthropic</option>
-                    <option value="gemini">Gemini</option>
-                    <option value="deepseek">DeepSeek</option>
-                  </select>
-                </div>
-                <div className="form-row">
-                  <label className="form-label">API Key</label>
-                  <input className="form-input" type="password" value={newConn.apiKey} onChange={(e) => setNewConn({ ...newConn, apiKey: e.target.value })} placeholder="sk-..." />
-                </div>
-                <div className="form-row">
-                  <label className="form-label">Base URL</label>
-                  <input className="form-input" value={newConn.baseUrl} onChange={(e) => { setNewConn({ ...newConn, baseUrl: e.target.value }); setFetchedModels([]); }} placeholder="（留空使用默认）" />
-                </div>
-                <div className="form-row" style={{ justifyContent: 'flex-end' }}>
-                  <button className="btn-sm btn-ghost" onClick={handleFetchModels} disabled={fetchingModels}>
-                    {fetchingModels ? '拉取中…' : '拉取模型'}
-                  </button>
-                </div>
-                <div className="form-row">
-                  <label className="form-label">默认模型</label>
-                  {fetchedModels.length > 0 ? (
-                    <select className="filter-select" style={{ flex: 1 }} value={newConn.defaultModel} onChange={(e) => setNewConn({ ...newConn, defaultModel: e.target.value })}>
-                      <option value="">请选择模型…</option>
-                      {fetchedModels.map((m) => <option key={m} value={m}>{m}</option>)}
+              {addingConn && (
+                <div className="settings-card">
+                  <div className="settings-card-title">新连接</div>
+                  <div className="form-row">
+                    <label className="form-label">名称</label>
+                    <input className="form-input" value={newConn.name} onChange={(e) => setNewConn({ ...newConn, name: e.target.value })} placeholder="连接名称" />
+                  </div>
+                  <div className="form-row">
+                    <label className="form-label">Provider</label>
+                    <select className="filter-select" value={newConn.provider} onChange={(e) => setNewConn({ ...newConn, provider: e.target.value, defaultModel: '' })}>
+                      <option value="openai">OpenAI / 兼容</option>
+                      <option value="anthropic">Anthropic</option>
+                      <option value="gemini">Gemini</option>
+                      <option value="deepseek">DeepSeek</option>
                     </select>
-                  ) : (
-                    <input className="form-input" value={newConn.defaultModel} onChange={(e) => setNewConn({ ...newConn, defaultModel: e.target.value })} placeholder="模型名称（或点「拉取模型」）" />
+                  </div>
+                  <div className="form-row">
+                    <label className="form-label">API Key</label>
+                    <input className="form-input" type="password" value={newConn.apiKey} onChange={(e) => setNewConn({ ...newConn, apiKey: e.target.value })} placeholder="sk-..." />
+                  </div>
+                  <div className="form-row">
+                    <label className="form-label">Base URL</label>
+                    <input className="form-input" value={newConn.baseUrl} onChange={(e) => { setNewConn({ ...newConn, baseUrl: e.target.value }); setFetchedModels([]); }} placeholder="（留空使用默认）" />
+                  </div>
+                  <div className="form-row" style={{ justifyContent: 'flex-end' }}>
+                    <button className="btn-sm btn-ghost" onClick={handleFetchModels} disabled={fetchingModels}>
+                      {fetchingModels ? '拉取中…' : '拉取模型'}
+                    </button>
+                  </div>
+                  <div className="form-row">
+                    <label className="form-label">默认模型</label>
+                    {fetchedModels.length > 0 ? (
+                      <select className="filter-select" style={{ flex: 1 }} value={newConn.defaultModel} onChange={(e) => setNewConn({ ...newConn, defaultModel: e.target.value })}>
+                        <option value="">请选择模型…</option>
+                        {fetchedModels.map((m) => <option key={m} value={m}>{m}</option>)}
+                      </select>
+                    ) : (
+                      <input className="form-input" value={newConn.defaultModel} onChange={(e) => setNewConn({ ...newConn, defaultModel: e.target.value })} placeholder="模型名称（或点「拉取模型」）" />
                   )}
+                  </div>
+                  <div className="form-row form-actions">
+                    <button className="btn-sm btn-ghost" onClick={() => { setAddingConn(false); setFetchedModels([]); }}>取消</button>
+                    <button className="btn-sm btn-primary" onClick={handleAddConn}>添加</button>
+                  </div>
                 </div>
-                <div className="form-row form-actions">
-                  <button className="btn-sm btn-ghost" onClick={() => { setAddingConn(false); setFetchedModels([]); }}>取消</button>
-                  <button className="btn-sm btn-primary" onClick={handleAddConn}>添加</button>
+              )}
+            </Section>
+            <Section title="图片理解">
+              <div className="settings-card">
+                <div className="card-row">
+                  <span className="card-row-label">保留老图片描述</span>
+                  <label className="toggle">
+                    <input type="checkbox" checked={imageDescriptions !== false} onChange={(e) => setImageDescriptions(e.target.checked)} />
+                    <span className="toggle-track" />
+                  </label>
                 </div>
+                <p className="card-hint">发图后自动生成一句文字描述，图片被移出上下文之后，涟言还知道那张图里有什么。每条带图消息会多一次识图调用（走主模型）。关掉的话，老图片在上下文里只剩「[图片]」。</p>
               </div>
-            )}
-          </Section>
+            </Section>
+          </>
         )}
 
         {/* ── Memory Injection ─────────────────────────────────── */}

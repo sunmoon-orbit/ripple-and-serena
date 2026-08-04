@@ -40,6 +40,28 @@ import CompletionEgg, { pickEgg } from './CompletionEgg'
 // 同一对话的压缩共用一个 Promise，后来的生成不再发第二份轻模型请求。
 const compactionJobs = new Map()
 
+const IMAGE_DESC_PROMPT = '用中文客观描述这张图，80 字以内。保留界面文字和数字、人物动作、物品、场景。只输出描述。'
+
+async function describeImages(chatId, messageId, images, conn, updateMessage, recordTokenUsage) {
+  try {
+    const result = await sendMessage({
+      connection: conn,
+      messages: [{ role: 'user', content: IMAGE_DESC_PROMPT, images }],
+      model: conn.defaultModel,
+      generationConfig: { maxTokens: 300, temperature: 0.2 },
+      autoTools: false,
+    })
+    // 识图是这条管线里唯一按张收费的调用，不记账用量页就看不见它。
+    // 设置里那个开关写着「多一次识图调用」，得让这句话在账上真能核对到。
+    if (result.usage) recordTokenUsage(conn.id, result.usage)
+    const imageDesc = (result.text || '').trim().slice(0, 80)
+    if (!imageDesc) return
+    // 极慢请求可能让一轮历史先以「[图片]」发出，下一轮补上描述会断一次缓存前缀；
+    // 图片通常四条后才降级，这个小概率代价比改动已量化的缓存分界线更可控。
+    updateMessage(chatId, messageId, { imageDesc })
+  } catch { /* 识图失败不影响聊天，老图片自然退回普通占位符 */ }
+}
+
 // 这个判据只用来挡「轻模型的拒答文案/报错」——0711 那次就是拒答文案直接进了她眼前。
 // ⚠️ 故意不比冒号、也不要求四个全中：模型爱给标题加粗、爱把「：」打成半角，
 // 全等匹配会把一份好笔记判死，症状是压缩永远不成功、且没有任何报错。
@@ -133,7 +155,7 @@ export default function Chat() {
   const {
     chats, activeChatId, connections, activeConnectionId,
     globalInstruction, memoryItems, generationConfig,
-    searchConfig, moonMemory, autoTools, injectMode, injectPrompt, setInjectMode, replyDelay, customStickers,
+    searchConfig, moonMemory, autoTools, imageDescriptions, injectMode, injectPrompt, setInjectMode, replyDelay, customStickers,
     createChat, setActiveChat, getActiveConnection, getActiveChat, getMessages,
     addMessage, updateMessage, removeLastEmptyAssistant, truncateMessagesFrom, touchChat, deleteMessage,
     recordTokenUsage, updateChatModel, updateChatConnection, applyContextLimit,
@@ -229,7 +251,10 @@ export default function Chat() {
       const imgKeepFrom = Math.max(0, Math.floor((allMsgs.length - IMG_KEEP_RECENT) / imgStep) * imgStep)
       const prepared = allMsgs.map((m, i) => {
         const keepImages = i >= imgKeepFrom
-        const baseContent = !keepImages && m.images?.length && !m.content ? '[图片]' : m.content
+        const imageMarker = m.imageDesc ? `[图片:${m.imageDesc}]` : '[图片]'
+        const baseContent = !keepImages && m.images?.length
+          ? `${imageMarker}${m.content ? ` ${m.content}` : ''}`
+          : m.content
         let c = baseContent
         if (m.quote) {
           const who = m.quote.role === 'user' ? '我之前说' : '你（涟言）之前说'
@@ -640,20 +665,22 @@ export default function Chat() {
       opts.bilingual ? BILINGUAL_NOTE : null,
     ].filter(Boolean).join('\n\n') || undefined
     const segments = opts.segments && opts.segments.length > 1 ? opts.segments : null
+    let imageMessage
     if (segments) {
       // 分段发送：每段一条气泡；图片挂最后一段，引用挂第一段，注入词只挂最后一段
       segments.forEach((seg, i) => {
         const last = i === segments.length - 1
-        addMessage(chat.id, {
+        const message = addMessage(chat.id, {
           role: 'user',
           content: seg,
           images: last && images.length ? images : undefined,
           quote: i === 0 ? (opts.quote || undefined) : undefined,
           injected: last ? inject : undefined,
         })
+        if (last) imageMessage = message
       })
     } else {
-      addMessage(chat.id, {
+      imageMessage = addMessage(chat.id, {
         role: 'user',
         content: text,
         images: images.length ? images : undefined,
@@ -666,6 +693,9 @@ export default function Chat() {
         // 主动开口的触发消息：进上下文但不渲染成气泡
         hidden: opts.hidden || undefined,
       })
+    }
+    if (imageDescriptions !== false && images.length && imageMessage) {
+      void describeImages(chat.id, imageMessage.id, images, conn, updateMessage, recordTokenUsage)
     }
     setPendingImages([])
 
@@ -685,7 +715,7 @@ export default function Chat() {
     }
 
     await generateReply(chat, conn, { titleText: text, hidden: opts.hidden, voicemail: opts.voicemail })
-  }, [isSending, activeChat, activeConn, connections, injectMode, injectPrompt, replyDelay, generateReply])
+  }, [isSending, activeChat, activeConn, connections, imageDescriptions, injectMode, injectPrompt, replyDelay, generateReply])
 
   // ── 延迟回复到点检查：每 5s + 回前台时看一眼，到点就补上回复 ──────────────
   useEffect(() => {

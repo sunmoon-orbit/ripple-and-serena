@@ -30,6 +30,7 @@ const DEFAULT_STATE = {
     callAvatarMode: 'follow', callAvatarImage: null,
   },
   autoTools: true,
+  imageDescriptions: true,
   moonMemory: {
     enabled: false,
     baseUrl: 'https://memory.ravenlove.cc',
@@ -179,7 +180,7 @@ const persistedKeys = [
   'connections', 'activeConnectionId', 'chats', 'activeChatId',
   'messagesByChatId', 'globalInstruction', 'summariesByChatId',
   'generationConfig', 'memoryItems', 'tokenStats', 'contextLimit',
-  'searchConfig', 'avatarConfig', 'autoTools', 'moonMemory', 'theme', 'glassOpacity',
+  'searchConfig', 'avatarConfig', 'autoTools', 'imageDescriptions', 'moonMemory', 'theme', 'glassOpacity',
   'injectMode', 'injectPrompt', 'scrollAnchor', 'textReveal', 'replyDelay', 'customStickers',
   'voiceCallStyle', 'vcBackground', 'homeStyle', 'timeAwareness', 'longingPush', 'randomTool', 'ringtone',
 ]
@@ -528,6 +529,9 @@ export const useStore = create((set, get) => ({
   },
   setAutoTools: (v) => {
     set((s) => { savePersistedState({ ...s, autoTools: v }); return { autoTools: v } })
+  },
+  setImageDescriptions: (v) => {
+    set((s) => { savePersistedState({ ...s, imageDescriptions: v }); return { imageDescriptions: v } })
   },
   setMoonMemory: (patch) => {
     set((s) => {
