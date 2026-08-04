@@ -63,6 +63,7 @@ const DEFAULT_STATE = {
   longingPush: true,
   // 来电铃声：soft-chime 是原有的 E5 → C5 两音轻响，老用户默认听感不变
   ringtone: 'soft-chime',
+  lastBackupAt: 0,
   // UI-only (not persisted)
   activePanel: 'roost',
   // 聊天记录从 IndexedDB 读回来了没有：开屏动画期间是 false，界面靠它判断「现在的空是真空还是没读完」
@@ -182,7 +183,7 @@ const persistedKeys = [
   'generationConfig', 'memoryItems', 'tokenStats', 'contextLimit',
   'searchConfig', 'avatarConfig', 'autoTools', 'imageDescriptions', 'moonMemory', 'theme', 'glassOpacity',
   'injectMode', 'injectPrompt', 'scrollAnchor', 'textReveal', 'replyDelay', 'customStickers',
-  'voiceCallStyle', 'vcBackground', 'homeStyle', 'timeAwareness', 'longingPush', 'randomTool', 'ringtone',
+  'voiceCallStyle', 'vcBackground', 'homeStyle', 'timeAwareness', 'longingPush', 'randomTool', 'ringtone', 'lastBackupAt',
 ]
 
 function mergeWithDefaults(persisted) {
@@ -226,6 +227,7 @@ export const useStore = create((set, get) => ({
   setRandomTool: (v) => set((s) => { savePersistedState({ ...s, randomTool: v }); return { randomTool: v } }),
   setTimeAwareness: (v) => set((s) => { savePersistedState({ ...s, timeAwareness: v }); return { timeAwareness: v } }),
   setLongingPush: (v) => set((s) => { savePersistedState({ ...s, longingPush: v }); return { longingPush: v } }),
+  setLastBackupAt: (ts) => set((s) => { savePersistedState({ ...s, lastBackupAt: ts }); return { lastBackupAt: ts } }),
   // 锁屏来电是原生 CallActivity 放的铃，它读不到 localStorage——
   // 每次改铃声都往原生 SharedPreferences 抄一份，否则她选的铃声只在开着言叽时听得到。
   setRingtone: (v) => set((s) => {

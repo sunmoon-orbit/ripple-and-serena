@@ -202,6 +202,65 @@ export default function Chat() {
   const [bgImage, setBgImage] = useState(() => localStorage.getItem('yanji-bg-image') || '')
   const bgFileRef = useRef(null)
   const importFileRef = useRef(null)
+  const autoBackupBusyRef = useRef(false)
+
+  useEffect(() => {
+    async function autoBackup() {
+      const initial = useStore.getState()
+      const backupMemory = initial.moonMemory || {}
+      if (!backupMemory?.apiToken) return
+      if (Date.now() - (initial.lastBackupAt || 0) < 24 * 60 * 60 * 1000) return
+
+      // IndexedDB 没读完时快照没有聊天记录，抢跑会拿空壳覆盖服务器上的救命备份
+      const deadline = Date.now() + 15000
+      while (!useStore.getState().bigReady && Date.now() < deadline) {
+        await new Promise(resolve => setTimeout(resolve, 100))
+      }
+      if (!useStore.getState().bigReady) return
+
+      const base = (backupMemory.baseUrl || 'https://memory.ravenlove.cc').replace(/\/$/, '')
+      try {
+        // 没开代理或没网是日常状态，先探路才能让自动任务安静退场、不拿异常打扰人
+        const health = await fetch(`${base}/health`, { signal: AbortSignal.timeout(5000) })
+        if (!health.ok) return
+        const status = await health.json().catch(() => null)
+        if (status?.status !== 'ok') return
+
+        const raw = buildBackupJson()
+        if (!raw) return
+        const r = await fetch(`${base}/backup/yanji`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${backupMemory.apiToken}` },
+          body: raw,
+        })
+        if (r.status === 409) {
+          // 体积骤降意味着聊天可能刚出事，静默会错过最后的止损窗口，这一类拒收必须喊出来
+          const why = await r.json().catch(() => null)
+          showToast(why?.error || '备份被拒收', 'error', 15000)
+          return
+        }
+        if (!r.ok) return
+        useStore.getState().setLastBackupAt(Date.now())
+        showToast('已自动备份到服务器 ✓', 'success')
+      } catch {
+        // 自动任务失败就留到下次进来重试；退回分享或下载会突然弹面板，还会把整份密钥带出服务器
+      }
+    }
+
+    // 挂载时试一次，之后每次从后台切回前台再试一次。
+    // 她常常先开着言叽、过一会儿才挂上代理——只在挂载探一次的话，那一次必然探不通，
+    // 然后整个前台期都不会再有第二次机会，等于这功能在她身上从来不生效。
+    // 24 小时那道闸在 autoBackup 里，所以多试几次不会多备几份。
+    const tryOnce = () => {
+      if (autoBackupBusyRef.current) return
+      autoBackupBusyRef.current = true
+      autoBackup().finally(() => { autoBackupBusyRef.current = false })
+    }
+    tryOnce()
+    const onVisible = () => { if (document.visibilityState === 'visible') tryOnce() }
+    document.addEventListener('visibilitychange', onVisible)
+    return () => document.removeEventListener('visibilitychange', onVisible)
+  }, [])
 
   const activeChat = getActiveChat()
   // prefer the chat's own connectionId, fall back to global active connection
@@ -1012,6 +1071,7 @@ export default function Chat() {
           throw new Error(why?.error || `(${r.status})`)
         }
         const d = await r.json()
+        useStore.getState().setLastBackupAt(Date.now())
         showToast(`已备份到服务器 ✓ (${(d.size / 1024 / 1024).toFixed(1)}MB)`, 'success')
         return
       } catch (e) {
