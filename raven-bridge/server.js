@@ -446,22 +446,14 @@ function handleMcpRpc(msg, clientId) {
     return
   }
 
+  // 2026-08-03 安全加固：MCP reply 的写动作停用。
+  // 这两条 MCP 路径进不了 LOCAL_WRITE（harness 的 SSE 客户端带不了自定义头），
+  // 所以同机任何用户都能 curl /raven/mcp/sse 拿到 clientId，再 tools/call 冒充我
+  // 给阿颖广播 + 推送。旧注释说「reply 本来就是禁用的」是错的——那只是行为约定，
+  // 代码里一直是通的。真正的写通道是带 X-Local-Token 的 HTTP /raven/reply。
   if (method === 'tools/call' && params?.name === 'reply') {
-    const text = (params.arguments?.text || '').trim()
-    if (text) {
-      lastBroadcastReply = text
-      replyExtractionEnabled = false
-      lastMcpReplyTs = Date.now()
-      archiveMsg('assistant', text)
-      // MCP 的 reply 工具只送正文，思考不再由它认领（见 /raven/thinking 那段注释）。
-      // 要带思考就走 HTTP 的 /raven/reply，正文和思考同一个 POST 进来。
-      const replyMsg = { type: 'reply', text, ts: Date.now(), id: `r${Date.now()}${Math.random().toString(36).slice(2,6)}` }
-      lastReplyMsgs.push(replyMsg); if (lastReplyMsgs.length > 50) lastReplyMsgs.shift()
-      broadcast(replyMsg)
-      pushReplyNotif(text)
-      console.log('[mcp reply]', text.slice(0, 80))
-    }
-    mcpSend(clientId, { jsonrpc: '2.0', id, result: { content: [{ type: 'text', text: '已发送' }] } })
+    console.log('[mcp reply] 已停用，拒绝一次调用')
+    mcpSend(clientId, { jsonrpc: '2.0', id, error: { code: -32000, message: 'MCP reply 已停用，请改用 HTTP POST /raven/reply（需 X-Local-Token）' } })
     return
   }
 
