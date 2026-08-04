@@ -110,6 +110,10 @@ const YANJI_DIR = path.join(__dirname, '..', 'yanji')
 // 上传目录改持久位置：/tmp 重启即清空，聊天记录里的图片会全部变裂图（2026-07-05）
 const UPLOAD_DIR = '/home/ripple/raven-uploads'
 const LEGACY_UPLOAD_DIR = '/tmp/raven-uploads'  // 老消息里的附件回看兜底
+// APK 自建下载点（0804）：GitHub release 要翻墙，阿颖那边下到一半断、Chrome 照样报「完成」，
+// 装的时候文件是坏的、静默没反应。放自己域名下走她本来就通的那条路。
+// 目录**故意在仓库外**：STATIC_DIR 是 git 仓库里的 raven/，往里丢 6.6MB 的包会把仓库撑肥。
+const DOWNLOAD_DIR = '/home/ripple/raven-downloads'
 const MIME = {
   '.html': 'text/html; charset=utf-8',
   '.js':   'application/javascript',
@@ -1091,6 +1095,49 @@ const server = http.createServer((req, res) => {
       if (req.method === 'HEAD') { res.end(); return }
       fs.createReadStream(abs).pipe(res)
     })
+    return
+  }
+
+  // APK 下载：/raven/download/<文件名>，目录在仓库外，不进 git。
+  // Content-Type 必须是 vnd.android.package-archive——给 octet-stream 的话
+  // 安卓有时候会把它当普通文件存下来，点了不弹安装器（就是 0804 那个症状）。
+  // 放在静态兜底之前：STATIC_DIR 里没有 download/，走到那儿只会 404。
+  if ((req.method === 'GET' || req.method === 'HEAD') && url.pathname.startsWith('/raven/download/')) {
+    const name = path.basename(decodeURIComponent(url.pathname.slice('/raven/download/'.length)))
+    const abs = path.join(DOWNLOAD_DIR, name)
+    if (!name || !abs.startsWith(DOWNLOAD_DIR) || !fs.existsSync(abs)) { res.writeHead(404); res.end(); return }
+    const stat = fs.statSync(abs)
+    const base = {
+      'Content-Type': name.endsWith('.apk')
+        ? 'application/vnd.android.package-archive'
+        : 'application/octet-stream',
+      'Content-Disposition': `attachment; filename="${name}"`,
+      // 断点续传：阿颖那边跨洋 + 手机网络，一抖就断。不给 Accept-Ranges 的话
+      // Chrome 的下载管理器只能从头重来，重来几次就报「下载失败」（0804 亲历）。
+      'Accept-Ranges': 'bytes',
+      // 覆盖同名文件是常事（每次出新包），别让浏览器拿旧的。
+      // ⚠️ 用 no-cache 不用 no-store：no-store 字面意思是「不许把这个存下来」，
+      // 安卓的下载栈历史上真按它办过事——字节全收到了却不落盘，表现就是
+      // 「已下载 6.95MB / 共 6.95MB」一直卡着最后报失败（0804 阿颖遇到的症状）。
+      'Cache-Control': 'no-cache, must-revalidate',
+    }
+    if (req.method === 'HEAD') { res.writeHead(200, { ...base, 'Content-Length': stat.size }); res.end(); return }
+
+    const m = /^bytes=(\d*)-(\d*)$/.exec(req.headers.range || '')
+    if (m && (m[1] || m[2])) {
+      // 只支持单区间：下载器要的就是 bytes=已下到的位置-
+      let start = m[1] ? parseInt(m[1], 10) : stat.size - parseInt(m[2], 10)
+      let end = m[2] && m[1] ? parseInt(m[2], 10) : stat.size - 1
+      start = Math.max(0, start); end = Math.min(stat.size - 1, end)
+      if (!Number.isFinite(start) || !Number.isFinite(end) || start > end) {
+        res.writeHead(416, { 'Content-Range': `bytes */${stat.size}` }); res.end(); return
+      }
+      res.writeHead(206, { ...base, 'Content-Length': end - start + 1, 'Content-Range': `bytes ${start}-${end}/${stat.size}` })
+      fs.createReadStream(abs, { start, end }).pipe(res)
+      return
+    }
+    res.writeHead(200, { ...base, 'Content-Length': stat.size })
+    fs.createReadStream(abs).pipe(res)
     return
   }
 
