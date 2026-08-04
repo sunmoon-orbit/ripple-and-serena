@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useStore } from './store'
 import { pushNative } from './utils/nativeInbox'
 import { squareDownscale } from './utils/squareDownscale'
+import { refreshNativePushToken } from './api/push'
 import IconNav from './components/IconNav'
 import Chat from './components/Chat'
 import Memory from './components/Memory'
@@ -92,6 +93,19 @@ export default function App() {
   useEffect(() => {
     document.documentElement.style.setProperty('--avatar-size', `${avatarSize}px`)
   }, [avatarSize])
+
+  // 推送 token 开机重报：重装 APK 之后服务器手里那条会失效/被删，
+  // 而设置页那个开关只读 localStorage，照样显示「开着」——于是推送和来电
+  // 一起静默死掉，除非她碰巧去拨一下开关（0804 覆盖安装后就是这样）。
+  // 放在最前面：她可能一进来就在等一通电话。
+  useEffect(() => {
+    const mm = useStore.getState().moonMemory
+    if (!mm?.enabled || !mm?.baseUrl || !mm?.apiToken) return
+    refreshNativePushToken({
+      apiUrl: (mm.baseUrl || '').replace(/\/$/, ''),
+      apiToken: mm.apiToken,
+    }).catch(() => { /* 没网/没代理是日常，下次开机再对，别拿红字吓她 */ })
+  }, [])
 
   // 开机也抄一次：她可能在装新包之前就选好了铃声，只靠 setRingtone 同步的话，
   // 除非她再点一次选项，原生端永远停在默认的「檐下晚风」。

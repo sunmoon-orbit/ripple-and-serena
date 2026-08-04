@@ -24,6 +24,41 @@ export function getNativePushToken() {
   try { return localStorage.getItem(FCM_TOKEN_KEY) } catch { return null }
 }
 
+// 开机重报 token（0804）。
+// FCM token 会在**重装 APK、清数据、Google 主动轮换**时变成新的一个，
+// 旧的立刻作废。原生端的 onNewToken 只把新 token 写进 prefs，注释里写着
+// 「前端下次打开时重新上报」——但那个上报从来没实现过：subscribeNativePush
+// 唯一的调用点是设置页那个开关。于是重装之后推送**静默失效**，
+// 开关还显示「开着」（它只读 localStorage），除非她碰巧去拨一下开关，
+// 否则永远收不到通知，也收不到来电。0804 覆盖安装后就是这样，
+// 服务器 fcm_tokens 里言叽那条已经被 UNREGISTERED 清掉了。
+//
+// 所以每次开机无条件补报一次，**不比对本地存的那个**：
+// token 没变、服务器那条却被删掉的情况同样会发生（重装期间 app 短暂不存在，
+// 期间任何一条推送都会拿到 UNREGISTERED，服务器就把行删了）。
+// 只比对「变没变」的话，这种情况永远修不好。服务端是 UPSERT，重报无副作用。
+// 只在「她本来就开着推送」时做（localStorage 有值），不替她打开没开过的功能。
+export async function refreshNativePushToken(moonConfig) {
+  if (!isKotlinApp()) return null
+  if (!getNativePushToken()) return null              // 没开过推送，不多事
+  if (!moonConfig?.apiUrl || !moonConfig?.apiToken) return null
+
+  // 这里**不能**调 retryFcmToken 后干等 15 秒：开机路径上不该阻塞。
+  // 取不到就算了，下次开机再对——反正设置页那个开关仍是手动兜底。
+  const token = window.YanjiNative?.getFcmToken?.()
+  if (!token) return null
+
+  const resp = await fetch(`${moonConfig.apiUrl}/push/fcm-token`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${moonConfig.apiToken}` },
+    body: JSON.stringify({ token }),
+  })
+  if (!resp.ok) throw new Error(`token 重报失败 (${resp.status})`)
+  // 服务器收下了才写本地，否则下次开机会以为已经报过、不再重试
+  try { localStorage.setItem(FCM_TOKEN_KEY, token) } catch { /* noop */ }
+  return token
+}
+
 // Kotlin 壳：token 由 MainActivity 启动时异步预取存 prefs，这里轮询等它就位
 async function getKotlinFcmToken() {
   // 启动时那次可能已失败，点开关时主动再拉一次（旧 APK 无此方法则跳过）
