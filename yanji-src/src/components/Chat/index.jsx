@@ -759,6 +759,13 @@ export default function Chat() {
 
   const handleEditMessage = useCallback((msg, newText) => {
     if (!newText.trim() || !activeChatId) return
+    // 「保存并重发」会砍掉这条之后的全部消息。0804 就是这么没的：滑动时蹭到铅笔，
+    // 在一条 6-17 的老消息上按了保存，2560 条当场消失，没有确认也没有撤销。
+    // 改一句刚说错的话（后面没几条）不该被弹窗烦，所以只在真要丢东西时问。
+    const msgs = useStore.getState().messagesByChatId[activeChatId] || []
+    const idx = msgs.findIndex((m) => m.id === msg.id)
+    const drop = idx >= 0 ? msgs.length - idx - 1 : 0
+    if (drop > 4 && !window.confirm(`重发这条会删掉它后面的 ${drop} 条消息（删了拿不回来）。确定吗？`)) return
     truncateMessagesFrom(activeChatId, msg.id)
     setTimeout(() => handleSend(newText, []), 0)
   }, [activeChatId, truncateMessagesFrom, handleSend])
@@ -995,12 +1002,20 @@ export default function Chat() {
           headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${moonMemory.apiToken}` },
           body: raw,
         })
-        if (!r.ok) throw new Error(`(${r.status})`)
+        if (!r.ok) {
+          // 服务器会因为「体积骤降」拒收（409），那句话解释了到底出了什么事，
+          // 只报一个状态码等于把唯一有用的信息扔了
+          const why = await r.json().catch(() => null)
+          // 拒收是「这份快照本身可疑」，不是「服务器不通」。这时候再弹分享面板
+          // 存本地既没用又把密钥往外递（见上面 0803 那段），到此为止。
+          if (r.status === 409) { showToast(why?.error || '备份被拒收', 'error', 15000); return }
+          throw new Error(why?.error || `(${r.status})`)
+        }
         const d = await r.json()
         showToast(`已备份到服务器 ✓ (${(d.size / 1024 / 1024).toFixed(1)}MB)`, 'success')
         return
       } catch (e) {
-        showToast(`服务器备份失败 ${e.message}，改存到本地兜底…`, 'error')
+        showToast(`服务器备份失败：${e.message}，改存到本地兜底…`, 'error', 10000)
       }
     } else {
       showToast('没配拾羽连接，只能存本地——这份带着密钥，别外发', 'error', 8000)
