@@ -361,12 +361,16 @@ class MainActivity : AppCompatActivity() {
         val nm = getSystemService(NOTIFICATION_SERVICE) as android.app.NotificationManager
         if (nm.canUseFullScreenIntent()) return
 
-        Toast.makeText(this, "涟言来电还不能在锁屏弹出：设置 → 应用 → 言叽 → 全屏通知", Toast.LENGTH_LONG).show()
+        Toast.makeText(this, "涟言来电还不能在锁屏弹出：正在打开「全屏通知」设置页", Toast.LENGTH_LONG).show()
 
-        // 每次启动都提醒（Toast 便宜），但只主动跳一次设置页，免得天天弹她一脸
-        val prefs = getSharedPreferences("yanji_fsi", Context.MODE_PRIVATE)
-        if (prefs.getBoolean("jumped", false)) return
-        prefs.edit().putBoolean("jumped", true).apply()
+        // 0804：原来这里存了个 `jumped` 标记「只主动跳一次设置页，免得天天弹她一脸」。
+        // 那条判断是错的，代价很大：
+        //   1. 覆盖安装会保留 app data，标记还在，但系统可能已经把权限收回了
+        //      —— 于是只剩一个一闪而过的 Toast，来电从此不亮屏，而且不报错。
+        //   2. 这一页在国产 ROM 里不在「应用权限管理」下面（属「特殊应用权限」），
+        //      她照 Toast 里的路径**找不到**，唯一进得去的方式就是这个跳转。
+        // 权限关着 = 来电功能是坏的，这时候每次启动都送她过去才是对的；
+        // 一旦开好，canUseFullScreenIntent() 上面就 return 了，自然再也不弹。
         try {
             startActivity(Intent(
                 android.provider.Settings.ACTION_MANAGE_APP_USE_FULL_SCREEN_INTENT,
