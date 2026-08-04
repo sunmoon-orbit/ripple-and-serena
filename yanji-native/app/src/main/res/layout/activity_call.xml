@@ -131,9 +131,9 @@
                 android:layout_height="70dp"
                 android:background="@drawable/call_btn_answer"
                 android:gravity="center"
-                android:text="✆"
-                android:textSize="30sp"
-                android:textColor="#FFFFFF"
+                android:foreground="@drawable/ic_call_handset"
+                android:foregroundGravity="center"
+                android:contentDescription="接听"
                 android:clickable="true"
                 android:focusable="true" />
 
