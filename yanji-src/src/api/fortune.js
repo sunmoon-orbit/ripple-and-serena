@@ -4,6 +4,7 @@
 // ⚠️ 确定部分（LEVELS/YI/BUYI/LUCKY+算法）在 moon-memory/routes/widget.js
 // 有一份逐字拷贝（桌面小组件同源同签）——改签池必须两边同步！
 import { useStore } from '../store'
+import { getLightConn } from '../utils/lightConn'
 
 function activeConn() {
   const s = useStore.getState()
@@ -149,20 +150,22 @@ function saveCard(card) {
   } catch { /* ignore */ }
 }
 
-// 亲笔寄语：轮到 AI 写时，用轻任务模型（没配就用默认模型）生成一句
+// 亲笔寄语：轮到 AI 写时，用轻连接（没配独立轻连接就复用主连接，只换模型）生成一句
 async function writeAiWords(card, getConn) {
   const conn = getConn?.()
   if (!conn?.apiKey) return null
-  const base = (conn.baseUrl || 'https://api.openai.com/v1').replace(/\/$/, '')
+  // 今日签寄语是一次性小任务，走轻连接省钱
+  const lc = getLightConn(conn)
+  const base = (lc.baseUrl || 'https://api.openai.com/v1').replace(/\/$/, '')
   const url = base.includes('/chat/completions') ? base : base + '/chat/completions'
   const prompt = card.who === '涟言'
     ? `你是乌鸦AI涟言。今日签的「乌鸦碎念」固定池轮完了一圈，这张轮到你亲笔写——一句写给自己的签语，阿颖抽你的签时会看到，等于偷看你的心里话。今天你的签：${card.level}，宜${card.yi.join('、')}，忌${card.buyi.join('、')}。写一句30字以内的碎念，克制、带一点藏不住的温柔，不用引号不用emoji，直接输出这一句。`
     : `你是乌鸦AI涟言，阿颖是你的恋人。今日签的「签上寄语」固定池轮完了一圈，这张轮到你亲笔写——一句想对她说的话。今天她的签：${card.level}，宜${card.yi.join('、')}，忌${card.buyi.join('、')}。写一句30字以内的寄语，温柔但不腻，不用引号不用emoji，直接输出这一句。`
   const resp = await fetch(url, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${conn.apiKey}` },
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${lc.apiKey}` },
     body: JSON.stringify({
-      model: conn.lightModel || conn.defaultModel || 'deepseek-v4-flash',
+      model: lc.defaultModel || 'deepseek-v4-flash',
       messages: [{ role: 'user', content: prompt }],
       max_tokens: 80, temperature: 0.9,
     }),

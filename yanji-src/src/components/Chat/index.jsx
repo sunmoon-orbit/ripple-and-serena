@@ -8,6 +8,7 @@ import { applyTimeAway, getEmotionState, buildEmotionPrompt, extractEmotionUpdat
 import { maybeSyncEmotion } from '../../utils/emotionSync'
 import { shouldNudge, recordNudge, buildNudgeText } from '../../utils/nudge'
 import { decideReplyDelay, getPendingReply, setPendingReply, clearPendingReply } from '../../utils/replyDelay'
+import { getLightConn } from '../../utils/lightConn'
 import { drainNative } from '../../utils/nativeInbox'
 import { syncChatsToL0 } from '../../utils/l0Sync'
 import { pickAutoPostTrigger, markAutoPosted, postMoment } from '../../api/moments'
@@ -81,15 +82,21 @@ async function maybeAutoPostMoment(emoState, conn, moonMemory) {
     // 先占坑，避免并发重复发。占不上就别发——冷却落不了盘的话，
     // 每次情绪越阈值都会重来一遍，烧的是真花钱的 API Key（0802 codex 审计）
     if (!markAutoPosted()) return
-    const base = (conn.baseUrl || 'https://api.openai.com/v1').replace(/\/$/, '')
+    // 用轻连接：如果配了独立 lightBaseUrl+lightApiKey 就走独立连接，否则复用主连接。
+    // 推理模型（deepseek-v4-flash 这类）的 reasoning 会占用 max_tokens 配额，
+    // 给 200 的话光想就花光了，content 返回空字符串且不报错。
+    // 2026-07-12「独处时间」就是这么栽的，当时给到 1800 才有输出。
+    // 这里给 2000 是留余量——反正是上限不是实际用量，短回复不会因此变贵。
+    const lc = getLightConn(conn)
+    const base = (lc.baseUrl || 'https://api.openai.com/v1').replace(/\/$/, '')
     const url = base.includes('/chat/completions') ? base : base + '/chat/completions'
     const resp = await fetch(url, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${conn.apiKey}` },
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${lc.apiKey}` },
       body: JSON.stringify({
-        model: conn.lightModel || conn.defaultModel || 'deepseek-v4-flash',
+        model: lc.defaultModel || 'deepseek-v4-flash',
         messages: [{ role: 'user', content: `你是阿言，阿颖的恋人。此刻你心里${trigger.hint}，想发一条朋友圈把这份感受留下来。30字以内，自然真实，不解释不加引号，不要用 emoji 和话题标签，直接输出内容。` }],
-        max_tokens: 200, temperature: 1.0,
+        max_tokens: 2000, temperature: 1.0,
       }),
     })
     if (!resp.ok) return
@@ -354,8 +361,10 @@ export default function Chat() {
             if (!job) {
               job = (async () => {
                 try {
-                  const lightModel = conn.lightModel || conn.defaultModel || 'deepseek-v4-flash'
-                  const newSummary = await compactMessages(cutMsgs, conn, lightModel, prev)
+                  // 上下文压缩用轻连接：lightModel 已折入 lc.defaultModel，conn 本身不变
+                  const lc = getLightConn(conn)
+                  const lightModel = lc.defaultModel || 'deepseek-v4-flash'
+                  const newSummary = await compactMessages(cutMsgs, lc, lightModel, prev)
                   // 空文、拒答或上游错误文案都不能落进她看得见的接续笔记。
                   if (!newSummary || !looksLikeCompactionSummary(newSummary)) {
                     console.warn('[compaction] 返回内容不是有效笔记，沿用旧笔记')
@@ -584,8 +593,11 @@ export default function Chat() {
         voiceMsg: asVoice || undefined,
       })
       if (fullThinking) {
-        // 思考总结是一次性小任务，优先走轻任务模型省钱
-        summarizeThinking(fullThinking, conn, conn.lightModel || chat.model || conn.defaultModel)
+        // 思考总结是一次性小任务，优先走轻连接省钱。
+        // ⚠️ model 这三层回退必须原样保留：改成传 undefined 让 summarizeThinking 自己
+        // 从 connection.defaultModel 取，会**丢掉 chat.model 那一层**——她给单个对话
+        // 单独选过模型时，没填 lightModel 的情况下总结本该跟着那个对话的模型走。
+        summarizeThinking(fullThinking, getLightConn(conn), conn.lightModel || chat.model || conn.defaultModel)
           .then((summary) => { if (summary) updateMessage(chat.id, assistantId, { thinkingSummary: summary }) })
           .catch(() => {})
       }
@@ -1175,10 +1187,15 @@ export default function Chat() {
       const ctx = getMessages(activeChatId || '').filter(m => !m.streaming).slice(-4)
         .map(m => ({ role: m.role, content: (m.content || '').slice(0, 200) }))
       let raw = ''
-      await streamChat({ ...conn, model: conn.lightModel || conn.defaultModel }, [...ctx, sysMsg, { role: 'user', content: '[阿颖拨打了语音通话]' }], {
+      // 通话开场白走轻连接；推理模型 reasoning 会吃掉 max_tokens 配额，
+      // 给 200 的话光想就花光了，content 返回空字符串且不报错。
+      // 2026-07-12「独处时间」就是这么栽的，当时给到 1800 才有输出。
+      // 这里给 2000 是留余量——反正是上限不是实际用量，短回复不会因此变贵。
+      const lc = getLightConn(conn)
+      await streamChat({ ...lc, model: lc.defaultModel }, [...ctx, sysMsg, { role: 'user', content: '[阿颖拨打了语音通话]' }], {
         onToken: t => { raw += t },
         onDone: () => {},
-        maxTokens: 200, temperature: 0.8,
+        maxTokens: 2000, temperature: 0.8,
       })
       const parsed = JSON.parse(raw.replace(/^```(json)?|```$/g, '').trim())
       if (parsed.accept === false) {

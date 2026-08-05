@@ -333,8 +333,32 @@ function ConnectionCard({ conn, onSave, onDelete, onActivate, isActive }) {
           <div className="form-row">
             <label className="form-label"></label>
             {form.lightModel?.trim()
-              ? <p className="card-hint" style={{ margin: 0 }}>后台小任务（自动发圈、朋友圈评论、上下文压缩、思考总结）走这个模型。带图识图仍走主模型。</p>
+              ? <p className="card-hint" style={{ margin: 0 }}>后台小任务（自动发圈、朋友圈评论、上下文压缩、思考总结）走这个模型。带图识图仍走主模型。{form.lightBaseUrl?.trim() && form.lightApiKey?.trim() ? '轻任务走独立地址（见下方「轻任务地址」）。' : ''}</p>
               : <p className="card-hint" style={{ margin: 0, color: 'var(--danger, #c0563f)' }}>⚠️ 这栏空着，后台小任务会用主模型跑。如果主模型是按次计费的渠道，每次自动发圈、每条评论、每次上下文压缩都按一次完整请求扣费——填个便宜模型名进来。</p>}
+          </div>
+          {/* 轻任务独立连接：主连接是只收 Claude 的中转站、DeepSeek 是另一套 key 时，
+              填这两个字段才能让轻任务真正打到 DeepSeek——只填 lightModel 会被中转站 400。
+              两个字段必须同时填才生效，缺任意一个退回到复用主连接（防半截配置搞乱 key）。 */}
+          <div className="form-row">
+            <label className="form-label">轻任务地址</label>
+            <input className="form-input" value={form.lightBaseUrl || ''} onChange={(e) => setForm({ ...form, lightBaseUrl: e.target.value })} placeholder="可选：留空则和主连接同一个地址，如 https://api.deepseek.com/v1" />
+          </div>
+          <div className="form-row">
+            <label className="form-label">轻任务密钥</label>
+            <input className="form-input" type="password" value={form.lightApiKey || ''} onChange={(e) => setForm({ ...form, lightApiKey: e.target.value })} placeholder="sk-..." />
+          </div>
+          <div className="form-row">
+            <label className="form-label">轻任务格式</label>
+            <select className="filter-select" value={form.lightProvider || ''} onChange={(e) => setForm({ ...form, lightProvider: e.target.value })}>
+              <option value="">默认（openai）</option>
+              <option value="openai">openai</option>
+              <option value="anthropic">anthropic</option>
+              <option value="gemini">gemini</option>
+            </select>
+          </div>
+          <div className="form-row">
+            <label className="form-label"></label>
+            <p className="card-hint" style={{ margin: 0 }}>DeepSeek / 大部分中转站选 openai。轻任务地址和密钥必须同时填才切换，缺一个继续走主连接。</p>
           </div>
           <div className="form-row form-actions">
             <button className="btn-sm btn-ghost" onClick={() => setEditing(false)}>取消</button>

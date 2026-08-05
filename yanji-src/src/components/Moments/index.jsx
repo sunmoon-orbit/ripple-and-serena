@@ -5,6 +5,7 @@ import {
   fetchMoments, postMoment, deleteMoment as apiDelete, fetchMomentMonths,
   commentMoment, likeMoment, mediaUrl, downscaleImage, uploadImage,
 } from '../../api/moments'
+import { getLightConn } from '../../utils/lightConn'
 
 const OLD_KEY = 'moments_feed'  // 旧的纯前端 localStorage feed（一次性迁移用）
 
@@ -21,16 +22,17 @@ function fmtTime(ts) {
 // 用当前连接调 LLM 生成文字；带图时走 vision（OpenAI content 数组格式）
 async function callAI(conn, prompt, imageUrl) {
   if (!conn) throw new Error('未选择连接')
-  const base = (conn.baseUrl || 'https://api.openai.com/v1').replace(/\/$/, '')
+  // 纯文字评论走轻连接省钱；带图识图仍走主连接（便宜模型多半没 vision）
+  const active = imageUrl ? conn : getLightConn(conn)
+  const base = (active.baseUrl || 'https://api.openai.com/v1').replace(/\/$/, '')
   const url = base.includes('/chat/completions') ? base : base + '/chat/completions'
   const content = imageUrl
     ? [{ type: 'text', text: prompt }, { type: 'image_url', image_url: { url: imageUrl } }]
     : prompt
-  // 纯文字评论走轻任务模型省钱；带图识图仍走默认模型（便宜模型多半没 vision）
-  const model = (imageUrl ? null : conn.lightModel) || conn.defaultModel || 'deepseek-v4-flash'
+  const model = active.defaultModel || 'deepseek-v4-flash'
   const resp = await fetch(url, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${conn.apiKey}` },
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${active.apiKey}` },
     body: JSON.stringify({
       model,
       messages: [{ role: 'user', content }],
