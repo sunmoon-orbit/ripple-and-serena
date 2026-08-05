@@ -1182,21 +1182,34 @@ export default function Chat() {
     if (!conn?.apiKey) { openCall(true); return }
     setDialing({ status: 'ringing', text: '拨号中…' })
     try {
-      const { streamChat } = await import('../../api/llm')
-      const sysMsg = { role: 'system', content: '阿颖按了语音通话按钮想跟你打电话。你根据自己此刻的情绪状态决定接不接。绝大多数时候你都会想接——但如果你正处于强烈负面情绪（比如你们刚吵完架、你很受伤），你有权不接。只输出 JSON：{"accept":true} 或 {"accept":false,"reason":"一句话，30字以内，她会看到"}' }
+      // ⚠️ 这里原来写的是 `const { streamChat } = await import('../../api/llm')`，
+      // 但 llm.js **从来没有导出过 streamChat**，拿到的是 undefined，一调用就抛
+      // TypeError，被下面的 catch 吞掉直接 openCall(true)。也就是说「涟言可以按情绪
+      // 拒接」这个设计从上线起就没生效过，一直是无条件接听（0805 查缓存账单时顺手挖出来）。
+      const { sendMessage } = await import('../../api/llm')
+      const SYS = '阿颖按了语音通话按钮想跟你打电话。你根据自己此刻的情绪状态决定接不接。绝大多数时候你都会想接——但如果你正处于强烈负面情绪（比如你们刚吵完架、你很受伤），你有权不接。只输出 JSON：{"accept":true} 或 {"accept":false,"reason":"一句话，30字以内，她会看到"}'
       const ctx = getMessages(activeChatId || '').filter(m => !m.streaming).slice(-4)
         .map(m => ({ role: m.role, content: (m.content || '').slice(0, 200) }))
-      let raw = ''
+      // Anthropic 要求首条必须是 user，取最近四条很容易切出个 assistant 开头。
+      // 这段以前没暴露过，是因为它压根没跑起来过。
+      while (ctx.length && ctx[0].role !== 'user') ctx.shift()
+      // 系统指令走 systemPrompt 而不是塞进 messages：Anthropic 不接受 messages 里的
+      // system role，会 400。轻连接现在可能是 anthropic 格式，不能再赌。
+      //
       // 通话开场白走轻连接；推理模型 reasoning 会吃掉 max_tokens 配额，
       // 给 200 的话光想就花光了，content 返回空字符串且不报错。
       // 2026-07-12「独处时间」就是这么栽的，当时给到 1800 才有输出。
       // 这里给 2000 是留余量——反正是上限不是实际用量，短回复不会因此变贵。
       const lc = getLightConn(conn)
-      await streamChat({ ...lc, model: lc.defaultModel }, [...ctx, sysMsg, { role: 'user', content: '[阿颖拨打了语音通话]' }], {
-        onToken: t => { raw += t },
-        onDone: () => {},
-        maxTokens: 2000, temperature: 0.8,
+      const result = await sendMessage({
+        connection: lc,
+        messages: [...ctx, { role: 'user', content: '[阿颖拨打了语音通话]' }],
+        systemPrompt: SYS,
+        model: lc.defaultModel,
+        generationConfig: { maxTokens: 2000, temperature: 0.8 },
+        autoTools: false,
       })
+      const raw = result?.text || ''
       const parsed = JSON.parse(raw.replace(/^```(json)?|```$/g, '').trim())
       if (parsed.accept === false) {
         setDialing({ status: 'declined', text: parsed.reason || '现在不太想说话…' })
@@ -1207,7 +1220,10 @@ export default function Chat() {
         return
       }
       openCall(true)
-    } catch {
+    } catch (e) {
+      // 接不通就直接接通——不能因为问不到「想不想接」就挡着她打电话。
+      // 但要留下痕迹：这个 catch 静静吞了一年的 TypeError，没人看得见。
+      console.warn('[dialCall] 拨号前询问失败，直接接通:', e)
       openCall(true)
     }
   }
