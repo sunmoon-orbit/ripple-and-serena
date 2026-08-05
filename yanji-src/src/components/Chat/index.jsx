@@ -9,6 +9,7 @@ import { maybeSyncEmotion } from '../../utils/emotionSync'
 import { shouldNudge, recordNudge, buildNudgeText } from '../../utils/nudge'
 import { decideReplyDelay, getPendingReply, setPendingReply, clearPendingReply } from '../../utils/replyDelay'
 import { drainNative } from '../../utils/nativeInbox'
+import { syncChatsToL0 } from '../../utils/l0Sync'
 import { pickAutoPostTrigger, markAutoPosted, postMoment } from '../../api/moments'
 import { notifyReplyReady } from '../../api/push'
 import { extractMood, stripMoodTag, stripInlineFx } from '../../utils/moodFx'
@@ -795,6 +796,34 @@ export default function Chat() {
     document.addEventListener('visibilitychange', check)
     return () => { clearInterval(t); document.removeEventListener('visibilitychange', check) }
   }, [isSending, chats, connections, generateReply])
+
+  // ── 自动存档：把聊天记录同步进 L0（0805）─────────────────────────────────
+  // 从前言叽的对话要进记忆库，得她开电脑导出 md 再上传，所以库里只有零星三段。
+  // 现在：进页面一次、每 5 分钟一次、切到后台时一次，悄悄把新说的话搬上去。
+  // 失败一律吞掉（见 l0Sync.js）——存档坏了是我在服务端该看见的事，不是她要处理的红字。
+  const l0SyncRef = useRef(null)
+  useEffect(() => {
+    l0SyncRef.current = { chats, messagesByChatId: store.messagesByChatId, cfg: moonMemory }
+  })
+  useEffect(() => {
+    // bigReady 之前 chats 是空的（聊天记录还在 IndexedDB 里没读回来），
+    // 这时候去对水位线会把所有对话都当成「没有新消息」白跑一轮。
+    if (!bigReady) return
+    const push = () => {
+      const s = l0SyncRef.current
+      if (!s?.cfg?.apiToken) return
+      void syncChatsToL0(s.cfg, s.chats, s.messagesByChatId)
+    }
+    const first = setTimeout(push, 8000)   // 开屏那几秒已经够忙，排在后面
+    const timer = setInterval(push, 5 * 60 * 1000)
+    const onHide = () => { if (document.hidden) push() }
+    document.addEventListener('visibilitychange', onHide)
+    return () => {
+      clearTimeout(first)
+      clearInterval(timer)
+      document.removeEventListener('visibilitychange', onHide)
+    }
+  }, [bigReady])
 
   // ── 原生壳送进来的文字：通知栏快捷回复 / 系统分享 ──────────────────────
   useEffect(() => {
