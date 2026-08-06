@@ -4,8 +4,9 @@ import { showToast } from '../Toast'
 import {
   fetchBooks, fetchBook, fetchBookChapter, createBook, appendBookChapters,
   createBookAnnotation, deleteBookAnnotation, saveBookBookmark,
-  sendReadingHeartbeat, stampBook, unstampBook,
+  sendReadingHeartbeat, fetchBookChat, createBookChatMessage, stampBook, unstampBook,
 } from '../../api/moonMemory'
+import { sendMessage } from '../../api/llm'
 
 const COLORS = [
   { id: 'yellow', hex: '#f5d76e' },
@@ -95,7 +96,12 @@ function savePos(bookId, ch, scroll) {
 
 export default function BookRead({ onClose }) {
   const moonMemory = useStore((s) => s.moonMemory)
+  const connections = useStore((s) => s.connections)
+  const activeConnectionId = useStore((s) => s.activeConnectionId)
+  const generationConfig = useStore((s) => s.generationConfig)
+  const globalInstruction = useStore((s) => s.globalInstruction)
   const cfg = { baseUrl: (moonMemory?.baseUrl || 'https://memory.ravenlove.cc').replace(/\/$/, ''), apiToken: moonMemory?.apiToken }
+  const connection = connections.find((c) => c.id === activeConnectionId)
 
   const [books, setBooks] = useState(null)      // null=loading
   const [active, setActive] = useState(null)    // 选中的书（列表项）
@@ -114,12 +120,18 @@ export default function BookRead({ onClose }) {
   const [toc, setToc] = useState(null)             // 目录 [{idx,title,chars}]，打开时拉取
   const [tocOpen, setTocOpen] = useState(false)
   const [tocErr, setTocErr] = useState('')         // 拉取异常时面板内可见（别再哑巴）
+  const [chatOpen, setChatOpen] = useState(false)
+  const [chatMessages, setChatMessages] = useState([])
+  const [chatInput, setChatInput] = useState('')
+  const [chatLoading, setChatLoading] = useState(false)
+  const [chatSending, setChatSending] = useState(false)
   const textRef = useRef(null)
   const annoRefs = useRef({})
   const fileRef = useRef(null)
   const bodyRef = useRef(null)          // 阅读视图的滚动容器
   const restoreScrollRef = useRef(0)    // 章节渲染完后要恢复到的滚动位置
   const scrollTimerRef = useRef(null)
+  const chatEndRef = useRef(null)
 
   useEffect(() => {
     if (!cfg.apiToken) { setBooks([]); return }
@@ -132,22 +144,76 @@ export default function BookRead({ onClose }) {
     if (!active || !cfg.apiToken) return
     const t = setInterval(() => {
       if (document.visibilityState === 'visible') {
-        sendReadingHeartbeat(cfg, active.id, '阿颖').catch(() => {})
+        sendReadingHeartbeat(cfg, active.id, '阿颖', chapter?.idx ?? null).catch(() => {})
       }
     }, 60 * 1000)
     return () => clearInterval(t)
-  }, [active])
+  }, [active, chapter?.idx])
 
   const openChapter = useCallback(async (book, idx, restoreScroll = 0) => {
     setLoading(true)
+    setChatOpen(false); setChatMessages([]); setChatLoading(true)
     setPending(null); setComposing(false); setFocusAnno(null)
     try {
-      const ch = await fetchBookChapter(cfg, book.id, idx)
+      const [ch, messages] = await Promise.all([
+        fetchBookChapter(cfg, book.id, idx),
+        fetchBookChat(cfg, book.id, idx, 40).catch(() => []),
+      ])
       restoreScrollRef.current = restoreScroll
       setChapter(ch)
+      setChatMessages(Array.isArray(messages) ? messages : [])
       savePos(book.id, idx, restoreScroll)
-    } catch { showToast('章节加载失败', 'error') } finally { setLoading(false) }
+      sendReadingHeartbeat(cfg, book.id, '阿颖', idx, 0).catch(() => {})
+    } catch { showToast('章节加载失败', 'error') } finally { setLoading(false); setChatLoading(false) }
   }, [])
+
+  useEffect(() => {
+    if (chatOpen) chatEndRef.current?.scrollIntoView({ block: 'end' })
+  }, [chatOpen, chatMessages])
+
+  function readingExcerpt() {
+    const content = chapter?.content || ''
+    const el = bodyRef.current
+    const maxScroll = Math.max(1, (el?.scrollHeight || 1) - (el?.clientHeight || 0))
+    const center = Math.round(content.length * Math.min(1, Math.max(0, (el?.scrollTop || 0) / maxScroll)))
+    const start = Math.max(0, center - 1200)
+    return content.slice(start, start + 2400)
+  }
+
+  async function sendBookChat() {
+    const content = chatInput.trim()
+    if (!content || chatSending || !chapter) return
+    if (!connection) { showToast('还没有选择模型连接', 'error'); return }
+    setChatSending(true)
+    setChatInput('')
+    let userSaved = false
+    try {
+      const mine = await createBookChatMessage(cfg, active.id, { chapter_idx: chapter.idx, role: 'user', content })
+      userSaved = true
+      const history = [...chatMessages, mine]
+      setChatMessages(history)
+      const result = await sendMessage({
+        connection,
+        model: connection.defaultModel,
+        messages: history.map((m) => ({ role: m.role, content: m.content })),
+        systemPrompt: globalInstruction,
+        dynamicContext: `阿颖正在共读书架阅读《${active.title}》第 ${chapter.idx + 1} 章《${chapter.title || `第 ${chapter.idx + 1} 章`}》。\n以下是她当前视口附近的正文摘录：\n---\n${readingExcerpt()}\n---\n这是书页内独立的随读随聊，请结合摘录自然回应。`,
+        generationConfig,
+        moonMemoryConfig: moonMemory,
+        autoTools: false,
+        cacheKey: `book-chat-${active.id}-${chapter.idx}`,
+      })
+      const reply = (result?.text || '').trim()
+      if (!reply) throw new Error('模型没有返回内容')
+      const hers = await createBookChatMessage(cfg, active.id, { chapter_idx: chapter.idx, role: 'assistant', content: reply })
+      setChatMessages((prev) => [...prev, hers])
+    } catch (e) {
+      if (!userSaved) setChatInput(content)
+      showToast(`随读随聊发送失败：${e?.message || e}`, 'error')
+    } finally {
+      setChatSending(false)
+    }
+  }
 
   // 目录跳转：章节标题列表从书籍详情接口拉取（只有标题不含正文，一次拉全）
   // 每次打开都重拉：payload 很小，顺带覆盖追更后目录过期；旧数据先显示（stale-while-revalidate）
@@ -534,6 +600,41 @@ export default function BookRead({ onClose }) {
             </>
           )}
         </div>
+
+        {chatOpen && (
+          <section className="bookread-chat-panel" onClick={(e) => e.stopPropagation()} aria-label="随读随聊">
+            <div className="bookread-chat-head">
+              <span>和涟言聊这一章</span>
+              <button onClick={() => setChatOpen(false)} aria-label="收起随读随聊">✕</button>
+            </div>
+            <div className="bookread-chat-stream">
+              {chatLoading && <div className="roost-empty">翻聊天记录……</div>}
+              {!chatLoading && chatMessages.length === 0 && <div className="bookread-chat-empty">想到什么就说，涟言看得到你正在读的这一段。</div>}
+              {chatMessages.map((m) => (
+                <div key={m.id} className={'coread-msg ' + (m.role === 'user' ? 'mine' : 'hers')}>
+                  <div className="coread-msg-role">{m.role === 'user' ? '阿颖' : '涟言'}</div>
+                  <div className="coread-bubble">{m.content}</div>
+                </div>
+              ))}
+              {chatSending && <div className="bookread-chat-thinking">涟言在想……</div>}
+              <div ref={chatEndRef} />
+            </div>
+            <div className="bookread-chat-compose">
+              <textarea
+                value={chatInput}
+                onChange={(e) => setChatInput(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendBookChat() } }}
+                placeholder="聊聊正在读的这一段……"
+                rows={2}
+                disabled={chatSending}
+              />
+              <button onClick={sendBookChat} disabled={chatSending || !chatInput.trim()}>发送</button>
+            </div>
+          </section>
+        )}
+        {!chatOpen && chapter && (
+          <button className="bookread-chat-fab" onClick={() => setChatOpen(true)} aria-label="打开随读随聊" title="和涟言聊这一页">聊</button>
+        )}
 
         {/* 选中文字 → 浮出划线入口 */}
         {pending && !composing && (

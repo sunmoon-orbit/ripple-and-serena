@@ -344,10 +344,23 @@ export async function saveBookBookmark(config, bookId, chapterIdx, updatedBy) {
 }
 
 // 阅读心跳：BookRead 打开且可见时每60s打一次，服务端按北京日累加时长
-export async function sendReadingHeartbeat(config, bookId, reader = '阿颖') {
+export async function sendReadingHeartbeat(config, bookId, reader = '阿颖', chapterIdx = null, seconds = 60) {
   const { baseUrl, apiToken } = config
   return request(baseUrl, `/books/${bookId}/heartbeat`, {
-    method: 'POST', headers: headers(apiToken), body: JSON.stringify({ reader, seconds: 60 }),
+    method: 'POST', headers: headers(apiToken), body: JSON.stringify({ reader, seconds, chapter_idx: chapterIdx }),
+  })
+}
+
+export async function fetchBookChat(config, bookId, chapterIdx, limit = 40) {
+  const { baseUrl, apiToken } = config
+  const qs = new URLSearchParams({ chapter_idx: String(chapterIdx), limit: String(limit) })
+  return request(baseUrl, `/books/${bookId}/chat?${qs}`, { headers: headers(apiToken) })
+}
+
+export async function createBookChatMessage(config, bookId, body) {
+  const { baseUrl, apiToken } = config
+  return request(baseUrl, `/books/${bookId}/chat`, {
+    method: 'POST', headers: headers(apiToken), body: JSON.stringify(body),
   })
 }
 

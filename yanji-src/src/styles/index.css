@@ -3422,6 +3422,58 @@ textarea.form-input { display: block; margin: 8px 16px 12px; }
 .bookread-spine-dot { width: 22px; height: 22px; border-radius: 6px; border: 2px solid transparent; cursor: pointer; }
 .bookread-spine-dot.active { border-color: var(--text); }
 
+/* 随读随聊：悬在阅读区上层，沿用共读气泡与主题变量 */
+.bookread-chat-fab {
+  position: absolute; right: 18px; bottom: 18px; z-index: 4;
+  width: 46px; height: 46px; border-radius: 50%; cursor: pointer;
+  border: 1px solid color-mix(in srgb, var(--accent) 65%, var(--border));
+  background: var(--card); color: var(--accent); font: 600 14px/1 inherit;
+  box-shadow: 0 5px 18px color-mix(in srgb, var(--accent) 28%, transparent);
+}
+.bookread-chat-fab:hover { transform: translateY(-1px); }
+.bookread-chat-panel {
+  position: absolute; z-index: 5; right: 12px; bottom: 12px;
+  width: min(390px, calc(100% - 24px)); height: min(520px, calc(100% - 72px));
+  display: flex; flex-direction: column; overflow: hidden;
+  background: var(--card); color: var(--text); border: 1px solid var(--border);
+  border-radius: 16px; box-shadow: 0 10px 32px color-mix(in srgb, var(--text) 18%, transparent);
+}
+.bookread-chat-head {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 11px 13px; border-bottom: 1px solid var(--border);
+  font-size: 13px; font-weight: 600; color: var(--text);
+}
+.bookread-chat-head button {
+  border: none; background: none; color: var(--text-faint); cursor: pointer; font-size: 13px;
+}
+.bookread-chat-stream {
+  flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column;
+  gap: 11px; padding: 12px; background: var(--bg);
+}
+.bookread-chat-empty, .bookread-chat-thinking {
+  margin: auto; padding: 12px; color: var(--text-faint); font-size: 12px; line-height: 1.6; text-align: center;
+}
+.bookread-chat-thinking { margin: 0; text-align: left; }
+.bookread-chat-compose {
+  display: flex; align-items: flex-end; gap: 8px; padding: 10px;
+  border-top: 1px solid var(--border); background: var(--card);
+}
+.bookread-chat-compose textarea {
+  flex: 1; min-width: 0; resize: none; border: 1px solid var(--border); border-radius: 10px;
+  padding: 8px 10px; background: var(--bg); color: var(--text); font: 13px/1.5 inherit;
+}
+.bookread-chat-compose textarea:focus { outline: 1px solid var(--accent); border-color: var(--accent); }
+.bookread-chat-compose button {
+  border: 1px solid var(--accent); border-radius: 9px; padding: 8px 12px;
+  background: var(--card); color: var(--accent); cursor: pointer; font: 12px inherit;
+}
+.bookread-chat-compose button:disabled { opacity: 0.5; cursor: default; }
+
+@media (max-width: 560px) {
+  .bookread-chat-panel { inset: 56px 8px 8px; width: auto; height: auto; }
+  .bookread-chat-fab { right: 14px; bottom: 14px; }
+}
+
 /* ── 音乐：点歌卡片 / 迷你播放器 / 歌单 ───────────────────────── */
 /* 聊天里的点歌卡片 */
 .music-card {
