@@ -16,6 +16,7 @@ export default function MemoryPeek({ moonMemory }) {
   const [mem, setMem] = useState(null)
   const [onThisDay, setOnThisDay] = useState(false)
   const [spinning, setSpinning] = useState(false)
+  const [expanded, setExpanded] = useState(false)
 
   const loadPool = useCallback(async () => {
     if (!token) return
@@ -55,9 +56,11 @@ export default function MemoryPeek({ moonMemory }) {
   }, [base, token])
 
   useEffect(() => { loadPool() }, [loadPool])
+  useEffect(() => { setExpanded(false) }, [mem?.id])
 
   function refresh() {
     if (!pool?.length) { loadPool(); return }
+    setExpanded(false)
     setSpinning(true)
     setMem(prev => {
       if (pool.length < 2) return prev
@@ -88,7 +91,8 @@ export default function MemoryPeek({ moonMemory }) {
   const rawContent = mem?.kind === 'conversation'
     ? `${mem.title || '一段旧日对话'}${mem.message_count != null ? ` · ${mem.message_count} 条消息` : ''}`
     : (mem?.content || '').replace(/【[^】]*】/g, '').trim()
-  const content = rawContent.slice(0, 200)
+  const isLong = rawContent.length > 200
+  const content = expanded ? rawContent : rawContent.slice(0, 200)
   const tags = mem?.tags ? String(mem.tags).split(',').map(t => t.trim()).filter(Boolean).slice(0, 5) : []
 
   return (
@@ -108,7 +112,12 @@ export default function MemoryPeek({ moonMemory }) {
       {pool !== null && !mem && <div className="roost-msg-empty">还没捡到合适的碎片</div>}
       {mem && (
         <div key={mem.id} className="roost-msg-rotate">
-          <div className="mempeek-content">{content}{rawContent.length > 200 ? '……' : ''}</div>
+          <div className={`mempeek-content${expanded ? ' expanded' : ''}`}>{content}{isLong && !expanded ? '……' : ''}</div>
+          {isLong && (
+            <button className="mem-expand-btn" onClick={() => setExpanded(value => !value)}>
+              {expanded ? '收起' : '展开'}
+            </button>
+          )}
           {tags.length > 0 && (
             <div className="mempeek-tags">
               {tags.map(t => <span key={t} className="mempeek-tag">{t}</span>)}

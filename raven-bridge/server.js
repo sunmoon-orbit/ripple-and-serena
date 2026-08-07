@@ -14,14 +14,45 @@ const PW_HASH = (() => {
     return m ? m[1].trim() : null
   } catch { return null }
 })()
-const TOKENS_FILE = path.join(__dirname, '.valid-tokens.json')
-function loadTokens() {
-  try { return new Set(JSON.parse(fs.readFileSync(TOKENS_FILE, 'utf8'))) } catch { return new Set() }
+if (!PW_HASH) {
+  console.error('\n[FATAL] RAVEN_PASSWORD_HASH is not set. Refusing to start raven-bridge without authentication.\n')
+  process.exit(1)
 }
-function saveTokens(set) {
-  try { fs.writeFileSync(TOKENS_FILE, JSON.stringify([...set])) } catch {}
+const TOKENS_FILE = path.join(__dirname, '.valid-tokens.json')
+const TOKEN_TTL_MS = 90 * 24 * 60 * 60 * 1000
+let tokensNeedMigration = false
+function loadTokens() {
+  try {
+    const stored = JSON.parse(fs.readFileSync(TOKENS_FILE, 'utf8'))
+    if (!Array.isArray(stored)) return new Map()
+    const migratedExpiry = Date.now() + TOKEN_TTL_MS
+    return new Map(stored.flatMap(entry => {
+      if (typeof entry === 'string') { tokensNeedMigration = true; return [[entry, migratedExpiry]] }
+      if (entry && typeof entry.token === 'string' && Number.isFinite(entry.expiresAt)) {
+        return [[entry.token, entry.expiresAt]]
+      }
+      return []
+    }))
+  } catch { return new Map() }
+}
+function saveTokens(tokens) {
+  try {
+    const stored = [...tokens].map(([token, expiresAt]) => ({ token, expiresAt }))
+    fs.writeFileSync(TOKENS_FILE, JSON.stringify(stored))
+  } catch {}
 }
 const validTokens = loadTokens()
+if (tokensNeedMigration) saveTokens(validTokens) // 把旧版字符串数组迁移为带过期时间的记录
+
+function tokenIsValid(token) {
+  if (!token || !validTokens.has(token)) return false
+  if (validTokens.get(token) <= Date.now()) {
+    validTokens.delete(token)
+    saveTokens(validTokens)
+    return false
+  }
+  return true
+}
 
 // ── 本机写通道 token（2026-07-23，codex 入住铺路）──────────────────────
 // 「本机直连=CC」这个假设只在服务器上只有一个用户时成立；第二个用户
@@ -49,6 +80,10 @@ function localWriteAuthed(req) {
 // 它自己来长轮询取。它取走后照常用 /raven/reply 回复，阿颖那边完全无感。
 const pendingForRemote = []
 let lastPendingPoll = 0
+const VERIFY_BODY_LIMIT = 1024
+const VERIFY_WINDOW_MS = 15 * 60 * 1000
+const VERIFY_MAX_FAILURES = 10
+const verifyFailures = new Map()
 // 两分钟内有人来取过件，就认为远程 CC 还醒着，消息进队列而不是报「没送到」
 function remoteListenerAlive() { return Date.now() - lastPendingPoll < 120000 }
 
@@ -60,11 +95,10 @@ function isExternal(req) {
 }
 // 外网请求校验 token：Authorization: Bearer <token> 或 ?token=<token>
 function externalAuthed(req, url) {
-  if (!PW_HASH) return true            // 没设密码的开发环境不拦
   if (!isExternal(req)) return true    // 本机直连放行
   const h = req.headers.authorization || ''
   const t = h.startsWith('Bearer ') ? h.slice(7) : (url.searchParams.get('token') || '')
-  return validTokens.has(t)
+  return tokenIsValid(t)
 }
 
 // token 从 moon-memory/.env 读取，不准硬编码（2026.6.11 公开仓库泄漏教训）
@@ -387,7 +421,10 @@ let appLatestCache = { at: 0, data: null }  // 归巢 APK 最新版本信息，�
 function broadcast(msg) {
   const data = JSON.stringify(msg)
   for (const ws of clients) {
-    if (ws.readyState === 1) ws.send(data)
+    if (!tokenIsValid(ws.authToken)) {
+      clients.delete(ws)
+      if (ws.readyState === 1) ws.close(1008, 'token expired or revoked')
+    } else if (ws.readyState === 1) ws.send(data)
   }
 }
 
@@ -656,18 +693,28 @@ const server = http.createServer((req, res) => {
     if (!localWriteAuthed(req)) { res.writeHead(401); res.end('{"error":"unauthorized"}'); return }
     lastPendingPoll = Date.now()
     const deadline = Date.now() + 55000
+    let timer = null
+    let closed = false
+    const cleanup = () => {
+      closed = true
+      if (timer) clearTimeout(timer)
+      timer = null
+    }
     const finish = () => {
+      if (closed || res.destroyed || res.writableEnded) return cleanup()
+      cleanup()
       lastPendingPoll = Date.now()   // 收货这一刻也算「我还醒着」
       const msgs = pendingForRemote.splice(0, pendingForRemote.length)
       res.writeHead(200, { 'Content-Type': 'application/json' })
       res.end(JSON.stringify({ messages: msgs }))
     }
     const tick = () => {
-      if (res.writableEnded) return
+      if (closed || res.destroyed || res.writableEnded) return cleanup()
       if (pendingForRemote.length || Date.now() > deadline) return finish()
-      setTimeout(tick, 500)
+      timer = setTimeout(tick, 500)
     }
-    req.on('close', () => { /* 客户端撤了就别再写了，tick 靠 writableEnded 自己收手 */ })
+    res.on('close', cleanup)
+    req.on('aborted', cleanup)
     tick()
     return
   }
@@ -691,26 +738,74 @@ const server = http.createServer((req, res) => {
     return
   }
 
-  // 密码验证
+  // 密码验证：1 KB 请求体上限；同一来源 15 分钟内连续失败 10 次后暂时拒绝。
   if (req.method === 'POST' && url.pathname === '/raven/verify') {
+    const ip = String(req.headers['x-forwarded-for'] || req.socket.remoteAddress || 'unknown').split(',')[0].trim()
+    const now = Date.now()
+    const previous = verifyFailures.get(ip)
+    if (previous && previous.resetAt > now && previous.count >= VERIFY_MAX_FAILURES) {
+      res.writeHead(429, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*', 'Retry-After': String(Math.ceil((previous.resetAt - now) / 1000)) })
+      res.end(JSON.stringify({ ok: false, error: 'too many attempts' }))
+      return
+    }
+    if (previous && previous.resetAt <= now) verifyFailures.delete(ip)
     let body = ''
-    req.on('data', d => body += d)
+    let received = 0
+    let tooLarge = false
+    req.on('data', d => {
+      if (tooLarge) return
+      received += d.length
+      if (received > VERIFY_BODY_LIMIT) {
+        tooLarge = true
+        res.writeHead(413, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' })
+        res.end(JSON.stringify({ ok: false, error: 'request body too large' }))
+        return
+      }
+      body += d
+    })
     req.on('end', () => {
+      if (tooLarge) return
       try {
         const { password } = JSON.parse(body)
         const hash = crypto.createHash('sha256').update(password || '').digest('hex')
-        if (PW_HASH && hash === PW_HASH) {
+        if (hash === PW_HASH) {
           const token = crypto.randomBytes(24).toString('hex')
-          validTokens.add(token)
+          validTokens.set(token, Date.now() + TOKEN_TTL_MS)
           saveTokens(validTokens)
+          verifyFailures.delete(ip)
           res.writeHead(200, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' })
           res.end(JSON.stringify({ ok: true, token }))
         } else {
+          const current = verifyFailures.get(ip)
+          verifyFailures.set(ip, current && current.resetAt > Date.now()
+            ? { count: current.count + 1, resetAt: current.resetAt }
+            : { count: 1, resetAt: Date.now() + VERIFY_WINDOW_MS })
           res.writeHead(401, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' })
           res.end(JSON.stringify({ ok: false }))
         }
       } catch { res.writeHead(400); res.end() }
     })
+    return
+  }
+
+  if (req.method === 'POST' && url.pathname === '/raven/logout') {
+    const auth = req.headers.authorization || ''
+    const token = auth.startsWith('Bearer ') ? auth.slice(7) : ''
+    if (!tokenIsValid(token)) {
+      res.writeHead(401, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' })
+      res.end(JSON.stringify({ ok: false, error: 'unauthorized' }))
+      return
+    }
+    validTokens.delete(token)
+    saveTokens(validTokens)
+    for (const ws of clients) {
+      if (ws.authToken === token) {
+        clients.delete(ws)
+        ws.close(1008, 'logged out')
+      }
+    }
+    res.writeHead(200, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' })
+    res.end(JSON.stringify({ ok: true }))
     return
   }
 
@@ -980,7 +1075,7 @@ const server = http.createServer((req, res) => {
       try { parsed = JSON.parse(body) } catch { res.writeHead(400); res.end('{"error":"bad json"}'); return }
       const text = (parsed.text || '').trim()
       if (!text) { res.writeHead(400); res.end('{"error":"empty"}'); return }
-      if (PW_HASH && !validTokens.has(parsed.token)) { res.writeHead(401); res.end('{"error":"unauthorized"}'); return }
+      if (!tokenIsValid(parsed.token)) { res.writeHead(401); res.end('{"error":"unauthorized"}'); return }
       // 去重跟 WS 那条路一样：这条路（通知栏快捷回复）以前没做，重发会往 L0 写两份
       if (parsed.cid) {
         if (recentCids.has(parsed.cid)) {
@@ -1007,7 +1102,7 @@ const server = http.createServer((req, res) => {
     req.on('end', () => {
       let parsed
       try { parsed = JSON.parse(body) } catch { res.writeHead(400); res.end('{}'); return }
-      if (PW_HASH && !validTokens.has(parsed.token)) { res.writeHead(401); res.end('{"error":"unauthorized"}'); return }
+      if (!tokenIsValid(parsed.token)) { res.writeHead(401); res.end('{"error":"unauthorized"}'); return }
       moonPost('/push/fcm-token', { token: parsed.fcmToken, app: 'raven' })
         .then(r => { res.writeHead(r.status, { 'Content-Type': 'application/json' }); res.end(JSON.stringify(r.data)) })
         .catch(() => { res.writeHead(500); res.end('{}') })
@@ -1025,7 +1120,7 @@ const server = http.createServer((req, res) => {
     req.on('end', () => {
       let parsed
       try { parsed = JSON.parse(body) } catch { res.writeHead(400); res.end('{"error":"bad json"}'); return }
-      if (PW_HASH && !validTokens.has(parsed.token)) { res.writeHead(401); res.end('{"error":"unauthorized"}'); return }
+      if (!tokenIsValid(parsed.token)) { res.writeHead(401); res.end('{"error":"unauthorized"}'); return }
       const text = (parsed.text || '').trim()
       if (!text) { res.writeHead(400); res.end('{"error":"empty"}'); return }
       moonPost('/tts', { text: text.slice(0, 500) })
@@ -1176,7 +1271,7 @@ wss.on('connection', (ws) => {
   // 之前一连上就发终端最后 80 行 + 最近回复，且 broadcast 不看认证状态，
   // 等于任何人连上 wss 就能偷听终端输出和我们的对话。现在：
   // 未认证的连接不进 clients（收不到任何广播），15 秒内不认证就断开。
-  ws.authed = !PW_HASH
+  ws.authed = false
   const sendWelcome = () => {
     clients.add(ws)
     console.log('[ws] client authed, total:', clients.size)
@@ -1189,18 +1284,16 @@ wss.on('connection', (ws) => {
       ws.send(JSON.stringify(lastPermData))
     }
   }
-  if (ws.authed) sendWelcome()
-  else {
-    const authTimer = setTimeout(() => { if (!ws.authed) ws.close() }, 15000)
-    ws.once('close', () => clearTimeout(authTimer))
-  }
+  const authTimer = setTimeout(() => { if (!ws.authed) ws.close() }, 15000)
+  ws.once('close', () => clearTimeout(authTimer))
 
   ws.on('message', (raw) => {
     try {
       const msg = JSON.parse(raw)
       // 前端连上后第一件事发 {type:'auth', token}，通过才开始收广播
       if (msg.type === 'auth') {
-        if (!PW_HASH || validTokens.has(msg.token)) {
+        if (tokenIsValid(msg.token)) {
+          ws.authToken = msg.token
           if (!ws.authed) { ws.authed = true; sendWelcome() }
         } else {
           ws.send(JSON.stringify({ type: 'auth_failed' }))
@@ -1209,8 +1302,9 @@ wss.on('connection', (ws) => {
       }
       if (!ws.authed) {
         // 兼容旧前端：没发过 auth 但 send 里带了有效 token，也算认证通过
-        if (msg.type === 'send' && msg.token && validTokens.has(msg.token)) {
+        if (msg.type === 'send' && tokenIsValid(msg.token)) {
           ws.authed = true
+          ws.authToken = msg.token
           clients.add(ws)
         } else {
           ws.send(JSON.stringify({ type: 'auth_failed' }))
@@ -1218,10 +1312,11 @@ wss.on('connection', (ws) => {
         }
       }
       if (msg.type === 'send' && msg.text) {
-        if (PW_HASH && !validTokens.has(msg.token)) {
+        if (!tokenIsValid(msg.token)) {
           ws.send(JSON.stringify({ type: 'auth_failed' }))
           return
         }
+        ws.authToken = msg.token
         // 前端等不到 sent 回执会重发同一条（半开连接：socket 看着是活的，
         // 发出去其实掉进黑洞）。cid 去重保证重发不会变成两条一样的消息。
         if (msg.cid) {
