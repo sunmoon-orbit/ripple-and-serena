@@ -3470,7 +3470,8 @@ textarea.form-input { display: block; margin: 8px 16px 12px; }
 .bookread-chat-compose button:disabled { opacity: 0.5; cursor: default; }
 
 @media (max-width: 560px) {
-  .bookread-chat-panel { inset: 56px 8px 8px; width: auto; height: auto; }
+  /* 半屏浮层：从底部往上盖住不到一半，上半截书页始终留着能看见（0807 阿颖反馈原版几乎全屏挡住书） */
+  .bookread-chat-panel { top: auto; left: 8px; right: 8px; bottom: 8px; width: auto; height: 46%; max-height: 400px; }
   .bookread-chat-fab { right: 14px; bottom: 14px; }
 }
 
