@@ -587,7 +587,7 @@ async function callWithTools({
       let base = connection.baseUrl || `https://generativelanguage.googleapis.com/${apiVer}`
       if (!base.includes('/v1')) base = base.replace(/\/$/, '') + '/' + apiVer
       base = base.replace(/\/$/, '')
-      const url = `${base}/models/${encodeURIComponent(model)}:generateContent`
+      const url = `${base}/models/${encodeURIComponent(model)}:streamGenerateContent?alt=sse`
       const contents = buildGeminiContents(convo, systemPrompt, iter === 0 ? dynamicContext : undefined)
       const body = {
         contents,
@@ -597,7 +597,9 @@ async function callWithTools({
       }
       const resp = await geminiFetch(url, connection.apiKey, JSON.stringify(body))
       if (!resp.ok) throw new Error('Gemini ' + resp.status + ': ' + (await resp.text()).slice(0, 200))
-      const data = await resp.json()
+      const data = await streamGeminiParts(resp, (t) => { streamedOut = true; onChunk?.(t) })
+      const gu = data.usageMetadata
+      if (gu) accUsage(usage, { p: gu.promptTokens, c: gu.completionTokens, cached: gu.cachedTokens })
       lastFinish = data.candidates?.[0]?.finishReason
       lastBlock = data.promptFeedback?.blockReason
       const parts = data.candidates?.[0]?.content?.parts || []
@@ -1003,6 +1005,106 @@ async function streamAnthropicBlocks(resp, onText, onThinking) {
   for (const b of blocks) if (b && typeof b.text === 'string') b.text = stripSentinel(b.text)
   if (dropped) blocks.push({ type: 'text', text: badEventNote(dropped) })
   return { content: blocks.filter(Boolean), usage, stop_reason: stopReason }
+}
+
+// Gemini 流式 + 工具调用：把 SSE 事件还原成非流式 candidates[0].content.parts 的形状。
+// Gemini 的 functionCall.args 在每个合法事件里是 JSON 对象，不是 OpenAI 那种字符串 delta；
+// 未验证中转站是否会重复/累计发送同一次调用，此处按**工具名**合并，两种情况都能兜住。
+async function streamGeminiParts(resp, onText) {
+  const reader = resp.body.getReader()
+  const decoder = new TextDecoder()
+  const parts = []
+  const functionParts = new Map()
+  let finishReason = null
+  let blockReason = null
+  let buf = ''
+  let dropped = 0
+  // Gemini 带工具这条路以前一直没记账（非流式那版压根没读 usageMetadata），
+  // 而言叽日常聊天工具是常挂的——等于用量监控页里 Gemini 的账一直是缺的。
+  // 流式响应本来就带 usageMetadata，顺手接上。
+  const usage = { promptTokens: 0, completionTokens: 0, cachedTokens: 0 }
+
+  const mergeValue = (oldValue, newValue) => {
+    if (oldValue == null) return newValue
+    if (newValue == null || oldValue === newValue) return oldValue
+    if (typeof oldValue === 'string' && typeof newValue === 'string') {
+      if (newValue.startsWith(oldValue)) return newValue   // 累计式：后一个是前一个的超集
+      if (oldValue.startsWith(newValue)) return oldValue
+      // 互不包含：只能当成被切成两段的分片来拼。这一步是猜的——万一它其实是
+      // 两次不同的调用，拼出来就是个畸形参数，而且工具会照单全收。所以必须留痕，
+      // 别让它跟正常路径长得一样（0803「静默 catch 藏三个月」的教训）。
+      console.warn('[言叽] Gemini functionCall 参数出现互不包含的两段，按分片拼接：',
+        String(oldValue).slice(0, 80), '+', String(newValue).slice(0, 80))
+      return oldValue + newValue
+    }
+    if (Array.isArray(oldValue) && Array.isArray(newValue)) return newValue
+    if (typeof oldValue === 'object' && typeof newValue === 'object' && !Array.isArray(oldValue) && !Array.isArray(newValue)) {
+      const merged = { ...oldValue }
+      for (const [key, value] of Object.entries(newValue)) merged[key] = mergeValue(merged[key], value)
+      return merged
+    }
+    return newValue
+  }
+
+  const handleLine = (line) => {
+    if (!line.startsWith('data: ')) return
+    const raw = line.slice(6)
+    if (raw === '[DONE]') return
+    let json
+    try { json = JSON.parse(raw) } catch { dropped++; warnBadEvent(raw); return }
+
+    const candidate = json.candidates?.[0]
+    if (candidate?.finishReason) finishReason = candidate.finishReason
+    if (json.promptFeedback?.blockReason) blockReason = json.promptFeedback.blockReason
+    // usageMetadata 是每个事件都重发一份累计值（不是增量），所以直接覆盖不能相加
+    const um = json.usageMetadata
+    if (um) {
+      usage.promptTokens = um.promptTokenCount || 0
+      usage.completionTokens = um.candidatesTokenCount || 0
+      usage.cachedTokens = um.cachedContentTokenCount || 0
+    }
+    for (const part of candidate?.content?.parts || []) {
+      if (typeof part.text === 'string') {
+        parts.push({ ...part })
+        onText?.(stripSentinel(part.text))
+      } else if (part.functionCall) {
+        // ⚠️ 合并键用工具名，**不能用事件内的数组下标**：每个 SSE 事件的 parts
+        // 都是从 0 重新数的，Gemini 并行调用两个不同工具时它们的下标都可能是 0——
+        // 拿下标当键会把两次调用的参数静默搅在一起（{location:"北京"} 撞上
+        // {location:"上海"} 拼成 {location:"北京上海"}），然后照样发给工具执行。
+        // 用 name 当键：只有同名才可能是同一次调用的续传，不同工具各占一个 part。
+        const name = part.functionCall.name
+        const existing = name ? functionParts.get(name) : null
+        if (existing) {
+          existing.functionCall = mergeValue(existing.functionCall, part.functionCall)
+        } else {
+          const saved = { ...part, functionCall: mergeValue(null, part.functionCall) }
+          if (name) functionParts.set(name, saved)
+          parts.push(saved)
+        }
+      } else {
+        parts.push({ ...part })
+      }
+    }
+  }
+
+  while (true) {
+    const { done, value } = await reader.read()
+    if (done) break
+    buf += decoder.decode(value, { stream: true })
+    const lines = buf.split('\n')
+    buf = lines.pop()  // 末尾可能是半行，留到下一轮
+    for (const line of lines) handleLine(line)
+  }
+  if (buf) handleLine(buf)
+
+  for (const part of parts) if (typeof part.text === 'string') part.text = stripSentinel(part.text)
+  if (dropped) parts.push({ text: badEventNote(dropped) })
+  return {
+    candidates: [{ content: { parts }, finishReason }],
+    promptFeedback: blockReason ? { blockReason } : undefined,
+    usageMetadata: usage,
+  }
 }
 
 async function streamSSE(resp, parseLine, onChunk, extractUsage) {
