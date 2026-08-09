@@ -4630,7 +4630,7 @@ body.mp-active .scroll-bottom-btn { bottom: 139px; }
    第一版牌高写死 200px，加上标题栏/页签/箴言/牌阵条/提问框/两排按钮，一屏装不下。
    改成跟着视口高度走，矮屏自动缩、高屏还是原来那么大。
    用 min-height 不是 height —— 点开「看牌义」时牌还得能长高。 */
-.tarot-spread { display: flex; gap: 8px; margin-bottom: 10px; }
+.tarot-spread { display: flex; gap: 8px; margin-bottom: 8px; }
 .tarot-spread.n1 { justify-content: center; }
 .tarot-spread.n3, .tarot-spread.n5 { overflow-x: auto; padding-bottom: 6px; scroll-snap-type: x mandatory; }
 .tarot-spread.n3 .tarot-card, .tarot-spread.n5 .tarot-card { flex: 0 0 156px; scroll-snap-align: center; }
@@ -4639,7 +4639,7 @@ body.mp-active .scroll-bottom-btn { bottom: 139px; }
 .tarot-card { display: flex; flex-direction: column; gap: 4px; }
 .tarot-card-label { font-size: 11px; letter-spacing: 0.1em; color: var(--accent); text-align: center; }
 .tarot-card-back, .tarot-card-front {
-  min-height: clamp(146px, 25vh, 200px); padding: 11px 9px; border-radius: var(--r-sm);
+  min-height: clamp(132px, 22vh, 190px); padding: 10px 9px; border-radius: var(--r-sm);
   border: 1px solid var(--border-md);
   box-shadow: inset 0 0 0 3px var(--card), inset 0 0 0 4px var(--border-md), var(--shadow-sm);
 }
@@ -4671,7 +4671,7 @@ body.mp-active .scroll-bottom-btn { bottom: 139px; }
 .tarot-card-more { margin-top: auto; padding-top: 6px; font-size: 10.5px; color: var(--text-faint); }
 
 /* 抽牌页整页的竖向预算很紧，箴言和牌阵条只在塔罗里收窄一点，别动幸运轮盘的 */
-.tarot-modal .fw-motto { margin: 2px 0 10px; font-size: 12px; }
+.tarot-modal .fw-motto { margin: 0 0 8px; font-size: 12px; }
 .tarot-modal .fw-chips { margin-bottom: 10px; }
 .tarot-modal .fw-lever { margin-bottom: 6px; }
 .tarot-modal .fate-actions { margin-top: 6px; }
