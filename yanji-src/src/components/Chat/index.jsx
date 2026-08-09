@@ -11,7 +11,7 @@ import { decideReplyDelay, getPendingReply, setPendingReply, clearPendingReply }
 import { getLightConn } from '../../utils/lightConn'
 import { drainNative } from '../../utils/nativeInbox'
 import { syncChatsToL0 } from '../../utils/l0Sync'
-import { pickAutoPostTrigger, markAutoPosted, postMoment } from '../../api/moments'
+import { pickAutoPostTrigger, markAutoPosted, postMoment, fetchAutopostSetting } from '../../api/moments'
 import { notifyReplyReady } from '../../api/push'
 import { extractMood, stripMoodTag, stripInlineFx } from '../../utils/moodFx'
 import { showToast } from '../Toast'
@@ -79,6 +79,12 @@ async function maybeAutoPostMoment(emoState, conn, moonMemory) {
   try {
     const trigger = pickAutoPostTrigger(emoState?.slots || {})
     if (!trigger || !conn?.apiKey || !moonMemory?.apiToken) return
+    // 总闸检查：阿颖在设置里关掉「自动发圈」时，这条聊天触发的情绪自动发圈也要停
+    // ——之前只有服务端 cron（她离开时发的那条）认这个开关，这条聊天时触发的路径
+    // 从没查过，导致关了开关朋友圈还在自己蹦出来（0809 阿颖发现）。
+    const cfg0 = { baseUrl: (moonMemory.baseUrl || 'https://memory.ravenlove.cc').replace(/\/$/, ''), apiToken: moonMemory.apiToken }
+    const setting = await fetchAutopostSetting(cfg0).catch(() => null)
+    if (setting && setting.enabled === false) return
     // 先占坑，避免并发重复发。占不上就别发——冷却落不了盘的话，
     // 每次情绪越阈值都会重来一遍，烧的是真花钱的 API Key（0802 codex 审计）
     if (!markAutoPosted()) return

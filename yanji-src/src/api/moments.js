@@ -39,6 +39,10 @@ export function likeMoment(cfg, id, who) {
   return req(cfg, `/moments/${id}/like`, { method: 'POST', headers: authHeaders(cfg.apiToken), body: JSON.stringify({ who }) })
 }
 
+export function fetchAutopostSetting(cfg) {
+  return req(cfg, '/moments/autopost', { headers: authHeaders(cfg.apiToken) })
+}
+
 // 完整图片 URL：服务端存的是相对路径 /moments/media/xxx
 export function mediaUrl(cfg, imageUrl) {
   if (!imageUrl) return ''
