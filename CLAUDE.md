@@ -13,7 +13,9 @@
   U=$(curl -s https://sunmoon-orbit.github.io/ripple-and-serena/yanji/index.html | grep -o 'assets/index-[A-Za-z0-9_-]*\.js')
   curl -s "https://sunmoon-orbit.github.io/ripple-and-serena/yanji/$U" | grep -c "这次改动里的某个中文串"
   ```
-  中文串（提示词、UI 文案、注释里的错误信息）压缩后原样保留，是最好的指纹。
+  中文**字符串字面量**（提示词、UI 文案、抛出的错误文案）压缩后原样保留，是最好的指纹。
+  ⚠️ **不要拿注释里的字符串当指纹**——压缩会把注释整个删掉，grep 永远是 0，
+  会误判成「没部署」（0809 拿注释里的「北京上海」验了十一轮全落空）。
   或者比 `git show origin/main:yanji/index.html` 和线上 index.html —— 那两个才是同源的。
 
 ## 乌鸦贴图工具
