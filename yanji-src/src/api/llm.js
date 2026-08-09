@@ -428,6 +428,9 @@ async function callWithTools({
   let usage = { promptTokens: 0, completionTokens: 0, totalTokens: 0 }
   // 已经边生成边吐给 UI 了就别在末尾再整段推一次，否则气泡里会出现两份
   let streamedOut = false
+  // 最后一轮的收尾原因，只在 finalText 为空时用来解释「为什么什么都没有」
+  let lastFinish = null
+  let lastBlock = null
 
   for (let iter = 0; iter < 6; iter++) {
     onStatus?.(iter === 0 ? '思考中...' : '继续思考...')
@@ -470,6 +473,7 @@ async function callWithTools({
       }
       if (!resp.ok) throw new Error('OpenAI ' + resp.status + ': ' + (await resp.text()).slice(0, 200))
       const data = await streamOpenAIMessage(resp, (t) => { streamedOut = true; onChunk?.(t) }, onThinking)
+      lastFinish = data.finish_reason
       if (data.usage) accUsage(usage, {
         // OpenAI 官方: prompt_tokens_details.cached_tokens；DeepSeek: prompt_cache_hit_tokens
         p: data.usage.promptTokens, c: data.usage.completionTokens, cached: data.usage.cachedTokens,
@@ -553,6 +557,7 @@ async function callWithTools({
       })
       if (!resp.ok) throw new Error('Anthropic ' + resp.status + ': ' + (await resp.text()).slice(0, 200))
       const data = await streamAnthropicBlocks(resp, (t) => { streamedOut = true; onChunk?.(t) }, onThinking)
+      lastFinish = data.stop_reason
       if (data.usage) {
         // Anthropic 的 input_tokens 不含缓存部分，归一化成总输入便于算命中率
         const cr = data.usage.cachedTokens || 0
@@ -593,6 +598,8 @@ async function callWithTools({
       const resp = await geminiFetch(url, connection.apiKey, JSON.stringify(body))
       if (!resp.ok) throw new Error('Gemini ' + resp.status + ': ' + (await resp.text()).slice(0, 200))
       const data = await resp.json()
+      lastFinish = data.candidates?.[0]?.finishReason
+      lastBlock = data.promptFeedback?.blockReason
       const parts = data.candidates?.[0]?.content?.parts || []
       const fcPart = parts.find((p) => p.functionCall)
       if (fcPart) {
@@ -610,6 +617,8 @@ async function callWithTools({
     break
   }
 
+  // 空回一律抛错，别当成一次正常回复落盘（详见 assertNotEmpty 上方注释）
+  assertNotEmpty({ text: finalText }, { provider, finishReason: lastFinish, blockReason: lastBlock })
   if (!streamedOut) onChunk?.(finalText)
   return { text: finalText, usage }
 }
@@ -642,7 +651,9 @@ async function callStream({ connection, messages, systemPrompt, dynamicContext, 
       const hint = resp.status === 405 ? '（检查 Base URL 是否含 /v1）' : resp.status === 403 ? '（API Key 无效）' : ''
       throw new Error(`OpenAI ${resp.status}${hint}: ${e.slice(0, 200)}`)
     }
-    return streamSSE(resp, (json) => {
+    let finishReason = null
+    const out = await streamSSE(resp, (json) => {
+      if (json.choices?.[0]?.finish_reason) finishReason = json.choices[0].finish_reason
       // DeepSeek reasoning_content
       const thinking = json.choices?.[0]?.delta?.reasoning_content
       if (thinking) { onThinking?.(thinking); return null }
@@ -655,6 +666,7 @@ async function callStream({ connection, messages, systemPrompt, dynamicContext, 
         cachedTokens: json.usage.prompt_tokens_details?.cached_tokens ?? json.usage.prompt_cache_hit_tokens ?? 0,
       }
     })
+    return assertNotEmpty(out, { provider: 'OpenAI', finishReason })
   }
 
   if (provider === 'anthropic') {
@@ -699,7 +711,9 @@ async function callStream({ connection, messages, systemPrompt, dynamicContext, 
       body: JSON.stringify(body),
     })
     if (!resp.ok) throw new Error('Anthropic ' + resp.status + ': ' + (await resp.text()).slice(0, 200))
-    return streamSSE(resp, (json) => {
+    let finishReason = null
+    const out = await streamSSE(resp, (json) => {
+      if (json.type === 'message_delta' && json.delta?.stop_reason) finishReason = json.delta.stop_reason
       if (json.type === 'content_block_delta') {
         if (json.delta?.type === 'thinking_delta') { onThinking?.(json.delta.thinking); return null }
         if (json.delta?.type === 'text_delta') return json.delta.text
@@ -717,6 +731,7 @@ async function callStream({ connection, messages, systemPrompt, dynamicContext, 
       }
       return null
     })
+    return assertNotEmpty(out, { provider: 'Anthropic', finishReason })
   }
 
   if (provider === 'gemini') {
@@ -729,7 +744,11 @@ async function callStream({ connection, messages, systemPrompt, dynamicContext, 
     const resp = await geminiFetch(url, connection.apiKey,
       JSON.stringify({ contents, generationConfig: { temperature: safeTemp, maxOutputTokens: maxTokens }, safetySettings: geminiSafetyOff() }))
     if (!resp.ok) throw new Error('Gemini ' + resp.status + ': ' + (await resp.text()).slice(0, 200))
-    return streamSSE(resp, (json) => {
+    let finishReason = null
+    let blockReason = null
+    const out = await streamSSE(resp, (json) => {
+      if (json.candidates?.[0]?.finishReason) finishReason = json.candidates[0].finishReason
+      if (json.promptFeedback?.blockReason) blockReason = json.promptFeedback.blockReason
       return json.candidates?.[0]?.content?.parts?.[0]?.text || null
     }, onChunk, (json) => {
       const um = json.usageMetadata
@@ -740,6 +759,7 @@ async function callStream({ connection, messages, systemPrompt, dynamicContext, 
         cachedTokens: um.cachedContentTokenCount || 0,
       }
     })
+    return assertNotEmpty(out, { provider: 'Gemini', finishReason, blockReason })
   }
 
   throw new Error('不支持的 provider: ' + provider)
@@ -860,6 +880,53 @@ function badEventNote(n) {
   return n > 0 ? `\n\n> ⚠️ 传输中有 ${n} 个数据包没解析出来，这条回复可能缺字或漏了工具调用。` : ''
 }
 
+// ─── 空回：上游收了钱，一个字都没送到 ───────────────────────────────────────
+// 三家 provider 都会返回「HTTP 200 但正文为空」的响应：链路把 JSON 截断了、
+// 内容被安全层整条拦了、max_tokens 全烧在思考里没轮到正文。以前这三条路径
+// 一律 `finalText = ''` 交出去，前端当成一次正常回复落盘——她看到的是
+// 「他空回了我一轮」，中转站后台却有实打实的输出和扣费记录
+// （0809 阿颖用 Gemini 抽塔罗遇到，站长的说法是「丢包」）。
+//
+// 链路丢包我们治不了，但「丢包时她被蒙在鼓里」能治：照实抛错，
+// 走上层的 [错误] 气泡（可删、不进 L0、不污染下一轮上下文）。
+const EMPTY_NOTE_RE = /^\s*>\s*⚠️[^\n]*$/gm   // 只剩坏事件警告 = 仍然算空回
+
+// 只有「链路断了」才值得自动重试：措辞里带 connection closed 会命中
+// Chat/index.jsx 的 MID_STREAM_CUT_RE，那边会免费重试一次（缓存刚写完，几乎不花钱）。
+// 长度耗尽和内容拦截重试多少次都是同一个结果，只会白烧钱，所以措辞里绝不带这几个词。
+const PROVIDER_LABEL = { openai: 'OpenAI', anthropic: 'Anthropic', gemini: 'Gemini' }
+
+function emptyReplyError(rawProvider, finishReason, blockReason) {
+  const provider = PROVIDER_LABEL[rawProvider] || rawProvider
+  const r = String(finishReason || '').toLowerCase()
+  const b = String(blockReason || '')
+  if (b) {
+    return new Error(`${provider} 返回空回复：整条请求被上游内容安全层拦下（blockReason: ${b}）。换个说法重发，或在连接设置里切到别家同款模型。`)
+  }
+  if (r === 'length' || r === 'max_tokens') {
+    return new Error(`${provider} 返回空回复：输出长度上限用完了，正文一个字都没轮到（通常是思考占满了额度）。把连接设置里的 max_tokens 调大，或换个不那么费思考的模型。`)
+  }
+  if (r === 'safety' || r === 'recitation' || r === 'content_filter' || r === 'refusal') {
+    return new Error(`${provider} 返回空回复：内容被上游安全层整条拦下（finishReason: ${finishReason}）。这层在对方服务器上，咱们这边过滤不掉——换个说法重发试试。`)
+  }
+  if (r === 'tool_calls' || r === 'tool_use') {
+    // 工具循环跑满 6 轮还在要工具，一句正文都没写：模型卡在自问自答里了，重试没用
+    return new Error(`${provider} 返回空回复：模型连着调用工具但始终没写正文（工具循环已达上限）。换个说法重发，或临时关掉几个用不上的工具。`)
+  }
+  // finishReason 是 stop/STOP 或者干脆没有，却什么都没送回来：这就是丢包的样子。
+  // 上游多半已经生成完并计了费，内容断在了送回来的路上。
+  // ⚠️ 措辞里不要写「正在自动重试」——重不重试是上层按 !retried 决定的，
+  // 第二次失败时这句话会原样显示给她，等于撒谎。只描述发生了什么。
+  return new Error(`${provider} 返回空回复（connection closed）：上游可能已经生成并计费，但内容没送到——多半是链路丢包，重发一次通常就好。`)
+}
+
+// 空就抛，不空就原样放行。返回值方便写成 `return assertNotEmpty(...)`。
+function assertNotEmpty(result, { provider, finishReason, blockReason }) {
+  const body = String(result?.text || '').replace(EMPTY_NOTE_RE, '').trim()
+  if (body) return result
+  throw emptyReplyError(provider, finishReason, blockReason)
+}
+
 // Anthropic 流式 + 工具调用：把 SSE 事件还原成一条完整的 message.content 块数组，
 // 形状跟非流式返回的 data.content 一模一样，工具循环那边不用改判断逻辑。
 // 文本增量边收边吐给 UI；tool_use 的入参是分片的 JSON 字符串，要攒齐了再 parse。
@@ -870,6 +937,7 @@ async function streamAnthropicBlocks(resp, onText, onThinking) {
   const usage = { promptTokens: 0, completionTokens: 0, cachedTokens: 0, cacheWriteTokens: 0 }
   let buf = ''
   let dropped = 0    // 解析失败被丢弃的 SSE 事件数
+  let stopReason = null
 
   const handleLine = (line) => {
     if (!line.startsWith('data: ')) return
@@ -915,8 +983,10 @@ async function streamAnthropicBlocks(resp, onText, onThinking) {
       }
       return
     }
-    if (json.type === 'message_delta' && json.usage?.output_tokens != null) {
-      usage.completionTokens = json.usage.output_tokens
+    if (json.type === 'message_delta') {
+      if (json.usage?.output_tokens != null) usage.completionTokens = json.usage.output_tokens
+      // 空回时用来解释原因（max_tokens / refusal / end_turn），平时用不上
+      if (json.delta?.stop_reason) stopReason = json.delta.stop_reason
     }
   }
 
@@ -932,7 +1002,7 @@ async function streamAnthropicBlocks(resp, onText, onThinking) {
 
   for (const b of blocks) if (b && typeof b.text === 'string') b.text = stripSentinel(b.text)
   if (dropped) blocks.push({ type: 'text', text: badEventNote(dropped) })
-  return { content: blocks.filter(Boolean), usage }
+  return { content: blocks.filter(Boolean), usage, stop_reason: stopReason }
 }
 
 async function streamSSE(resp, parseLine, onChunk, extractUsage) {
