@@ -4601,3 +4601,93 @@ body.mp-active .scroll-bottom-btn { bottom: 139px; }
   .conv-item-title { padding-right: 78px; }
   .conv-action-btn { width: 26px; height: 26px; }   /* 手指比鼠标粗，放大一点 */
 }
+
+/* ===== 塔罗（苏堤柳塔罗搬进侧边栏）===== */
+.tarot-modal { max-width: 460px; }
+.tarot-tabs { display: flex; gap: 2px; padding: 0 16px; border-bottom: 1px solid var(--border); }
+.tarot-tab {
+  flex: 1; padding: 9px 0; border: none; background: none; cursor: pointer;
+  font-size: 13px; color: var(--text-muted); border-bottom: 2px solid transparent; margin-bottom: -1px;
+}
+.tarot-tab.on { color: var(--accent); border-bottom-color: var(--accent); font-weight: 600; }
+.tarot-question {
+  width: 100%; box-sizing: border-box; padding: 8px 12px; margin-bottom: 14px;
+  border: 1px solid var(--border); border-radius: var(--r-sm);
+  background: var(--card); color: var(--text); font-size: 13px;
+}
+
+/* 牌桌：一张时占满，三/五张时横向滚动——手机宽度塞不下五张，
+   强行缩小会把牌义挤成蚂蚁字，不如让它能滑。 */
+.tarot-spread { display: flex; gap: 8px; margin-bottom: 14px; }
+.tarot-spread.n1 { justify-content: center; }
+.tarot-spread.n3, .tarot-spread.n5 { overflow-x: auto; padding-bottom: 6px; scroll-snap-type: x mandatory; }
+.tarot-spread.n3 .tarot-card, .tarot-spread.n5 .tarot-card { flex: 0 0 176px; scroll-snap-align: center; }
+.tarot-spread.n1 .tarot-card { flex: 0 0 232px; }
+
+.tarot-card { display: flex; flex-direction: column; gap: 5px; }
+.tarot-card-label { font-size: 11px; letter-spacing: 0.1em; color: var(--accent); text-align: center; }
+.tarot-card-back, .tarot-card-front {
+  min-height: 200px; padding: 14px 12px; border-radius: var(--r-sm);
+  border: 1px solid var(--border-md);
+  box-shadow: inset 0 0 0 3px var(--card), inset 0 0 0 4px var(--border-md), var(--shadow-sm);
+}
+.tarot-card-back {
+  display: flex; align-items: center; justify-content: center;
+  background: color-mix(in srgb, var(--card) 88%, var(--accent));
+  color: var(--text-faint); font-size: 26px;
+}
+.tarot-card-front {
+  background: var(--card); cursor: pointer; text-align: center;
+  display: flex; flex-direction: column; align-items: center;
+  animation: tarot-flip 0.45s cubic-bezier(0.3, 0.85, 0.3, 1);
+}
+@keyframes tarot-flip { from { transform: rotateY(90deg); opacity: 0; } to { transform: none; opacity: 1; } }
+/* 逆位把整张牌倒过来，但字不能跟着倒——所以只转外框，内容再转回来 */
+.tarot-card.rev .tarot-card-numeral { transform: rotate(180deg); }
+.tarot-card-numeral { font-size: 12px; color: var(--text-faint); letter-spacing: 0.15em; }
+.tarot-card-name { font-size: 19px; font-weight: 800; font-family: "Noto Serif SC", serif; color: var(--text); margin-top: 4px; }
+.tarot-card-en { font-size: 10.5px; font-style: italic; color: var(--text-faint); letter-spacing: 0.06em; }
+.tarot-card-orient {
+  margin: 8px 0 6px; padding: 1px 9px; border-radius: 10px; font-size: 11px;
+  border: 1px solid var(--border); color: var(--text-muted);
+}
+.tarot-card-orient.rev { color: var(--accent); border-color: var(--accent-soft); }
+.tarot-card-kw { font-size: 11.5px; color: var(--text-mid); line-height: 1.6; }
+.tarot-card-meaning { font-size: 12.5px; color: var(--text-mid); line-height: 1.75; text-align: left; margin-top: 8px; }
+.tarot-card-more { margin-top: auto; padding-top: 8px; font-size: 11px; color: var(--text-faint); }
+
+.tarot-empty { text-align: center; color: var(--text-muted); font-size: 13px; padding: 28px 0; }
+
+/* 牌记 */
+.tarot-history { display: flex; flex-direction: column; gap: 6px; }
+.tarot-hist-item { border: 1px solid var(--border); border-radius: var(--r-sm); background: var(--card); overflow: hidden; }
+.tarot-hist-head { display: flex; align-items: baseline; gap: 8px; padding: 9px 12px; cursor: pointer; }
+.tarot-hist-who { flex-shrink: 0; font-size: 11px; color: var(--accent); }
+.tarot-hist-sum { flex: 1; min-width: 0; font-size: 12.5px; color: var(--text-mid); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tarot-hist-date { flex-shrink: 0; font-size: 11px; color: var(--text-faint); }
+.tarot-hist-body { padding: 0 12px 12px; border-top: 1px dashed var(--border); }
+.tarot-hist-q { font-size: 12px; color: var(--text-muted); margin: 8px 0; }
+.tarot-hist-card { font-size: 12px; line-height: 1.7; color: var(--text-mid); margin-top: 6px; }
+.tarot-hist-card b { color: var(--text); margin-right: 5px; }
+.tarot-hist-reading {
+  margin-top: 10px; padding: 9px 11px; border-left: 2px solid var(--accent);
+  background: var(--bg-soft, rgba(0,0,0,0.03)); font-size: 12.5px; line-height: 1.75; color: var(--text-mid);
+  white-space: pre-wrap;
+}
+.tarot-hist-noread { margin-top: 10px; font-size: 11.5px; color: var(--text-faint); }
+.tarot-hist-actions { display: flex; gap: 8px; margin-top: 10px; }
+.tarot-hist-actions .roost-btn { flex: 1; }
+.tarot-del { color: var(--danger, #b3453f); }
+
+/* 图鉴 */
+.tarot-ency { display: flex; flex-direction: column; gap: 4px; }
+.tarot-ency-item { border: 1px solid var(--border); border-radius: var(--r-sm); background: var(--card); }
+.tarot-ency-head { display: flex; align-items: baseline; gap: 8px; padding: 8px 12px; cursor: pointer; }
+.tarot-ency-num { flex-shrink: 0; width: 34px; font-size: 11px; color: var(--text-faint); }
+.tarot-ency-name { font-size: 13.5px; font-weight: 600; color: var(--text); }
+.tarot-ency-en { margin-left: auto; font-size: 10.5px; font-style: italic; color: var(--text-faint); }
+.tarot-ency-body { padding: 0 12px 10px; border-top: 1px dashed var(--border); }
+.tarot-ency-sec { margin-top: 9px; font-size: 11.5px; color: var(--text-muted); }
+.tarot-ency-sec b { display: inline-block; margin-right: 7px; color: var(--accent); font-size: 11px; }
+.tarot-ency-sec.rev b { color: var(--text-muted); }
+.tarot-ency-sec p { margin: 4px 0 0; font-size: 12.5px; line-height: 1.75; color: var(--text-mid); }

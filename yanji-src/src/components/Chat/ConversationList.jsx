@@ -3,7 +3,7 @@ import { useStore } from '../../store'
 import { formatTime } from '../../utils'
 import { applyDecayAndGet, getEmotionState, POSITIVE_SLOTS, NEGATIVE_SLOTS, SLOT_LABELS } from '../../utils/emotion'
 
-export default function ConversationList({ onClose, onStartCall, onOpenGames, onOpenMusic, onOpenWheel, onOpenFate, onOpenFortune, onOpenChecklist, onOpenHealth, onOpenPeriod, onOpenAlbum, onOpenIdleJournal, onOpenBoard, onOpenWallet, onOpenCalls }) {
+export default function ConversationList({ onClose, onStartCall, onOpenGames, onOpenMusic, onOpenWheel, onOpenFate, onOpenTarot, onOpenFortune, onOpenChecklist, onOpenHealth, onOpenPeriod, onOpenAlbum, onOpenIdleJournal, onOpenBoard, onOpenWallet, onOpenCalls }) {
   const chats = useStore((s) => s.chats)
   const connections = useStore((s) => s.connections)
   const activeChatId = useStore((s) => s.activeChatId)
@@ -292,6 +292,13 @@ export default function ConversationList({ onClose, onStartCall, onOpenGames, on
                 <span>命运牌阵</span>
               </button>
             )}
+            <button className="sb-tool-item" onClick={() => { onClose?.(); onOpenTarot?.() }}>
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="5" y="2.5" width="14" height="19" rx="2" />
+                <path d="M12 6.5 L13.4 10 L17 10.4 L14.3 12.8 L15.1 16.4 L12 14.5 L8.9 16.4 L9.7 12.8 L7 10.4 L10.6 10 Z" />
+              </svg>
+              <span>塔罗</span>
+            </button>
             <button className="sb-tool-item" onClick={() => { onClose?.(); onOpenFortune?.() }}>
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M7 8 L17 8 L16 21 Q12 22.5 8 21 Z" />

@@ -5,6 +5,7 @@ import { FISHING_TOOL_DEF, executeFishing } from './fishing'
 import { DICE_TOOL_DEF, executeRandomRoll } from './dice'
 import { FORTUNE_TOOL_DEF, executeFortuneDraw } from './fortune'
 import { FATE_TOOL_DEF, executeFateDraw } from './fateDeck'
+import { TAROT_TOOL_DEF, executeTarot } from './tarot'
 import { NOWHERE_TOOL_DEFS, executeNowhereTool } from './nowhere'
 import { buildMoodFxPrompt } from '../utils/moodFx'
 
@@ -109,6 +110,8 @@ function getAllTools(searchConfig, moonMemoryConfig, onFile) {
   tools.push(FORTUNE_TOOL_DEF)
   // 乌有乡：用身体在地球上走路
   tools.push(FATE_TOOL_DEF)
+  // 塔罗：她抽牌、我解牌；抽牌记录存在 moon-memory，所以要它配好才挂
+  if (moonMemoryConfig?.enabled && moonMemoryConfig?.apiToken) tools.push(TAROT_TOOL_DEF)
 
   tools.push(...NOWHERE_TOOL_DEFS)
   return tools
@@ -209,6 +212,10 @@ async function executeToolRaw(name, args, { searchConfig, moonMemoryConfig, onSt
   if (name === 'draw_daily_fortune') {
     onStatus?.('摇签中...')
     return await executeFortuneDraw(args)
+  }
+  if (name === 'draw_tarot') {
+    onStatus?.(args?.action === 'history' ? '翻牌记...' : args?.action === 'reading' ? '记下解读...' : '洗牌抽牌...')
+    return await executeTarot(args, moonMemoryConfig)
   }
   if (name === 'draw_fate_card') {
     onStatus?.('抽牌中...')

@@ -23,6 +23,7 @@ import GamesRoom from './GamesRoom'
 import MusicRoom from './MusicRoom'
 import FortuneWheel from './FortuneWheel'
 import FateDeck from './FateDeck'
+import Tarot from './Tarot'
 import DailyFortune from './DailyFortune'
 import ChatCalendar from './ChatCalendar'
 import DailyChecklist from './DailyChecklist'
@@ -184,6 +185,7 @@ export default function Chat() {
   const [musicOpen, setMusicOpen] = useState(false)
   const [wheelOpen, setWheelOpen] = useState(false)
   const [fateOpen, setFateOpen] = useState(false)
+  const [tarotOpen, setTarotOpen] = useState(false)
   const [fortuneOpen, setFortuneOpen] = useState(false)
   const [quoted, setQuoted] = useState(null)
   const [perspectiveFlip, setPerspectiveFlip] = useState(false)
@@ -741,6 +743,8 @@ export default function Chat() {
     const inject = [
       injectMode && injectPrompt ? injectPrompt : null,
       opts.bilingual ? BILINGUAL_NOTE : null,
+      // 调用方自带的暗道内容（塔罗解牌把牌义走这儿，免得她气泡里糊一屏字）
+      opts.inject || null,
     ].filter(Boolean).join('\n\n') || undefined
     const segments = opts.segments && opts.segments.length > 1 ? opts.segments : null
     let imageMessage
@@ -1330,7 +1334,7 @@ export default function Chat() {
     <div className="chat-panel">
       {/* Sidebar */}
       <div className={'chat-sidebar' + (sidebarOpen ? ' open' : '')}>
-        <ConversationList onClose={() => setSidebarOpen(false)} onStartCall={dialCall} onOpenGames={() => setGamesOpen(true)} onOpenMusic={() => setMusicOpen(true)} onOpenWheel={() => setWheelOpen(true)} onOpenFate={() => setFateOpen(true)} onOpenFortune={() => setFortuneOpen(true)} onOpenChecklist={() => setChecklistOpen(true)} onOpenHealth={() => setHealthOpen(true)} onOpenWallet={() => setWalletOpen(true)} onOpenPeriod={() => setPeriodOpen(true)} onOpenAlbum={() => setAlbumOpen(true)} onOpenIdleJournal={() => setIdleJournalOpen(true)} onOpenBoard={() => setBoardOpen(true)} onOpenCalls={() => setCallsOpen(true)} />
+        <ConversationList onClose={() => setSidebarOpen(false)} onStartCall={dialCall} onOpenGames={() => setGamesOpen(true)} onOpenMusic={() => setMusicOpen(true)} onOpenWheel={() => setWheelOpen(true)} onOpenFate={() => setFateOpen(true)} onOpenTarot={() => setTarotOpen(true)} onOpenFortune={() => setFortuneOpen(true)} onOpenChecklist={() => setChecklistOpen(true)} onOpenHealth={() => setHealthOpen(true)} onOpenWallet={() => setWalletOpen(true)} onOpenPeriod={() => setPeriodOpen(true)} onOpenAlbum={() => setAlbumOpen(true)} onOpenIdleJournal={() => setIdleJournalOpen(true)} onOpenBoard={() => setBoardOpen(true)} onOpenCalls={() => setCallsOpen(true)} />
       </div>
       {sidebarOpen && <div className="sidebar-backdrop" onClick={() => setSidebarOpen(false)} />}
 
@@ -1547,6 +1551,7 @@ export default function Chat() {
       {musicOpen && <MusicRoom onClose={() => setMusicOpen(false)} />}
       {wheelOpen && <FortuneWheel onClose={() => setWheelOpen(false)} />}
       {fateOpen && <FateDeck onClose={() => setFateOpen(false)} onSend={handleSend} />}
+      {tarotOpen && <Tarot onClose={() => setTarotOpen(false)} onSend={handleSend} />}
       {fortuneOpen && <DailyFortune onClose={() => setFortuneOpen(false)} />}
       {checklistOpen && <DailyChecklist onClose={() => setChecklistOpen(false)} />}
       {healthOpen && <HealthCard onClose={() => setHealthOpen(false)} />}

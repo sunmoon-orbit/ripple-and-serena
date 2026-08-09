@@ -1,0 +1,1256 @@
+{
+  "cards": [
+    {
+      "id": "major_0",
+      "numeral": "0",
+      "nameEn": "The Fool",
+      "nameCn": "愚者",
+      "suit": "major",
+      "upright": {
+        "meaning": "你站在这一步之前，背包轻得像是刻意遗忘了什么。不是不知道风险，是决定此刻的好奇比恐惧更重要。出发前不需要把一切都准备好——准备好了就不叫跳跃了。",
+        "keywords": "新开始 · 信任 · 跳跃 · 未知"
+      },
+      "reversed": {
+        "meaning": "犹豫不是谨慎，是你在用\"再想想\"推迟一个已经知道答案的决定。或者反过来：正在鲁莽冲进一件根本没打算负责的事里。",
+        "keywords": "逃避决定 · 鲁莽 · 拖延 · 不负责"
+      }
+    },
+    {
+      "id": "major_1",
+      "numeral": "I",
+      "nameEn": "The Magician",
+      "nameCn": "魔术师",
+      "suit": "major",
+      "upright": {
+        "meaning": "你面前的材料已经够用了。不是缺什么，是还没有把手边的东西真正整合起来。技能、意志、时机——都在。现在是动手的时候，不是等待的时候。",
+        "keywords": "整合 · 行动 · 专注 · 资源已备"
+      },
+      "reversed": {
+        "meaning": "才能在，但方向对了吗？可能是把手段用成了目的，用聪明在操弄而不是在创造。也可能是明明有能力，却一直在等一个永远不会来的\"最佳时机\"。",
+        "keywords": "操控 · 才能虚耗 · 动机不纯 · 拖而不发"
+      }
+    },
+    {
+      "id": "major_2",
+      "numeral": "II",
+      "nameEn": "The High Priestess",
+      "nameCn": "女祭司",
+      "suit": "major",
+      "upright": {
+        "meaning": "答案早就有了，只是你在等一个更大声的声音来确认它。停下来。不是所有真相都在明面上——有些东西需要你在安静里才能听到。直觉不是感觉，是积累出来的认知。",
+        "keywords": "直觉 · 潜意识 · 内在知晓 · 沉默"
+      },
+      "reversed": {
+        "meaning": "该知道的信息一直被压着不去面对，或者在表面的热闹里把真实感受给盖住了。有些秘密不是别人瞒着你，是你瞒着自己。",
+        "keywords": "压制直觉 · 信息遮蔽 · 自我欺骗 · 表面化"
+      }
+    },
+    {
+      "id": "major_3",
+      "numeral": "III",
+      "nameEn": "The Empress",
+      "nameCn": "女皇",
+      "suit": "major",
+      "upright": {
+        "meaning": "不是你去追求丰盛，是丰盛在等你愿意接受它。创造力、感官、生长——一切都在向你开放。你现在的状态适合孕育，适合让一件事从无到有地成形。",
+        "keywords": "创造 · 丰饶 · 滋养 · 生长"
+      },
+      "reversed": {
+        "meaning": "付出太多、自我消耗、把照顾别人当成逃避照顾自己的方式。或者相反：创造力被堵住了，不知道从哪里开始，或者不相信自己有东西可以给出去。",
+        "keywords": "自我消耗 · 创造受阻 · 依赖 · 匮乏感"
+      }
+    },
+    {
+      "id": "major_4",
+      "numeral": "IV",
+      "nameEn": "The Emperor",
+      "nameCn": "皇帝",
+      "suit": "major",
+      "upright": {
+        "meaning": "不是要你变得冷硬，是让你的结构足够稳，别人才能依靠。混乱的时候需要有人出来定锚。你现在站的位置，需要你做决定、建规则、承担后果。",
+        "keywords": "结构 · 权威 · 稳定 · 承担"
+      },
+      "reversed": {
+        "meaning": "控制欲盖过了真正的领导力——用规则在管束而不是在保护。或者是把所有稳定都外包给别人，自己不愿意负责任何结果。",
+        "keywords": "过度控制 · 专制 · 逃避责任 · 僵化"
+      }
+    },
+    {
+      "id": "major_5",
+      "numeral": "V",
+      "nameEn": "The Hierophant",
+      "nameCn": "教皇",
+      "suit": "major",
+      "upright": {
+        "meaning": "有人走过这条路，留下了方法。不一定要完全照着走，但值得认真听一遍——尤其是在你自己还没摸清楚的领域里。传统不是束缚，是别人替你试错过的经验。",
+        "keywords": "传承 · 导师 · 系统 · 精神指引"
+      },
+      "reversed": {
+        "meaning": "一味遵循规则而不去质疑规则是为了什么。或者是叛逆本身成了目的——不是真的找到自己的路，而是用\"我不一样\"来回避真正的选择。",
+        "keywords": "盲从 · 为反对而反对 · 教条 · 逃离"
+      }
+    },
+    {
+      "id": "major_6",
+      "numeral": "VI",
+      "nameEn": "The Lovers",
+      "nameCn": "恋人",
+      "suit": "major",
+      "upright": {
+        "meaning": "不只是关于感情——是一个真正考验你价值观的选择摆在面前。两条路都有代价，真正的问题是：你选哪个，你就是谁。不要选别人认为你该选的那个。",
+        "keywords": "真实选择 · 价值观 · 契合 · 忠于自己"
+      },
+      "reversed": {
+        "meaning": "在逃避这个选择，或者已经选了但不愿承认是自己选的。关系中出现了真实的裂缝——可能是价值观的分歧，也可能是一直在取悦而不是在真正相处。",
+        "keywords": "逃避选择 · 价值错位 · 不忠于自我 · 关系裂缝"
+      }
+    },
+    {
+      "id": "major_7",
+      "numeral": "VII",
+      "nameEn": "The Chariot",
+      "nameCn": "战车",
+      "suit": "major",
+      "upright": {
+        "meaning": "不是蛮力推进，是内外同向时自然产生的动力。你现在知道自己要去哪里，这本身就是最强的驱动力。矛盾还在，但方向已定——带着它们一起走。",
+        "keywords": "方向 · 意志 · 推进 · 内外一致"
+      },
+      "reversed": {
+        "meaning": "方向感丢失了，或者内部在拉锯——想走，又怕走；知道该做，又一直在找理由不做。速度不是问题，是搞不清楚在往哪里开。",
+        "keywords": "方向混乱 · 内耗 · 失控 · 被欲望驱动"
+      }
+    },
+    {
+      "id": "major_8",
+      "numeral": "VIII",
+      "nameEn": "Strength",
+      "nameCn": "力量",
+      "suit": "major",
+      "upright": {
+        "meaning": "驯服不是压制，是理解。你内心最烈的那部分不需要被消灭，需要被听见、被转化。真正的力量是在最想爆发的时候选择了另一种方式——不是忍，是懂。",
+        "keywords": "内在力量 · 耐心 · 温柔的坚定 · 转化"
+      },
+      "reversed": {
+        "meaning": "在压制而不是在理解，把强撑当成了力量。或者是相反——被情绪推着走，没有任何缓冲，事后才知道自己做了什么。",
+        "keywords": "自我怀疑 · 情绪失控 · 硬撑 · 内力耗尽"
+      }
+    },
+    {
+      "id": "major_9",
+      "numeral": "IX",
+      "nameEn": "The Hermit",
+      "nameCn": "隐者",
+      "suit": "major",
+      "upright": {
+        "meaning": "答案不在外面。你已经走了很远了，现在是把收集到的东西整理成智慧的时候了。独处不是孤独，是给自己一个不需要表演的空间。灯是给自己照路的，不是给别人看的。",
+        "keywords": "独处 · 内省 · 整合 · 自我导向"
+      },
+      "reversed": {
+        "meaning": "孤立已经超过了独处的边界，在用沉默惩罚自己或者逃开本该面对的东西。或者是假装内省，其实只是在反复咀嚼同一个伤口。",
+        "keywords": "孤立 · 逃避 · 封闭 · 拒绝连接"
+      }
+    },
+    {
+      "id": "major_10",
+      "numeral": "X",
+      "nameEn": "Wheel of Fortune",
+      "nameCn": "命运之轮",
+      "suit": "major",
+      "upright": {
+        "meaning": "局势在转动，不是你推的，也不是针对你的。你能做的是认清现在转到了哪个位置，然后相应而动。有些事情已经开始变了——不管你准备好了没有。",
+        "keywords": "转折 · 周期 · 时机 · 顺势而为"
+      },
+      "reversed": {
+        "meaning": "在一个低潮的位置上死撑，不愿承认这只是轮子的一段，不是终点。或者是运气好的时候没有意识到这是窗口期，错过了。",
+        "keywords": "抗拒转变 · 错失时机 · 低谷死撑 · 执念"
+      }
+    },
+    {
+      "id": "major_11",
+      "numeral": "XI",
+      "nameEn": "Justice",
+      "nameCn": "正义",
+      "suit": "major",
+      "upright": {
+        "meaning": "没有隐藏的裁判——只有你的选择和它的结果之间清晰的关系。因果不是惩罚，是逻辑。现在是一个需要做出诚实决定的时刻，不偏不倚地看清楚正在发生什么。",
+        "keywords": "因果 · 诚实 · 公正 · 清醒的判断"
+      },
+      "reversed": {
+        "meaning": "在回避一个已经知道答案的问题。用借口代替承担，或者在用\"不公平\"解释一个其实是自己造成的结果。",
+        "keywords": "逃避责任 · 自欺 · 不公 · 拒绝看清"
+      }
+    },
+    {
+      "id": "major_12",
+      "numeral": "XII",
+      "nameEn": "The Hanged Man",
+      "nameCn": "倒吊人",
+      "suit": "major",
+      "upright": {
+        "meaning": "倒挂着看，世界不一样了。这个暂停不是失去，是换了个视角。你现在无法推进是有原因的——有什么东西需要先被放下，才能让下一步真正发生。",
+        "keywords": "暂停 · 视角转换 · 放下 · 等待中的理解"
+      },
+      "reversed": {
+        "meaning": "一直在等，但这种等是在拖延一个该做的决定。或者在为一件已经不值得的事情消耗自己，把忍耐当成了美德。",
+        "keywords": "无意义的等待 · 拖延 · 自我牺牲失当 · 困顿"
+      }
+    },
+    {
+      "id": "major_13",
+      "numeral": "XIII",
+      "nameEn": "Death",
+      "nameCn": "死神",
+      "suit": "major",
+      "upright": {
+        "meaning": "这一章确实要结束了。不是失败，是完成。执着于已经结束的事物，才会错过已经开始的。蜕变不舒服，但不蜕变才是真正的困死。",
+        "keywords": "终结 · 蜕变 · 放手 · 转化"
+      },
+      "reversed": {
+        "meaning": "明知道该结束，还在硬撑着不肯让它结束——关系、阶段、旧的自己。或者是陷在结束的痛苦里出不来，拒绝让这次终结变成转折。",
+        "keywords": "抗拒结束 · 停滞 · 困在过去 · 不愿蜕变"
+      }
+    },
+    {
+      "id": "major_14",
+      "numeral": "XIV",
+      "nameEn": "Temperance",
+      "nameCn": "节制",
+      "suit": "major",
+      "upright": {
+        "meaning": "不是强迫自己克制，而是自然地知道什么时候够了。两种看似矛盾的东西其实可以同时存在——你现在有能力把它们流动在一起，而不是非此即彼。",
+        "keywords": "调和 · 流动 · 耐心 · 不走极端"
+      },
+      "reversed": {
+        "meaning": "走进了某个极端，要么过度要么完全压制。在一件事上用力过猛，或者在该坚持的时候忽然全部放弃。节奏乱了。",
+        "keywords": "失衡 · 过度 · 急躁 · 极端化"
+      }
+    },
+    {
+      "id": "major_15",
+      "numeral": "XV",
+      "nameEn": "The Devil",
+      "nameCn": "恶魔",
+      "suit": "major",
+      "upright": {
+        "meaning": "链条是真实的。但注意看清楚——是谁锁上的？很多时候绑住我们的不是外力，是我们不愿意承认的舒适、习惯或恐惧。认出来，才是解开的第一步。",
+        "keywords": "束缚 · 执念 · 阴影 · 认清控制你的是什么"
+      },
+      "reversed": {
+        "meaning": "开始看到那根链条了，或者已经开始挣脱。但也可能是用一种瘾换了另一种瘾，以为自己自由了，其实只是换了个牢笼。",
+        "keywords": "挣脱 · 觉醒 · 依赖转移 · 表面的自由"
+      }
+    },
+    {
+      "id": "major_16",
+      "numeral": "XVI",
+      "nameEn": "The Tower",
+      "nameCn": "高塔",
+      "suit": "major",
+      "upright": {
+        "meaning": "某个建立在错误基础上的东西正在倒塌，或者已经倒了。这很痛，但那个基础本来就不稳——它早晚会倒，只是现在发生了。倒了反而可以建真正牢固的东西。",
+        "keywords": "崩塌 · 觉醒 · 根基动摇 · 必要的破坏"
+      },
+      "reversed": {
+        "meaning": "在用大量力气阻止一个必然要发生的崩塌，或者崩塌已经发生了但还没有让自己真正接受这件事。越抗拒，下一次来的就越猛。",
+        "keywords": "抗拒必要改变 · 延迟觉醒 · 恐惧 · 逃避"
+      }
+    },
+    {
+      "id": "major_17",
+      "numeral": "XVII",
+      "nameEn": "The Star",
+      "nameCn": "星星",
+      "suit": "major",
+      "upright": {
+        "meaning": "暴风雨之后，夜空是这样的。不是所有问题都解决了，是你记起来了——你原本就有的那种平静和方向感。受伤过，但没有破碎。向前走是可以的。",
+        "keywords": "希望 · 平静 · 疗愈 · 方向感回归"
+      },
+      "reversed": {
+        "meaning": "失望盖过了希望，暂时看不到前面。或者明明已经走出来了，又被某件小事拉回去，不相信好事可以持续。",
+        "keywords": "失望 · 失去方向 · 不相信好的 · 断联"
+      }
+    },
+    {
+      "id": "major_18",
+      "numeral": "XVIII",
+      "nameEn": "The Moon",
+      "nameCn": "月亮",
+      "suit": "major",
+      "upright": {
+        "meaning": "不是所有模糊都是危险，但现在这种模糊需要被认真对待。你感觉到的那些不安不是幻觉——只是还看不清楚是什么。事情可能不是表面呈现的样子，等一等，让月光再亮一点。",
+        "keywords": "幻象 · 潜意识 · 不确定 · 直觉示警"
+      },
+      "reversed": {
+        "meaning": "迷雾开始散了，或者恐惧被看穿了就小了。也可能是长期在焦虑里转，混淆了真实的危险和想象出来的威胁。",
+        "keywords": "走出迷雾 · 真相浮现 · 恐惧消解 · 辨别现实"
+      }
+    },
+    {
+      "id": "major_19",
+      "numeral": "XIX",
+      "nameEn": "The Sun",
+      "nameCn": "太阳",
+      "suit": "major",
+      "upright": {
+        "meaning": "不用怀疑这份好。有些时刻就是单纯地好，值得你完整地在里面。活力、清晰、真实的喜悦——这些不是运气，是你一路走来之后应得的。",
+        "keywords": "喜悦 · 成功 · 活力 · 真实的好"
+      },
+      "reversed": {
+        "meaning": "好事在发生，但在用各种理由拦着自己接受它。或者过度乐观到看不见真实的问题，用表面的阳光把该面对的东西晒干了算了。",
+        "keywords": "过度乐观 · 无法接受好事 · 光芒被遮 · 暂时受阻"
+      }
+    },
+    {
+      "id": "major_20",
+      "numeral": "XX",
+      "nameEn": "Judgement",
+      "nameCn": "审判",
+      "suit": "major",
+      "upright": {
+        "meaning": "有什么一直没有正视的，现在该面对了。不是审判你，是召唤你回到真实的自己。这个觉醒不一定舒服，但它是你一直在等的转折点。听到了就别再装没听到。",
+        "keywords": "觉醒 · 召唤 · 反思 · 真实的自我"
+      },
+      "reversed": {
+        "meaning": "听到了那个召唤但在假装没听见。或者在用苛刻的自我批判代替真正的反思——那是另一种逃避，不是成长。",
+        "keywords": "逃避觉醒 · 自我批判 · 拒绝改变 · 错过转折"
+      }
+    },
+    {
+      "id": "major_21",
+      "numeral": "XXI",
+      "nameEn": "The World",
+      "nameCn": "世界",
+      "suit": "major",
+      "upright": {
+        "meaning": "你到了。不是终点，是一个圆满的完成。这段旅程里学到的、经历的、改变的——都成了你自己的一部分。带着这些，准备好踏入下一个周期。",
+        "keywords": "完满 · 成就 · 圆满 · 一个阶段真正完成"
+      },
+      "reversed": {
+        "meaning": "差一步到终点，但在这里卡住了——可能是怕结束，可能是怕完成之后\"然后呢\"。或者在骗自己已经完成了，其实还有一些真实的东西没有收尾。",
+        "keywords": "未完成 · 差一步 · 逃避收尾 · 圆满感缺失"
+      }
+    },
+    {
+      "id": "wands_ace",
+      "numeral": "",
+      "nameEn": "Ace of Wands",
+      "nameCn": "权杖王牌",
+      "symbol": "🪄",
+      "suit": "wands",
+      "upright": {
+        "meaning": "新的灵感，创造力的火花，热情的开始。",
+        "keywords": "灵感 · 热情 · 新开始 · 潜力"
+      },
+      "reversed": {
+        "meaning": "延迟的开始，创意受阻，缺乏动力。",
+        "keywords": "延迟 · 受阻 · 缺乏动力 · 犹豫"
+      }
+    },
+    {
+      "id": "wands_2",
+      "numeral": "",
+      "nameEn": "Two of Wands",
+      "nameCn": "权杖二",
+      "symbol": "🪄",
+      "suit": "wands",
+      "upright": {
+        "meaning": "规划未来，做出决定，掌握主动权。",
+        "keywords": "规划 · 决定 · 主动 · 远见"
+      },
+      "reversed": {
+        "meaning": "缺乏计划，恐惧未知，犹豫不决。",
+        "keywords": "无计划 · 恐惧 · 犹豫 · 短视"
+      }
+    },
+    {
+      "id": "wands_3",
+      "numeral": "",
+      "nameEn": "Three of Wands",
+      "nameCn": "权杖三",
+      "symbol": "🪄",
+      "suit": "wands",
+      "upright": {
+        "meaning": "拓展视野，等待成果，远方的机遇。",
+        "keywords": "拓展 · 远见 · 等待 · 机遇"
+      },
+      "reversed": {
+        "meaning": "回避挑战，视野狭隘，成果延迟。",
+        "keywords": "回避 · 狭隘 · 延迟 · 受挫"
+      }
+    },
+    {
+      "id": "wands_4",
+      "numeral": "",
+      "nameEn": "Four of Wands",
+      "nameCn": "权杖四",
+      "symbol": "🪄",
+      "suit": "wands",
+      "upright": {
+        "meaning": "庆祝，稳定，和谐的家庭，里程碑。",
+        "keywords": "庆祝 · 稳定 · 和谐 · 归属"
+      },
+      "reversed": {
+        "meaning": "缺乏稳定感，过渡期的不安。",
+        "keywords": "不安 · 过渡 · 不稳定 · 缺乏归属"
+      }
+    },
+    {
+      "id": "wands_5",
+      "numeral": "",
+      "nameEn": "Five of Wands",
+      "nameCn": "权杖五",
+      "symbol": "🪄",
+      "suit": "wands",
+      "upright": {
+        "meaning": "竞争，冲突，不同意见的碰撞，成长的摩擦。",
+        "keywords": "竞争 · 冲突 · 碰撞 · 挑战"
+      },
+      "reversed": {
+        "meaning": "避免冲突，内在矛盾，寻求和解。",
+        "keywords": "回避 · 内耗 · 和解 · 妥协"
+      }
+    },
+    {
+      "id": "wands_6",
+      "numeral": "",
+      "nameEn": "Six of Wands",
+      "nameCn": "权杖六",
+      "symbol": "🪄",
+      "suit": "wands",
+      "upright": {
+        "meaning": "胜利，认可，公众的赞誉，信心增长。",
+        "keywords": "胜利 · 认可 · 赞誉 · 信心"
+      },
+      "reversed": {
+        "meaning": "自我怀疑，缺乏认可，失败感。",
+        "keywords": "怀疑 · 不被认可 · 失败 · 挫折"
+      }
+    },
+    {
+      "id": "wands_7",
+      "numeral": "",
+      "nameEn": "Seven of Wands",
+      "nameCn": "权杖七",
+      "symbol": "🪄",
+      "suit": "wands",
+      "upright": {
+        "meaning": "坚守立场，捍卫信念，面对挑战不退缩。",
+        "keywords": "坚守 · 捍卫 · 勇气 · 不退缩"
+      },
+      "reversed": {
+        "meaning": "不堪重负，放弃抵抗，力不从心。",
+        "keywords": "重负 · 放弃 · 力竭 · 被动"
+      }
+    },
+    {
+      "id": "wands_8",
+      "numeral": "",
+      "nameEn": "Eight of Wands",
+      "nameCn": "权杖八",
+      "symbol": "🪄",
+      "suit": "wands",
+      "upright": {
+        "meaning": "迅速行动，消息到来，事情加速推进。",
+        "keywords": "迅速 · 消息 · 加速 · 进展"
+      },
+      "reversed": {
+        "meaning": "延迟，等待中的焦虑，方向不明。",
+        "keywords": "延迟 · 焦虑 · 不明 · 停滞"
+      }
+    },
+    {
+      "id": "wands_9",
+      "numeral": "",
+      "nameEn": "Nine of Wands",
+      "nameCn": "权杖九",
+      "symbol": "🪄",
+      "suit": "wands",
+      "upright": {
+        "meaning": "坚韧，警惕，从经验中学到的力量。",
+        "keywords": "坚韧 · 警惕 · 经验 · 准备"
+      },
+      "reversed": {
+        "meaning": "过度防卫，偏执，疲惫不堪。",
+        "keywords": "防卫 · 偏执 · 疲惫 · 多疑"
+      }
+    },
+    {
+      "id": "wands_10",
+      "numeral": "",
+      "nameEn": "Ten of Wands",
+      "nameCn": "权杖十",
+      "symbol": "🪄",
+      "suit": "wands",
+      "upright": {
+        "meaning": "负担过重，责任太多，但仍在坚持。",
+        "keywords": "重担 · 责任 · 坚持 · 压力"
+      },
+      "reversed": {
+        "meaning": "学会放下，委托他人，减轻负担。",
+        "keywords": "放下 · 委托 · 减压 · 释放"
+      }
+    },
+    {
+      "id": "wands_page",
+      "numeral": "",
+      "nameEn": "Page of Wands",
+      "nameCn": "权杖侍从",
+      "symbol": "🪄",
+      "suit": "wands",
+      "upright": {
+        "meaning": "好消息，新的热情，探索的精神。",
+        "keywords": "好消息 · 热情 · 探索 · 好奇"
+      },
+      "reversed": {
+        "meaning": "缺乏方向，三分钟热度，犹豫不定。",
+        "keywords": "缺方向 · 三分钟热度 · 犹豫 · 肤浅"
+      }
+    },
+    {
+      "id": "wands_knight",
+      "numeral": "",
+      "nameEn": "Knight of Wands",
+      "nameCn": "权杖骑士",
+      "symbol": "🪄",
+      "suit": "wands",
+      "upright": {
+        "meaning": "充满激情的行动，冒险精神，勇往直前。",
+        "keywords": "激情 · 冒险 · 行动 · 勇敢"
+      },
+      "reversed": {
+        "meaning": "冲动，鲁莽，缺乏深思熟虑。",
+        "keywords": "冲动 · 鲁莽 · 轻率 · 急躁"
+      }
+    },
+    {
+      "id": "wands_queen",
+      "numeral": "",
+      "nameEn": "Queen of Wands",
+      "nameCn": "权杖王后",
+      "symbol": "🪄",
+      "suit": "wands",
+      "upright": {
+        "meaning": "自信，温暖，独立，充满魅力的能量。",
+        "keywords": "自信 · 温暖 · 独立 · 魅力"
+      },
+      "reversed": {
+        "meaning": "自我怀疑，嫉妒，情绪不稳。",
+        "keywords": "怀疑 · 嫉妒 · 情绪化 · 不安"
+      }
+    },
+    {
+      "id": "wands_king",
+      "numeral": "",
+      "nameEn": "King of Wands",
+      "nameCn": "权杖国王",
+      "symbol": "🪄",
+      "suit": "wands",
+      "upright": {
+        "meaning": "领导力，远见，大胆的决策，激励他人。",
+        "keywords": "领导 · 远见 · 决策 · 激励"
+      },
+      "reversed": {
+        "meaning": "傲慢，独断专行，期望过高。",
+        "keywords": "傲慢 · 独断 · 过高期望 · 急躁"
+      }
+    },
+    {
+      "id": "cups_ace",
+      "numeral": "",
+      "nameEn": "Ace of Cups",
+      "nameCn": "圣杯王牌",
+      "symbol": "🏆",
+      "suit": "cups",
+      "upright": {
+        "meaning": "新的情感，爱的开始，直觉的涌现，内心的满足。",
+        "keywords": "新感情 · 爱 · 直觉 · 满足"
+      },
+      "reversed": {
+        "meaning": "情感压抑，爱的机会被错过，空虚感。",
+        "keywords": "压抑 · 错过 · 空虚 · 封闭"
+      }
+    },
+    {
+      "id": "cups_2",
+      "numeral": "",
+      "nameEn": "Two of Cups",
+      "nameCn": "圣杯二",
+      "symbol": "🏆",
+      "suit": "cups",
+      "upright": {
+        "meaning": "伙伴关系，互相吸引，平等的连接。",
+        "keywords": "伙伴 · 吸引 · 连接 · 平等"
+      },
+      "reversed": {
+        "meaning": "关系失衡，沟通障碍，缺乏信任。",
+        "keywords": "失衡 · 障碍 · 不信任 · 疏离"
+      }
+    },
+    {
+      "id": "cups_3",
+      "numeral": "",
+      "nameEn": "Three of Cups",
+      "nameCn": "圣杯三",
+      "symbol": "🏆",
+      "suit": "cups",
+      "upright": {
+        "meaning": "友谊，庆祝，社交的快乐，共同的喜悦。",
+        "keywords": "友谊 · 庆祝 · 社交 · 喜悦"
+      },
+      "reversed": {
+        "meaning": "过度放纵，社交疲劳，表面的快乐。",
+        "keywords": "放纵 · 疲劳 · 表面 · 孤立"
+      }
+    },
+    {
+      "id": "cups_4",
+      "numeral": "",
+      "nameEn": "Four of Cups",
+      "nameCn": "圣杯四",
+      "symbol": "🏆",
+      "suit": "cups",
+      "upright": {
+        "meaning": "冷漠，无聊，错失机会，对现有的不满足。",
+        "keywords": "冷漠 · 无聊 · 忽视 · 不满"
+      },
+      "reversed": {
+        "meaning": "重新看见，感恩，接受新的可能。",
+        "keywords": "重新看见 · 感恩 · 接受 · 觉醒"
+      }
+    },
+    {
+      "id": "cups_5",
+      "numeral": "",
+      "nameEn": "Five of Cups",
+      "nameCn": "圣杯五",
+      "symbol": "🏆",
+      "suit": "cups",
+      "upright": {
+        "meaning": "失落，遗憾，关注失去的而忽略拥有的。",
+        "keywords": "失落 · 遗憾 · 悲伤 · 忽略"
+      },
+      "reversed": {
+        "meaning": "接受与放下，从失落中恢复，向前看。",
+        "keywords": "接受 · 放下 · 恢复 · 前行"
+      }
+    },
+    {
+      "id": "cups_6",
+      "numeral": "",
+      "nameEn": "Six of Cups",
+      "nameCn": "圣杯六",
+      "symbol": "🏆",
+      "suit": "cups",
+      "upright": {
+        "meaning": "怀旧，童年记忆，纯真，过去的温暖。",
+        "keywords": "怀旧 · 记忆 · 纯真 · 温暖"
+      },
+      "reversed": {
+        "meaning": "活在过去，不切实际的回忆，逃避现实。",
+        "keywords": "沉溺过去 · 不切实际 · 逃避 · 幻想"
+      }
+    },
+    {
+      "id": "cups_7",
+      "numeral": "",
+      "nameEn": "Seven of Cups",
+      "nameCn": "圣杯七",
+      "symbol": "🏆",
+      "suit": "cups",
+      "upright": {
+        "meaning": "幻想，选择太多，白日梦，需要回到现实。",
+        "keywords": "幻想 · 选择 · 白日梦 · 迷惑"
+      },
+      "reversed": {
+        "meaning": "回归现实，做出选择，脚踏实地。",
+        "keywords": "现实 · 选择 · 聚焦 · 清醒"
+      }
+    },
+    {
+      "id": "cups_8",
+      "numeral": "",
+      "nameEn": "Eight of Cups",
+      "nameCn": "圣杯八",
+      "symbol": "🏆",
+      "suit": "cups",
+      "upright": {
+        "meaning": "离开，放弃不再有意义的事物，寻找更深的意义。",
+        "keywords": "离开 · 放弃 · 寻找 · 深层意义"
+      },
+      "reversed": {
+        "meaning": "恐惧改变，不愿离开舒适区。",
+        "keywords": "恐惧 · 不愿离开 · 执着 · 停滞"
+      }
+    },
+    {
+      "id": "cups_9",
+      "numeral": "",
+      "nameEn": "Nine of Cups",
+      "nameCn": "圣杯九",
+      "symbol": "🏆",
+      "suit": "cups",
+      "upright": {
+        "meaning": "心愿达成，满足感，情感上的富足。",
+        "keywords": "心愿 · 满足 · 富足 · 幸福"
+      },
+      "reversed": {
+        "meaning": "贪婪，不满足，物质主义。",
+        "keywords": "贪婪 · 不满足 · 空虚 · 物质化"
+      }
+    },
+    {
+      "id": "cups_10",
+      "numeral": "",
+      "nameEn": "Ten of Cups",
+      "nameCn": "圣杯十",
+      "symbol": "🏆",
+      "suit": "cups",
+      "upright": {
+        "meaning": "情感的圆满，家庭幸福，深层的和谐与爱。",
+        "keywords": "圆满 · 幸福 · 和谐 · 爱"
+      },
+      "reversed": {
+        "meaning": "家庭矛盾，情感不和谐，理想与现实的差距。",
+        "keywords": "矛盾 · 不和谐 · 差距 · 失望"
+      }
+    },
+    {
+      "id": "cups_page",
+      "numeral": "",
+      "nameEn": "Page of Cups",
+      "nameCn": "圣杯侍从",
+      "symbol": "🏆",
+      "suit": "cups",
+      "upright": {
+        "meaning": "情感的新消息，浪漫的开始，直觉的信号。",
+        "keywords": "消息 · 浪漫 · 直觉 · 敏感"
+      },
+      "reversed": {
+        "meaning": "情绪化，不成熟的情感表达。",
+        "keywords": "情绪化 · 不成熟 · 脆弱 · 幻想"
+      }
+    },
+    {
+      "id": "cups_knight",
+      "numeral": "",
+      "nameEn": "Knight of Cups",
+      "nameCn": "圣杯骑士",
+      "symbol": "🏆",
+      "suit": "cups",
+      "upright": {
+        "meaning": "浪漫的追求者，跟随内心，理想主义。",
+        "keywords": "浪漫 · 追随内心 · 理想 · 温柔"
+      },
+      "reversed": {
+        "meaning": "情绪不稳，不切实际的浪漫，逃避。",
+        "keywords": "不稳 · 不切实际 · 逃避 · 善变"
+      }
+    },
+    {
+      "id": "cups_queen",
+      "numeral": "",
+      "nameEn": "Queen of Cups",
+      "nameCn": "圣杯王后",
+      "symbol": "🏆",
+      "suit": "cups",
+      "upright": {
+        "meaning": "共情，关怀，情感的安全感，直觉力强。",
+        "keywords": "共情 · 关怀 · 安全感 · 直觉"
+      },
+      "reversed": {
+        "meaning": "过度情绪化，依赖，失去自我边界。",
+        "keywords": "情绪化 · 依赖 · 失去边界 · 不安"
+      }
+    },
+    {
+      "id": "cups_king",
+      "numeral": "",
+      "nameEn": "King of Cups",
+      "nameCn": "圣杯国王",
+      "symbol": "🏆",
+      "suit": "cups",
+      "upright": {
+        "meaning": "情感的成熟，平静的力量，智慧与慈悲。",
+        "keywords": "成熟 · 平静 · 智慧 · 慈悲"
+      },
+      "reversed": {
+        "meaning": "情感操控，压抑情绪，冷漠。",
+        "keywords": "操控 · 压抑 · 冷漠 · 不表达"
+      }
+    },
+    {
+      "id": "swords_ace",
+      "numeral": "",
+      "nameEn": "Ace of Swords",
+      "nameCn": "宝剑王牌",
+      "symbol": "⚔️",
+      "suit": "swords",
+      "upright": {
+        "meaning": "清晰的思维，突破，真相，新的理解。",
+        "keywords": "清晰 · 突破 · 真相 · 理解"
+      },
+      "reversed": {
+        "meaning": "思维混乱，误用理智，无法看清。",
+        "keywords": "混乱 · 误用 · 模糊 · 迷惑"
+      }
+    },
+    {
+      "id": "swords_2",
+      "numeral": "",
+      "nameEn": "Two of Swords",
+      "nameCn": "宝剑二",
+      "symbol": "⚔️",
+      "suit": "swords",
+      "upright": {
+        "meaning": "抉择困难，需要平衡，暂时的回避。",
+        "keywords": "抉择 · 平衡 · 回避 · 僵局"
+      },
+      "reversed": {
+        "meaning": "信息过载，无法做出选择，焦虑。",
+        "keywords": "过载 · 犹豫 · 焦虑 · 纠结"
+      }
+    },
+    {
+      "id": "swords_3",
+      "numeral": "",
+      "nameEn": "Three of Swords",
+      "nameCn": "宝剑三",
+      "symbol": "⚔️",
+      "suit": "swords",
+      "upright": {
+        "meaning": "心痛，悲伤，失去，情感的伤口。",
+        "keywords": "心痛 · 悲伤 · 失去 · 伤痛"
+      },
+      "reversed": {
+        "meaning": "从伤痛中恢复，原谅，伤口在愈合。",
+        "keywords": "恢复 · 原谅 · 愈合 · 释放"
+      }
+    },
+    {
+      "id": "swords_4",
+      "numeral": "",
+      "nameEn": "Four of Swords",
+      "nameCn": "宝剑四",
+      "symbol": "⚔️",
+      "suit": "swords",
+      "upright": {
+        "meaning": "休息，恢复，静养，暂时退出。需要给自己时间。",
+        "keywords": "休息 · 恢复 · 静养 · 退后"
+      },
+      "reversed": {
+        "meaning": "焦躁不安，被迫行动，休息不够。",
+        "keywords": "焦躁 · 被迫 · 不安 · 精疲力竭"
+      }
+    },
+    {
+      "id": "swords_5",
+      "numeral": "",
+      "nameEn": "Five of Swords",
+      "nameCn": "宝剑五",
+      "symbol": "⚔️",
+      "suit": "swords",
+      "upright": {
+        "meaning": "冲突，不光彩的胜利，自私的行为。",
+        "keywords": "冲突 · 不光彩 · 自私 · 争斗"
+      },
+      "reversed": {
+        "meaning": "和解的可能，从冲突中学习。",
+        "keywords": "和解 · 学习 · 放下 · 反思"
+      }
+    },
+    {
+      "id": "swords_6",
+      "numeral": "",
+      "nameEn": "Six of Swords",
+      "nameCn": "宝剑六",
+      "symbol": "⚔️",
+      "suit": "swords",
+      "upright": {
+        "meaning": "过渡，离开困境，走向平静的水域。",
+        "keywords": "过渡 · 离开 · 平静 · 前行"
+      },
+      "reversed": {
+        "meaning": "困在原地，不愿面对改变。",
+        "keywords": "困住 · 不愿 · 拖延 · 抗拒"
+      }
+    },
+    {
+      "id": "swords_7",
+      "numeral": "",
+      "nameEn": "Seven of Swords",
+      "nameCn": "宝剑七",
+      "symbol": "⚔️",
+      "suit": "swords",
+      "upright": {
+        "meaning": "策略，隐藏的行动，需要智慧和谨慎。",
+        "keywords": "策略 · 隐藏 · 智慧 · 谨慎"
+      },
+      "reversed": {
+        "meaning": "谎言暴露，计划失败，缺乏诚信。",
+        "keywords": "暴露 · 失败 · 不诚 · 自欺"
+      }
+    },
+    {
+      "id": "swords_8",
+      "numeral": "",
+      "nameEn": "Eight of Swords",
+      "nameCn": "宝剑八",
+      "symbol": "⚔️",
+      "suit": "swords",
+      "upright": {
+        "meaning": "困境，受限，感觉无路可走。但限制往往是自己设的。",
+        "keywords": "困境 · 受限 · 无力 · 自我设限"
+      },
+      "reversed": {
+        "meaning": "解脱的开始，看到出路，挣脱枷锁。",
+        "keywords": "解脱 · 出路 · 挣脱 · 觉醒"
+      }
+    },
+    {
+      "id": "swords_9",
+      "numeral": "",
+      "nameEn": "Nine of Swords",
+      "nameCn": "宝剑九",
+      "symbol": "⚔️",
+      "suit": "swords",
+      "upright": {
+        "meaning": "焦虑，噩梦，过度担忧，深夜的恐惧。",
+        "keywords": "焦虑 · 担忧 · 恐惧 · 失眠"
+      },
+      "reversed": {
+        "meaning": "走出焦虑，找到希望，最坏的已过去。",
+        "keywords": "走出 · 希望 · 释然 · 恢复"
+      }
+    },
+    {
+      "id": "swords_10",
+      "numeral": "",
+      "nameEn": "Ten of Swords",
+      "nameCn": "宝剑十",
+      "symbol": "⚔️",
+      "suit": "swords",
+      "upright": {
+        "meaning": "触底，终结，痛苦的结束。最低谷也是转折点。",
+        "keywords": "触底 · 终结 · 痛苦 · 转折"
+      },
+      "reversed": {
+        "meaning": "恢复的开始，不愿放手旧痛，缓慢疗愈。",
+        "keywords": "恢复 · 不放手 · 疗愈 · 缓慢"
+      }
+    },
+    {
+      "id": "swords_page",
+      "numeral": "",
+      "nameEn": "Page of Swords",
+      "nameCn": "宝剑侍从",
+      "symbol": "⚔️",
+      "suit": "swords",
+      "upright": {
+        "meaning": "新想法，好奇心，求知欲，冷静的观察。",
+        "keywords": "新想法 · 好奇 · 求知 · 观察"
+      },
+      "reversed": {
+        "meaning": "缺乏深度思考，言语伤人，冷漠。",
+        "keywords": "肤浅 · 伤人 · 冷漠 · 八卦"
+      }
+    },
+    {
+      "id": "swords_knight",
+      "numeral": "",
+      "nameEn": "Knight of Swords",
+      "nameCn": "宝剑骑士",
+      "symbol": "⚔️",
+      "suit": "swords",
+      "upright": {
+        "meaning": "敏捷的思维，直言不讳，果断行动。",
+        "keywords": "敏捷 · 直言 · 果断 · 锐利"
+      },
+      "reversed": {
+        "meaning": "言辞过激，冲动行事，缺乏同理心。",
+        "keywords": "过激 · 冲动 · 无同理心 · 伤害"
+      }
+    },
+    {
+      "id": "swords_queen",
+      "numeral": "",
+      "nameEn": "Queen of Swords",
+      "nameCn": "宝剑王后",
+      "symbol": "⚔️",
+      "suit": "swords",
+      "upright": {
+        "meaning": "独立思考，清晰的判断，理性与感性的平衡。",
+        "keywords": "独立 · 清晰 · 判断 · 平衡"
+      },
+      "reversed": {
+        "meaning": "冷酷，过于理性，切断情感连接。",
+        "keywords": "冷酷 · 过度理性 · 断联 · 苛刻"
+      }
+    },
+    {
+      "id": "swords_king",
+      "numeral": "",
+      "nameEn": "King of Swords",
+      "nameCn": "宝剑国王",
+      "symbol": "⚔️",
+      "suit": "swords",
+      "upright": {
+        "meaning": "理性权威，清晰的思维，公正的决策。",
+        "keywords": "理性 · 权威 · 清晰 · 公正"
+      },
+      "reversed": {
+        "meaning": "思维僵化，滥用权力，冷漠专制。",
+        "keywords": "僵化 · 滥用 · 冷漠 · 独裁"
+      }
+    },
+    {
+      "id": "pentacles_ace",
+      "numeral": "",
+      "nameEn": "Ace of Pentacles",
+      "nameCn": "星币王牌",
+      "symbol": "⭐",
+      "suit": "pentacles",
+      "upright": {
+        "meaning": "新的物质机会，繁荣的种子，务实的开始。",
+        "keywords": "机会 · 繁荣 · 务实 · 种子"
+      },
+      "reversed": {
+        "meaning": "错失良机，财务不稳，缺乏规划。",
+        "keywords": "错失 · 不稳 · 缺乏规划 · 短视"
+      }
+    },
+    {
+      "id": "pentacles_2",
+      "numeral": "",
+      "nameEn": "Two of Pentacles",
+      "nameCn": "星币二",
+      "symbol": "⭐",
+      "suit": "pentacles",
+      "upright": {
+        "meaning": "平衡多个方面，灵活应对，适应变化。",
+        "keywords": "平衡 · 灵活 · 适应 · 多任务"
+      },
+      "reversed": {
+        "meaning": "失去平衡，分身乏术，顾此失彼。",
+        "keywords": "失衡 · 分身乏术 · 混乱 · 焦虑"
+      }
+    },
+    {
+      "id": "pentacles_3",
+      "numeral": "",
+      "nameEn": "Three of Pentacles",
+      "nameCn": "星币三",
+      "symbol": "⭐",
+      "suit": "pentacles",
+      "upright": {
+        "meaning": "团队合作，技能的提升，认真学习。",
+        "keywords": "合作 · 技能 · 学习 · 匠心"
+      },
+      "reversed": {
+        "meaning": "缺乏合作，敷衍了事，不求进步。",
+        "keywords": "缺合作 · 敷衍 · 不求进 · 马虎"
+      }
+    },
+    {
+      "id": "pentacles_4",
+      "numeral": "",
+      "nameEn": "Four of Pentacles",
+      "nameCn": "星币四",
+      "symbol": "⭐",
+      "suit": "pentacles",
+      "upright": {
+        "meaning": "稳固，安全感，保护资源，守住成果。",
+        "keywords": "稳固 · 安全 · 保护 · 守住"
+      },
+      "reversed": {
+        "meaning": "过度吝啬，控制欲强，不愿分享。",
+        "keywords": "吝啬 · 控制 · 不分享 · 贪婪"
+      }
+    },
+    {
+      "id": "pentacles_5",
+      "numeral": "",
+      "nameEn": "Five of Pentacles",
+      "nameCn": "星币五",
+      "symbol": "⭐",
+      "suit": "pentacles",
+      "upright": {
+        "meaning": "困难时期，物质上的不安，需要帮助。",
+        "keywords": "困难 · 不安 · 匮乏 · 需要帮助"
+      },
+      "reversed": {
+        "meaning": "走出困境，开始恢复，找到支持。",
+        "keywords": "走出 · 恢复 · 支持 · 希望"
+      }
+    },
+    {
+      "id": "pentacles_6",
+      "numeral": "",
+      "nameEn": "Six of Pentacles",
+      "nameCn": "星币六",
+      "symbol": "⭐",
+      "suit": "pentacles",
+      "upright": {
+        "meaning": "慷慨，给予与接受，资源的流通。",
+        "keywords": "慷慨 · 给予 · 接受 · 流通"
+      },
+      "reversed": {
+        "meaning": "自私，债务，给予的不平等。",
+        "keywords": "自私 · 债务 · 不平等 · 贪取"
+      }
+    },
+    {
+      "id": "pentacles_7",
+      "numeral": "",
+      "nameEn": "Seven of Pentacles",
+      "nameCn": "星币七",
+      "symbol": "⭐",
+      "suit": "pentacles",
+      "upright": {
+        "meaning": "耐心等待，长期投资，播种后的等待。",
+        "keywords": "耐心 · 投资 · 等待 · 播种"
+      },
+      "reversed": {
+        "meaning": "急于求成，缺乏耐心，放弃太早。",
+        "keywords": "急躁 · 缺耐心 · 放弃 · 短视"
+      }
+    },
+    {
+      "id": "pentacles_8",
+      "numeral": "",
+      "nameEn": "Eight of Pentacles",
+      "nameCn": "星币八",
+      "symbol": "⭐",
+      "suit": "pentacles",
+      "upright": {
+        "meaning": "精益求精，专注技艺，匠心精神。",
+        "keywords": "精进 · 专注 · 匠心 · 品质"
+      },
+      "reversed": {
+        "meaning": "缺乏热情，重复无意义的工作，倦怠。",
+        "keywords": "缺热情 · 重复 · 倦怠 · 无意义"
+      }
+    },
+    {
+      "id": "pentacles_9",
+      "numeral": "",
+      "nameEn": "Nine of Pentacles",
+      "nameCn": "星币九",
+      "symbol": "⭐",
+      "suit": "pentacles",
+      "upright": {
+        "meaning": "丰收，独立，物质与精神的富足。",
+        "keywords": "丰收 · 独立 · 富足 · 享受"
+      },
+      "reversed": {
+        "meaning": "过度追求物质，忽略精神层面。",
+        "keywords": "过度物质 · 忽略精神 · 不满 · 孤独"
+      }
+    },
+    {
+      "id": "pentacles_10",
+      "numeral": "",
+      "nameEn": "Ten of Pentacles",
+      "nameCn": "星币十",
+      "symbol": "⭐",
+      "suit": "pentacles",
+      "upright": {
+        "meaning": "财富传承，家族，长久的稳定与成功。",
+        "keywords": "传承 · 家族 · 稳定 · 成功"
+      },
+      "reversed": {
+        "meaning": "家族负担，财务问题，不稳定的根基。",
+        "keywords": "负担 · 问题 · 不稳 · 破裂"
+      }
+    },
+    {
+      "id": "pentacles_page",
+      "numeral": "",
+      "nameEn": "Page of Pentacles",
+      "nameCn": "星币侍从",
+      "symbol": "⭐",
+      "suit": "pentacles",
+      "upright": {
+        "meaning": "学习新技能，务实的计划，好的开始。",
+        "keywords": "学习 · 务实 · 计划 · 新手"
+      },
+      "reversed": {
+        "meaning": "缺乏方向，不切实际，三分钟热度。",
+        "keywords": "缺方向 · 不切实际 · 浮躁 · 懒散"
+      }
+    },
+    {
+      "id": "pentacles_knight",
+      "numeral": "",
+      "nameEn": "Knight of Pentacles",
+      "nameCn": "星币骑士",
+      "symbol": "⭐",
+      "suit": "pentacles",
+      "upright": {
+        "meaning": "勤恳，可靠，稳步前进，踏实工作。",
+        "keywords": "勤恳 · 可靠 · 稳步 · 踏实"
+      },
+      "reversed": {
+        "meaning": "过于保守，无聊，停滞不前。",
+        "keywords": "保守 · 无聊 · 停滞 · 固执"
+      }
+    },
+    {
+      "id": "pentacles_queen",
+      "numeral": "",
+      "nameEn": "Queen of Pentacles",
+      "nameCn": "星币王后",
+      "symbol": "⭐",
+      "suit": "pentacles",
+      "upright": {
+        "meaning": "务实的关怀，富足的生活，安全与舒适。",
+        "keywords": "务实 · 关怀 · 富足 · 安全"
+      },
+      "reversed": {
+        "meaning": "过于关注物质，忽略情感需求。",
+        "keywords": "物质化 · 忽略情感 · 不安 · 控制"
+      }
+    },
+    {
+      "id": "pentacles_king",
+      "numeral": "",
+      "nameEn": "King of Pentacles",
+      "nameCn": "星币国王",
+      "symbol": "⭐",
+      "suit": "pentacles",
+      "upright": {
+        "meaning": "财务上的成功与稳定，成熟的决策。",
+        "keywords": "成功 · 稳定 · 成熟 · 决策"
+      },
+      "reversed": {
+        "meaning": "过于功利，物质至上，缺乏人情味。",
+        "keywords": "功利 · 物质至上 · 冷淡 · 贪婪"
+      }
+    }
+  ],
+  "spreads": {
+    "1": {
+      "name": "单张抽牌",
+      "labels": [
+        "启示"
+      ]
+    },
+    "3": {
+      "name": "时光之流",
+      "labels": [
+        "过去",
+        "现在",
+        "未来"
+      ]
+    },
+    "5": {
+      "name": "五芒启示",
+      "labels": [
+        "现况",
+        "障碍",
+        "建议",
+        "环境",
+        "结果"
+      ]
+    }
+  }
+}
