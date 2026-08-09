@@ -1273,10 +1273,16 @@ function buildAnthropicMessages(messages, dynamicContext) {
     }
   }
 
-  // 缓存断点打**两个**：滚动式的读写分离，位置按绝对网格量化。
+  // 缓存断点打两个：按真实对话轮次找「上一轮读点 + 本轮写点」，不再按消息数量猜。
   //
-  // 深拷贝避免 cache_control 写回 store（否则旧消息会累积断点）。
-  // TTL 1h：对话间隔常超 5min，1h 命中稳定且白天持续聊基本不过期
+  // 一条 assistant 回复会被 [MSG] 拆成多个气泡，还可能夹着 thinking / tool_use；
+  // 因此「每 6 条消息一个锚点」并不等于固定轮次，跨格时容易错过上一轮真正写过的位置。
+  // 这里以最后一条 user/tool_result（它承载每轮动态上下文）为动态后缀：
+  // - writeIdx：它前面的最后一个稳定块，写入本轮最长可复用前缀；
+  // - readIdx：再往前一轮 user 前的稳定块，正是上一轮曾写过的位置。
+  // system + read + write 共 3 个断点，不超过 Anthropic 的 4 个上限。
+  //
+  // 深拷贝避免 cache_control 写回 store；TTL 1h 覆盖日常稍长的聊天间隔。
   const mark = (i) => {
     const m = out[i]
     if (!m) return
@@ -1289,25 +1295,21 @@ function buildAnthropicMessages(messages, dynamicContext) {
       out[i] = { ...m, content: blocks }
     }
   }
-  // ⚠️ 断点位置必须**锚点量化**，不能从末尾倒数（跟 applyContextLimit、图片降级
-  // 边界是同一个道理，这是第三次在同一个坑里栽）。
-  //
-  // 「倒数第四条」本来是想指向上一轮写缓存的位置，前提是每轮固定追加两条
-  // （user + assistant）。但实际不固定：assistant 回复会按 [MSG] 拆成 2-3 个气泡，
-  // 合并同角色时又因为第一条带 thinking 而拒绝合并（见 Chat/index.jsx 的合并条件），
-  // 于是每轮追加 2~4 条不等。倒数第四条因此几乎从不落在真正写过缓存的位置上——
-  // 症状就是阿颖 0727 看到的：每轮都写，一次没读。写按 1.25 倍收钱，纯亏。
-  //
-  // 改成绝对网格：位置 = 向下取整到 STEP 的倍数。同一格内断点纹丝不动，于是连着
-  // 好几轮读写同一个位置；跨格时新写点 = 旧写点 + STEP，读点正好落回旧写点，
-  // 仍是精确命中。追加不会移动已有消息的下标，所以网格是稳的。
-  // （模拟 30 轮、每轮随机追加 2~4 条：新写法读点 27/27 命中已写位置，旧写法错 15 次）
-  const STEP = 6
-  const w = Math.floor((out.length - 2) / STEP) * STEP  // 写：本格锚点（保证不落在最后一条上）
-  const r = w - STEP                                     // 读：上一格锚点，前几轮就写在这儿
-  if (r >= 0) mark(r)
-  if (w > 0) mark(w)
-  else mark(out.length >= 2 ? out.length - 2 : out.length - 1)  // 消息还很少时退回原打法
+
+  let lastUserIdx = -1
+  for (let i = out.length - 1; i >= 0; i--) {
+    if (out[i]?.role === 'user') { lastUserIdx = i; break }
+  }
+  const writeIdx = lastUserIdx > 0 ? lastUserIdx - 1 : -1
+
+  let previousUserIdx = -1
+  for (let i = writeIdx - 1; i >= 0; i--) {
+    if (out[i]?.role === 'user') { previousUserIdx = i; break }
+  }
+  const readIdx = previousUserIdx > 0 ? previousUserIdx - 1 : -1
+
+  if (readIdx >= 0) mark(readIdx)
+  if (writeIdx >= 0 && writeIdx !== readIdx) mark(writeIdx)
   return redactDeep(out)
 }
 
