@@ -446,7 +446,11 @@ async function callWithTools({
       // 粘性路由键：中转站背后是一堆后端节点，不带这个字段同一个对话可能每轮
       // 落到不同节点上——缓存写在 A 读不到，于是「只写不读」，写还按 1.25 倍收钱。
       // 用每个对话一个稳定 id（不是全局固定），不同对话不互相挤同一个节点。（0726）
-      if (cacheKey) body.user = cacheKey
+      if (cacheKey) {
+        // user 保留给会拿它做粘性路由的中转站；prompt_cache_key 是 OpenAI 官方缓存路由键。
+        body.user = cacheKey
+        body.prompt_cache_key = cacheKey
+      }
       if (isReasoningModel(model)) {
         body.max_completion_tokens = maxTokens
       } else {
@@ -457,7 +461,14 @@ async function callWithTools({
       let resp = await fetch(url, { method: 'POST', headers: hdrs, body: JSON.stringify(body) })
       if (!resp.ok && resp.status === 400) {
         let errText = await resp.text()
-        if (body.tools && /tool|function|unsupported|invalid.*param/i.test(errText)) {
+        // 一些 OpenAI 兼容中转站还不认识官方 prompt_cache_key：只撤这个新字段重试，
+        // user 继续保留，避免把中转站原有的粘性路由一起弄丢。
+        if (body.prompt_cache_key && /prompt_cache_key|unknown|unrecognized|unsupported|extra (?:field|input|parameter)/i.test(errText)) {
+          delete body.prompt_cache_key
+          resp = await fetch(url, { method: 'POST', headers: hdrs, body: JSON.stringify(body) })
+          if (!resp.ok && resp.status === 400) errText = await resp.text()
+        }
+        if (!resp.ok && body.tools && /tool|function|unsupported|invalid.*param/i.test(errText)) {
           delete body.tools; delete body.tool_choice
           resp = await fetch(url, { method: 'POST', headers: hdrs, body: JSON.stringify(body) })
           if (!resp.ok && resp.status === 400) errText = await resp.text()
@@ -476,7 +487,8 @@ async function callWithTools({
       lastFinish = data.finish_reason
       if (data.usage) accUsage(usage, {
         // OpenAI 官方: prompt_tokens_details.cached_tokens；DeepSeek: prompt_cache_hit_tokens
-        p: data.usage.promptTokens, c: data.usage.completionTokens, cached: data.usage.cachedTokens,
+        p: data.usage.promptTokens, c: data.usage.completionTokens,
+        cached: data.usage.cachedTokens, cacheWrite: data.usage.cacheWriteTokens,
       })
       const msg = data.message
       if (msg.tool_calls?.length) {
@@ -635,7 +647,11 @@ async function callStream({ connection, messages, systemPrompt, dynamicContext, 
     const url = buildApiUrl(connection.baseUrl, 'openai')
     const bodyMsgs = buildOpenAIMessages(messages, systemPrompt, dynamicContext)
     const body = { model, messages: bodyMsgs, stream: true, stream_options: { include_usage: true } }
-    if (cacheKey) body.user = cacheKey // 粘性路由
+    if (cacheKey) {
+        // user 保留给会拿它做粘性路由的中转站；prompt_cache_key 是 OpenAI 官方缓存路由键。
+        body.user = cacheKey
+        body.prompt_cache_key = cacheKey
+      } // 粘性路由
     if (isReasoningModel(model)) {
       body.max_completion_tokens = maxTokens
     } else {
@@ -644,9 +660,17 @@ async function callStream({ connection, messages, systemPrompt, dynamicContext, 
     const hdrs = { 'Content-Type': 'application/json', Authorization: 'Bearer ' + connection.apiKey }
     let resp = await fetch(url, { method: 'POST', headers: hdrs, body: JSON.stringify(body) })
     if (!resp.ok && resp.status === 400) {
-      delete body.stream_options; delete body.temperature; delete body.max_tokens; delete body.user
-      body.max_completion_tokens = body.max_completion_tokens || maxTokens
-      resp = await fetch(url, { method: 'POST', headers: hdrs, body: JSON.stringify(body) })
+      let errText = await resp.text()
+      if (body.prompt_cache_key && /prompt_cache_key|unknown|unrecognized|unsupported|extra (?:field|input|parameter)/i.test(errText)) {
+        delete body.prompt_cache_key
+        resp = await fetch(url, { method: 'POST', headers: hdrs, body: JSON.stringify(body) })
+        if (!resp.ok && resp.status === 400) errText = await resp.text()
+      }
+      if (!resp.ok && resp.status === 400) {
+        delete body.stream_options; delete body.temperature; delete body.max_tokens; delete body.user; delete body.prompt_cache_key
+        body.max_completion_tokens = body.max_completion_tokens || maxTokens
+        resp = await fetch(url, { method: 'POST', headers: hdrs, body: JSON.stringify(body) })
+      }
     }
     if (!resp.ok) {
       const e = await resp.text()
@@ -665,7 +689,15 @@ async function callStream({ connection, messages, systemPrompt, dynamicContext, 
       return {
         promptTokens: json.usage.prompt_tokens,
         completionTokens: json.usage.completion_tokens,
-        cachedTokens: json.usage.prompt_tokens_details?.cached_tokens ?? json.usage.prompt_cache_hit_tokens ?? 0,
+        cachedTokens: json.usage.prompt_tokens_details?.cached_tokens
+          ?? json.usage.input_tokens_details?.cached_tokens
+          ?? json.usage.prompt_cache_hit_tokens
+          ?? json.usage.cache_read_input_tokens
+          ?? 0,
+        cacheWriteTokens: json.usage.prompt_tokens_details?.cache_write_tokens
+          ?? json.usage.input_tokens_details?.cache_write_tokens
+          ?? json.usage.cache_creation_input_tokens
+          ?? 0,
       }
     })
     return assertNotEmpty(out, { provider: 'OpenAI', finishReason })
@@ -800,7 +832,7 @@ async function streamOpenAIMessage(resp, onText, onThinking) {
   const decoder = new TextDecoder()
   const msg = { role: 'assistant', content: '' }
   const toolCalls = []
-  const usage = { promptTokens: 0, completionTokens: 0, cachedTokens: 0 }
+  const usage = { promptTokens: 0, completionTokens: 0, cachedTokens: 0, cacheWriteTokens: 0 }
   let finishReason = null
   let buf = ''
   let pending = ''   // 还没放行的正文
@@ -834,7 +866,9 @@ async function streamOpenAIMessage(resp, onText, onThinking) {
     if (json.usage) {
       usage.promptTokens = json.usage.prompt_tokens || 0
       usage.completionTokens = json.usage.completion_tokens || 0
-      usage.cachedTokens = json.usage.prompt_tokens_details?.cached_tokens ?? json.usage.prompt_cache_hit_tokens ?? 0
+      const details = json.usage.prompt_tokens_details || json.usage.input_tokens_details || {}
+      usage.cachedTokens = details.cached_tokens ?? json.usage.prompt_cache_hit_tokens ?? json.usage.cache_read_input_tokens ?? 0
+      usage.cacheWriteTokens = details.cache_write_tokens ?? json.usage.cache_creation_input_tokens ?? 0
     }
     const ch = json.choices?.[0]
     if (!ch) return
