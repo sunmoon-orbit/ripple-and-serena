@@ -703,7 +703,11 @@ export default function MessageBubble({ msg, onEdit, onQuote, onDelete, isLast }
             <span className="message-tokens">
               {msg.tokenUsage.totalTokens} tokens
               {msg.tokenUsage.cachedTokens > 0 && msg.tokenUsage.promptTokens > 0 &&
-                ` · 缓存${Math.round(msg.tokenUsage.cachedTokens / msg.tokenUsage.promptTokens * 100)}%`}
+                ` · 缓存命中${Math.round(msg.tokenUsage.cachedTokens / msg.tokenUsage.promptTokens * 100)}%`}
+              {msg.tokenUsage.cacheWriteTokens > 0 &&
+                ` · 缓存写入${msg.tokenUsage.cacheWriteTokens}`}
+              {!msg.tokenUsage.cachedTokens && !msg.tokenUsage.cacheWriteTokens && msg.tokenUsage.promptTokens > 0 &&
+                ' · 未命中'}
             </span>
           )}
           {isUser && !isStreaming && !editing && onEdit && (

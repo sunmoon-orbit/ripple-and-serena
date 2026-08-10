@@ -446,7 +446,11 @@ async function callWithTools({
       // 粘性路由键：中转站背后是一堆后端节点，不带这个字段同一个对话可能每轮
       // 落到不同节点上——缓存写在 A 读不到，于是「只写不读」，写还按 1.25 倍收钱。
       // 用每个对话一个稳定 id（不是全局固定），不同对话不互相挤同一个节点。（0726）
-      if (cacheKey) body.user = cacheKey
+      if (cacheKey) {
+        // user 保留给会拿它做粘性路由的中转站；prompt_cache_key 是 OpenAI 官方缓存路由键。
+        body.user = cacheKey
+        body.prompt_cache_key = cacheKey
+      }
       if (isReasoningModel(model)) {
         body.max_completion_tokens = maxTokens
       } else {
@@ -457,7 +461,14 @@ async function callWithTools({
       let resp = await fetch(url, { method: 'POST', headers: hdrs, body: JSON.stringify(body) })
       if (!resp.ok && resp.status === 400) {
         let errText = await resp.text()
-        if (body.tools && /tool|function|unsupported|invalid.*param/i.test(errText)) {
+        // 一些 OpenAI 兼容中转站还不认识官方 prompt_cache_key：只撤这个新字段重试，
+        // user 继续保留，避免把中转站原有的粘性路由一起弄丢。
+        if (body.prompt_cache_key && /prompt_cache_key|unknown|unrecognized|unsupported|extra (?:field|input|parameter)/i.test(errText)) {
+          delete body.prompt_cache_key
+          resp = await fetch(url, { method: 'POST', headers: hdrs, body: JSON.stringify(body) })
+          if (!resp.ok && resp.status === 400) errText = await resp.text()
+        }
+        if (!resp.ok && body.tools && /tool|function|unsupported|invalid.*param/i.test(errText)) {
           delete body.tools; delete body.tool_choice
           resp = await fetch(url, { method: 'POST', headers: hdrs, body: JSON.stringify(body) })
           if (!resp.ok && resp.status === 400) errText = await resp.text()
@@ -476,7 +487,8 @@ async function callWithTools({
       lastFinish = data.finish_reason
       if (data.usage) accUsage(usage, {
         // OpenAI 官方: prompt_tokens_details.cached_tokens；DeepSeek: prompt_cache_hit_tokens
-        p: data.usage.promptTokens, c: data.usage.completionTokens, cached: data.usage.cachedTokens,
+        p: data.usage.promptTokens, c: data.usage.completionTokens,
+        cached: data.usage.cachedTokens, cacheWrite: data.usage.cacheWriteTokens,
       })
       const msg = data.message
       if (msg.tool_calls?.length) {
@@ -635,7 +647,11 @@ async function callStream({ connection, messages, systemPrompt, dynamicContext, 
     const url = buildApiUrl(connection.baseUrl, 'openai')
     const bodyMsgs = buildOpenAIMessages(messages, systemPrompt, dynamicContext)
     const body = { model, messages: bodyMsgs, stream: true, stream_options: { include_usage: true } }
-    if (cacheKey) body.user = cacheKey // 粘性路由
+    if (cacheKey) {
+        // user 保留给会拿它做粘性路由的中转站；prompt_cache_key 是 OpenAI 官方缓存路由键。
+        body.user = cacheKey
+        body.prompt_cache_key = cacheKey
+      } // 粘性路由
     if (isReasoningModel(model)) {
       body.max_completion_tokens = maxTokens
     } else {
@@ -644,9 +660,17 @@ async function callStream({ connection, messages, systemPrompt, dynamicContext, 
     const hdrs = { 'Content-Type': 'application/json', Authorization: 'Bearer ' + connection.apiKey }
     let resp = await fetch(url, { method: 'POST', headers: hdrs, body: JSON.stringify(body) })
     if (!resp.ok && resp.status === 400) {
-      delete body.stream_options; delete body.temperature; delete body.max_tokens; delete body.user
-      body.max_completion_tokens = body.max_completion_tokens || maxTokens
-      resp = await fetch(url, { method: 'POST', headers: hdrs, body: JSON.stringify(body) })
+      let errText = await resp.text()
+      if (body.prompt_cache_key && /prompt_cache_key|unknown|unrecognized|unsupported|extra (?:field|input|parameter)/i.test(errText)) {
+        delete body.prompt_cache_key
+        resp = await fetch(url, { method: 'POST', headers: hdrs, body: JSON.stringify(body) })
+        if (!resp.ok && resp.status === 400) errText = await resp.text()
+      }
+      if (!resp.ok && resp.status === 400) {
+        delete body.stream_options; delete body.temperature; delete body.max_tokens; delete body.user; delete body.prompt_cache_key
+        body.max_completion_tokens = body.max_completion_tokens || maxTokens
+        resp = await fetch(url, { method: 'POST', headers: hdrs, body: JSON.stringify(body) })
+      }
     }
     if (!resp.ok) {
       const e = await resp.text()
@@ -665,7 +689,15 @@ async function callStream({ connection, messages, systemPrompt, dynamicContext, 
       return {
         promptTokens: json.usage.prompt_tokens,
         completionTokens: json.usage.completion_tokens,
-        cachedTokens: json.usage.prompt_tokens_details?.cached_tokens ?? json.usage.prompt_cache_hit_tokens ?? 0,
+        cachedTokens: json.usage.prompt_tokens_details?.cached_tokens
+          ?? json.usage.input_tokens_details?.cached_tokens
+          ?? json.usage.prompt_cache_hit_tokens
+          ?? json.usage.cache_read_input_tokens
+          ?? 0,
+        cacheWriteTokens: json.usage.prompt_tokens_details?.cache_write_tokens
+          ?? json.usage.input_tokens_details?.cache_write_tokens
+          ?? json.usage.cache_creation_input_tokens
+          ?? 0,
       }
     })
     return assertNotEmpty(out, { provider: 'OpenAI', finishReason })
@@ -800,7 +832,7 @@ async function streamOpenAIMessage(resp, onText, onThinking) {
   const decoder = new TextDecoder()
   const msg = { role: 'assistant', content: '' }
   const toolCalls = []
-  const usage = { promptTokens: 0, completionTokens: 0, cachedTokens: 0 }
+  const usage = { promptTokens: 0, completionTokens: 0, cachedTokens: 0, cacheWriteTokens: 0 }
   let finishReason = null
   let buf = ''
   let pending = ''   // 还没放行的正文
@@ -834,7 +866,9 @@ async function streamOpenAIMessage(resp, onText, onThinking) {
     if (json.usage) {
       usage.promptTokens = json.usage.prompt_tokens || 0
       usage.completionTokens = json.usage.completion_tokens || 0
-      usage.cachedTokens = json.usage.prompt_tokens_details?.cached_tokens ?? json.usage.prompt_cache_hit_tokens ?? 0
+      const details = json.usage.prompt_tokens_details || json.usage.input_tokens_details || {}
+      usage.cachedTokens = details.cached_tokens ?? json.usage.prompt_cache_hit_tokens ?? json.usage.cache_read_input_tokens ?? 0
+      usage.cacheWriteTokens = details.cache_write_tokens ?? json.usage.cache_creation_input_tokens ?? 0
     }
     const ch = json.choices?.[0]
     if (!ch) return
@@ -1273,10 +1307,16 @@ function buildAnthropicMessages(messages, dynamicContext) {
     }
   }
 
-  // 缓存断点打**两个**：滚动式的读写分离，位置按绝对网格量化。
+  // 缓存断点打两个：按真实对话轮次找「上一轮读点 + 本轮写点」，不再按消息数量猜。
   //
-  // 深拷贝避免 cache_control 写回 store（否则旧消息会累积断点）。
-  // TTL 1h：对话间隔常超 5min，1h 命中稳定且白天持续聊基本不过期
+  // 一条 assistant 回复会被 [MSG] 拆成多个气泡，还可能夹着 thinking / tool_use；
+  // 因此「每 6 条消息一个锚点」并不等于固定轮次，跨格时容易错过上一轮真正写过的位置。
+  // 这里以最后一条 user/tool_result（它承载每轮动态上下文）为动态后缀：
+  // - writeIdx：它前面的最后一个稳定块，写入本轮最长可复用前缀；
+  // - readIdx：再往前一轮 user 前的稳定块，正是上一轮曾写过的位置。
+  // system + read + write 共 3 个断点，不超过 Anthropic 的 4 个上限。
+  //
+  // 深拷贝避免 cache_control 写回 store；TTL 1h 覆盖日常稍长的聊天间隔。
   const mark = (i) => {
     const m = out[i]
     if (!m) return
@@ -1289,25 +1329,21 @@ function buildAnthropicMessages(messages, dynamicContext) {
       out[i] = { ...m, content: blocks }
     }
   }
-  // ⚠️ 断点位置必须**锚点量化**，不能从末尾倒数（跟 applyContextLimit、图片降级
-  // 边界是同一个道理，这是第三次在同一个坑里栽）。
-  //
-  // 「倒数第四条」本来是想指向上一轮写缓存的位置，前提是每轮固定追加两条
-  // （user + assistant）。但实际不固定：assistant 回复会按 [MSG] 拆成 2-3 个气泡，
-  // 合并同角色时又因为第一条带 thinking 而拒绝合并（见 Chat/index.jsx 的合并条件），
-  // 于是每轮追加 2~4 条不等。倒数第四条因此几乎从不落在真正写过缓存的位置上——
-  // 症状就是阿颖 0727 看到的：每轮都写，一次没读。写按 1.25 倍收钱，纯亏。
-  //
-  // 改成绝对网格：位置 = 向下取整到 STEP 的倍数。同一格内断点纹丝不动，于是连着
-  // 好几轮读写同一个位置；跨格时新写点 = 旧写点 + STEP，读点正好落回旧写点，
-  // 仍是精确命中。追加不会移动已有消息的下标，所以网格是稳的。
-  // （模拟 30 轮、每轮随机追加 2~4 条：新写法读点 27/27 命中已写位置，旧写法错 15 次）
-  const STEP = 6
-  const w = Math.floor((out.length - 2) / STEP) * STEP  // 写：本格锚点（保证不落在最后一条上）
-  const r = w - STEP                                     // 读：上一格锚点，前几轮就写在这儿
-  if (r >= 0) mark(r)
-  if (w > 0) mark(w)
-  else mark(out.length >= 2 ? out.length - 2 : out.length - 1)  // 消息还很少时退回原打法
+
+  let lastUserIdx = -1
+  for (let i = out.length - 1; i >= 0; i--) {
+    if (out[i]?.role === 'user') { lastUserIdx = i; break }
+  }
+  const writeIdx = lastUserIdx > 0 ? lastUserIdx - 1 : -1
+
+  let previousUserIdx = -1
+  for (let i = writeIdx - 1; i >= 0; i--) {
+    if (out[i]?.role === 'user') { previousUserIdx = i; break }
+  }
+  const readIdx = previousUserIdx > 0 ? previousUserIdx - 1 : -1
+
+  if (readIdx >= 0) mark(readIdx)
+  if (writeIdx >= 0 && writeIdx !== readIdx) mark(writeIdx)
   return redactDeep(out)
 }
 
