@@ -843,9 +843,13 @@ function releaseSentinelSafe(s) {
 // 出问题时可以在气泡下方展开查看，退出重进后也还在。
 const RESPONSE_DIAGNOSTIC_MAX = 12000
 function sanitizeResponseDiagnostic(raw) {
+  // 正常响应没有诊断信息时传进来的是 undefined。JSON.stringify(undefined) 仍是
+  // undefined，旧代码紧接着调用 .replace()，导致每条成功回复都在收尾阶段假装断线。
+  if (raw == null) return ''
   let text
   try { text = typeof raw === 'string' ? raw : JSON.stringify(raw) } catch { text = String(raw) }
-  text = text.replace(/data:[^;,\s]+;base64,[A-Za-z0-9+/_=-]+/gi, '[图片数据已省略]')
+  if (text == null) return ''
+  text = String(text).replace(/data:[^;,\s]+;base64,[A-Za-z0-9+/_=-]+/gi, '[图片数据已省略]')
   return redactSecrets(text).slice(0, RESPONSE_DIAGNOSTIC_MAX)
 }
 function mergeResponseDiagnostic(current, raw, label = '') {
