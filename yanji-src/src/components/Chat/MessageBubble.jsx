@@ -682,6 +682,23 @@ export default function MessageBubble({ msg, onEdit, onQuote, onDelete, isLast }
             {msg.files.map((f, i) => <GenFileCard key={i} file={f} />)}
           </div>
         )}
+        {!isUser && msg.responseDiagnostic && (
+          <AttachChip
+            name="响应诊断（已脱敏）"
+            content={(
+              <pre style={{
+                margin: 0,
+                maxHeight: 240,
+                overflow: 'auto',
+                whiteSpace: 'pre-wrap',
+                overflowWrap: 'anywhere',
+                fontSize: 11,
+              }}>
+                {msg.responseDiagnostic}
+              </pre>
+            )}
+          />
+        )}
         {!isUser && isStreaming && (
           // 流式尾随 logo：生成中缀在正文下方旋转的小太阳（官端标志性细节）
           <span className="trail-logo" aria-hidden="true">
