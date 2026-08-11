@@ -475,10 +475,22 @@ async function callWithTools({
           if (!resp.ok && resp.status === 400) errText = await resp.text()
         }
         if (!resp.ok && resp.status === 400) {
-          // stream_options 是后加的，老一点的中转站不认；temperature/max_tokens 同理
-          delete body.stream_options; delete body.temperature; delete body.max_tokens
-          body.max_completion_tokens = body.max_completion_tokens || maxTokens
+          // 有些中转只回「上游失败 / bad_response_status_code」这种笼统 400，不告诉
+          // 到底是哪一项不兼容。旧逻辑因此一直保留 prompt_cache_key + tools，
+          // 用几乎同一份请求再撞一次，别的简洁客户端能用，言叽却始终失败。
+          // 最后一层改用基础流式请求：先撤掉路由/工具/用量扩展，保留模型与 token 上限。
+          delete body.prompt_cache_key; delete body.user
+          delete body.tools; delete body.tool_choice
+          delete body.stream_options; delete body.temperature
+          onStatus?.('当前线路不兼容扩展参数，正用基础模式重试…')
           resp = await fetch(url, { method: 'POST', headers: hdrs, body: JSON.stringify(body) })
+          if (!resp.ok && resp.status === 400) {
+            // 极老或非标准实现连 max_tokens / max_completion_tokens 也可能不认；
+            // 再撤 token 上限一次。仍失败就把真实错误交给界面，不无限重试。
+            errText = await resp.text()
+            delete body.max_tokens; delete body.max_completion_tokens
+            resp = await fetch(url, { method: 'POST', headers: hdrs, body: JSON.stringify(body) })
+          }
           if (!resp.ok) errText = await resp.text()
         }
         if (!resp.ok) throw new Error('OpenAI ' + resp.status + ': ' + (errText || '').slice(0, 200))
@@ -671,9 +683,16 @@ async function callStream({ connection, messages, systemPrompt, dynamicContext, 
         if (!resp.ok && resp.status === 400) errText = await resp.text()
       }
       if (!resp.ok && resp.status === 400) {
-        delete body.stream_options; delete body.temperature; delete body.max_tokens; delete body.user; delete body.prompt_cache_key
-        body.max_completion_tokens = body.max_completion_tokens || maxTokens
+        // 通用 400 不一定点名不兼容字段；直接降到基础流式请求，和常见简洁客户端对齐。
+        delete body.stream_options; delete body.temperature
+        delete body.user; delete body.prompt_cache_key
         resp = await fetch(url, { method: 'POST', headers: hdrs, body: JSON.stringify(body) })
+        if (!resp.ok && resp.status === 400) {
+          // 最后一层才撤 token 上限，避免正常线路无故失去输出长度控制。
+          await resp.text()
+          delete body.max_tokens; delete body.max_completion_tokens
+          resp = await fetch(url, { method: 'POST', headers: hdrs, body: JSON.stringify(body) })
+        }
       }
     }
     if (!resp.ok) {
