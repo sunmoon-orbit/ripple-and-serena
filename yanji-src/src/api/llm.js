@@ -461,39 +461,30 @@ async function callWithTools({
       const hdrs = { 'Content-Type': 'application/json', Authorization: 'Bearer ' + connection.apiKey }
       let resp = await fetch(url, { method: 'POST', headers: hdrs, body: JSON.stringify(body) })
       if (!resp.ok && resp.status === 400) {
-        let errText = await resp.text()
-        // 一些 OpenAI 兼容中转站还不认识官方 prompt_cache_key：只撤这个新字段重试，
-        // user 继续保留，避免把中转站原有的粘性路由一起弄丢。
-        if (body.prompt_cache_key && /prompt_cache_key|unknown|unrecognized|unsupported|extra (?:field|input|parameter)/i.test(errText)) {
+        const firstErrText = await resp.text()
+        let fallbackReason = ''
+        // 自动重试只用于错误正文明确点名的不兼容字段。笼统 400（例如
+        // bad_response_status_code / 内容审查）不能猜着连发，否则一条消息会在后台
+        // 变成 2～5 个请求，最后的 429 还会把真正的首个 400 盖掉。
+        if (body.prompt_cache_key && /prompt_cache_key|unknown|unrecognized|unsupported|extra (?:field|input|parameter)/i.test(firstErrText)) {
           delete body.prompt_cache_key
-          resp = await fetch(url, { method: 'POST', headers: hdrs, body: JSON.stringify(body) })
-          if (!resp.ok && resp.status === 400) errText = await resp.text()
-        }
-        if (!resp.ok && body.tools && /tool|function|unsupported|invalid.*param/i.test(errText)) {
+          fallbackReason = 'prompt_cache_key'
+        } else if (body.tools && /tool|function|unsupported|invalid.*param/i.test(firstErrText)) {
           delete body.tools; delete body.tool_choice
-          resp = await fetch(url, { method: 'POST', headers: hdrs, body: JSON.stringify(body) })
-          if (!resp.ok && resp.status === 400) errText = await resp.text()
+          fallbackReason = 'tools'
         }
-        if (!resp.ok && resp.status === 400) {
-          // 有些中转只回「上游失败 / bad_response_status_code」这种笼统 400，不告诉
-          // 到底是哪一项不兼容。旧逻辑因此一直保留 prompt_cache_key + tools，
-          // 用几乎同一份请求再撞一次，别的简洁客户端能用，言叽却始终失败。
-          // 最后一层改用基础流式请求：先撤掉路由/工具/用量扩展，保留模型与 token 上限。
-          delete body.prompt_cache_key; delete body.user
-          delete body.tools; delete body.tool_choice
-          delete body.stream_options; delete body.temperature
-          onStatus?.('当前线路不兼容扩展参数，正用基础模式重试…')
-          resp = await fetch(url, { method: 'POST', headers: hdrs, body: JSON.stringify(body) })
-          if (!resp.ok && resp.status === 400) {
-            // 极老或非标准实现连 max_tokens / max_completion_tokens 也可能不认；
-            // 再撤 token 上限一次。仍失败就把真实错误交给界面，不无限重试。
-            errText = await resp.text()
-            delete body.max_tokens; delete body.max_completion_tokens
-            resp = await fetch(url, { method: 'POST', headers: hdrs, body: JSON.stringify(body) })
-          }
-          if (!resp.ok) errText = await resp.text()
+        if (!fallbackReason) {
+          throw new Error('OpenAI 400: ' + (firstErrText || '').slice(0, 200))
         }
-        if (!resp.ok) throw new Error('OpenAI ' + resp.status + ': ' + (errText || '').slice(0, 200))
+        onStatus?.(`线路不兼容 ${fallbackReason}，仅重试一次…`)
+        resp = await fetch(url, { method: 'POST', headers: hdrs, body: JSON.stringify(body) })
+        if (!resp.ok) {
+          const retryErrText = await resp.text()
+          throw new Error(
+            `OpenAI ${resp.status}: ${(retryErrText || '').slice(0, 140)}` +
+            `（首次请求为 400: ${(firstErrText || '').slice(0, 120)}；兼容回退仅重试了 1 次）`
+          )
+        }
       }
       if (!resp.ok) throw new Error('OpenAI ' + resp.status + ': ' + (await resp.text()).slice(0, 200))
       const data = await streamOpenAIMessage(resp, (t) => { streamedOut = true; onChunk?.(t) }, onThinking)
@@ -676,23 +667,20 @@ async function callStream({ connection, messages, systemPrompt, dynamicContext, 
     const hdrs = { 'Content-Type': 'application/json', Authorization: 'Bearer ' + connection.apiKey }
     let resp = await fetch(url, { method: 'POST', headers: hdrs, body: JSON.stringify(body) })
     if (!resp.ok && resp.status === 400) {
-      let errText = await resp.text()
-      if (body.prompt_cache_key && /prompt_cache_key|unknown|unrecognized|unsupported|extra (?:field|input|parameter)/i.test(errText)) {
-        delete body.prompt_cache_key
-        resp = await fetch(url, { method: 'POST', headers: hdrs, body: JSON.stringify(body) })
-        if (!resp.ok && resp.status === 400) errText = await resp.text()
+      const firstErrText = await resp.text()
+      // 无工具分支同样只对明确点名的 prompt_cache_key 做一次回退；通用 400
+      // 原样抛出，避免自动重试触发 429、也避免把首个错误证据吃掉。
+      if (!body.prompt_cache_key || !/prompt_cache_key|unknown|unrecognized|unsupported|extra (?:field|input|parameter)/i.test(firstErrText)) {
+        throw new Error('OpenAI 400: ' + (firstErrText || '').slice(0, 200))
       }
-      if (!resp.ok && resp.status === 400) {
-        // 通用 400 不一定点名不兼容字段；直接降到基础流式请求，和常见简洁客户端对齐。
-        delete body.stream_options; delete body.temperature
-        delete body.user; delete body.prompt_cache_key
-        resp = await fetch(url, { method: 'POST', headers: hdrs, body: JSON.stringify(body) })
-        if (!resp.ok && resp.status === 400) {
-          // 最后一层才撤 token 上限，避免正常线路无故失去输出长度控制。
-          await resp.text()
-          delete body.max_tokens; delete body.max_completion_tokens
-          resp = await fetch(url, { method: 'POST', headers: hdrs, body: JSON.stringify(body) })
-        }
+      delete body.prompt_cache_key
+      resp = await fetch(url, { method: 'POST', headers: hdrs, body: JSON.stringify(body) })
+      if (!resp.ok) {
+        const retryErrText = await resp.text()
+        throw new Error(
+          `OpenAI ${resp.status}: ${(retryErrText || '').slice(0, 140)}` +
+          `（首次请求为 400: ${(firstErrText || '').slice(0, 120)}；兼容回退仅重试了 1 次）`
+        )
       }
     }
     if (!resp.ok) {
