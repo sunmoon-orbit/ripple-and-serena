@@ -414,6 +414,23 @@ function stripFakeToolResult(text) {
     .trim()
 }
 
+// 兼容回退会真的再发一次请求，所以判据必须同时出现「具体字段名」和
+// 「不支持/未知参数」这类拒绝词。只看见一个笼统的 unsupported 就重试，
+// 会把「模型不支持」「内容不支持」之类完全无关的 400 也重复扣一遍。
+function hasNamedCompatibilityError(raw, fieldPattern) {
+  const text = String(raw || '')
+  const rejected = '(?:unknown|unrecognized|unsupported|not\\s+supported|extra|unexpected|invalid|not\\s+allowed|does\\s+not\\s+support)'
+  return new RegExp(`(?:${fieldPattern})[^\\n]{0,120}${rejected}|${rejected}[^\\n]{0,120}(?:${fieldPattern})`, 'i').test(text)
+}
+
+function isPromptCacheKeyCompatibilityError(raw) {
+  return hasNamedCompatibilityError(raw, 'prompt_cache_key')
+}
+
+function isToolsCompatibilityError(raw) {
+  return hasNamedCompatibilityError(raw, 'tools?|tool_choice|functions?|function_call')
+}
+
 // ─── Tool-use loop (non-streaming, supports multi-turn) ─────────────────────
 
 async function callWithTools({
@@ -466,10 +483,10 @@ async function callWithTools({
         // 自动重试只用于错误正文明确点名的不兼容字段。笼统 400（例如
         // bad_response_status_code / 内容审查）不能猜着连发，否则一条消息会在后台
         // 变成 2～5 个请求，最后的 429 还会把真正的首个 400 盖掉。
-        if (body.prompt_cache_key && /prompt_cache_key|unknown|unrecognized|unsupported|extra (?:field|input|parameter)/i.test(firstErrText)) {
+        if (body.prompt_cache_key && isPromptCacheKeyCompatibilityError(firstErrText)) {
           delete body.prompt_cache_key
           fallbackReason = 'prompt_cache_key'
-        } else if (body.tools && /tool|function|unsupported|invalid.*param/i.test(firstErrText)) {
+        } else if (body.tools && isToolsCompatibilityError(firstErrText)) {
           delete body.tools; delete body.tool_choice
           fallbackReason = 'tools'
         }
@@ -496,6 +513,12 @@ async function callWithTools({
         cached: data.usage.cachedTokens, cacheWrite: data.usage.cacheWriteTokens,
       })
       const msg = data.message
+      assertStreamComplete({
+        text: msg.content || '',
+        usage,
+        streamComplete: data.streamComplete,
+        responseDiagnostic,
+      }, { provider, finishReason: data.finish_reason })
       if (msg.tool_calls?.length) {
         onToolCall?.(msg.tool_calls.map((t) => t.function.name))
         const aMsg = { role: 'assistant', content: msg.content || '', tool_calls: msg.tool_calls }
@@ -582,6 +605,13 @@ async function callWithTools({
         const cw = data.usage.cacheWriteTokens || 0
         accUsage(usage, { p: data.usage.promptTokens, c: data.usage.completionTokens, cached: cr, cacheWrite: cw })
       }
+      const anthropicText = data.content?.filter((b) => b.type === 'text').map((b) => b.text).join('') || ''
+      assertStreamComplete({
+        text: anthropicText,
+        usage,
+        streamComplete: data.streamComplete,
+        responseDiagnostic,
+      }, { provider, finishReason: data.stop_reason })
       const toolBlocks = data.content?.filter((b) => b.type === 'tool_use') || []
       if (toolBlocks.length) {
         // 一次回复可能含多个 tool_use，每个都必须有对应 tool_result，否则 API 400
@@ -595,7 +625,7 @@ async function callWithTools({
         convo.push({ role: 'user', content: results })
         continue
       }
-      finalText = data.content?.filter((b) => b.type === 'text').map((b) => b.text).join('') || ''
+      finalText = anthropicText
       break
     }
 
@@ -622,6 +652,13 @@ async function callWithTools({
       lastFinish = data.candidates?.[0]?.finishReason
       lastBlock = data.promptFeedback?.blockReason
       const parts = data.candidates?.[0]?.content?.parts || []
+      const geminiText = parts.filter((p) => p.text).map((p) => p.text).join('')
+      assertStreamComplete({
+        text: geminiText,
+        usage,
+        streamComplete: data.streamComplete,
+        responseDiagnostic,
+      }, { provider, finishReason: lastFinish, blockReason: lastBlock })
       const fcPart = parts.find((p) => p.functionCall)
       if (fcPart) {
         const fc = fcPart.functionCall
@@ -631,7 +668,7 @@ async function callWithTools({
         convo.push({ role: 'function', content: result, functionResponse: { name: fc.name, response: { result } } })
         continue
       }
-      finalText = parts.filter((p) => p.text).map((p) => p.text).join('')
+      finalText = geminiText
       break
     }
 
@@ -639,7 +676,7 @@ async function callWithTools({
   }
 
   // 空回一律抛错，别当成一次正常回复落盘（详见 assertNotEmpty 上方注释）
-  assertNotEmpty({ text: finalText, responseDiagnostic }, { provider, finishReason: lastFinish, blockReason: lastBlock })
+  assertNotEmpty({ text: finalText, usage, responseDiagnostic }, { provider, finishReason: lastFinish, blockReason: lastBlock })
   if (!streamedOut) onChunk?.(finalText)
   return { text: finalText, usage, responseDiagnostic: responseDiagnostic || undefined }
 }
@@ -670,7 +707,7 @@ async function callStream({ connection, messages, systemPrompt, dynamicContext, 
       const firstErrText = await resp.text()
       // 无工具分支同样只对明确点名的 prompt_cache_key 做一次回退；通用 400
       // 原样抛出，避免自动重试触发 429、也避免把首个错误证据吃掉。
-      if (!body.prompt_cache_key || !/prompt_cache_key|unknown|unrecognized|unsupported|extra (?:field|input|parameter)/i.test(firstErrText)) {
+      if (!body.prompt_cache_key || !isPromptCacheKeyCompatibilityError(firstErrText)) {
         throw new Error('OpenAI 400: ' + (firstErrText || '').slice(0, 200))
       }
       delete body.prompt_cache_key
@@ -711,7 +748,10 @@ async function callStream({ connection, messages, systemPrompt, dynamicContext, 
           ?? 0,
       }
     })
-    return assertNotEmpty(out, { provider: 'OpenAI', finishReason })
+    return assertNotEmpty(
+      assertStreamComplete(out, { provider: 'OpenAI', finishReason }),
+      { provider: 'OpenAI', finishReason }
+    )
   }
 
   if (provider === 'anthropic') {
@@ -776,7 +816,10 @@ async function callStream({ connection, messages, systemPrompt, dynamicContext, 
       }
       return null
     })
-    return assertNotEmpty(out, { provider: 'Anthropic', finishReason })
+    return assertNotEmpty(
+      assertStreamComplete(out, { provider: 'Anthropic', finishReason }),
+      { provider: 'Anthropic', finishReason }
+    )
   }
 
   if (provider === 'gemini') {
@@ -804,7 +847,10 @@ async function callStream({ connection, messages, systemPrompt, dynamicContext, 
         cachedTokens: um.cachedContentTokenCount || 0,
       }
     })
-    return assertNotEmpty(out, { provider: 'Gemini', finishReason, blockReason })
+    return assertNotEmpty(
+      assertStreamComplete(out, { provider: 'Gemini', finishReason, blockReason }),
+      { provider: 'Gemini', finishReason, blockReason }
+    )
   }
 
   throw new Error('不支持的 provider: ' + provider)
@@ -838,6 +884,16 @@ function releaseSentinelSafe(s) {
   return m ? [t.slice(0, m.index), t.slice(m.index)] : [t, '']
 }
 
+// SSE 规范允许 `data:` 后面没有空格，Windows/部分代理还会留下 `\r`。
+// 旧解析器只认 `data: `，会把合法事件整行跳过，最后看起来像付了钱却空回。
+function readSseData(line) {
+  if (typeof line !== 'string' || !line.startsWith('data:')) return null
+  let data = line.slice(5)
+  if (data.startsWith(' ')) data = data.slice(1)
+  if (data.endsWith('\r')) data = data.slice(0, -1)
+  return data
+}
+
 // 只保留真正异常的响应片段，不把每次正常聊天全文重复存一份。
 // 内容先脱敏、剥掉巨大的 data URL，再限制总长；它会随消息存进 IndexedDB，
 // 出问题时可以在气泡下方展开查看，退出重进后也还在。
@@ -859,8 +915,14 @@ function mergeResponseDiagnostic(current, raw, label = '') {
   const joined = current ? `${current}\n\n${entry}` : entry
   return joined.slice(0, RESPONSE_DIAGNOSTIC_MAX)
 }
-function attachResponseDiagnostic(error, diagnostic) {
-  if (diagnostic) error.responseDiagnostic = sanitizeResponseDiagnostic(diagnostic)
+function attachResponseMetadata(error, result) {
+  if (result?.responseDiagnostic) {
+    error.responseDiagnostic = sanitizeResponseDiagnostic(result.responseDiagnostic)
+  }
+  if (result?.usage && Object.values(result.usage).some((n) => Number(n) > 0)) {
+    // 请求失败不等于没计费。把已经收到的 usage 带到上层，账单页仍能记下这轮。
+    error.usage = result.usage
+  }
   return error
 }
 
@@ -876,6 +938,7 @@ async function streamOpenAIMessage(resp, onText, onThinking) {
   let gated = false  // 撞上疑似 JSON 后就一直扣着
   let dropped = 0    // 解析失败被丢弃的 SSE 事件数
   let responseDiagnostic = ''
+  let streamComplete = false
 
   const flushText = () => {
     if (gated) return
@@ -895,9 +958,9 @@ async function streamOpenAIMessage(resp, onText, onThinking) {
   }
 
   const handleLine = (line) => {
-    if (!line.startsWith('data: ')) return
-    const raw = line.slice(6)
-    if (raw === '[DONE]') return
+    const raw = readSseData(line)
+    if (raw == null || raw === '') return
+    if (raw.trim() === '[DONE]') { streamComplete = true; return }
     let json
     try { json = JSON.parse(raw) } catch {
       dropped++
@@ -939,12 +1002,19 @@ async function streamOpenAIMessage(resp, onText, onThinking) {
     buf = lines.pop()
     for (const l of lines) handleLine(l)
   }
+  buf += decoder.decode()
   if (buf) handleLine(buf)
 
   const filled = toolCalls.filter(Boolean)
   if (filled.length) msg.tool_calls = filled
   msg.content = stripSentinel(msg.content) + badEventNote(dropped)   // 气泡最终落的是这个，被拆开的哨兵在这里补剥
-  return { message: msg, finish_reason: finishReason, usage, responseDiagnostic: responseDiagnostic || undefined }
+  return {
+    message: msg,
+    finish_reason: finishReason,
+    usage,
+    streamComplete,
+    responseDiagnostic: responseDiagnostic || undefined,
+  }
 }
 
 // ─── SSE 坏事件记账 ─────────────────────────────────────────────────────────
@@ -999,13 +1069,47 @@ function emptyReplyError(rawProvider, finishReason, blockReason) {
   return new Error(`${provider} 返回空回复（connection closed）：上游可能已经生成并计费，但内容没送到——多半是链路丢包，重发一次通常就好。`)
 }
 
+function incompleteReplyError(rawProvider, finishReason, blockReason) {
+  const provider = PROVIDER_LABEL[rawProvider] || rawProvider
+  const r = String(finishReason || '').toLowerCase()
+  const b = String(blockReason || '')
+  if (b) {
+    return new Error(`${provider} 的回复生成到一半被上游内容安全层拦下（blockReason: ${b}），已收到的文字保留在上面。`)
+  }
+  if (/^(?:length|max_tokens|max_output_tokens)$/.test(r)) {
+    return new Error(`${provider} 的回复达到输出长度上限，没能说完；已收到的文字保留在上面。把连接设置里的 max_tokens 调大再试。`)
+  }
+  if (/safety|recitation|content_filter|refusal|blocklist|prohibited|spii|image_safety/.test(r)) {
+    return new Error(`${provider} 的回复生成到一半被上游安全层截断（finishReason: ${finishReason}），已收到的文字保留在上面。`)
+  }
+  return new Error(`${provider} 回复传输中断（connection closed）：已收到的文字保留在上面，但结尾确认事件没有送到。`)
+}
+
+// 有正文并不代表完整：连接在半句时断开，旧逻辑仍会把它当作正常回复落盘。
+// `[DONE]` / message_stop 或 provider 的 finishReason 至少要见到一个；长度耗尽、
+// 安全拦截则无论有没有正文都明确报出来。
+function assertStreamComplete(result, { provider, finishReason, blockReason }) {
+  const body = String(result?.text || '').replace(EMPTY_NOTE_RE, '').trim()
+  const r = String(finishReason || '').toLowerCase()
+  const abnormal = blockReason
+    || /^(?:length|max_tokens|max_output_tokens)$/.test(r)
+    || /safety|recitation|content_filter|refusal|blocklist|prohibited|spii|image_safety/.test(r)
+  if (abnormal || (!result?.streamComplete && !finishReason)) {
+    const error = body
+      ? incompleteReplyError(provider, finishReason, blockReason)
+      : emptyReplyError(provider, finishReason, blockReason)
+    throw attachResponseMetadata(error, result)
+  }
+  return result
+}
+
 // 空就抛，不空就原样放行。返回值方便写成 `return assertNotEmpty(...)`。
 function assertNotEmpty(result, { provider, finishReason, blockReason }) {
   const body = String(result?.text || '').replace(EMPTY_NOTE_RE, '').trim()
   if (body) return result
-  throw attachResponseDiagnostic(
+  throw attachResponseMetadata(
     emptyReplyError(provider, finishReason, blockReason),
-    result?.responseDiagnostic
+    result
   )
 }
 
@@ -1021,11 +1125,12 @@ async function streamAnthropicBlocks(resp, onText, onThinking) {
   let dropped = 0    // 解析失败被丢弃的 SSE 事件数
   let stopReason = null
   let responseDiagnostic = ''
+  let streamComplete = false
 
   const handleLine = (line) => {
-    if (!line.startsWith('data: ')) return
-    const raw = line.slice(6)
-    if (raw === '[DONE]') return
+    const raw = readSseData(line)
+    if (raw == null || raw === '') return
+    if (raw.trim() === '[DONE]') { streamComplete = true; return }
     let json
     try { json = JSON.parse(raw) } catch {
       dropped++
@@ -1081,6 +1186,7 @@ async function streamAnthropicBlocks(resp, onText, onThinking) {
       // 空回时用来解释原因（max_tokens / refusal / end_turn），平时用不上
       if (json.delta?.stop_reason) stopReason = json.delta.stop_reason
     }
+    if (json.type === 'message_stop') streamComplete = true
   }
 
   while (true) {
@@ -1091,11 +1197,18 @@ async function streamAnthropicBlocks(resp, onText, onThinking) {
     buf = lines.pop()  // 末尾可能是半行，留到下一轮
     for (const l of lines) handleLine(l)
   }
+  buf += decoder.decode()
   if (buf) handleLine(buf)
 
   for (const b of blocks) if (b && typeof b.text === 'string') b.text = stripSentinel(b.text)
   if (dropped) blocks.push({ type: 'text', text: badEventNote(dropped) })
-  return { content: blocks.filter(Boolean), usage, stop_reason: stopReason, responseDiagnostic: responseDiagnostic || undefined }
+  return {
+    content: blocks.filter(Boolean),
+    usage,
+    stop_reason: stopReason,
+    streamComplete,
+    responseDiagnostic: responseDiagnostic || undefined,
+  }
 }
 
 // Gemini 流式 + 工具调用：把 SSE 事件还原成非流式 candidates[0].content.parts 的形状。
@@ -1111,6 +1224,7 @@ async function streamGeminiParts(resp, onText) {
   let buf = ''
   let dropped = 0
   let responseDiagnostic = ''
+  let streamComplete = false
   // Gemini 带工具这条路以前一直没记账（非流式那版压根没读 usageMetadata），
   // 而言叽日常聊天工具是常挂的——等于用量监控页里 Gemini 的账一直是缺的。
   // 流式响应本来就带 usageMetadata，顺手接上。
@@ -1139,9 +1253,9 @@ async function streamGeminiParts(resp, onText) {
   }
 
   const handleLine = (line) => {
-    if (!line.startsWith('data: ')) return
-    const raw = line.slice(6)
-    if (raw === '[DONE]') return
+    const raw = readSseData(line)
+    if (raw == null || raw === '') return
+    if (raw.trim() === '[DONE]') { streamComplete = true; return }
     let json
     try { json = JSON.parse(raw) } catch {
       dropped++
@@ -1193,6 +1307,7 @@ async function streamGeminiParts(resp, onText) {
     buf = lines.pop()  // 末尾可能是半行，留到下一轮
     for (const line of lines) handleLine(line)
   }
+  buf += decoder.decode()
   if (buf) handleLine(buf)
 
   for (const part of parts) if (typeof part.text === 'string') part.text = stripSentinel(part.text)
@@ -1201,6 +1316,7 @@ async function streamGeminiParts(resp, onText) {
     candidates: [{ content: { parts }, finishReason }],
     promptFeedback: blockReason ? { blockReason } : undefined,
     usageMetadata: usage,
+    streamComplete,
     responseDiagnostic: responseDiagnostic || undefined,
   }
 }
@@ -1214,30 +1330,35 @@ async function streamSSE(resp, parseLine, onChunk, extractUsage) {
   let pendingOut = ''  // 末尾疑似半个 [done] 哨兵，攒着等下一块拼齐
   let dropped = 0      // 解析失败被丢弃的 SSE 事件数
   let responseDiagnostic = ''
+  let streamComplete = false
 
   const handleLine = (line) => {
-    if (!line.startsWith('data: ')) return
-    const data = line.slice(6)
-    if (data === '[DONE]') return
-    try {
-      const json = JSON.parse(data)
-      if (extractUsage) {
-        const u = extractUsage(json)
-        if (u) usage = { ...(usage || {}), ...u }
-      }
-      const text = parseLine(json)
-      if (text) {
-        const cleaned = text.replace(/([一-鿿＀-￯]),/g, '$1，').replace(/,([一-鿿＀-￯])/g, '，$1')
-        fullText += cleaned
-        pendingOut += cleaned
-        const [out, hold] = releaseSentinelSafe(pendingOut)
-        pendingOut = hold
-        if (out) onChunk?.(out)
-      }
-    } catch {
+    const data = readSseData(line)
+    if (data == null || data === '') return
+    if (data.trim() === '[DONE]') { streamComplete = true; return }
+    let json
+    try { json = JSON.parse(data) } catch {
       dropped++
       responseDiagnostic = mergeResponseDiagnostic(responseDiagnostic, data, 'SSE 解析失败')
       warnBadEvent(data)
+      return
+    }
+    if (json.type === 'message_stop') streamComplete = true
+    if (extractUsage) {
+      const u = extractUsage(json)
+      if (u) usage = { ...(usage || {}), ...u }
+    }
+    const text = parseLine(json)
+    if (text != null && text !== '') {
+      if (typeof text !== 'string') {
+        throw new TypeError(`SSE 文本增量不是字符串（收到 ${typeof text}）`)
+      }
+      const cleaned = text.replace(/([一-鿿＀-￯]),/g, '$1，').replace(/,([一-鿿＀-￯])/g, '，$1')
+      fullText += cleaned
+      pendingOut += cleaned
+      const [out, hold] = releaseSentinelSafe(pendingOut)
+      pendingOut = hold
+      if (out) onChunk?.(out)
     }
   }
 
@@ -1249,6 +1370,7 @@ async function streamSSE(resp, parseLine, onChunk, extractUsage) {
     buf = lines.pop()  // 末尾可能是不完整的一行，留到下一轮
     for (const line of lines) handleLine(line)
   }
+  buf += decoder.decode()
   if (buf) handleLine(buf)
   if (pendingOut) onChunk?.(pendingOut)  // 流真的到此为止，扣住的那点是正常文本，放行
   if (usage) {
@@ -1257,6 +1379,7 @@ async function streamSSE(resp, parseLine, onChunk, extractUsage) {
   return {
     text: stripSentinel(fullText) + badEventNote(dropped),
     usage,
+    streamComplete,
     responseDiagnostic: responseDiagnostic || undefined,
   }
 }
