@@ -431,6 +431,7 @@ async function callWithTools({
   // 最后一轮的收尾原因，只在 finalText 为空时用来解释「为什么什么都没有」
   let lastFinish = null
   let lastBlock = null
+  let responseDiagnostic = ''
 
   for (let iter = 0; iter < 6; iter++) {
     onStatus?.(iter === 0 ? '思考中...' : '继续思考...')
@@ -484,6 +485,7 @@ async function callWithTools({
       }
       if (!resp.ok) throw new Error('OpenAI ' + resp.status + ': ' + (await resp.text()).slice(0, 200))
       const data = await streamOpenAIMessage(resp, (t) => { streamedOut = true; onChunk?.(t) }, onThinking)
+      responseDiagnostic = mergeResponseDiagnostic(responseDiagnostic, data.responseDiagnostic)
       lastFinish = data.finish_reason
       if (data.usage) accUsage(usage, {
         // OpenAI 官方: prompt_tokens_details.cached_tokens；DeepSeek: prompt_cache_hit_tokens
@@ -569,6 +571,7 @@ async function callWithTools({
       })
       if (!resp.ok) throw new Error('Anthropic ' + resp.status + ': ' + (await resp.text()).slice(0, 200))
       const data = await streamAnthropicBlocks(resp, (t) => { streamedOut = true; onChunk?.(t) }, onThinking)
+      responseDiagnostic = mergeResponseDiagnostic(responseDiagnostic, data.responseDiagnostic)
       lastFinish = data.stop_reason
       if (data.usage) {
         // Anthropic 的 input_tokens 不含缓存部分，归一化成总输入便于算命中率
@@ -610,6 +613,7 @@ async function callWithTools({
       const resp = await geminiFetch(url, connection.apiKey, JSON.stringify(body))
       if (!resp.ok) throw new Error('Gemini ' + resp.status + ': ' + (await resp.text()).slice(0, 200))
       const data = await streamGeminiParts(resp, (t) => { streamedOut = true; onChunk?.(t) })
+      responseDiagnostic = mergeResponseDiagnostic(responseDiagnostic, data.responseDiagnostic)
       const gu = data.usageMetadata
       if (gu) accUsage(usage, { p: gu.promptTokens, c: gu.completionTokens, cached: gu.cachedTokens })
       lastFinish = data.candidates?.[0]?.finishReason
@@ -632,9 +636,9 @@ async function callWithTools({
   }
 
   // 空回一律抛错，别当成一次正常回复落盘（详见 assertNotEmpty 上方注释）
-  assertNotEmpty({ text: finalText }, { provider, finishReason: lastFinish, blockReason: lastBlock })
+  assertNotEmpty({ text: finalText, responseDiagnostic }, { provider, finishReason: lastFinish, blockReason: lastBlock })
   if (!streamedOut) onChunk?.(finalText)
-  return { text: finalText, usage }
+  return { text: finalText, usage, responseDiagnostic: responseDiagnostic || undefined }
 }
 
 // ─── Streaming (no tools) ───────────────────────────────────────────────────
@@ -827,6 +831,28 @@ function releaseSentinelSafe(s) {
   return m ? [t.slice(0, m.index), t.slice(m.index)] : [t, '']
 }
 
+// 只保留真正异常的响应片段，不把每次正常聊天全文重复存一份。
+// 内容先脱敏、剥掉巨大的 data URL，再限制总长；它会随消息存进 IndexedDB，
+// 出问题时可以在气泡下方展开查看，退出重进后也还在。
+const RESPONSE_DIAGNOSTIC_MAX = 12000
+function sanitizeResponseDiagnostic(raw) {
+  let text
+  try { text = typeof raw === 'string' ? raw : JSON.stringify(raw) } catch { text = String(raw) }
+  text = text.replace(/data:[^;,\s]+;base64,[A-Za-z0-9+/_=-]+/gi, '[图片数据已省略]')
+  return redactSecrets(text).slice(0, RESPONSE_DIAGNOSTIC_MAX)
+}
+function mergeResponseDiagnostic(current, raw, label = '') {
+  const clean = sanitizeResponseDiagnostic(raw)
+  if (!clean) return current || ''
+  const entry = label ? `[${label}]\n${clean}` : clean
+  const joined = current ? `${current}\n\n${entry}` : entry
+  return joined.slice(0, RESPONSE_DIAGNOSTIC_MAX)
+}
+function attachResponseDiagnostic(error, diagnostic) {
+  if (diagnostic) error.responseDiagnostic = sanitizeResponseDiagnostic(diagnostic)
+  return error
+}
+
 async function streamOpenAIMessage(resp, onText, onThinking) {
   const reader = resp.body.getReader()
   const decoder = new TextDecoder()
@@ -838,6 +864,7 @@ async function streamOpenAIMessage(resp, onText, onThinking) {
   let pending = ''   // 还没放行的正文
   let gated = false  // 撞上疑似 JSON 后就一直扣着
   let dropped = 0    // 解析失败被丢弃的 SSE 事件数
+  let responseDiagnostic = ''
 
   const flushText = () => {
     if (gated) return
@@ -861,7 +888,12 @@ async function streamOpenAIMessage(resp, onText, onThinking) {
     const raw = line.slice(6)
     if (raw === '[DONE]') return
     let json
-    try { json = JSON.parse(raw) } catch { dropped++; warnBadEvent(raw); return }
+    try { json = JSON.parse(raw) } catch {
+      dropped++
+      responseDiagnostic = mergeResponseDiagnostic(responseDiagnostic, raw, 'OpenAI SSE 解析失败')
+      warnBadEvent(raw)
+      return
+    }
 
     if (json.usage) {
       usage.promptTokens = json.usage.prompt_tokens || 0
@@ -901,7 +933,7 @@ async function streamOpenAIMessage(resp, onText, onThinking) {
   const filled = toolCalls.filter(Boolean)
   if (filled.length) msg.tool_calls = filled
   msg.content = stripSentinel(msg.content) + badEventNote(dropped)   // 气泡最终落的是这个，被拆开的哨兵在这里补剥
-  return { message: msg, finish_reason: finishReason, usage }
+  return { message: msg, finish_reason: finishReason, usage, responseDiagnostic: responseDiagnostic || undefined }
 }
 
 // ─── SSE 坏事件记账 ─────────────────────────────────────────────────────────
@@ -960,7 +992,10 @@ function emptyReplyError(rawProvider, finishReason, blockReason) {
 function assertNotEmpty(result, { provider, finishReason, blockReason }) {
   const body = String(result?.text || '').replace(EMPTY_NOTE_RE, '').trim()
   if (body) return result
-  throw emptyReplyError(provider, finishReason, blockReason)
+  throw attachResponseDiagnostic(
+    emptyReplyError(provider, finishReason, blockReason),
+    result?.responseDiagnostic
+  )
 }
 
 // Anthropic 流式 + 工具调用：把 SSE 事件还原成一条完整的 message.content 块数组，
@@ -974,13 +1009,19 @@ async function streamAnthropicBlocks(resp, onText, onThinking) {
   let buf = ''
   let dropped = 0    // 解析失败被丢弃的 SSE 事件数
   let stopReason = null
+  let responseDiagnostic = ''
 
   const handleLine = (line) => {
     if (!line.startsWith('data: ')) return
     const raw = line.slice(6)
     if (raw === '[DONE]') return
     let json
-    try { json = JSON.parse(raw) } catch { dropped++; warnBadEvent(raw); return }
+    try { json = JSON.parse(raw) } catch {
+      dropped++
+      responseDiagnostic = mergeResponseDiagnostic(responseDiagnostic, raw, 'Anthropic SSE 解析失败')
+      warnBadEvent(raw)
+      return
+    }
 
     if (json.type === 'message_start') {
       const u = json.message?.usage
@@ -1014,7 +1055,12 @@ async function streamAnthropicBlocks(resp, onText, onThinking) {
         // 攒齐的入参 JSON 解析不了 → 以前静默变成 {}，工具就带着一手空参数被调用了。
         // 参数照旧兜底成 {}（让工具自己报错给模型看，能自我纠正），但账要记上。
         try { b.input = b._json ? JSON.parse(b._json) : {} }
-        catch { b.input = {}; dropped++; warnBadEvent(`tool_use[${b.name}] 入参：${b._json}`) }
+        catch {
+          b.input = {}
+          dropped++
+          responseDiagnostic = mergeResponseDiagnostic(responseDiagnostic, b._json, `Anthropic 工具参数解析失败：${b.name}`)
+          warnBadEvent(`tool_use[${b.name}] 入参：${b._json}`)
+        }
         delete b._json
       }
       return
@@ -1038,7 +1084,7 @@ async function streamAnthropicBlocks(resp, onText, onThinking) {
 
   for (const b of blocks) if (b && typeof b.text === 'string') b.text = stripSentinel(b.text)
   if (dropped) blocks.push({ type: 'text', text: badEventNote(dropped) })
-  return { content: blocks.filter(Boolean), usage, stop_reason: stopReason }
+  return { content: blocks.filter(Boolean), usage, stop_reason: stopReason, responseDiagnostic: responseDiagnostic || undefined }
 }
 
 // Gemini 流式 + 工具调用：把 SSE 事件还原成非流式 candidates[0].content.parts 的形状。
@@ -1053,6 +1099,7 @@ async function streamGeminiParts(resp, onText) {
   let blockReason = null
   let buf = ''
   let dropped = 0
+  let responseDiagnostic = ''
   // Gemini 带工具这条路以前一直没记账（非流式那版压根没读 usageMetadata），
   // 而言叽日常聊天工具是常挂的——等于用量监控页里 Gemini 的账一直是缺的。
   // 流式响应本来就带 usageMetadata，顺手接上。
@@ -1085,7 +1132,12 @@ async function streamGeminiParts(resp, onText) {
     const raw = line.slice(6)
     if (raw === '[DONE]') return
     let json
-    try { json = JSON.parse(raw) } catch { dropped++; warnBadEvent(raw); return }
+    try { json = JSON.parse(raw) } catch {
+      dropped++
+      responseDiagnostic = mergeResponseDiagnostic(responseDiagnostic, raw, 'Gemini SSE 解析失败')
+      warnBadEvent(raw)
+      return
+    }
 
     const candidate = json.candidates?.[0]
     if (candidate?.finishReason) finishReason = candidate.finishReason
@@ -1138,6 +1190,7 @@ async function streamGeminiParts(resp, onText) {
     candidates: [{ content: { parts }, finishReason }],
     promptFeedback: blockReason ? { blockReason } : undefined,
     usageMetadata: usage,
+    responseDiagnostic: responseDiagnostic || undefined,
   }
 }
 
@@ -1149,6 +1202,7 @@ async function streamSSE(resp, parseLine, onChunk, extractUsage) {
   let buf = ''  // SSE 事件可能被 TCP 分包截断，跨 read 缓冲半行避免 JSON 解析失败丢数据
   let pendingOut = ''  // 末尾疑似半个 [done] 哨兵，攒着等下一块拼齐
   let dropped = 0      // 解析失败被丢弃的 SSE 事件数
+  let responseDiagnostic = ''
 
   const handleLine = (line) => {
     if (!line.startsWith('data: ')) return
@@ -1171,6 +1225,7 @@ async function streamSSE(resp, parseLine, onChunk, extractUsage) {
       }
     } catch {
       dropped++
+      responseDiagnostic = mergeResponseDiagnostic(responseDiagnostic, data, 'SSE 解析失败')
       warnBadEvent(data)
     }
   }
@@ -1188,7 +1243,11 @@ async function streamSSE(resp, parseLine, onChunk, extractUsage) {
   if (usage) {
     usage.totalTokens = (usage.promptTokens || 0) + (usage.completionTokens || 0)
   }
-  return { text: stripSentinel(fullText) + badEventNote(dropped), usage }
+  return {
+    text: stripSentinel(fullText) + badEventNote(dropped),
+    usage,
+    responseDiagnostic: responseDiagnostic || undefined,
+  }
 }
 
 // ─── Message format helpers ─────────────────────────────────────────────────
