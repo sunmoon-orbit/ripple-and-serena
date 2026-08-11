@@ -1,4 +1,4 @@
-// 从 llm.js 里抠出真实的 streamGeminiParts 函数体来测，不测复制品。
+// 从 llm.js 里抠出真实的流解析/判错函数来测，不测复制品。
 import fs from 'fs'
 import vm from 'vm'
 
@@ -10,8 +10,9 @@ function grab(name) {
   // 从函数名往前退到行首（可能有 async / 注释）
   let s = src.lastIndexOf('\n', start) + 1
   if (src.slice(s, start).trim() === 'async') s = src.lastIndexOf('\n', s - 2) + 1
-  let depth = 0, i = src.indexOf('{', start)
-  const from = i
+  // 不能拿函数名后的第一个 `{`：参数可能是对象解构（例如
+  // `fn(result, { provider })`），那会把参数的右花括号误认成函数结尾。
+  let depth = 0, i = src.indexOf('{', src.indexOf(') {', start))
   for (; i < src.length; i++) {
     if (src[i] === '{') depth++
     else if (src[i] === '}') { depth--; if (depth === 0) break }
@@ -19,17 +20,39 @@ function grab(name) {
   return src.slice(s, i + 1)
 }
 
-const ctx = { console, TextDecoder }
+const ctx = { console, TextDecoder, redactSecrets: (value) => value }
 vm.createContext(ctx)
 vm.runInContext([
   src.match(/^const SENTINEL_RE = .*$/m)[0],
+  src.match(/^const RESPONSE_DIAGNOSTIC_MAX = .*$/m)[0],
+  src.match(/^const EMPTY_NOTE_RE = .*$/m)[0],
+  src.match(/^const PROVIDER_LABEL = .*$/m)[0],
   grab('stripSentinel'),
+  grab('releaseSentinelSafe'),
+  grab('readSseData'),
+  grab('sanitizeResponseDiagnostic'),
+  grab('mergeResponseDiagnostic'),
+  grab('attachResponseMetadata'),
   grab('warnBadEvent'),
   grab('badEventNote'),
+  grab('emptyReplyError'),
+  grab('incompleteReplyError'),
+  grab('assertStreamComplete'),
+  grab('hasNamedCompatibilityError'),
+  grab('isPromptCacheKeyCompatibilityError'),
+  grab('isToolsCompatibilityError'),
   grab('streamGeminiParts'),
-  '__fn = streamGeminiParts;',
+  grab('streamSSE'),
+  '__fns = { streamGeminiParts, streamSSE, assertStreamComplete, sanitizeResponseDiagnostic, isPromptCacheKeyCompatibilityError, isToolsCompatibilityError };',
 ].join('\n\n'), ctx)
-const streamGeminiParts = ctx.__fn
+const {
+  streamGeminiParts,
+  streamSSE,
+  assertStreamComplete,
+  sanitizeResponseDiagnostic,
+  isPromptCacheKeyCompatibilityError,
+  isToolsCompatibilityError,
+} = ctx.__fns
 
 // 把若干字符串块伪装成 resp.body.getReader()
 function fakeResp(chunks) {
@@ -117,6 +140,64 @@ const check = (name, cond, extra = '') => {
   console.log('用例6 blockReason：')
   check('捕获到 SAFETY', d.promptFeedback?.blockReason === 'SAFETY')
   check('正文为空', d.candidates[0].content.parts.length === 0)
+}
+
+// ── 7. 合法 SSE 可以没有 data 后空格，也可以用 CRLF ───────────────────
+{
+  const got = []
+  const payload = JSON.stringify({ choices: [{ delta: { content: '没漏字' } }] })
+  const d = await streamSSE(
+    fakeResp([`data:${payload}\r\n\r\ndata:[DONE]\r\n\r\n`]),
+    (json) => json.choices?.[0]?.delta?.content,
+    (text) => got.push(text),
+  )
+  console.log('用例7 SSE 空格与 CRLF 兼容：')
+  check('正文解析成功', d.text === '没漏字', d.text)
+  check('终止事件被识别', d.streamComplete === true, String(d.streamComplete))
+  check('UI 收到增量', got.join('') === '没漏字', JSON.stringify(got))
+}
+
+// ── 8. 回调里的编程错误必须冒出去，不能伪装成「坏数据包」──────────────
+{
+  let thrown = null
+  try {
+    await streamSSE(
+      fakeResp([ev({ value: 'hello' }), 'data: [DONE]\n\n']),
+      () => { throw new TypeError('callback exploded') },
+      () => {},
+    )
+  } catch (error) { thrown = error }
+  console.log('用例8 回调异常：')
+  check('真实异常没有被吞', thrown?.message === 'callback exploded', thrown?.message)
+}
+
+// ── 9. 半句断流要报错，并把已收到的 usage 带给上层记账 ────────────────
+{
+  let thrown = null
+  const partial = {
+    text: '只收到半句',
+    usage: { promptTokens: 100, completionTokens: 8, totalTokens: 108 },
+    streamComplete: false,
+  }
+  try { assertStreamComplete(partial, { provider: 'OpenAI' }) } catch (error) { thrown = error }
+  console.log('用例9 半句断流：')
+  check('判为 connection closed', /connection closed/i.test(thrown?.message || ''), thrown?.message)
+  check('usage 没丢', thrown?.usage?.totalTokens === 108, JSON.stringify(thrown?.usage))
+}
+
+// ── 10. 400 兼容重试只能在错误明确点名字段时触发 ──────────────────────
+{
+  console.log('用例10 OpenAI 400 回退判据：')
+  check('明确拒绝 prompt_cache_key 会回退', isPromptCacheKeyCompatibilityError("Unknown parameter: 'prompt_cache_key'"))
+  check('仅 unsupported model 不会重复请求', !isPromptCacheKeyCompatibilityError('This model is unsupported'))
+  check('明确不支持 tool calls 会回退', isToolsCompatibilityError('This model does not support tool calls'))
+  check('无关 invalid request 不会删工具重试', !isToolsCompatibilityError('Invalid request: model is offline'))
+}
+
+// ── 11. 正常响应没有诊断字段时不能再因 undefined.replace 崩溃 ─────────
+{
+  console.log('用例11 空诊断：')
+  check('undefined 安全返回空串', sanitizeResponseDiagnostic(undefined) === '')
 }
 
 console.log(`\n通过 ${pass}，失败 ${fail}`)

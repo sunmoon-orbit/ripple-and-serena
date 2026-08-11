@@ -1,6 +1,22 @@
+self.addEventListener('install', (event) => {
+  // 新版本一部署就接管，不让旧 service worker 在后台继续等到所有窗口关闭。
+  event.waitUntil(self.skipWaiting())
+})
+
+self.addEventListener('activate', (event) => {
+  event.waitUntil(self.clients.claim())
+})
+
 self.addEventListener('fetch', (event) => {
   // pass-through: no offline caching, just satisfy PWA install criteria
-  event.respondWith(fetch(event.request))
+  // HTML 导航强制重新验证，避免 APK/WebView 退出重进后仍拿到旧 index.html，
+  // 进而继续加载已经修掉 bug 的旧 bundle；带 hash 的静态资源照常走浏览器缓存。
+  const request = event.request
+  event.respondWith(
+    request.mode === 'navigate'
+      ? fetch(request, { cache: 'no-store' })
+      : fetch(request)
+  )
 })
 
 self.addEventListener('push', (event) => {

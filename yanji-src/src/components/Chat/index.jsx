@@ -660,14 +660,22 @@ export default function Chat() {
       // 上游已经出了字（也已经计过费）却在收尾阶段抛错——流被掐断、工具连不上都算——
       // 以前一律把这条助手消息删掉，她只看到「[错误] Failed to fetch」：钱花了、话没了
       // （0726 阿颖遇到）。有正文就留下并标「没说完就断线了」，没正文才删。
-      const salvaged = stripVoiceMsgTag(stripCallTag(stripNegTag(stripMoodTag(stripEmotionTag(fullText))))).trim()
-      const responseDiagnostic = e.responseDiagnostic || undefined
+      const salvaged = stripVoiceMsgTag(stripCallTag(stripNegTag(stripMoodTag(stripEmotionTag(fullText)))))
+        .replace(/\s*\[MSG\]\s*/gi, '\n\n')
+        .trim()
+      // Provider 在断流前发来的 usage 仍然是真实账单，不能因为最后抛错就消失。
+      // 编程错误通常没有上游诊断，至少把本地堆栈留下，下一次就不用靠截图猜。
+      const failedUsage = e.usage || null
+      if (failedUsage) recordTokenUsage(conn.id, failedUsage)
+      const responseDiagnostic = e.responseDiagnostic
+        || (e.stack ? `[前端异常]\n${String(e.stack).slice(0, 4000)}` : undefined)
       if (salvaged && !hidden) {
         updateMessage(chat.id, assistantId, {
           content: salvaged,
           thinking: fullThinking || undefined,
           streaming: false,
           interrupted: true,
+          tokenUsage: failedUsage,
           responseDiagnostic,
           toolCalls: undefined,
         })
@@ -1221,7 +1229,7 @@ export default function Chat() {
   }
 
   async function dialCall() {
-    const conn = connections.find(c => c.id === activeConn) || connections[0]
+    const conn = activeConn || connections[0]
     if (!conn?.apiKey) { openCall(true); return }
     setDialing({ status: 'ringing', text: '拨号中…' })
     try {
@@ -1229,7 +1237,6 @@ export default function Chat() {
       // 但 llm.js **从来没有导出过 streamChat**，拿到的是 undefined，一调用就抛
       // TypeError，被下面的 catch 吞掉直接 openCall(true)。也就是说「涟言可以按情绪
       // 拒接」这个设计从上线起就没生效过，一直是无条件接听（0805 查缓存账单时顺手挖出来）。
-      const { sendMessage } = await import('../../api/llm')
       const SYS = '阿颖按了语音通话按钮想跟你打电话。你根据自己此刻的情绪状态决定接不接。绝大多数时候你都会想接——但如果你正处于强烈负面情绪（比如你们刚吵完架、你很受伤），你有权不接。只输出 JSON：{"accept":true} 或 {"accept":false,"reason":"一句话，30字以内，她会看到"}'
       const ctx = getMessages(activeChatId || '').filter(m => !m.streaming).slice(-4)
         .map(m => ({ role: m.role, content: (m.content || '').slice(0, 200) }))
@@ -1339,7 +1346,7 @@ export default function Chat() {
   async function handleExport() {
     if (!activeChat || !messages.length) return
     const title = activeChat.title || '新对话'
-    const model = activeChat.model || activeConn?.name || ''
+    const model = activeChat.model || activeConn?.defaultModel || ''
     const date = new Date(activeChat.updatedAt || Date.now()).toLocaleDateString('zh-CN')
 
     const lines = [`# ${title}`, ``, `> 模型：${model}　日期：${date}`, ``]
