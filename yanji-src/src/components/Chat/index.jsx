@@ -596,6 +596,7 @@ export default function Chat() {
         thinking: fullThinking || undefined,
         streaming: false,
         tokenUsage: result.usage || null,
+        responseDiagnostic: result.responseDiagnostic || undefined,
         toolCalls: undefined,
         files: genFiles.length ? genFiles : undefined,
         voiceMsg: asVoice || undefined,
@@ -660,31 +661,51 @@ export default function Chat() {
       // 以前一律把这条助手消息删掉，她只看到「[错误] Failed to fetch」：钱花了、话没了
       // （0726 阿颖遇到）。有正文就留下并标「没说完就断线了」，没正文才删。
       const salvaged = stripVoiceMsgTag(stripCallTag(stripNegTag(stripMoodTag(stripEmotionTag(fullText))))).trim()
+      const responseDiagnostic = e.responseDiagnostic || undefined
       if (salvaged && !hidden) {
         updateMessage(chat.id, assistantId, {
           content: salvaged,
           thinking: fullThinking || undefined,
           streaming: false,
           interrupted: true,
+          responseDiagnostic,
           toolCalls: undefined,
         })
       } else if (MID_STREAM_CUT_RE.test(e.message || '') && !retried && !hidden) {
-        // 一个字都没出来就断线：上游其实已经在生成（钱也已经计了），是连接被中途掐断。
-        // 自动重试一次——刚才那次请求已经把缓存写进去了（阿颖 0728 的截图：写入 16511 tokens），
-        // 重试正好命中读缓存，几乎不要钱，比让她看一个光秃秃的 [错误] 再手动重发划算。
-        // 只重一次，避免上游真挂了的时候无限烧钱。
-        removeLastEmptyAssistant(chat.id)
-        setStatus('断线了，正在重试…')
-        await new Promise((r) => setTimeout(r, 800))
-        return generateReplyRef.current?.(chat, conn, { titleText, hidden, voicemail, retried: true })
+        // 一个字都没出来就断线时，上游可能已经生成并计费。以前这里会直接再请求一次；
+        // 缓存通常能让第二次很便宜，但中转不保证命中，最坏会再扣一遍。
+        // 把决定交给阿颖：确认才重试，取消就保留报错和诊断，不悄悄花第二笔。
+        const shouldRetry = window.confirm(
+          '这次请求可能已经生成并计费，但言叽没有收到正文。\n\n' +
+          '现在重试可能再次扣费。要重试一次吗？\n\n' +
+          '点“确定”重试；点“取消”停止并保留错误信息。'
+        )
+        if (shouldRetry) {
+          removeLastEmptyAssistant(chat.id)
+          setStatus('按你的选择重试中…')
+          await new Promise((r) => setTimeout(r, 800))
+          return generateReplyRef.current?.(chat, conn, { titleText, hidden, voicemail, retried: true })
+        }
+        if (fullThinking) {
+          updateMessage(chat.id, assistantId, {
+            content: '（这轮的话还没说出口就断了，思考留在上面）',
+            thinking: fullThinking,
+            streaming: false,
+            interrupted: true,
+            responseDiagnostic,
+            toolCalls: undefined,
+          })
+        } else {
+          removeLastEmptyAssistant(chat.id)
+        }
       } else if (fullThinking && !hidden) {
-        // 重试也没成/或不是断线：正文虽然空，但思考已经出来了（钱花在这儿了）。
-        // 留下来给她看，别只剩一个 [错误]（0728 阿颖：输出 1302 tokens 全在思考里）。
+        // 正文虽然空，但思考已经出来了（钱花在这儿了），留下来别只剩一个报错。
         updateMessage(chat.id, assistantId, {
           content: '（这轮的话还没说出口就断了，思考留在上面）',
           thinking: fullThinking,
           streaming: false,
           interrupted: true,
+          responseDiagnostic,
           toolCalls: undefined,
         })
       } else {
@@ -704,13 +725,25 @@ export default function Chat() {
             updateMessage(chat.id, m.id, { images: undefined, content: (m.content || '') + '\n[图片，该模型不支持]' })
           }
         })
-        addMessage(chat.id, { role: 'assistant', content: '[错误] 该模型不支持图片，已自动清除历史中的图片，可以继续对话。' })
+        addMessage(chat.id, {
+          role: 'assistant',
+          content: '[错误] 该模型不支持图片，已自动清除历史中的图片，可以继续对话。',
+          responseDiagnostic,
+        })
       } else if (/contentFilter|1301|敏感内容|content_filter|内容安全/i.test(e.message || '')) {
         // 上游内容审查拒稿（智谱国版 1301 等）：审查发生在对方服务器上，
         // 中间层拦不住——把一坨 JSON 翻译成人话+能做的事（2026-07-19 阿颖被 GLM 拒稿）
-        addMessage(chat.id, { role: 'assistant', content: '[错误] 上游模型的内容审查把这条拦下了（国内版 API 自带的合规层，发生在对方服务器上，咱们这边过滤不掉）。可以试试：换个说法重发、或在连接设置里切到海外版/中转站的同款模型。你发的消息还在，不用重打。' })
+        addMessage(chat.id, {
+          role: 'assistant',
+          content: '[错误] 上游模型的内容审查把这条拦下了（国内版 API 自带的合规层，发生在对方服务器上，咱们这边过滤不掉）。可以试试：换个说法重发、或在连接设置里切到海外版/中转站的同款模型。你发的消息还在，不用重打。',
+          responseDiagnostic,
+        })
       } else {
-        addMessage(chat.id, { role: 'assistant', content: `[错误] ${e.message}` })
+        addMessage(chat.id, {
+          role: 'assistant',
+          content: `[错误] ${e.message}`,
+          responseDiagnostic,
+        })
       }
       showToast(e.message, 'error')
     } finally {
