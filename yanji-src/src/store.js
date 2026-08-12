@@ -123,6 +123,48 @@ function sweepStaleStreaming(map) {
   return map
 }
 
+function limitMessagesForContext(messages, contextLimit) {
+  const mode = contextLimit?.mode || 'none'
+  if (mode === 'none') return messages
+
+  // 「轮数」必须按 user 轮次算，不能把 [MSG] 拆出的 2～3 个 assistant 气泡
+  // 各算一轮。旧算法 maxRounds * 2 会让 40 轮实际只剩约 20 轮，而且裁剪锚点
+  // 每几轮就跳一次，整段 prompt cache 随之失效。
+  if (mode === 'rounds') {
+    const maxRounds = Math.max(1, contextLimit.maxRounds || 50)
+    const userStarts = []
+    for (let i = 0; i < messages.length; i++) {
+      if (messages[i]?.role === 'user' && messages[i - 1]?.role !== 'user') userStarts.push(i)
+    }
+    if (userStarts.length <= maxRounds) return messages
+
+    // 每四分之一窗口移动一次切点；同一段里的新消息只扩展尾部，不动缓存前缀。
+    const stepRounds = Math.max(1, Math.floor(maxRounds / 4))
+    const excessRounds = userStarts.length - maxRounds
+    const cutRounds = Math.min(
+      userStarts.length - 1,
+      Math.ceil(excessRounds / stepRounds) * stepRounds,
+    )
+    return messages.slice(userStarts[cutRounds])
+  }
+
+  if (mode === 'tokens') {
+    const maxTok = contextLimit.maxTokens || 30000
+    let total = 0
+    let minCut = 0
+    for (let i = messages.length - 1; i >= 0; i--) {
+      total += estimateTokens(messages[i].content)
+      if (total > maxTok && i < messages.length - 1) { minCut = i + 1; break }
+    }
+    if (minCut === 0) return messages
+    const step = 8
+    let cut = Math.ceil(minCut / step) * step
+    if (cut >= messages.length) cut = messages.length - 1
+    return messages.slice(cut)
+  }
+  return messages
+}
+
 // ─── 落盘：设置走 localStorage（同步、小），聊天记录走 IndexedDB（异步、大） ───
 let bigHydrated = false   // IndexedDB 里的聊天记录读回来了没有——没读回来之前绝不回写，免得拿空状态盖掉真数据
 let bigFailed = false     // IndexedDB 彻底不可用（隐私模式之类）时退回老办法：全塞 localStorage
@@ -448,34 +490,7 @@ export const useStore = create((set, get) => ({
     })
   },
   applyContextLimit: (messages) => {
-    const { contextLimit } = get()
-    const mode = contextLimit?.mode || 'none'
-    if (mode === 'none') return messages
-    // 锚点式裁剪：切点按 step 对齐，只在跨过边界时才移动。
-    // 滑动窗口（slice(-max)）每条消息都改变开头，破坏 prompt 缓存的前缀匹配；
-    // 量化切点让前缀在多轮内保持稳定，代价是窗口比 max 略小。
-    if (mode === 'rounds') {
-      const max = (contextLimit.maxRounds || 50) * 2
-      if (messages.length <= max) return messages
-      const step = Math.max(2, Math.floor(max / 4) * 2)
-      const cut = Math.ceil((messages.length - max) / step) * step
-      return messages.slice(cut)
-    }
-    if (mode === 'tokens') {
-      const maxTok = contextLimit.maxTokens || 30000
-      let total = 0
-      let minCut = 0
-      for (let i = messages.length - 1; i >= 0; i--) {
-        total += estimateTokens(messages[i].content)
-        if (total > maxTok && i < messages.length - 1) { minCut = i + 1; break }
-      }
-      if (minCut === 0) return messages
-      const step = 8
-      let cut = Math.ceil(minCut / step) * step
-      if (cut >= messages.length) cut = messages.length - 1
-      return messages.slice(cut)
-    }
-    return messages
+    return limitMessagesForContext(messages, get().contextLimit)
   },
 
   // ─── summaries (context compaction) ───────────────────────────────
