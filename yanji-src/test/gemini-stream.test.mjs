@@ -41,9 +41,12 @@ vm.runInContext([
   grab('hasNamedCompatibilityError'),
   grab('isPromptCacheKeyCompatibilityError'),
   grab('isToolsCompatibilityError'),
+  grab('parseProviderHttpMessage'),
+  grab('providerRequestSummary'),
+  grab('providerHttpError'),
   grab('streamGeminiParts'),
   grab('streamSSE'),
-  '__fns = { streamGeminiParts, streamSSE, assertStreamComplete, sanitizeResponseDiagnostic, isPromptCacheKeyCompatibilityError, isToolsCompatibilityError };',
+  '__fns = { streamGeminiParts, streamSSE, assertStreamComplete, sanitizeResponseDiagnostic, isPromptCacheKeyCompatibilityError, isToolsCompatibilityError, providerHttpError };',
 ].join('\n\n'), ctx)
 const {
   streamGeminiParts,
@@ -52,6 +55,7 @@ const {
   sanitizeResponseDiagnostic,
   isPromptCacheKeyCompatibilityError,
   isToolsCompatibilityError,
+  providerHttpError,
 } = ctx.__fns
 
 // 把若干字符串块伪装成 resp.body.getReader()
@@ -198,6 +202,27 @@ const check = (name, cond, extra = '') => {
 {
   console.log('用例11 空诊断：')
   check('undefined 安全返回空串', sanitizeResponseDiagnostic(undefined) === '')
+}
+
+// ── 12. 上游 429 不能伪装成前端崩溃，也不能在气泡里铺满追踪号 ────────
+{
+  const requestId = '202608120407539932196948268d9d6VCkWU3VP'
+  const raw = JSON.stringify({ error: { message: `暂不可用，请切换模型，小梦加速修复中(${requestId})`, type: 'rate_limited' } })
+  const error = providerHttpError('OpenAI', 429, raw, {
+    model: 'ver-ant-test', messages: [{ role: 'user', content: '不应进入诊断' }],
+    tools: [{ type: 'function' }], stream: true, max_tokens: 4096,
+    user: 'secret-chat-id', prompt_cache_key: 'secret-chat-id',
+  })
+  console.log('用例12 OpenAI 429 诊断：')
+  check('明确标成上游错误', error.isProviderError === true && error.status === 429)
+  check('气泡不展示长追踪号', !error.message.includes(requestId), error.message)
+  check('说明没有自动重试', error.message.includes('未自动重试'), error.message)
+  check('诊断保留上游追踪号', error.responseDiagnostic.includes(requestId))
+  check('诊断只有请求轮廓，不含消息正文和路由键值',
+    error.responseDiagnostic.includes('messages: 1') &&
+    error.responseDiagnostic.includes('tools: 1') &&
+    !error.responseDiagnostic.includes('不应进入诊断') &&
+    !error.responseDiagnostic.includes('secret-chat-id'))
 }
 
 console.log(`\n通过 ${pass}，失败 ${fail}`)
