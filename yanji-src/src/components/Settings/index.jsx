@@ -1068,7 +1068,7 @@ export default function Settings() {
                   <input className="form-input form-input-sm" type="number" min="0" max="2" step="0.1" value={generationConfig.temperature ?? 0.7} onChange={(e) => setGenerationConfig({ temperature: Number(e.target.value) })} />
                 </div>
                 <div className="card-row">
-                  <span className="card-row-label">Max Tokens</span>
+                  <span className="card-row-label">最大输出 Tokens</span>
                   <input className="form-input form-input-sm" type="number" min="256" max="32000" step="256" value={generationConfig.maxTokens ?? 4096} onChange={(e) => setGenerationConfig({ maxTokens: Number(e.target.value) })} />
                 </div>
               </div>

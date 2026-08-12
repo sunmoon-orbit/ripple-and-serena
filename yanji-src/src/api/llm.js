@@ -8,6 +8,7 @@ import { FATE_TOOL_DEF, executeFateDraw } from './fateDeck'
 import { TAROT_TOOL_DEF, executeTarot } from './tarot'
 import { NOWHERE_TOOL_DEFS, executeNowhereTool } from './nowhere'
 import { buildMoodFxPrompt } from '../utils/moodFx'
+import { normalizeGenerationConfig } from '../utils/generationConfig'
 
 export function normalizeProvider(raw) {
   const v = (raw || '').toString().toLowerCase()
@@ -378,6 +379,9 @@ export async function sendMessage({
   const provider = normalizeProvider(connection.provider)
   const usedModel = (model || connection.defaultModel || '').trim()
   if (!usedModel) throw new Error('未设置模型')
+  // Max Tokens 是输出上限，不是上下文窗口。旧备份/手动输入可能留下超大值；
+  // 各家严格线路会把它当成非法请求直接 400，所以请求出口必须再兜一次底。
+  const safeGenerationConfig = normalizeGenerationConfig(generationConfig)
 
   const tools = autoTools !== false ? getAllTools(searchConfig, moonMemoryConfig, onFile) : []
   const hasTools = tools.length > 0 && checkToolSupport(provider, usedModel)
@@ -385,12 +389,12 @@ export async function sendMessage({
   if (hasTools) {
     return await callWithTools({
       connection, messages, systemPrompt: systemPrompt ? systemPrompt + '\n\n' + TOOL_BATCH_PROMPT : TOOL_BATCH_PROMPT,
-      dynamicContext, model: usedModel, generationConfig,
+      dynamicContext, model: usedModel, generationConfig: safeGenerationConfig,
       tools, provider, searchConfig, moonMemoryConfig, onChunk, onThinking, onStatus, onToolCall, onFile, cacheKey,
     })
   }
   return await callStream({
-    connection, messages, systemPrompt, dynamicContext, model: usedModel, generationConfig, provider, onChunk, onThinking, cacheKey,
+    connection, messages, systemPrompt, dynamicContext, model: usedModel, generationConfig: safeGenerationConfig, provider, onChunk, onThinking, cacheKey,
   })
 }
 

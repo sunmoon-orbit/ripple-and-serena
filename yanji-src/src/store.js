@@ -2,6 +2,7 @@ import { create } from 'zustand'
 import { uuid, estimateTokens } from './utils'
 import { bigGet, bigSet } from './utils/bigStore'
 import { showToast } from './components/Toast'
+import { normalizeGenerationConfig } from './utils/generationConfig'
 
 const LOCAL_KEY = 'llm_hub_state_v1'
 // 聊天记录和摘要不再进 localStorage（约 5MB 配额，撑满之后**所有**写入一起失败，
@@ -236,9 +237,11 @@ function mergeWithDefaults(persisted) {
   if (!Array.isArray(s.connections)) s.connections = []
   if (!Array.isArray(s.chats)) s.chats = []
   if (!s.messagesByChatId || typeof s.messagesByChatId !== 'object') s.messagesByChatId = {}
-  if (!s.generationConfig || typeof s.generationConfig !== 'object') {
-    s.generationConfig = { ...DEFAULT_STATE.generationConfig }
-  }
+  s.generationConfig = normalizeGenerationConfig(
+    s.generationConfig && typeof s.generationConfig === 'object'
+      ? { ...DEFAULT_STATE.generationConfig, ...s.generationConfig }
+      : DEFAULT_STATE.generationConfig,
+  )
   if (!s.moonMemory || typeof s.moonMemory !== 'object') {
     s.moonMemory = { ...DEFAULT_STATE.moonMemory }
   }
@@ -525,7 +528,7 @@ export const useStore = create((set, get) => ({
   },
   setGenerationConfig: (patch) => {
     set((s) => {
-      const generationConfig = { ...s.generationConfig, ...patch }
+      const generationConfig = normalizeGenerationConfig({ ...s.generationConfig, ...patch })
       savePersistedState({ ...s, generationConfig })
       return { generationConfig }
     })
