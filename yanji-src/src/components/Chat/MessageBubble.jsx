@@ -6,6 +6,7 @@ import { formatTime, splitTranslation } from '../../utils'
 import { useStore } from '../../store'
 import { synthesizeSpeech } from '../../api/moonMemory'
 import MusicCard from './MusicCard'
+import { shouldToggleMessageMeta } from './messageMetaToggle'
 import { applyInlineFx, stripInlineFx, stripEnglishTags } from '../../utils/moodFx'
 import { showToast } from '../Toast'
 
@@ -425,6 +426,8 @@ export default function MessageBubble({ msg, onEdit, onQuote, onDelete, isLast }
   const useImages = avatarConfig?.mode === 'image'
   const avatarRadius = avatarConfig?.shape === 'square' ? '6px' : '50%'
   const [editing, setEditing] = useState(false)
+  // 每条消息独立控制；重新打开窗口时按清清要的默认重新显示。
+  const [metaVisible, setMetaVisible] = useState(true)
   const [replyDlUrl, setReplyDlUrl] = useState(null)
   const [ttsState, setTtsState] = useState('idle') // idle | loading | playing
   // 语音条模式：正文隐藏，显示音浪。语音留言、以及涟言自己决定「用说的」那条（[voice] 标签），
@@ -524,6 +527,14 @@ export default function MessageBubble({ msg, onEdit, onQuote, onDelete, isLast }
   // 挂载时判断消息是否「新鲜」（8s 内创建），新鲜就整体显影一次；翻旧记录不触发（0720 阿颖实测二连没看到雾）
   const freshRevealRef = useRef(!isUser && Date.now() - new Date(msg.createdAt).getTime() < 8000)
 
+  const toggleMeta = useCallback((event) => {
+    if (editing) return
+    const selection = window.getSelection?.()
+    const hasTextSelection = Boolean(selection && !selection.isCollapsed)
+    if (!shouldToggleMessageMeta(event.target, hasTextSelection)) return
+    setMetaVisible((visible) => !visible)
+  }, [editing])
+
   return (
     <div data-mid={msg.id} className={`message-row ${isUser ? 'message-row-user' : 'message-row-assistant'}${isLast ? ' msg-last' : ''}`}>
       {!isUser && (
@@ -566,7 +577,10 @@ export default function MessageBubble({ msg, onEdit, onQuote, onDelete, isLast }
             <span className="msg-quote-text">{msg.quote.content}</span>
           </div>
         )}
-        <div className={`message-bubble ${isUser ? 'bubble-user' : 'bubble-assistant'}${isStreaming ? ' streaming' : ''}${bare && !editing ? ' bubble-bare' : ''}`}>
+        <div
+          className={`message-bubble ${isUser ? 'bubble-user' : 'bubble-assistant'}${isStreaming ? ' streaming' : ''}${bare && !editing ? ' bubble-bare' : ''}`}
+          onClick={toggleMeta}
+        >
           {isUser ? (
             editing ? (
               <div className="msg-edit-wrap">
@@ -711,7 +725,7 @@ export default function MessageBubble({ msg, onEdit, onQuote, onDelete, isLast }
             </svg>
           </span>
         )}
-        <div className="message-meta">
+        {metaVisible && <div className="message-meta">
           <span className="message-time">{formatTime(msg.createdAt)}</span>
           {msg.interrupted && (
             <span className="message-interrupted">这条没说完就断线了</span>
@@ -787,7 +801,7 @@ export default function MessageBubble({ msg, onEdit, onQuote, onDelete, isLast }
               )}
             </button>
           )}
-        </div>
+        </div>}
       </div>
     </div>
   )
