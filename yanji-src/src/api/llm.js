@@ -431,6 +431,62 @@ function isToolsCompatibilityError(raw) {
   return hasNamedCompatibilityError(raw, 'tools?|tool_choice|functions?|function_call')
 }
 
+function parseProviderHttpMessage(raw) {
+  const text = String(raw || '').trim()
+  if (!text) return '上游请求失败'
+  try {
+    const json = JSON.parse(text)
+    const message = json?.error?.message ?? json?.message ?? (typeof json?.error === 'string' ? json.error : '')
+    if (typeof message === 'string' && message.trim()) return message.trim()
+  } catch { /* 非 JSON 错误页，直接使用原文 */ }
+  return text
+}
+
+function providerRequestSummary(body) {
+  let requestChars = 0
+  try { requestChars = JSON.stringify(body || {}).length } catch { /* 普通请求体不会循环引用 */ }
+  const messageCount = Array.isArray(body?.messages)
+    ? body.messages.length
+    : Array.isArray(body?.contents) ? body.contents.length : 0
+  const toolCount = Array.isArray(body?.tools) ? body.tools.length : 0
+  const cacheRouting = body?.prompt_cache_key
+    ? 'user + prompt_cache_key'
+    : body?.user ? 'user' : 'none'
+  return [
+    `model: ${body?.model || 'unknown'}`,
+    `messages: ${messageCount}`,
+    `tools: ${toolCount}`,
+    `stream: ${body?.stream === true}`,
+    `maxTokens: ${body?.max_completion_tokens ?? body?.max_tokens ?? 'unset'}`,
+    `requestChars: ${requestChars}`,
+    `cacheRouting: ${cacheRouting}`,
+  ].join('\n')
+}
+
+// HTTP 4xx/5xx 是对方服务器明确拒绝了请求，不是前端 JavaScript 崩溃。
+// 把原始响应和不含正文/密钥的请求轮廓放进诊断，避免上层拿本地调用栈冒充「前端异常」。
+// 429 尤其不能悄悄自动重试：线路可能已经改变状态，第二次存在额外扣费风险。
+function providerHttpError(provider, status, raw, body, details) {
+  const opts = details || {}
+  const upstream = parseProviderHttpMessage(raw)
+  // 中转站常在末尾附一长串追踪号；完整值留在诊断里，气泡正文保持能读。
+  const visible = upstream.replace(/\s*\([A-Za-z0-9_-]{16,}\)\s*$/, '').trim().slice(0, 220)
+  const retryNote = status === 429
+    ? '（言叽未自动重试；若短请求能用，可稍后再试或缩短上下文）'
+    : ''
+  const error = new Error(`${provider} ${status}${opts.userHint || ''}: ${visible || '上游请求失败'}${retryNote}`)
+  error.isProviderError = true
+  error.status = status
+  error.responseDiagnostic = sanitizeResponseDiagnostic([
+    `[${provider} HTTP ${status}]`,
+    providerRequestSummary(body),
+    opts.extraDiagnostic || '',
+    '上游原始响应：',
+    String(raw || ''),
+  ].filter(Boolean).join('\n\n'))
+  return error
+}
+
 // ─── Tool-use loop (non-streaming, supports multi-turn) ─────────────────────
 
 async function callWithTools({
@@ -491,19 +547,18 @@ async function callWithTools({
           fallbackReason = 'tools'
         }
         if (!fallbackReason) {
-          throw new Error('OpenAI 400: ' + (firstErrText || '').slice(0, 200))
+          throw providerHttpError('OpenAI', 400, firstErrText, body)
         }
         onStatus?.(`线路不兼容 ${fallbackReason}，仅重试一次…`)
         resp = await fetch(url, { method: 'POST', headers: hdrs, body: JSON.stringify(body) })
         if (!resp.ok) {
           const retryErrText = await resp.text()
-          throw new Error(
-            `OpenAI ${resp.status}: ${(retryErrText || '').slice(0, 140)}` +
-            `（首次请求为 400: ${(firstErrText || '').slice(0, 120)}；兼容回退仅重试了 1 次）`
-          )
+          throw providerHttpError('OpenAI', resp.status, retryErrText, body, {
+            extraDiagnostic: `compatibilityRetry: ${fallbackReason}\n首次 400 响应：\n${firstErrText}`,
+          })
         }
       }
-      if (!resp.ok) throw new Error('OpenAI ' + resp.status + ': ' + (await resp.text()).slice(0, 200))
+      if (!resp.ok) throw providerHttpError('OpenAI', resp.status, await resp.text(), body)
       const data = await streamOpenAIMessage(resp, (t) => { streamedOut = true; onChunk?.(t) }, onThinking)
       responseDiagnostic = mergeResponseDiagnostic(responseDiagnostic, data.responseDiagnostic)
       lastFinish = data.finish_reason
@@ -708,22 +763,21 @@ async function callStream({ connection, messages, systemPrompt, dynamicContext, 
       // 无工具分支同样只对明确点名的 prompt_cache_key 做一次回退；通用 400
       // 原样抛出，避免自动重试触发 429、也避免把首个错误证据吃掉。
       if (!body.prompt_cache_key || !isPromptCacheKeyCompatibilityError(firstErrText)) {
-        throw new Error('OpenAI 400: ' + (firstErrText || '').slice(0, 200))
+        throw providerHttpError('OpenAI', 400, firstErrText, body)
       }
       delete body.prompt_cache_key
       resp = await fetch(url, { method: 'POST', headers: hdrs, body: JSON.stringify(body) })
       if (!resp.ok) {
         const retryErrText = await resp.text()
-        throw new Error(
-          `OpenAI ${resp.status}: ${(retryErrText || '').slice(0, 140)}` +
-          `（首次请求为 400: ${(firstErrText || '').slice(0, 120)}；兼容回退仅重试了 1 次）`
-        )
+        throw providerHttpError('OpenAI', resp.status, retryErrText, body, {
+          extraDiagnostic: `compatibilityRetry: prompt_cache_key\n首次 400 响应：\n${firstErrText}`,
+        })
       }
     }
     if (!resp.ok) {
       const e = await resp.text()
       const hint = resp.status === 405 ? '（检查 Base URL 是否含 /v1）' : resp.status === 403 ? '（API Key 无效）' : ''
-      throw new Error(`OpenAI ${resp.status}${hint}: ${e.slice(0, 200)}`)
+      throw providerHttpError('OpenAI', resp.status, e, body, { userHint: hint })
     }
     let finishReason = null
     const out = await streamSSE(resp, (json) => {
