@@ -427,6 +427,10 @@ function isPromptCacheKeyCompatibilityError(raw) {
   return hasNamedCompatibilityError(raw, 'prompt_cache_key')
 }
 
+function isPromptCacheHintCompatibilityError(raw) {
+  return hasNamedCompatibilityError(raw, 'prompt_cache_options|prompt_cache_breakpoint|cache_control')
+}
+
 function isToolsCompatibilityError(raw) {
   return hasNamedCompatibilityError(raw, 'tools?|tool_choice|functions?|function_call')
 }
@@ -444,7 +448,11 @@ function parseProviderHttpMessage(raw) {
 
 function providerRequestSummary(body) {
   let requestChars = 0
-  try { requestChars = JSON.stringify(body || {}).length } catch { /* 普通请求体不会循环引用 */ }
+  let serialized = ''
+  try {
+    serialized = JSON.stringify(body || {})
+    requestChars = serialized.length
+  } catch { /* 普通请求体不会循环引用 */ }
   const messageCount = Array.isArray(body?.messages)
     ? body.messages.length
     : Array.isArray(body?.contents) ? body.contents.length : 0
@@ -452,6 +460,9 @@ function providerRequestSummary(body) {
   const cacheRouting = body?.prompt_cache_key
     ? 'user + prompt_cache_key'
     : body?.user ? 'user' : 'none'
+  const cacheHints = body?.prompt_cache_options?.mode === 'explicit'
+    ? 'openai-explicit'
+    : serialized.includes('"cache_control"') ? 'anthropic-explicit' : 'none'
   return [
     `model: ${body?.model || 'unknown'}`,
     `messages: ${messageCount}`,
@@ -460,6 +471,7 @@ function providerRequestSummary(body) {
     `maxTokens: ${body?.max_completion_tokens ?? body?.max_tokens ?? 'unset'}`,
     `requestChars: ${requestChars}`,
     `cacheRouting: ${cacheRouting}`,
+    `cacheHints: ${cacheHints}`,
   ].join('\n')
 }
 
@@ -512,7 +524,9 @@ async function callWithTools({
     // ── OpenAI ──────────────────────────────────────────────────────
     if (provider === 'openai') {
       const url = buildApiUrl(connection.baseUrl, 'openai')
-      const bodyMsgs = buildOpenAIMessages(convo, systemPrompt, iter === 0 ? dynamicContext : undefined)
+      const baseMsgs = buildOpenAIMessages(convo, systemPrompt, iter === 0 ? dynamicContext : undefined)
+      const cacheHintMode = cacheKey ? getOpenAICacheHintMode(model) : null
+      const bodyMsgs = addOpenAICacheBreakpoints(baseMsgs, cacheHintMode)
       // 流式：非流式请求在模型思考的几十秒里一个字节都不发，中转站/代理会把它
       // 当空闲连接掐掉——上游照样出字照样计费，前端只看见 Failed to fetch。
       // （Anthropic 分支同款坑已在 233ac5c 修过，这条是同一个病）
@@ -525,6 +539,9 @@ async function callWithTools({
         body.user = cacheKey
         body.prompt_cache_key = cacheKey
       }
+      // GPT-5.6+ 关闭「最后一条动态 user」上的隐式写点，只写上面明确标记的
+      // 稳定历史。Claude 兼容线路使用 block 里的 cache_control，无此根字段。
+      if (cacheHintMode === 'openai') body.prompt_cache_options = { mode: 'explicit' }
       if (isReasoningModel(model)) {
         body.max_completion_tokens = maxTokens
       } else {
@@ -539,7 +556,11 @@ async function callWithTools({
         // 自动重试只用于错误正文明确点名的不兼容字段。笼统 400（例如
         // bad_response_status_code / 内容审查）不能猜着连发，否则一条消息会在后台
         // 变成 2～5 个请求，最后的 429 还会把真正的首个 400 盖掉。
-        if (body.prompt_cache_key && isPromptCacheKeyCompatibilityError(firstErrText)) {
+        if (cacheHintMode && isPromptCacheHintCompatibilityError(firstErrText)) {
+          body.messages = baseMsgs
+          delete body.prompt_cache_options
+          fallbackReason = 'prompt cache hints'
+        } else if (body.prompt_cache_key && isPromptCacheKeyCompatibilityError(firstErrText)) {
           delete body.prompt_cache_key
           fallbackReason = 'prompt_cache_key'
         } else if (body.tools && isToolsCompatibilityError(firstErrText)) {
@@ -744,13 +765,16 @@ async function callStream({ connection, messages, systemPrompt, dynamicContext, 
 
   if (provider === 'openai') {
     const url = buildApiUrl(connection.baseUrl, 'openai')
-    const bodyMsgs = buildOpenAIMessages(messages, systemPrompt, dynamicContext)
+    const baseMsgs = buildOpenAIMessages(messages, systemPrompt, dynamicContext)
+    const cacheHintMode = cacheKey ? getOpenAICacheHintMode(model) : null
+    const bodyMsgs = addOpenAICacheBreakpoints(baseMsgs, cacheHintMode)
     const body = { model, messages: bodyMsgs, stream: true, stream_options: { include_usage: true } }
     if (cacheKey) {
         // user 保留给会拿它做粘性路由的中转站；prompt_cache_key 是 OpenAI 官方缓存路由键。
         body.user = cacheKey
         body.prompt_cache_key = cacheKey
       } // 粘性路由
+    if (cacheHintMode === 'openai') body.prompt_cache_options = { mode: 'explicit' }
     if (isReasoningModel(model)) {
       body.max_completion_tokens = maxTokens
     } else {
@@ -760,17 +784,25 @@ async function callStream({ connection, messages, systemPrompt, dynamicContext, 
     let resp = await fetch(url, { method: 'POST', headers: hdrs, body: JSON.stringify(body) })
     if (!resp.ok && resp.status === 400) {
       const firstErrText = await resp.text()
-      // 无工具分支同样只对明确点名的 prompt_cache_key 做一次回退；通用 400
+      // 无工具分支同样只对明确点名的不兼容缓存字段做一次回退；通用 400
       // 原样抛出，避免自动重试触发 429、也避免把首个错误证据吃掉。
-      if (!body.prompt_cache_key || !isPromptCacheKeyCompatibilityError(firstErrText)) {
+      let fallbackReason = ''
+      if (cacheHintMode && isPromptCacheHintCompatibilityError(firstErrText)) {
+        body.messages = baseMsgs
+        delete body.prompt_cache_options
+        fallbackReason = 'prompt cache hints'
+      } else if (body.prompt_cache_key && isPromptCacheKeyCompatibilityError(firstErrText)) {
+        delete body.prompt_cache_key
+        fallbackReason = 'prompt_cache_key'
+      }
+      if (!fallbackReason) {
         throw providerHttpError('OpenAI', 400, firstErrText, body)
       }
-      delete body.prompt_cache_key
       resp = await fetch(url, { method: 'POST', headers: hdrs, body: JSON.stringify(body) })
       if (!resp.ok) {
         const retryErrText = await resp.text()
         throw providerHttpError('OpenAI', resp.status, retryErrText, body, {
-          extraDiagnostic: `compatibilityRetry: prompt_cache_key\n首次 400 响应：\n${firstErrText}`,
+          extraDiagnostic: `compatibilityRetry: ${fallbackReason}\n首次 400 响应：\n${firstErrText}`,
         })
       }
     }
@@ -1479,6 +1511,75 @@ function redactDeep(node, key) {
     return o
   }
   return node
+}
+
+// OpenAI 兼容端点背后不一定真是 OpenAI：阿颖常用的 Claude 克隆模型也走
+// /chat/completions。两家显式缓存标记不同，只在模型名能明确判断时添加，避免把
+// DeepSeek/Gemini 等兼容线路拿来试错。
+function getOpenAICacheHintMode(model) {
+  const id = String(model || '').toLowerCase()
+  if (/claude|anthropic|sonnet|opus|haiku|(?:^|[^a-z])ant(?:[^a-z]|$)/.test(id)) return 'anthropic'
+  if (/\bgpt-(?:[6-9]|\d{2,})(?:[.-]|$)|\bgpt-5\.(?:[6-9]|\d{2,})(?:[.-]|$)/.test(id)) return 'openai'
+  return null
+}
+
+function isOpenAICacheableMessage(message) {
+  if (typeof message?.content === 'string') return Boolean(message.content)
+  return Array.isArray(message?.content) && message.content.some((block) => block?.type === 'text' && block.text)
+}
+
+function markOpenAICacheBreakpoint(messages, index, mode) {
+  const message = messages[index]
+  if (!isOpenAICacheableMessage(message)) return false
+  const marker = mode === 'openai'
+    ? { prompt_cache_breakpoint: { mode: 'explicit' } }
+    : { cache_control: { type: 'ephemeral' } }
+  if (typeof message.content === 'string') {
+    messages[index] = { ...message, content: [{ type: 'text', text: message.content, ...marker }] }
+    return true
+  }
+  const blocks = message.content.map((block) => ({ ...block }))
+  for (let i = blocks.length - 1; i >= 0; i--) {
+    if (blocks[i]?.type === 'text' && blocks[i].text) {
+      blocks[i] = { ...blocks[i], ...marker }
+      messages[index] = { ...message, content: blocks }
+      return true
+    }
+  }
+  return false
+}
+
+// 每轮实时上下文都在最后一条 user 里，下一轮不会原样保留；因此绝不能把隐式
+// 缓存点放在那条消息上。滚动保留「上一轮已写点 + 本轮新写点」：下一轮前者会
+// 原样变成读点，而时间/记忆/情绪都留在断点之后，不再把三万 token 整段重写。
+function addOpenAICacheBreakpoints(messages, mode) {
+  if (!mode || !Array.isArray(messages) || messages.length === 0) return messages
+  const out = messages.map((message) => ({ ...message }))
+
+  const systemIdx = out.findIndex((message) => message?.role === 'system')
+  if (systemIdx >= 0) markOpenAICacheBreakpoint(out, systemIdx, mode)
+
+  let lastUserIdx = -1
+  for (let i = out.length - 1; i >= 0; i--) {
+    if (out[i]?.role === 'user') { lastUserIdx = i; break }
+  }
+  const cacheableBefore = (before) => {
+    for (let i = before - 1; i >= 0; i--) {
+      if (i !== systemIdx && isOpenAICacheableMessage(out[i])) return i
+    }
+    return -1
+  }
+  const writeIdx = cacheableBefore(lastUserIdx)
+
+  let previousUserIdx = -1
+  for (let i = writeIdx - 1; i >= 0; i--) {
+    if (out[i]?.role === 'user') { previousUserIdx = i; break }
+  }
+  const readIdx = cacheableBefore(previousUserIdx)
+
+  if (readIdx >= 0) markOpenAICacheBreakpoint(out, readIdx, mode)
+  if (writeIdx >= 0 && writeIdx !== readIdx) markOpenAICacheBreakpoint(out, writeIdx, mode)
+  return out
 }
 
 function buildOpenAIMessages(messages, systemPrompt, dynamicContext) {
