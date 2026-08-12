@@ -40,13 +40,14 @@ vm.runInContext([
   grab('assertStreamComplete'),
   grab('hasNamedCompatibilityError'),
   grab('isPromptCacheKeyCompatibilityError'),
+  grab('isPromptCacheHintCompatibilityError'),
   grab('isToolsCompatibilityError'),
   grab('parseProviderHttpMessage'),
   grab('providerRequestSummary'),
   grab('providerHttpError'),
   grab('streamGeminiParts'),
   grab('streamSSE'),
-  '__fns = { streamGeminiParts, streamSSE, assertStreamComplete, sanitizeResponseDiagnostic, isPromptCacheKeyCompatibilityError, isToolsCompatibilityError, providerHttpError };',
+  '__fns = { streamGeminiParts, streamSSE, assertStreamComplete, sanitizeResponseDiagnostic, isPromptCacheKeyCompatibilityError, isPromptCacheHintCompatibilityError, isToolsCompatibilityError, providerHttpError };',
 ].join('\n\n'), ctx)
 const {
   streamGeminiParts,
@@ -54,6 +55,7 @@ const {
   assertStreamComplete,
   sanitizeResponseDiagnostic,
   isPromptCacheKeyCompatibilityError,
+  isPromptCacheHintCompatibilityError,
   isToolsCompatibilityError,
   providerHttpError,
 } = ctx.__fns
@@ -194,6 +196,8 @@ const check = (name, cond, extra = '') => {
   console.log('用例10 OpenAI 400 回退判据：')
   check('明确拒绝 prompt_cache_key 会回退', isPromptCacheKeyCompatibilityError("Unknown parameter: 'prompt_cache_key'"))
   check('仅 unsupported model 不会重复请求', !isPromptCacheKeyCompatibilityError('This model is unsupported'))
+  check('明确拒绝 cache_control 会撤掉显式断点', isPromptCacheHintCompatibilityError("Unknown field 'cache_control'"))
+  check('无关的 cache miss 文案不会重复请求', !isPromptCacheHintCompatibilityError('prompt cache miss'))
   check('明确不支持 tool calls 会回退', isToolsCompatibilityError('This model does not support tool calls'))
   check('无关 invalid request 不会删工具重试', !isToolsCompatibilityError('Invalid request: model is offline'))
 }
