@@ -1,5 +1,24 @@
 @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;1,300;1,400&display=swap');
 
+/* 手机系统字体不一定收录颜文字用到的彝文部件和组合附加符号。
+   只接管这些小范围码位，普通中英文仍由系统字体绘制，避免整套界面换字形。 */
+@font-face {
+  font-family: 'Yanji Kaomoji Marks';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 400;
+  src: url('@fontsource/dejavu-sans/files/dejavu-sans-latin-400-normal.woff2') format('woff2');
+  unicode-range: U+00AF, U+0300-036F;
+}
+@font-face {
+  font-family: 'Yanji Kaomoji Yi';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 400;
+  src: url('@fontsource/noto-sans-yi/files/noto-sans-yi-yi-400-normal.woff2') format('woff2');
+  unicode-range: U+A490-A4CF;
+}
+
 /* ===== 变量 ===== */
 :root {
   --bg: #faf8fc;
@@ -297,7 +316,7 @@
 html, body, #root {
   height: 100%; height: 100dvh;
   width: 100%;
-  font-family: system-ui, -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", sans-serif;
+  font-family: 'Yanji Kaomoji Marks', 'Yanji Kaomoji Yi', system-ui, -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", sans-serif;
   background: var(--bg);
   color: var(--text);
   overflow: hidden;

@@ -3,6 +3,7 @@ import { uuid, estimateTokens } from './utils'
 import { bigGet, bigSet } from './utils/bigStore'
 import { showToast } from './components/Toast'
 import { normalizeGenerationConfig } from './utils/generationConfig'
+import { updateChatDraft, removeChatDraft } from './utils/chatDrafts'
 
 const LOCAL_KEY = 'llm_hub_state_v1'
 // 聊天记录和摘要不再进 localStorage（约 5MB 配额，撑满之后**所有**写入一起失败，
@@ -17,6 +18,8 @@ const DEFAULT_STATE = {
   messagesByChatId: {},
   globalInstruction: '',
   summariesByChatId: {},
+  // 每个窗口各存一份未发送文字。组件切去设置页会卸载，草稿不能跟着局部 state 一起消失。
+  draftsByChatId: {},
   generationConfig: { temperature: 0.7, maxTokens: 4096 },
   memoryItems: [],
   tokenStats: {},
@@ -222,7 +225,7 @@ function savePersistedState(state) {
 
 const persistedKeys = [
   'connections', 'activeConnectionId', 'chats', 'activeChatId',
-  'messagesByChatId', 'globalInstruction', 'summariesByChatId',
+  'messagesByChatId', 'globalInstruction', 'summariesByChatId', 'draftsByChatId',
   'generationConfig', 'memoryItems', 'tokenStats', 'contextLimit',
   'searchConfig', 'avatarConfig', 'autoTools', 'imageDescriptions', 'moonMemory', 'theme', 'glassOpacity',
   'injectMode', 'injectPrompt', 'scrollAnchor', 'textReveal', 'replyDelay', 'customStickers',
@@ -237,6 +240,7 @@ function mergeWithDefaults(persisted) {
   if (!Array.isArray(s.connections)) s.connections = []
   if (!Array.isArray(s.chats)) s.chats = []
   if (!s.messagesByChatId || typeof s.messagesByChatId !== 'object') s.messagesByChatId = {}
+  if (!s.draftsByChatId || typeof s.draftsByChatId !== 'object') s.draftsByChatId = {}
   s.generationConfig = normalizeGenerationConfig(
     s.generationConfig && typeof s.generationConfig === 'object'
       ? { ...DEFAULT_STATE.generationConfig, ...s.generationConfig }
@@ -366,6 +370,20 @@ export const useStore = create((set, get) => ({
       return { activeChatId: id }
     })
   },
+  // 输入时只改内存，ChatInput 300ms 防抖后再 flush；否则每敲一个字都重写 localStorage。
+  setChatDraft: (chatId, value) => {
+    if (!chatId) return
+    set((s) => ({ draftsByChatId: updateChatDraft(s.draftsByChatId, chatId, value) }))
+  },
+  flushChatDrafts: () => savePersistedState(get()),
+  clearChatDraft: (chatId) => {
+    if (!chatId) return
+    set((s) => {
+      const draftsByChatId = removeChatDraft(s.draftsByChatId, chatId)
+      savePersistedState({ ...s, draftsByChatId })
+      return { draftsByChatId }
+    })
+  },
   renameChat: (id, title) => {
     set((s) => {
       const chats = s.chats.map((c) => c.id === id ? { ...c, title } : c)
@@ -384,9 +402,10 @@ export const useStore = create((set, get) => ({
       delete messagesByChatId[id]
       const summariesByChatId = { ...s.summariesByChatId }
       delete summariesByChatId[id]
+      const draftsByChatId = removeChatDraft(s.draftsByChatId, id)
       const activeChatId = s.activeChatId === id ? (chats[0]?.id ?? null) : s.activeChatId
-      savePersistedState({ ...s, chats, messagesByChatId, summariesByChatId, activeChatId })
-      return { chats, messagesByChatId, summariesByChatId, activeChatId }
+      savePersistedState({ ...s, chats, messagesByChatId, summariesByChatId, draftsByChatId, activeChatId })
+      return { chats, messagesByChatId, summariesByChatId, draftsByChatId, activeChatId }
     })
   },
   updateChatModel: (chatId, model) => {
