@@ -38,7 +38,12 @@ const STICKER_BASE = 'https://memory.ravenlove.cc/raven/stickers/'
 
 export default function ChatInput({ onSend, disabled, onImageAdd, images, onImageRemove, moonMemory, quoted, onClearQuote }) {
   const customStickers = useStore((s) => s.customStickers) || []
-  const [text, setText] = useState('')
+  const activeChatId = useStore((s) => s.activeChatId)
+  const text = useStore((s) => s.draftsByChatId?.[s.activeChatId] || '')
+  const setChatDraft = useStore((s) => s.setChatDraft)
+  const flushChatDrafts = useStore((s) => s.flushChatDrafts)
+  const clearChatDraft = useStore((s) => s.clearChatDraft)
+  const setText = useCallback((value) => setChatDraft(activeChatId, value), [activeChatId, setChatDraft])
   const [stickerOpen, setStickerOpen] = useState(false)
   const [historyOpen, setHistoryOpen] = useState(false)
   const [historyQ, setHistoryQ] = useState('')
@@ -55,6 +60,18 @@ export default function ChatInput({ onSend, disabled, onImageAdd, images, onImag
   const audioChunksRef = useRef([])
   const pendingVoiceRef = useRef(null) // 这条待发消息来自语音：{ duration }
 
+  // 草稿在 store 内按对话隔离；落盘做防抖，切对话/切页面卸载时立即补写最后一版。
+  useEffect(() => {
+    if (!activeChatId) return
+    const timer = setTimeout(flushChatDrafts, 300)
+    return () => clearTimeout(timer)
+  }, [activeChatId, text, flushChatDrafts])
+
+  useEffect(() => {
+    if (!activeChatId) return
+    return () => flushChatDrafts()
+  }, [activeChatId, flushChatDrafts])
+
   useEffect(() => {
     if (!stickerOpen) return
     const close = (e) => { if (!pickerRef.current?.contains(e.target)) setStickerOpen(false) }
@@ -70,7 +87,7 @@ export default function ChatInput({ onSend, disabled, onImageAdd, images, onImag
   }, [historyOpen])
 
   // 系统分享进来的文字填进输入框（不直接发——她可能还想在前面补一句）。
-  // 输入框的文字是这个组件的局部 state，只能从这儿开一个口子；
+  // 输入框草稿由这个组件按当前对话维护，只能从这儿开一个口子；
   // 和 player.js 的 window.__yanjiMediaAction 是同一种写法。
   useEffect(() => {
     window.__yanjiFillInput = (t) => {
@@ -79,7 +96,7 @@ export default function ChatInput({ onSend, disabled, onImageAdd, images, onImag
       textareaRef.current?.focus()
     }
     return () => { delete window.__yanjiFillInput }
-  }, [])
+  }, [setText])
 
   const searchHistory = useCallback(async (q) => {
     if (!q.trim() || !moonMemory?.enabled || !moonMemory?.apiToken) return
@@ -186,7 +203,7 @@ export default function ChatInput({ onSend, disabled, onImageAdd, images, onImag
     onSend(finalText, images || [], vopts)
     pendingVoiceRef.current = null
     onClearQuote?.()
-    setText('')
+    clearChatDraft(activeChatId)
     setAttachedTexts([])
     if (textareaRef.current) {
       textareaRef.current.style.height = 'auto'
