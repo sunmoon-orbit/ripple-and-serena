@@ -1186,22 +1186,21 @@ export default function Settings() {
                     </button>
                   ))}
                 </div>
-                {(theme || 'default') === 'glass' && (
-                  <div className="card-row" style={{ marginTop: 14, paddingTop: 12, borderTop: '1px solid var(--border)' }}>
-                    <span className="card-row-label">气泡透明度</span>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <input
-                        type="range" min="0.1" max="0.6" step="0.05"
-                        value={glassOpacity ?? 0.3}
-                        onChange={(e) => setGlassOpacity(Number(e.target.value))}
-                        style={{ width: 100, accentColor: 'var(--accent)' }}
-                      />
-                      <span style={{ fontSize: 12, color: 'var(--text-muted)', minWidth: 30 }}>
-                        {Math.round((glassOpacity ?? 0.3) * 100)}%
-                      </span>
-                    </div>
+                <div className="card-row" style={{ marginTop: 14, paddingTop: 12, borderTop: '1px solid var(--border)' }}>
+                  <span className="card-row-label">气泡透明度</span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <input
+                      aria-label="气泡透明度"
+                      type="range" min="0.1" max="1" step="0.05"
+                      value={glassOpacity ?? 1}
+                      onChange={(e) => setGlassOpacity(Number(e.target.value))}
+                      style={{ width: 100, accentColor: 'var(--accent)' }}
+                    />
+                    <span style={{ fontSize: 12, color: 'var(--text-muted)', minWidth: 30 }}>
+                      {Math.round((glassOpacity ?? 1) * 100)}%
+                    </span>
                   </div>
-                )}
+                </div>
               </div>
             </Section>
             <Section title="滚动">

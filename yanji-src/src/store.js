@@ -42,7 +42,8 @@ const DEFAULT_STATE = {
     limit: 5,
   },
   theme: 'claude',
-  glassOpacity: 0.3,
+  // 新安装默认实色，保证各主题文字都清楚；老用户已经保存的透明度原样沿用。
+  glassOpacity: 1,
   // 官端滚动模型：发送后自己的消息滚到视口顶端，回复在下方往下长（外观设置里可关）
   scrollAnchor: true,
   // 显影式浮现：流式输出时新字带雾出现、几百毫秒变清晰（和拾羽落水涟漪凑一套水系，外观里可关）
