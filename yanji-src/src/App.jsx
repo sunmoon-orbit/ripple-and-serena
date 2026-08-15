@@ -39,7 +39,7 @@ function Splash({ onDone }) {
 export default function App() {
   const activePanel = useStore((s) => s.activePanel)
   const theme = useStore((s) => s.theme)
-  const glassOpacity = useStore((s) => s.glassOpacity ?? 0.3)
+  const glassOpacity = useStore((s) => s.glassOpacity ?? 1)
   const avatarSize = useStore((s) => s.avatarConfig?.size || 28)
   const ringtone = useStore((s) => s.ringtone)
   const avatarConfig = useStore((s) => s.avatarConfig)
@@ -79,14 +79,11 @@ export default function App() {
     const t0 = theme === 'guanduan' ? 'chensi' : theme
     const t = t0 && t0 !== 'default' ? t0 : ''
     document.documentElement.setAttribute('data-theme', t)
-    if (theme === 'glass') {
-      const a = glassOpacity ?? 0.3
-      document.documentElement.style.setProperty('--bubble-user-bg', `rgba(126,184,200,${a})`)
-      document.documentElement.style.setProperty('--bubble-asst-bg', `rgba(255,255,255,${a})`)
-    } else {
-      document.documentElement.style.removeProperty('--bubble-user-bg')
-      document.documentElement.style.removeProperty('--bubble-asst-bg')
-    }
+    // 透明度以前只写进烟水主题的两只气泡，切到别的主题滑杆就失效。
+    // 现在统一只下发 alpha；每套主题仍在 CSS 里保留自己的气泡 RGB，不会串色。
+    // 夹在 0.1–1 之间也兼容旧存档和手改 localStorage 的异常值。
+    const bubbleOpacity = Math.min(1, Math.max(0.1, Number(glassOpacity) || 1))
+    document.documentElement.style.setProperty('--bubble-opacity', String(bubbleOpacity))
     try { window.YanjiNative?.updateTheme(theme || 'default') } catch {}
   }, [theme, glassOpacity])
 
