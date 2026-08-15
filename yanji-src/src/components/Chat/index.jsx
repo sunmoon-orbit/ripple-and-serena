@@ -1,5 +1,6 @@
 import { useState, useCallback, useRef, useEffect } from 'react'
 import { createPortal } from 'react-dom'
+import { useShallow } from 'zustand/react/shallow'
 import { useStore, buildBackupJson, restoreFromBackupJson } from '../../store'
 import { sendMessage, summarizeThinking, normalizeProvider, BUILTIN_MODELS, buildSystemPrompt, compactMessages, buildSummaryInjection } from '../../api/llm'
 import { uuid } from '../../utils'
@@ -11,6 +12,7 @@ import { decideReplyDelay, getPendingReply, setPendingReply, clearPendingReply }
 import { getLightConn } from '../../utils/lightConn'
 import { drainNative } from '../../utils/nativeInbox'
 import { syncChatsToL0 } from '../../utils/l0Sync'
+import { createStreamUpdateScheduler } from '../../utils/streamUpdateScheduler'
 import { pickAutoPostTrigger, markAutoPosted, postMoment, fetchAutopostSetting } from '../../api/moments'
 import { notifyReplyReady } from '../../api/push'
 import { extractMood, stripMoodTag, stripInlineFx } from '../../utils/moodFx'
@@ -42,6 +44,7 @@ import CompletionEgg, { pickEgg } from './CompletionEgg'
 
 // 同一对话的压缩共用一个 Promise，后来的生成不再发第二份轻模型请求。
 const compactionJobs = new Map()
+const EMPTY_MESSAGES = []
 
 const IMAGE_DESC_PROMPT = '用中文客观描述这张图，80 字以内。保留界面文字和数字、人物动作、物品、场景。只输出描述。'
 
@@ -166,7 +169,48 @@ const MID_STREAM_CUT_RE = /network ?error|failed to fetch|load failed|connection
 const BILINGUAL_NOTE = '[双语通话模式：现在是语音通话，请直接用口语化、自然的英文回复她（你的声音说英文更好听），保持简短（2-4 句）；然后另起一行，用 [译:这里放中文翻译] 在末尾附上这段话的完整中文翻译。方括号里只放翻译文本，不要嵌套贴图、点歌等其他标签。]'
 
 export default function Chat() {
-  const store = useStore()
+  // 不能订阅整个 store：草稿每敲一个字、流式回复每来一个 chunk 都会改 store。
+  // 整体订阅会让聊天页（连同全部历史气泡）跟着重渲染，窗口越长越卡。
+  // 这里只挑聊天外壳真正依赖的字段；草稿等无关更新保持在各自组件内部。
+  const store = useStore(useShallow((s) => ({
+    chats: s.chats,
+    activeChatId: s.activeChatId,
+    connections: s.connections,
+    activeConnectionId: s.activeConnectionId,
+    globalInstruction: s.globalInstruction,
+    memoryItems: s.memoryItems,
+    generationConfig: s.generationConfig,
+    searchConfig: s.searchConfig,
+    moonMemory: s.moonMemory,
+    autoTools: s.autoTools,
+    imageDescriptions: s.imageDescriptions,
+    injectMode: s.injectMode,
+    injectPrompt: s.injectPrompt,
+    setInjectMode: s.setInjectMode,
+    replyDelay: s.replyDelay,
+    customStickers: s.customStickers,
+    createChat: s.createChat,
+    setActiveChat: s.setActiveChat,
+    getActiveConnection: s.getActiveConnection,
+    getActiveChat: s.getActiveChat,
+    getMessages: s.getMessages,
+    addMessage: s.addMessage,
+    updateMessage: s.updateMessage,
+    removeLastEmptyAssistant: s.removeLastEmptyAssistant,
+    truncateMessagesFrom: s.truncateMessagesFrom,
+    touchChat: s.touchChat,
+    deleteMessage: s.deleteMessage,
+    recordTokenUsage: s.recordTokenUsage,
+    updateChatModel: s.updateChatModel,
+    updateChatConnection: s.updateChatConnection,
+    applyContextLimit: s.applyContextLimit,
+    getSummary: s.getSummary,
+    commitCompaction: s.commitCompaction,
+    bigReady: s.bigReady,
+    renameChat: s.renameChat,
+    setActiveConnection: s.setActiveConnection,
+    setActivePanel: s.setActivePanel,
+  })))
   const {
     chats, activeChatId, connections, activeConnectionId,
     globalInstruction, memoryItems, generationConfig,
@@ -174,8 +218,12 @@ export default function Chat() {
     createChat, setActiveChat, getActiveConnection, getActiveChat, getMessages,
     addMessage, updateMessage, removeLastEmptyAssistant, truncateMessagesFrom, touchChat, deleteMessage,
     recordTokenUsage, updateChatModel, updateChatConnection, applyContextLimit,
-    getSummary, commitCompaction, bigReady,
+    getSummary, commitCompaction, bigReady, setActiveConnection, setActivePanel,
   } = store
+  // 单独订阅当前窗口的消息数组。别的设置或草稿变化不会碰它；真正有新消息时才刷新。
+  const messages = useStore((s) => (
+    s.activeChatId ? (s.messagesByChatId[s.activeChatId] || EMPTY_MESSAGES) : EMPTY_MESSAGES
+  ))
 
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [callOpen, setCallOpen] = useState(false)
@@ -283,8 +331,6 @@ export default function Chat() {
   const activeConn = activeChat
     ? (connections.find((c) => c.id === activeChat.connectionId) || getActiveConnection())
     : getActiveConnection()
-  const messages = activeChatId ? getMessages(activeChatId) : []
-
   // ── Model panel ──────────────────────────────────────────────────────────
   const provider = activeConn ? normalizeProvider(activeConn.provider) : 'openai'
   const builtinModels = BUILTIN_MODELS[provider] || []
@@ -312,6 +358,16 @@ export default function Chat() {
     // 声明在 try 外面：出错时 catch 要能拿到已经流出来的正文，把它抢救下来（见下面的 catch）
     let fullText = ''
     let fullThinking = ''
+    // 中转站可能一秒推来几十上百个碎 chunk。逐 chunk setState 会把主线程耗在
+    // React + Markdown 清洗上。合并成约 20fps 的界面刷新，文字仍实时增长但不会抖卡。
+    const streamUi = createStreamUpdateScheduler(() => {
+      const patch = { streaming: true }
+      if (fullText) {
+        patch.content = stripVoiceMsgTag(stripCallTag(stripNegTag(stripMoodTag(stripEmotionTag(fullText)))))
+      }
+      if (fullThinking) patch.thinking = fullThinking
+      updateMessage(chat.id, assistantId, patch)
+    })
 
     try {
       const allMsgs = getMessages(chat.id).filter((m) => !m.streaming && !m.sys)
@@ -549,12 +605,11 @@ export default function Chat() {
         cacheKey: chat.id,
         onChunk: (chunk) => {
           fullText += chunk
-          // 流式过程中剥离 <es>/<mood>/<neg>/[call:]/[voice] 标签，不让阿颖看到内部状态
-          updateMessage(chat.id, assistantId, { content: stripVoiceMsgTag(stripCallTag(stripNegTag(stripMoodTag(stripEmotionTag(fullText))))), streaming: true })
+          streamUi.schedule()
         },
         onThinking: (chunk) => {
           fullThinking += chunk
-          updateMessage(chat.id, assistantId, { thinking: fullThinking, streaming: true })
+          streamUi.schedule()
         },
         onStatus: setStatus,
         onToolCall: (toolNames) => {
@@ -566,6 +621,9 @@ export default function Chat() {
           updateMessage(chat.id, assistantId, { files: [...genFiles] })
         },
       })
+      // 最终落盘会一次写入完整正文；先取消尚未执行的流式刷新，避免它随后把
+      // streaming:true 覆盖回来，留下永不结束的光标。
+      streamUi.cancel()
 
       // 提取情绪更新标签，应用到情绪状态，从显示文本里剥离
       const { clean: afterEs, delta: emotionDelta } = extractEmotionUpdate(result.text || fullText)
@@ -657,6 +715,7 @@ export default function Chat() {
         store.renameChat(chat.id, short || '新对话')
       }
     } catch (e) {
+      streamUi.cancel()
       // 上游已经出了字（也已经计过费）却在收尾阶段抛错——流被掐断、工具连不上都算——
       // 以前一律把这条助手消息删掉，她只看到「[错误] Failed to fetch」：钱花了、话没了
       // （0726 阿颖遇到）。有正文就留下并标「没说完就断线了」，没正文才删。
@@ -755,6 +814,7 @@ export default function Chat() {
       }
       showToast(e.message, 'error')
     } finally {
+      streamUi.cancel()
       setIsSending(false)
       setStatus('')
     }
@@ -866,7 +926,7 @@ export default function Chat() {
   // 失败一律吞掉（见 l0Sync.js）——存档坏了是我在服务端该看见的事，不是她要处理的红字。
   const l0SyncRef = useRef(null)
   useEffect(() => {
-    l0SyncRef.current = { chats, messagesByChatId: store.messagesByChatId, cfg: moonMemory }
+    l0SyncRef.current = { chats, messagesByChatId: useStore.getState().messagesByChatId, cfg: moonMemory }
   })
   useEffect(() => {
     // bigReady 之前 chats 是空的（聊天记录还在 IndexedDB 里没读回来），
@@ -920,6 +980,22 @@ export default function Chat() {
     truncateMessagesFrom(activeChatId, msg.id)
     setTimeout(() => handleSend(newText, []), 0)
   }, [activeChatId, truncateMessagesFrom, handleSend])
+
+  const handleDeleteMessage = useCallback((msg) => {
+    if (activeChatId) deleteMessage(activeChatId, msg.id)
+  }, [activeChatId, deleteMessage])
+
+  const handleQuoteMessage = useCallback((msg) => {
+    setQuoted({
+      role: msg.role,
+      content: (msg.content || '')
+        .replace(/\[music:[^\]]+\]/g, '')
+        .replace(/\[sticker:[^\]]+\]/g, '')
+        .replace(/\[call:[^\]]+\]/gi, '')
+        .replace(/!\[[^\]]*\]\([^)]*\)/g, '')
+        .trim().slice(0, 140),
+    })
+  }, [])
 
   // ── 纪念日弹卡：当天第一次打开言叽弹一张涟言亲笔的小卡片，收下后当天不再弹 ──
   useEffect(() => {
@@ -1472,7 +1548,7 @@ export default function Chat() {
                   value={currentConnId}
                   onChange={(e) => {
                     if (activeChat) updateChatConnection(activeChat.id, e.target.value)
-                    else store.setActiveConnection(e.target.value)
+                    else setActiveConnection(e.target.value)
                   }}
                 >
                   {connections.map((c) => (
@@ -1525,7 +1601,7 @@ export default function Chat() {
           {!activeConn ? (
             <div className="messages-empty">
               <p className="messages-empty-hint">
-                请先在<button className="link-btn" onClick={() => store.setActivePanel('settings')}>设置</button>里添加 API 连接
+                请先在<button className="link-btn" onClick={() => setActivePanel('settings')}>设置</button>里添加 API 连接
               </p>
             </div>
           ) : (
@@ -1533,17 +1609,9 @@ export default function Chat() {
               messages={messages}
               status={status}
               onEdit={handleEditMessage}
-              onDelete={(m) => deleteMessage(activeChatId, m.id)}
+              onDelete={handleDeleteMessage}
               activeChatId={activeChatId}
-              onQuote={(m) => setQuoted({
-                role: m.role,
-                content: (m.content || '')
-                  .replace(/\[music:[^\]]+\]/g, '')
-                  .replace(/\[sticker:[^\]]+\]/g, '')
-                  .replace(/\[call:[^\]]+\]/gi, '')
-                  .replace(/!\[[^\]]*\]\([^)]*\)/g, '')
-                  .trim().slice(0, 140),
-              })}
+              onQuote={handleQuoteMessage}
             />
           )}
         </div>
