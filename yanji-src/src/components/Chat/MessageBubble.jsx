@@ -1,7 +1,10 @@
-import { useRef, useState, useCallback, useEffect, useLayoutEffect } from 'react'
+import { memo, useRef, useState, useCallback, useEffect, useLayoutEffect } from 'react'
+import { useShallow } from 'zustand/react/shallow'
 import { marked } from 'marked'
 import DOMPurify from 'dompurify'
-import hljs from 'highlight.js'
+// common 版保留日常会用到的 JS/TS/JSON/HTML/CSS/Python/Bash 等语言，
+// 不把近两百种完整语法表塞进手机 WebView；也让自动识别少做大量无关匹配。
+import hljs from 'highlight.js/lib/common'
 import { formatTime, splitTranslation } from '../../utils'
 import { useStore } from '../../store'
 import { synthesizeSpeech } from '../../api/moonMemory'
@@ -416,13 +419,19 @@ function isBareMedia(msg) {
   return false
 }
 
-export default function MessageBubble({ msg, onEdit, onQuote, onDelete, isLast }) {
+function MessageBubble({ msg, onEdit, onQuote, onDelete, isLast }) {
   const isUser = msg.role === 'user'
   const isStreaming = msg.streaming
   const bare = isBareMedia(msg)
   // [错误] 气泡（请求失败落盘的）：给一个删除钮，能从记录里刷掉
   const isErrorMsg = !isUser && typeof msg.content === 'string' && msg.content.startsWith('[错误]')
-  const { avatarConfig, moonMemory, textReveal } = useStore()
+  // 每个气泡只关心这三项展示配置。订阅整个 store 会让所有历史气泡在
+  // 草稿输入、流式 chunk、计数变化时一起重新解析 Markdown。
+  const { avatarConfig, moonMemory, textReveal } = useStore(useShallow((s) => ({
+    avatarConfig: s.avatarConfig,
+    moonMemory: s.moonMemory,
+    textReveal: s.textReveal,
+  })))
   const useImages = avatarConfig?.mode === 'image'
   const avatarRadius = avatarConfig?.shape === 'square' ? '6px' : '50%'
   const [editing, setEditing] = useState(false)
@@ -806,3 +815,7 @@ export default function MessageBubble({ msg, onEdit, onQuote, onDelete, isLast }
     </div>
   )
 }
+
+// updateMessage 会保留未修改消息对象的引用；配合稳定的操作回调，React.memo
+// 可让流式回复只重绘正在增长的最后一条，而不是把整段历史重新跑一遍。
+export default memo(MessageBubble)
