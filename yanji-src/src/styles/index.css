@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;1,300;1,400&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;1,300;1,400&family=Fraunces:opsz,wght@9..144,500&display=swap');
 
 /* 手机系统字体不一定收录颜文字用到的彝文部件和组合附加符号。
    只接管这些小范围码位，普通中英文仍由系统字体绘制，避免整套界面换字形。 */
@@ -2836,12 +2836,14 @@ textarea.form-input { display: block; margin: 8px 16px 12px; }
   opacity: 0.6;
 }
 .roost-days-num {
-  font-family: 'Cormorant Garamond', Georgia, serif;
-  font-size: 38px;
-  font-weight: 300;
-  line-height: 1;
+  font-family: 'Fraunces', 'Cormorant Garamond', Georgia, serif;
+  font-size: 46px;
+  font-weight: 500;
+  font-optical-sizing: auto;
+  font-variant-numeric: lining-nums proportional-nums;
+  line-height: 0.88;
   color: var(--text);
-  letter-spacing: -0.02em;
+  letter-spacing: -0.045em;
 }
 .roost-days-label {
   font-size: 11px;
@@ -2973,7 +2975,7 @@ textarea.form-input { display: block; margin: 8px 16px 12px; }
 
   .roost-anniversary { padding: 7px 14px; }
   .roost-names { font-size: 15px; margin-bottom: 2px; }
-  .roost-days-num { font-size: 32px; }
+  .roost-days-num { font-size: 40px; }
   .roost-days-label { margin-top: 2px; }
   .roost-since { margin-top: 2px; }
 
