@@ -182,6 +182,7 @@ export default function Chat() {
     generationConfig: s.generationConfig,
     searchConfig: s.searchConfig,
     moonMemory: s.moonMemory,
+    mcpServers: s.mcpServers,
     autoTools: s.autoTools,
     imageDescriptions: s.imageDescriptions,
     injectMode: s.injectMode,
@@ -214,7 +215,7 @@ export default function Chat() {
   const {
     chats, activeChatId, connections, activeConnectionId,
     globalInstruction, memoryItems, generationConfig,
-    searchConfig, moonMemory, autoTools, imageDescriptions, injectMode, injectPrompt, setInjectMode, replyDelay, customStickers,
+    searchConfig, moonMemory, mcpServers, autoTools, imageDescriptions, injectMode, injectPrompt, setInjectMode, replyDelay, customStickers,
     createChat, setActiveChat, getActiveConnection, getActiveChat, getMessages,
     addMessage, updateMessage, removeLastEmptyAssistant, truncateMessagesFrom, touchChat, deleteMessage,
     recordTokenUsage, updateChatModel, updateChatConnection, applyContextLimit,
@@ -599,6 +600,7 @@ export default function Chat() {
         generationConfig,
         searchConfig,
         moonMemoryConfig: moonMemory,
+        mcpServers,
         autoTools,
         // 缓存粘性路由键：同一个对话永远发同一个值，中转站才会把它粘在同一个后端
         // 节点上，缓存才读得回来（不带的话只写不读，写还按 1.25 倍计费）
