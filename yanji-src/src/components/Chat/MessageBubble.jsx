@@ -11,6 +11,7 @@ import { synthesizeSpeech } from '../../api/moonMemory'
 import MusicCard from './MusicCard'
 import { shouldToggleMessageMeta } from './messageMetaToggle'
 import { applyInlineFx, stripInlineFx, stripEnglishTags } from '../../utils/moodFx'
+import { downloadBlob } from '../../utils/download'
 import { showToast } from '../Toast'
 
 marked.setOptions({
@@ -227,6 +228,19 @@ function GenFileCard({ file }) {
   const [stashing, setStashing] = useState(false)
   const [preview, setPreview] = useState(false)
   const handleDownload = async () => {
+    // Kotlin WebView 壳已经提供了原生落盘桥。生成文件以前仍沿用 PWA 的
+    // 「先暂存、再点一次真实链接」流程，不但白绕服务器，第一次点击也只会
+    // 准备链接而不会保存；若后续 attachment 响应没被 WebView 接住，用户看到的
+    // 就是预览正常、下载完全没反应。原生端直接走统一 downloadBlob 出口，一次
+    // 点击写入 Download；浏览器/PWA 才继续使用下面的两步真实链接方案。
+    if (window.YanjiNative?.saveBase64File) {
+      downloadBlob(
+        new Blob([file.content], { type: fileMime(file.filename) }),
+        file.filename,
+      )
+      showToast('正在保存到 Download 文件夹…')
+      return
+    }
     if (dlUrl) return // 已有链接，让 <a> 的默认行为处理
     setStashing(true)
     try {

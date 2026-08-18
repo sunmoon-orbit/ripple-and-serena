@@ -3,7 +3,9 @@ package cc.ravenlove.yanji
 import android.Manifest
 import android.annotation.SuppressLint
 import android.app.DownloadManager
+import android.app.NotificationChannel
 import android.app.NotificationManager
+import android.app.PendingIntent
 import android.app.AlertDialog
 import android.content.Context
 import android.content.Intent
@@ -21,6 +23,7 @@ import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
+import androidx.core.app.NotificationCompat
 import androidx.core.app.RemoteInput
 import androidx.core.content.ContextCompat
 import androidx.core.view.ViewCompat
@@ -48,6 +51,8 @@ class MainActivity : AppCompatActivity() {
         private const val FILE_CHOOSER_CODE = 1001
         private const val NOTIFICATION_PERM_CODE = 1002
         private const val AUDIO_PERM_CODE = 1003
+        private const val DOWNLOAD_CHANNEL_ID = "yanji_downloads"
+        private const val DOWNLOAD_NOTIFICATION_ID = 4102
         const val YANJI_URL = "https://sunmoon-orbit.github.io/ripple-and-serena/yanji/"
     }
 
@@ -458,11 +463,53 @@ class MainActivity : AppCompatActivity() {
                     val dir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
                     java.io.File(dir, name).writeBytes(bytes)
                 }
-                runOnUiThread { Toast.makeText(this, "已存到 Download/$name", Toast.LENGTH_LONG).show() }
+                runOnUiThread {
+                    Toast.makeText(this, "已存到 Download/$name", Toast.LENGTH_LONG).show()
+                    showDownloadCompleteNotification(name)
+                }
             } catch (e: Exception) {
                 runOnUiThread { Toast.makeText(this, "下载失败: ${e.message}", Toast.LENGTH_LONG).show() }
             }
         }.start()
+    }
+
+    private fun showDownloadCompleteNotification(fileName: String) {
+        // Android 13+ 若通知权限被关掉，文件仍然已经成功落盘；这里只安静跳过
+        // 通知，不能让一个可选提示反过来把刚保存完的 App 弄崩。
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+            ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) !=
+            PackageManager.PERMISSION_GRANTED
+        ) return
+        val manager = getSystemService(NotificationManager::class.java)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            manager.createNotificationChannel(
+                NotificationChannel(
+                    DOWNLOAD_CHANNEL_ID,
+                    "文件下载",
+                    NotificationManager.IMPORTANCE_DEFAULT
+                ).apply {
+                    description = "言叽生成文件的保存结果"
+                    setShowBadge(false)
+                }
+            )
+        }
+        val openApp = PendingIntent.getActivity(
+            this,
+            DOWNLOAD_NOTIFICATION_ID,
+            Intent(this, MainActivity::class.java),
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+        manager.notify(
+            DOWNLOAD_NOTIFICATION_ID,
+            NotificationCompat.Builder(this, DOWNLOAD_CHANNEL_ID)
+                .setSmallIcon(android.R.drawable.ic_dialog_info)
+                .setContentTitle("文件已保存")
+                .setContentText("$fileName · Download 文件夹")
+                .setContentIntent(openApp)
+                .setAutoCancel(true)
+                .setOnlyAlertOnce(true)
+                .build()
+        )
     }
 
     // WebBridge 暴露给前端的重试入口
