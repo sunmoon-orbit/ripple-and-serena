@@ -374,6 +374,7 @@ export default function Settings() {
   const store = useStore()
   const {
     connections, activeConnectionId, tokenStats, moonMemory, theme, glassOpacity, avatarConfig, scrollAnchor,
+    customKeyboardEnabled, setCustomKeyboardEnabled, widgetBackgroundStyle, setWidgetBackgroundStyle,
     globalInstruction, generationConfig, contextLimit, searchConfig, autoTools, imageDescriptions, injectMode, injectPrompt,
     addConnection, updateConnection, deleteConnection, setActiveConnection,
     setGlobalInstruction, setGenerationConfig, setContextLimit, setSearchConfig,
@@ -1203,6 +1204,38 @@ export default function Settings() {
                 </div>
               </div>
             </Section>
+            <Section title="输入">
+              <div className="settings-card">
+                <div className="card-row">
+                  <span className="card-row-label">言叽拼音键盘</span>
+                  <label className="toggle">
+                    <input type="checkbox" checked={customKeyboardEnabled === true} onChange={(e) => setCustomKeyboardEnabled(e.target.checked)} />
+                    <span className="toggle-track" />
+                  </label>
+                </div>
+                <p className="card-hint">26 键布局跟随当前主题；选过的词只在本机学习，下次同音会优先出现。键盘右下角可以随时切回系统输入法。</p>
+              </div>
+            </Section>
+            {isNativeApp() && (
+              <Section title="桌面小组件">
+                <div className="settings-card">
+                  <div className="card-row">
+                    <span className="card-row-label">小组件背景</span>
+                    <div className="avatar-mode-toggle">
+                      <button
+                        className={'avatar-mode-btn' + ((widgetBackgroundStyle || 'solid') === 'solid' ? ' active' : '')}
+                        onClick={() => setWidgetBackgroundStyle('solid')}
+                      >实色</button>
+                      <button
+                        className={'avatar-mode-btn' + (widgetBackgroundStyle === 'translucent' ? ' active' : '')}
+                        onClick={() => setWidgetBackgroundStyle('translucent')}
+                      >半透明</button>
+                    </div>
+                  </div>
+                  <p className="card-hint">纪念日、心情和“想你键”三种原生小组件一起切换；颜色仍跟随言叽主题。</p>
+                </div>
+              </Section>
+            )}
             <Section title="滚动">
               <div className="settings-card">
                 <div className="card-row">
