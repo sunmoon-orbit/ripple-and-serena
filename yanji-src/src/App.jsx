@@ -40,6 +40,7 @@ export default function App() {
   const activePanel = useStore((s) => s.activePanel)
   const theme = useStore((s) => s.theme)
   const glassOpacity = useStore((s) => s.glassOpacity ?? 1)
+  const widgetBackgroundStyle = useStore((s) => s.widgetBackgroundStyle || 'solid')
   const avatarSize = useStore((s) => s.avatarConfig?.size || 28)
   const ringtone = useStore((s) => s.ringtone)
   const avatarConfig = useStore((s) => s.avatarConfig)
@@ -86,6 +87,12 @@ export default function App() {
     document.documentElement.style.setProperty('--bubble-opacity', String(bubbleOpacity))
     try { window.YanjiNative?.updateTheme(theme || 'default') } catch {}
   }, [theme, glassOpacity])
+
+  // 桌面小组件由原生 RemoteViews 绘制，读不到网页 localStorage。
+  // 开机同步一次，覆盖安装新 APK 后也无需她重新拨动设置。
+  useEffect(() => {
+    try { window.YanjiNative?.updateWidgetBackgroundStyle?.(widgetBackgroundStyle) } catch { /* 网页版没有这个桥 */ }
+  }, [widgetBackgroundStyle])
 
   useEffect(() => {
     document.documentElement.style.setProperty('--avatar-size', `${avatarSize}px`)
