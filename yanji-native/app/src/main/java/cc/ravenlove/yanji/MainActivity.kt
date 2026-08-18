@@ -244,10 +244,19 @@ class MainActivity : AppCompatActivity() {
      */
     private fun loadYanjiUrl() {
         val prefs = getSharedPreferences("yanji_native", Context.MODE_PRIVATE)
-        val currentVersion = BuildConfig.VERSION_CODE
-        if (prefs.getInt(WEB_CACHE_VERSION_KEY, -1) != currentVersion) {
+        // 这个工程关闭了 BuildConfig 生成，直接引用 BuildConfig.VERSION_CODE 会让
+        // Kotlin 编译失败。版本号从系统已安装的包信息读取，语义也正好是我们需要的
+        // 「本次覆盖安装是否换了 APK」。
+        val packageInfo = packageManager.getPackageInfo(packageName, 0)
+        @Suppress("DEPRECATION")
+        val currentVersion = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            packageInfo.longVersionCode
+        } else {
+            packageInfo.versionCode.toLong()
+        }
+        if (prefs.getLong(WEB_CACHE_VERSION_KEY, -1L) != currentVersion) {
             webView.clearCache(true)
-            prefs.edit().putInt(WEB_CACHE_VERSION_KEY, currentVersion).apply()
+            prefs.edit().putLong(WEB_CACHE_VERSION_KEY, currentVersion).apply()
         }
         webView.loadUrl(
             "${YANJI_URL}?native_v=$currentVersion",

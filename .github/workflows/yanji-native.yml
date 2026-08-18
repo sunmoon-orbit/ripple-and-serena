@@ -60,7 +60,9 @@ jobs:
 
       - name: Build debug APK
         working-directory: yanji-native
-        run: gradle assembleDebug --no-daemon --stacktrace 2>&1 | tee /tmp/build.log
+        run: |
+          set -o pipefail
+          gradle assembleDebug --no-daemon --stacktrace 2>&1 | tee /tmp/build.log
 
       # action-gh-release 遇到不存在的 files 路径只会警告，步骤仍然显示绿色，
       # 结果就是构建成功却把 Release 里的旧 APK 留着不动。先主动找到产物、
