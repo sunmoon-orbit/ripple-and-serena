@@ -11,7 +11,7 @@ import { synthesizeSpeech } from '../../api/moonMemory'
 import MusicCard from './MusicCard'
 import { shouldToggleMessageMeta } from './messageMetaToggle'
 import { applyInlineFx, stripInlineFx, stripEnglishTags } from '../../utils/moodFx'
-import { downloadBlob } from '../../utils/download'
+import { downloadBlob, hasNativeDownloadBridge } from '../../utils/download'
 import { showToast } from '../Toast'
 
 marked.setOptions({
@@ -233,7 +233,7 @@ function GenFileCard({ file }) {
     // 准备链接而不会保存；若后续 attachment 响应没被 WebView 接住，用户看到的
     // 就是预览正常、下载完全没反应。原生端直接走统一 downloadBlob 出口，一次
     // 点击写入 Download；浏览器/PWA 才继续使用下面的两步真实链接方案。
-    if (window.YanjiNative?.saveBase64File) {
+    if (hasNativeDownloadBridge()) {
       downloadBlob(
         new Blob([file.content], { type: fileMime(file.filename) }),
         file.filename,

@@ -53,6 +53,7 @@ class MainActivity : AppCompatActivity() {
         private const val AUDIO_PERM_CODE = 1003
         private const val DOWNLOAD_CHANNEL_ID = "yanji_downloads"
         private const val DOWNLOAD_NOTIFICATION_ID = 4102
+        private const val WEB_CACHE_VERSION_KEY = "web_cache_version"
         const val YANJI_URL = "https://sunmoon-orbit.github.io/ripple-and-serena/yanji/"
     }
 
@@ -213,7 +214,7 @@ class MainActivity : AppCompatActivity() {
         // JS bridge：让前端知道自己在原生 app 里
         webView.addJavascriptInterface(WebBridge(this), "YanjiNative")
 
-        webView.loadUrl(YANJI_URL)
+        loadYanjiUrl()
 
         // 请求通知权限
         requestNotificationPermission()
@@ -233,6 +234,25 @@ class MainActivity : AppCompatActivity() {
 
         // 全屏来电权限（安卓14+）。延后 3 秒：先让她看到 app 起来，别一点图标就被踹进设置页
         webView.postDelayed({ promptFullScreenIntentPermission() }, 3000)
+    }
+
+    /**
+     * 言叽的界面从 GitHub Pages 加载，覆盖安装会保留 WebView 的 HTTP 缓存。
+     * 这会让新 APK 继续运行上一版 index/bundle：原生桥明明已经在，页面却还走旧的
+     * PWA 两次下载流程。每个 APK 版本第一次启动时只清 HTTP 缓存（不碰 localStorage、
+     * 对话或设置），并给入口 URL 带上版本号，确保本次导航一定拿到当前网页入口。
+     */
+    private fun loadYanjiUrl() {
+        val prefs = getSharedPreferences("yanji_native", Context.MODE_PRIVATE)
+        val currentVersion = BuildConfig.VERSION_CODE
+        if (prefs.getInt(WEB_CACHE_VERSION_KEY, -1) != currentVersion) {
+            webView.clearCache(true)
+            prefs.edit().putInt(WEB_CACHE_VERSION_KEY, currentVersion).apply()
+        }
+        webView.loadUrl(
+            "${YANJI_URL}?native_v=$currentVersion",
+            mapOf("Cache-Control" to "no-cache")
+        )
     }
 
     override fun onNewIntent(intent: Intent) {
