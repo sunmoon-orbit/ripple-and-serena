@@ -619,7 +619,7 @@ export default function Settings() {
     { id: 'qingwu', name: '青梧', color: '#93b895' },
     { id: 'claude', name: 'Claude', color: '#c8745a' },
     { id: 'glass', name: '烟水', color: '#7eb8c8' },
-    { id: 'chensi', name: '沉思', color: '#2a2a2a' },
+    { id: 'chensi', name: '沉思', color: 'linear-gradient(135deg, #fff 0 48%, #292929 52% 100%)' },
   ]
 
   async function checkMoonHealth() {
