@@ -9,6 +9,7 @@ import { subscribePush, unsubscribePush, getSubscription, isNativeApp, subscribe
 import { DELAY_MODES } from '../../utils/replyDelay'
 import { DEFAULT_RINGTONE_ID, RINGTONES, playRingtone } from '../../utils/ringtones'
 import { squareDownscale } from '../../utils/squareDownscale'
+import McpSettings from './McpSettings'
 
 function Section({ title, children }) {
   return (
@@ -608,6 +609,7 @@ export default function Settings() {
   const TABS = [
     { id: 'connections', label: '连接' },
     { id: 'memory', label: '记忆注入' },
+    { id: 'tools', label: '工具与 MCP' },
     { id: 'moon', label: '拾羽记忆库' },
     { id: 'general', label: '通用' },
     { id: 'appearance', label: '外观' },
@@ -847,6 +849,13 @@ export default function Settings() {
                 }}>添加</button>
               </div>
             </div>
+          </Section>
+        )}
+
+        {/* ── Remote MCP tools ────────────────────────────────── */}
+        {tab === 'tools' && (
+          <Section title="工具与 MCP">
+            <McpSettings />
           </Section>
         )}
 
