@@ -1467,6 +1467,74 @@ textarea.form-input { display: block; margin: 8px 16px 12px; }
 }
 .chat-send-btn:hover:not(.disabled) { opacity: 0.85; transform: scale(1.04); }
 .chat-send-btn.disabled { opacity: 0.35; cursor: not-allowed; transform: none; }
+
+/* 言叽内嵌拼音键盘：只使用主题变量，切换任一主题时会跟着换色。 */
+.pinyin-keyboard {
+  max-width: 720px; margin: 8px auto -4px; padding: 7px 6px 6px;
+  border: 1px solid var(--border-md); border-radius: var(--r-lg);
+  background: color-mix(in srgb, var(--card) 94%, var(--accent) 6%);
+  box-shadow: 0 -4px 20px color-mix(in srgb, var(--text) 9%, transparent);
+  user-select: none; -webkit-user-select: none; touch-action: manipulation;
+}
+.pinyin-candidate-bar {
+  min-height: 38px; display: flex; align-items: center; gap: 6px;
+  padding: 0 2px 6px; margin-bottom: 3px; border-bottom: 1px solid var(--border);
+}
+.pinyin-composition {
+  flex: 0 0 auto; max-width: 92px; padding: 4px 8px;
+  color: var(--text-faint); font-size: 11px; white-space: nowrap;
+  overflow: hidden; text-overflow: ellipsis; border-radius: 8px;
+  background: color-mix(in srgb, var(--bg) 76%, transparent);
+}
+.pinyin-composition.active { color: var(--accent); font-weight: 650; }
+.pinyin-candidates {
+  display: flex; flex: 1; gap: 2px; overflow-x: auto; min-width: 0;
+  scrollbar-width: none; overscroll-behavior-x: contain;
+}
+.pinyin-candidates::-webkit-scrollbar { display: none; }
+.pinyin-candidate {
+  flex: 0 0 auto; min-width: 42px; height: 32px; padding: 0 8px;
+  border: none; border-radius: 8px; background: transparent;
+  color: var(--text); font: 500 15px/1 inherit;
+}
+.pinyin-candidate:active { background: var(--accent-dim); color: var(--accent); }
+.pinyin-candidate span { margin-right: 3px; color: var(--text-faint); font-size: 9px; vertical-align: top; }
+.pinyin-mini-btn {
+  width: 30px; height: 30px; flex: 0 0 auto; border: none; border-radius: 8px;
+  background: transparent; color: var(--text-muted); font-size: 18px;
+}
+.pinyin-letter-rows { display: flex; flex-direction: column; gap: 5px; }
+.pinyin-key-row { display: flex; justify-content: center; gap: 4px; }
+.pinyin-key-row.row-2 { padding-inline: 4.5%; }
+.pinyin-key-row.row-3 { padding-left: 7%; }
+.pinyin-key {
+  flex: 1 1 0; min-width: 0; height: 38px; padding: 0 3px;
+  border: 1px solid color-mix(in srgb, var(--border-md) 82%, transparent);
+  border-radius: 8px; background: color-mix(in srgb, var(--bg) 84%, white 16%);
+  color: var(--text); box-shadow: 0 1px 2px color-mix(in srgb, var(--text) 12%, transparent);
+  font: 550 15px/1 inherit; transition: transform 0.06s, background 0.1s;
+}
+.pinyin-key:active, .pinyin-key.active {
+  transform: translateY(1px); background: var(--accent-dim); color: var(--accent);
+}
+.pinyin-key-wide { flex-grow: 1.45; font-size: 12px; }
+.pinyin-function-row { gap: 5px; margin-top: 6px; }
+.pinyin-function-row .pinyin-key { flex-grow: 0.8; font-size: 11px; }
+.pinyin-function-row .pinyin-space-key { flex-grow: 3.4; font-size: 12px; }
+.pinyin-function-row .pinyin-system-key { flex-grow: 1.15; color: var(--accent); }
+.pinyin-symbol-grid {
+  display: grid; grid-template-columns: repeat(9, minmax(0, 1fr)); gap: 5px;
+  min-height: 124px; align-content: center;
+}
+.pinyin-symbol-grid .pinyin-key { width: 100%; }
+
+@media (max-width: 420px) {
+  .pinyin-keyboard { margin-inline: -6px; border-radius: 14px; }
+  .pinyin-composition { max-width: 72px; padding-inline: 6px; }
+  .pinyin-key-row { gap: 3px; }
+  .pinyin-key { height: 36px; border-radius: 7px; }
+  .pinyin-symbol-grid { grid-template-columns: repeat(7, minmax(0, 1fr)); min-height: 123px; }
+}
 .sticker-picker {
   max-width: 720px; margin: 0 auto 8px;
   display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px;
