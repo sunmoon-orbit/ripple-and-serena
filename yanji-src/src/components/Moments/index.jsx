@@ -61,17 +61,32 @@ const IconImage = () => (
     <path d="M21 15l-5-5L5 21"/>
   </svg>
 )
+const IconCamera = () => (
+  <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M14.5 4l1.4 2H19a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h3.1l1.4-2z" />
+    <circle cx="12" cy="12.5" r="3.4" />
+  </svg>
+)
+const IconBack = () => (
+  <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M15 18l-6-6 6-6" />
+  </svg>
+)
 
-function Avatar({ author }) {
+function Avatar({ author, avatarConfig, size = 42, className = '' }) {
+  const src = author === '阿颖' ? avatarConfig?.userImage : avatarConfig?.assistantImage
   return (
-    <div style={{ width: 36, height: 36, borderRadius: '50%', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18, background: author === '涟言' ? 'rgba(28,33,48,0.07)' : 'rgba(160,120,80,0.09)' }}>
-      {AVATAR[author] || '🐦'}
+    <div className={`moments-avatar ${className}`} style={{ width: size, height: size }}>
+      {src
+        ? <img src={src} alt={author} />
+        : <span>{AVATAR[author] || (author === '阿颖' ? '🐦' : '🐦‍⬛')}</span>}
     </div>
   )
 }
 
-function Post({ post, cfg, onLike, onComment, onAIComment, onDelete }) {
+function Post({ post, cfg, avatarConfig, onLike, onComment, onAIComment, onDelete }) {
   const [showComments, setShowComments] = useState(false)
+  const [showActions, setShowActions] = useState(false)
   const [commentInput, setCommentInput] = useState('')
 
   function submit() {
@@ -84,55 +99,58 @@ function Post({ post, cfg, onLike, onComment, onAIComment, onDelete }) {
   const img = mediaUrl(cfg, post.image_url)
 
   return (
-    <div style={{ background: 'var(--bg)', borderRadius: 14, padding: '14px 16px', marginBottom: 10 }}>
-      <div style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
-        <Avatar author={post.author} />
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
-            <div style={{ fontWeight: 600, fontSize: 13, color: 'var(--accent)' }}>{post.author}</div>
-            <button onClick={() => onDelete(post.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-faint)', fontSize: 16, lineHeight: 1, padding: '0 2px', opacity: 0.5 }}>×</button>
-          </div>
-          {post.content && <div style={{ fontSize: 15, color: 'var(--text)', lineHeight: 1.7, wordBreak: 'break-word' }}>{post.content}</div>}
+    <article className="moments-post">
+      <div className="moments-post-main">
+        <Avatar author={post.author} avatarConfig={avatarConfig} />
+        <div className="moments-post-body">
+          <div className="moments-author">{post.author}</div>
+          {post.content && <div className="moments-copy">{post.content}</div>}
           {img && (
-            <img src={img} alt="" loading="lazy" style={{ marginTop: 8, maxWidth: '100%', maxHeight: 320, borderRadius: 10, display: 'block', objectFit: 'cover' }} />
+            <img src={img} alt="" loading="lazy" className="moments-photo" />
           )}
-          <div style={{ fontSize: 11, color: 'var(--text-faint)', marginTop: 6 }}>{fmtTime(post.created_at)}</div>
+          <div className="moments-meta-row">
+            <span>{fmtTime(post.created_at)}</span>
+            <div className="moments-actions-wrap">
+              {showActions && (
+                <div className="moments-actions">
+                  <button className={liked ? 'active' : ''} onClick={() => { onLike(post.id); setShowActions(false) }}><IconHeart filled={liked} />{liked ? '取消' : '赞'}</button>
+                  <button onClick={() => { setShowComments(true); setShowActions(false) }}><IconChat />评论</button>
+                  {post.author === '阿颖' && <button onClick={() => { onAIComment(post); setShowActions(false) }}>让阿言说</button>}
+                  <button className="danger" onClick={() => onDelete(post.id)}>删除</button>
+                </div>
+              )}
+              <button className="moments-more" onClick={() => setShowActions(v => !v)} aria-label="动态操作">••</button>
+            </div>
+          </div>
+          {((post.likes || []).length > 0 || (post.comments || []).length > 0) && (
+            <div className="moments-social-summary">
+              {(post.likes || []).length > 0 && <button onClick={() => onLike(post.id)}><IconHeart filled={liked} /> {(post.likes || []).length}</button>}
+              {(post.comments || []).length > 0 && <button onClick={() => setShowComments(v => !v)}><IconChat /> {post.comments.length}</button>}
+            </div>
+          )}
         </div>
       </div>
 
-      <div style={{ display: 'flex', gap: 14, marginTop: 10, paddingTop: 8, borderTop: '1px solid var(--border)', alignItems: 'center' }}>
-        <button onClick={() => onLike(post.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: liked ? 'var(--accent)' : 'var(--text-faint)', display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, padding: 0 }}>
-          <IconHeart filled={liked} /> {(post.likes || []).length || 0}
-        </button>
-        <button onClick={() => setShowComments(!showComments)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: showComments ? 'var(--accent)' : 'var(--text-faint)', display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, padding: 0 }}>
-          <IconChat /> {post.comments?.length || 0}
-        </button>
-        {post.author === '阿颖' && (
-          <button onClick={() => onAIComment(post)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-faint)', fontSize: 12, padding: 0 }}>让阿言说话</button>
-        )}
-      </div>
-
       {showComments && (
-        <div style={{ marginTop: 10, paddingLeft: 12, borderLeft: '2px solid var(--border)', marginLeft: 18 }}>
+        <div className="moments-comments">
           {post.comments?.map(c => (
-            <div key={c.id} style={{ fontSize: 13, marginBottom: 8, color: 'var(--text)', lineHeight: 1.6 }}>
-              <span style={{ color: c.author === '涟言' ? 'var(--accent)' : 'var(--text)', fontWeight: 600 }}>{c.author}：</span>
+            <div key={c.id} className="moments-comment">
+              <span>{c.author}：</span>
               {c.content}
             </div>
           ))}
-          <div style={{ display: 'flex', gap: 6, marginTop: 10 }}>
+          <div className="moments-comment-compose">
             <input
-              style={{ flex: 1, minWidth: 0, padding: '7px 10px', borderRadius: 8, border: '1px solid var(--border)', background: 'transparent', fontSize: 13, color: 'var(--text)', outline: 'none' }}
               placeholder="说点什么…"
               value={commentInput}
               onChange={e => setCommentInput(e.target.value)}
               onKeyDown={e => e.key === 'Enter' && submit()}
             />
-            <button onClick={submit} style={{ padding: '7px 14px', borderRadius: 8, border: 'none', background: 'var(--accent)', color: '#fff', fontSize: 13, cursor: 'pointer' }}>发</button>
+            <button onClick={submit}>发</button>
           </div>
         </div>
       )}
-    </div>
+    </article>
   )
 }
 
@@ -140,6 +158,8 @@ export default function Moments() {
   const connections = useStore(s => s.connections)
   const activeConnectionId = useStore(s => s.activeConnectionId)
   const moonMemory = useStore(s => s.moonMemory)
+  const avatarConfig = useStore(s => s.avatarConfig)
+  const setActivePanel = useStore(s => s.setActivePanel)
   const conn = connections.find(c => c.id === activeConnectionId) || connections[0]
   const cfg = { baseUrl: (moonMemory?.baseUrl || 'https://memory.ravenlove.cc').replace(/\/$/, ''), apiToken: moonMemory?.apiToken }
 
@@ -154,8 +174,21 @@ export default function Moments() {
   const [months, setMonths] = useState([])          // 时间条：[{month:'2026-07', count}]
   const [monthFilter, setMonthFilter] = useState('') // ''=最新流，'YYYY-MM'=只看该月
   const fileRef = useRef(null)
+  const coverRef = useRef(null)
+  const [coverImage, setCoverImage] = useState(() => localStorage.getItem('yanji-moments-cover-image') || localStorage.getItem('yanji-roost-bg-image') || '')
   const SHOW_COUNT = 3
   const PAGE_SIZE = 50
+
+  // 朋友圈封面单独存在本设备；没有专属图时沿用 Roost 背景，仍没有就走主题渐变。
+  useEffect(() => {
+    const syncFallbackCover = () => {
+      if (!localStorage.getItem('yanji-moments-cover-image')) {
+        setCoverImage(localStorage.getItem('yanji-roost-bg-image') || '')
+      }
+    }
+    window.addEventListener('roost-bg-change', syncFallbackCover)
+    return () => window.removeEventListener('roost-bg-change', syncFallbackCover)
+  }, [])
 
   const reload = useCallback(async () => {
     try {
@@ -226,6 +259,21 @@ export default function Moments() {
     if (!file.type.startsWith('image/')) { showToast('请选图片文件', 'error'); return }
     try { setPendingImg({ dataUrl: await downscaleImage(file) }) }
     catch { showToast('图片处理失败', 'error') }
+  }
+
+  async function pickCover(e) {
+    const file = e.target.files?.[0]
+    e.target.value = ''
+    if (!file) return
+    if (!file.type.startsWith('image/')) { showToast('请选图片文件', 'error'); return }
+    try {
+      const dataUrl = await downscaleImage(file, 1200, 0.8)
+      localStorage.setItem('yanji-moments-cover-image', dataUrl)
+      setCoverImage(dataUrl)
+      showToast('朋友圈封面换好啦', 'success')
+    } catch (e) {
+      showToast(e?.name === 'QuotaExceededError' ? '图片太大，没能保存' : '封面处理失败', 'error')
+    }
   }
 
   async function handlePost() {
@@ -310,80 +358,88 @@ export default function Moments() {
   const list = posts || []
 
   return (
-    <div className="panel-shell">
+    <div className="panel-shell moments-shell">
       <div className="moments-inner">
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '18px 2px 16px' }}>
-        <h2 style={{ fontSize: 20, fontWeight: 700 }}>朋友圈</h2>
-        <button onClick={handleAIPost} disabled={aiPosting} style={{
-          padding: '7px 14px', borderRadius: 20, border: 'none', cursor: 'pointer',
-          background: 'var(--accent)', color: '#fff', fontSize: 13, fontWeight: 600, opacity: aiPosting ? 0.6 : 1,
-        }}>{aiPosting ? '发圈中…' : '🐦‍⬛ 让阿言说点什么'}</button>
-      </div>
+        <header className="moments-cover" style={coverImage ? { backgroundImage: `url(${coverImage})` } : undefined}>
+          <div className="moments-cover-shade" />
+          <div className="moments-cover-controls">
+            <button onClick={() => setActivePanel('roost')} aria-label="返回 Roost"><IconBack /></button>
+            <button onClick={() => coverRef.current?.click()} aria-label="更换朋友圈封面"><IconCamera /></button>
+          </div>
+          <input ref={coverRef} type="file" accept="image/*" onChange={pickCover} style={{ display: 'none' }} />
+          <div className="moments-profile">
+            <span>阿颖</span>
+            <Avatar author="阿颖" avatarConfig={avatarConfig} size={72} className="moments-profile-avatar" />
+          </div>
+        </header>
 
-      {/* 发动态框 */}
-      <div style={{ background: 'var(--bg)', borderRadius: 12, padding: '10px 12px', marginBottom: 12 }}>
-        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-          <div style={{ width: 32, height: 32, borderRadius: '50%', background: 'rgba(160,120,80,0.09)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 17, flexShrink: 0 }}>🐦</div>
+        <main className="moments-feed">
+          <div className="moments-title-row">
+            <div>
+              <h2>朋友圈</h2>
+              <p>把日子留在这里，也一起翻旧时光</p>
+            </div>
+            <button className="moments-ai-post" onClick={handleAIPost} disabled={aiPosting}>
+              {aiPosting ? '发圈中…' : '🐦‍⬛ 让阿言说点什么'}
+            </button>
+          </div>
+
+          {/* 发动态框 */}
+          <section className="moments-compose">
+            <div className="moments-compose-row">
+              <Avatar author="阿颖" avatarConfig={avatarConfig} size={38} />
           <input
-            style={{ flex: 1, minWidth: 0, border: 'none', background: 'transparent', fontSize: 14, color: 'var(--text)', outline: 'none' }}
             placeholder="在想什么…"
             value={input}
             onChange={e => setInput(e.target.value)}
             onKeyDown={e => e.key === 'Enter' && handlePost()}
           />
           <input ref={fileRef} type="file" accept="image/*" onChange={pickImage} style={{ display: 'none' }} />
-          <button onClick={() => fileRef.current?.click()} title="配图" style={{ background: 'none', border: 'none', cursor: 'pointer', flexShrink: 0, color: 'var(--text-muted)', display: 'flex', alignItems: 'center', padding: '0 4px' }}><IconImage /></button>
-          <button onClick={handlePost} disabled={posting || (!input.trim() && !pendingImg)} style={{
-            padding: '6px 14px', borderRadius: 16, border: 'none', cursor: 'pointer', flexShrink: 0,
-            background: 'var(--accent)', color: '#fff', fontSize: 13, fontWeight: 600,
-            opacity: posting || (!input.trim() && !pendingImg) ? 0.45 : 1,
-          }}>{posting ? '…' : '发'}</button>
-        </div>
-        {pendingImg && (
-          <div style={{ marginTop: 8, position: 'relative', display: 'inline-block' }}>
-            <img src={pendingImg.dataUrl} alt="" style={{ maxHeight: 120, borderRadius: 8, display: 'block' }} />
-            <button onClick={() => setPendingImg(null)} style={{ position: 'absolute', top: 4, right: 4, width: 22, height: 22, borderRadius: '50%', border: 'none', background: 'rgba(0,0,0,0.55)', color: '#fff', cursor: 'pointer', fontSize: 14, lineHeight: 1 }}>×</button>
-          </div>
-        )}
-      </div>
+              <button className="moments-image-btn" onClick={() => fileRef.current?.click()} title="配图"><IconImage /></button>
+              <button className="moments-send-btn" onClick={handlePost} disabled={posting || (!input.trim() && !pendingImg)}>{posting ? '…' : '发表'}</button>
+            </div>
+            {pendingImg && (
+              <div className="moments-pending-image">
+                <img src={pendingImg.dataUrl} alt="" />
+                <button onClick={() => setPendingImg(null)}>×</button>
+              </div>
+            )}
+          </section>
 
-      {/* 时间条：多于一个月才出现，点月份直达 */}
-      {months.length > 1 && (
-        <div style={{ display: 'flex', gap: 6, overflowX: 'auto', paddingBottom: 8, marginBottom: 4, WebkitOverflowScrolling: 'touch' }}>
-          <button onClick={() => jumpToMonth('')} style={{
-            flexShrink: 0, padding: '4px 12px', borderRadius: 14, border: 'none', cursor: 'pointer', fontSize: 12,
-            background: !monthFilter ? 'var(--accent)' : 'var(--bg)', color: !monthFilter ? '#fff' : 'var(--text-muted)',
-          }}>最新</button>
-          {months.map(m => (
-            <button key={m.month} onClick={() => jumpToMonth(m.month)} style={{
-              flexShrink: 0, padding: '4px 12px', borderRadius: 14, border: 'none', cursor: 'pointer', fontSize: 12,
-              background: monthFilter === m.month ? 'var(--accent)' : 'var(--bg)', color: monthFilter === m.month ? '#fff' : 'var(--text-muted)',
-            }}>{Number(m.month.slice(0, 4))}年{Number(m.month.slice(5))}月 · {m.count}</button>
+          {/* 时间条：多于一个月才出现，点月份直达 */}
+          {months.length > 1 && (
+            <nav className="moments-archive" aria-label="朋友圈历史月份">
+              <button onClick={() => jumpToMonth('')} className={!monthFilter ? 'active' : ''}>最新</button>
+              {months.map(m => (
+                <button key={m.month} onClick={() => jumpToMonth(m.month)} className={monthFilter === m.month ? 'active' : ''}>
+                  {Number(m.month.slice(0, 4))}年{Number(m.month.slice(5))}月 <span>· {m.count}</span>
+                </button>
+              ))}
+            </nav>
+          )}
+
+          {/* 列表 */}
+          {posts === null && <div className="moments-empty">加载中…</div>}
+          {posts !== null && list.length === 0 && (
+            <div className="moments-empty">
+              {cfg.apiToken ? (monthFilter ? '这个月没有动态' : '还没有动态，来发第一条？') : '先在设置里配置记忆库 token'}
+            </div>
+          )}
+          {!monthFilter && list.length > SHOW_COUNT && showAll && (
+            <button onClick={() => setShowAll(false)} className="moments-history-btn">收起 ↑</button>
+          )}
+          {(monthFilter || showAll ? list : list.slice(0, SHOW_COUNT)).map(p => (
+            <Post key={p.id} post={p} cfg={cfg} avatarConfig={avatarConfig} onLike={handleLike} onComment={handleComment} onAIComment={handleAIComment} onDelete={handleDelete} />
           ))}
-        </div>
-      )}
-
-      {/* 列表 */}
-      {posts === null && <div style={{ textAlign: 'center', padding: '40px 0', color: 'var(--text-faint)', fontSize: 14 }}>加载中…</div>}
-      {posts !== null && list.length === 0 && (
-        <div style={{ textAlign: 'center', padding: '40px 0', color: 'var(--text-faint)', fontSize: 14 }}>
-          {cfg.apiToken ? (monthFilter ? '这个月没有动态' : '还没有动态，来发第一条？') : '先在设置里配置记忆库 token'}
-        </div>
-      )}
-      {!monthFilter && list.length > SHOW_COUNT && showAll && (
-        <button onClick={() => setShowAll(false)} style={{ width: '100%', padding: '8px 0', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-faint)', fontSize: 13, marginBottom: 4 }}>收起 ↑</button>
-      )}
-      {(monthFilter || showAll ? list : list.slice(0, SHOW_COUNT)).map(p => (
-        <Post key={p.id} post={p} cfg={cfg} onLike={handleLike} onComment={handleComment} onAIComment={handleAIComment} onDelete={handleDelete} />
-      ))}
-      {!monthFilter && list.length > SHOW_COUNT && !showAll && (
-        <button onClick={() => setShowAll(true)} style={{ width: '100%', padding: '8px 0', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-faint)', fontSize: 13 }}>查看更多 · 共 {list.length}{hasMore ? '+' : ''} 条 ↓</button>
-      )}
-      {!monthFilter && showAll && hasMore && (
-        <button onClick={loadOlder} disabled={loadingMore} style={{ width: '100%', padding: '10px 0', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-faint)', fontSize: 13 }}>
-          {loadingMore ? '翻着呢…' : '看更早的 ↓'}
-        </button>
-      )}
+          {!monthFilter && list.length > SHOW_COUNT && !showAll && (
+            <button onClick={() => setShowAll(true)} className="moments-history-btn">查看更多 · 共 {list.length}{hasMore ? '+' : ''} 条 ↓</button>
+          )}
+          {!monthFilter && showAll && hasMore && (
+            <button onClick={loadOlder} disabled={loadingMore} className="moments-history-btn">
+              {loadingMore ? '翻着呢…' : '看更早的 ↓'}
+            </button>
+          )}
+        </main>
       </div>
     </div>
   )
