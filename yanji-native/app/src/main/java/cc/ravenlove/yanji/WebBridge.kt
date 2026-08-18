@@ -171,6 +171,17 @@ class WebBridge(private val activity: MainActivity) {
         refreshAllWidgets()
     }
 
+    @JavascriptInterface
+    fun updateWidgetBackgroundStyle(style: String) {
+        val safeStyle = if (style == "translucent") "translucent" else "solid"
+        activity.getSharedPreferences("yanji_theme", Context.MODE_PRIVATE)
+            .edit()
+            .putString("widget_background_style", safeStyle)
+            .apply()
+
+        refreshAllWidgets()
+    }
+
     private fun refreshAllWidgets() {
         val manager = AppWidgetManager.getInstance(activity)
         for (cls in arrayOf(YanjiWidget::class.java, EmotionWidget::class.java, PressWidget::class.java)) {

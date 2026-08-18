@@ -2,6 +2,7 @@ import { useState, useRef, useEffect, useCallback } from 'react'
 import { useStore } from '../../store'
 import { showToast } from '../Toast'
 import { transcribeAudio } from '../../api/moonMemory'
+import PinyinKeyboard from './PinyinKeyboard'
 
 const STICKERS = [
   'kaixin.png','wuyu.png','qushi.png','shangban.png','xihuan.png',
@@ -43,6 +44,7 @@ export default function ChatInput({ onSend, disabled, onImageAdd, images, onImag
   const setChatDraft = useStore((s) => s.setChatDraft)
   const flushChatDrafts = useStore((s) => s.flushChatDrafts)
   const clearChatDraft = useStore((s) => s.clearChatDraft)
+  const customKeyboardEnabled = useStore((s) => s.customKeyboardEnabled === true)
   const setText = useCallback((value) => setChatDraft(activeChatId, value), [activeChatId, setChatDraft])
   const [stickerOpen, setStickerOpen] = useState(false)
   const [historyOpen, setHistoryOpen] = useState(false)
@@ -52,6 +54,8 @@ export default function ChatInput({ onSend, disabled, onImageAdd, images, onImag
   const [attachedTexts, setAttachedTexts] = useState([])
   const [listening, setListening] = useState(false)     // 录音中
   const [transcribing, setTranscribing] = useState(false) // 转写中
+  const [customKeyboardOpen, setCustomKeyboardOpen] = useState(false)
+  const [systemKeyboardMode, setSystemKeyboardMode] = useState(false)
   const textareaRef = useRef(null)
   const fileRef = useRef(null)
   const pickerRef = useRef(null)
@@ -71,6 +75,12 @@ export default function ChatInput({ onSend, disabled, onImageAdd, images, onImag
     if (!activeChatId) return
     return () => flushChatDrafts()
   }, [activeChatId, flushChatDrafts])
+
+  useEffect(() => {
+    if (customKeyboardEnabled) return
+    setCustomKeyboardOpen(false)
+    setSystemKeyboardMode(false)
+  }, [customKeyboardEnabled])
 
   useEffect(() => {
     if (!stickerOpen) return
@@ -216,6 +226,61 @@ export default function ChatInput({ onSend, disabled, onImageAdd, images, onImag
     const el = e.target
     el.style.height = 'auto'
     el.style.height = Math.min(el.scrollHeight, 160) + 'px'
+  }
+
+  const insertAtCursor = useCallback((inserted) => {
+    const el = textareaRef.current
+    const current = el?.value ?? text
+    const start = el?.selectionStart ?? current.length
+    const end = el?.selectionEnd ?? start
+    const next = current.slice(0, start) + inserted + current.slice(end)
+    const cursor = start + inserted.length
+    setText(next)
+    requestAnimationFrame(() => {
+      const target = textareaRef.current
+      if (!target) return
+      target.focus({ preventScroll: true })
+      target.setSelectionRange(cursor, cursor)
+      target.style.height = 'auto'
+      target.style.height = Math.min(target.scrollHeight, 160) + 'px'
+    })
+  }, [setText, text])
+
+  const deleteAtCursor = useCallback(() => {
+    const el = textareaRef.current
+    const current = el?.value ?? text
+    const start = el?.selectionStart ?? current.length
+    const end = el?.selectionEnd ?? start
+    if (start === 0 && end === 0) return
+    let deleteStart = start
+    if (start === end) {
+      deleteStart = start - 1
+      const last = current.charCodeAt(start - 1)
+      const previous = current.charCodeAt(start - 2)
+      if (last >= 0xDC00 && last <= 0xDFFF && previous >= 0xD800 && previous <= 0xDBFF) deleteStart = start - 2
+    }
+    const next = current.slice(0, deleteStart) + current.slice(end)
+    setText(next)
+    requestAnimationFrame(() => {
+      const target = textareaRef.current
+      target?.focus({ preventScroll: true })
+      target?.setSelectionRange(deleteStart, deleteStart)
+    })
+  }, [setText, text])
+
+  function useSystemKeyboard() {
+    setCustomKeyboardOpen(false)
+    setSystemKeyboardMode(true)
+    const el = textareaRef.current
+    el?.blur()
+    setTimeout(() => el?.focus(), 60)
+  }
+
+  function useYanjiKeyboard() {
+    setSystemKeyboardMode(false)
+    setCustomKeyboardOpen(true)
+    textareaRef.current?.blur()
+    setTimeout(() => textareaRef.current?.focus({ preventScroll: true }), 60)
   }
 
   function handleImageClick() {
@@ -400,6 +465,13 @@ export default function ChatInput({ onSend, disabled, onImageAdd, images, onImag
               </svg>
             </button>
           )}
+          {customKeyboardEnabled && (
+            <button
+              className={'input-action-btn' + (customKeyboardOpen ? ' active' : '')}
+              title={customKeyboardOpen ? '收起言叽键盘' : '使用言叽拼音键盘'}
+              onClick={() => customKeyboardOpen ? setCustomKeyboardOpen(false) : useYanjiKeyboard()}
+            >拼</button>
+          )}
         </div>
         <textarea
           ref={textareaRef}
@@ -408,6 +480,13 @@ export default function ChatInput({ onSend, disabled, onImageAdd, images, onImag
           value={text}
           onChange={handleInput}
           onKeyDown={handleKeyDown}
+          onFocus={() => {
+            if (customKeyboardEnabled && !systemKeyboardMode) setCustomKeyboardOpen(true)
+          }}
+          onPointerDown={() => {
+            if (customKeyboardEnabled && !systemKeyboardMode) setCustomKeyboardOpen(true)
+          }}
+          inputMode={customKeyboardEnabled && !systemKeyboardMode ? 'none' : 'text'}
           disabled={disabled}
           rows={1}
         />
@@ -423,6 +502,14 @@ export default function ChatInput({ onSend, disabled, onImageAdd, images, onImag
           </svg>
         </button>
       </div>
+      {customKeyboardEnabled && customKeyboardOpen && (
+        <PinyinKeyboard
+          onInsert={insertAtCursor}
+          onDeleteBackward={deleteAtCursor}
+          onUseSystem={useSystemKeyboard}
+          onClose={() => setCustomKeyboardOpen(false)}
+        />
+      )}
       <input ref={fileRef} type="file" accept="image/*,.txt,.md,.csv,.json,.js,.py,.html,.css" multiple style={{ display: 'none' }} onChange={handleFileChange} />
     </div>
   )

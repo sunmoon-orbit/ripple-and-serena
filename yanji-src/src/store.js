@@ -44,6 +44,10 @@ const DEFAULT_STATE = {
   theme: 'claude',
   // 新安装默认实色，保证各主题文字都清楚；老用户已经保存的透明度原样沿用。
   glassOpacity: 1,
+  // 言叽自己的 26 键拼音键盘：默认关闭，避免第一次更新就替换她已经习惯的系统输入法。
+  customKeyboardEnabled: false,
+  // 原生桌面小组件背景：solid=实色，translucent=半透明。网页端保留设置，原生桥负责落到 SharedPreferences。
+  widgetBackgroundStyle: 'solid',
   // 官端滚动模型：发送后自己的消息滚到视口顶端，回复在下方往下长（外观设置里可关）
   scrollAnchor: true,
   // 显影式浮现：流式输出时新字带雾出现、几百毫秒变清晰（和拾羽落水涟漪凑一套水系，外观里可关）
@@ -229,6 +233,7 @@ const persistedKeys = [
   'messagesByChatId', 'globalInstruction', 'summariesByChatId', 'draftsByChatId',
   'generationConfig', 'memoryItems', 'tokenStats', 'contextLimit',
   'searchConfig', 'avatarConfig', 'autoTools', 'imageDescriptions', 'moonMemory', 'theme', 'glassOpacity',
+  'customKeyboardEnabled', 'widgetBackgroundStyle',
   'injectMode', 'injectPrompt', 'scrollAnchor', 'textReveal', 'replyDelay', 'customStickers',
   'voiceCallStyle', 'vcBackground', 'homeStyle', 'timeAwareness', 'longingPush', 'randomTool', 'ringtone', 'lastBackupAt',
 ]
@@ -268,6 +273,17 @@ export const useStore = create((set, get) => ({
   setActivePanel: (panel) => set({ activePanel: panel }),
   setTheme: (theme) => set((s) => { savePersistedState({ ...s, theme }); try { window.YanjiNative?.updateTheme(theme === 'default' ? 'default' : theme) } catch {}; return { theme } }),
   setGlassOpacity: (v) => set((s) => { savePersistedState({ ...s, glassOpacity: v }); return { glassOpacity: v } }),
+  setCustomKeyboardEnabled: (v) => set((s) => {
+    const customKeyboardEnabled = !!v
+    savePersistedState({ ...s, customKeyboardEnabled })
+    return { customKeyboardEnabled }
+  }),
+  setWidgetBackgroundStyle: (v) => set((s) => {
+    const widgetBackgroundStyle = v === 'translucent' ? 'translucent' : 'solid'
+    savePersistedState({ ...s, widgetBackgroundStyle })
+    try { window.YanjiNative?.updateWidgetBackgroundStyle?.(widgetBackgroundStyle) } catch { /* 网页版没有这个桥 */ }
+    return { widgetBackgroundStyle }
+  }),
   setScrollAnchor: (v) => set((s) => { savePersistedState({ ...s, scrollAnchor: v }); return { scrollAnchor: v } }),
   setTextReveal: (v) => set((s) => { savePersistedState({ ...s, textReveal: v }); return { textReveal: v } }),
   setReplyDelay: (v) => set((s) => { savePersistedState({ ...s, replyDelay: v }); return { replyDelay: v } }),
