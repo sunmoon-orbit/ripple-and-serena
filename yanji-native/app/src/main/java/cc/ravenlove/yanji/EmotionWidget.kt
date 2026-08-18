@@ -14,7 +14,7 @@ class EmotionWidget : AppWidgetProvider() {
         val prefs = context.getSharedPreferences("yanji_emotion", Context.MODE_PRIVATE)
         val slotsJson = prefs.getString("slots", null)
         val dominant = findDominant(slotsJson)
-        val bgRes = emotionThemeBg(context)
+        val bgRes = WidgetAppearance.background(context, WidgetAppearance.Kind.EMOTION)
 
         for (id in ids) {
             val views = RemoteViews(context.packageName, R.layout.emotion_widget_layout)
@@ -38,19 +38,6 @@ class EmotionWidget : AppWidgetProvider() {
     }
 
     companion object {
-        private fun emotionThemeBg(context: Context): Int {
-            val theme = context.getSharedPreferences("yanji_theme", Context.MODE_PRIVATE)
-                .getString("theme", "default") ?: "default"
-            return when (theme) {
-                "xilan" -> R.drawable.emotion_widget_bg_xilan
-                "qingwu" -> R.drawable.emotion_widget_bg_qingwu
-                "claude" -> R.drawable.emotion_widget_bg_claude
-                "glass" -> R.drawable.emotion_widget_bg_glass
-                "guanduan" -> R.drawable.emotion_widget_bg_guanduan
-                else -> R.drawable.emotion_widget_bg
-            }
-        }
-
         private data class Mood(val emoji: String, val label: String, val sub: String)
 
         private val EMOTION_MAP = mapOf(
