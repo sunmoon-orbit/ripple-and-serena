@@ -41,6 +41,8 @@ const DEFAULT_STATE = {
     apiToken: '',
     limit: 5,
   },
+  // 远程 Streamable HTTP MCP。令牌和 API Key 一样只保存在这台设备的本地设置中。
+  mcpServers: [],
   theme: 'claude',
   // 新安装默认实色，保证各主题文字都清楚；老用户已经保存的透明度原样沿用。
   glassOpacity: 1,
@@ -232,7 +234,7 @@ const persistedKeys = [
   'connections', 'activeConnectionId', 'chats', 'activeChatId',
   'messagesByChatId', 'globalInstruction', 'summariesByChatId', 'draftsByChatId',
   'generationConfig', 'memoryItems', 'tokenStats', 'contextLimit',
-  'searchConfig', 'avatarConfig', 'autoTools', 'imageDescriptions', 'moonMemory', 'theme', 'glassOpacity',
+  'searchConfig', 'avatarConfig', 'autoTools', 'imageDescriptions', 'moonMemory', 'mcpServers', 'theme', 'glassOpacity',
   'customKeyboardEnabled', 'widgetBackgroundStyle',
   'injectMode', 'injectPrompt', 'scrollAnchor', 'textReveal', 'replyDelay', 'customStickers',
   'voiceCallStyle', 'vcBackground', 'homeStyle', 'timeAwareness', 'longingPush', 'randomTool', 'ringtone', 'lastBackupAt',
@@ -255,6 +257,7 @@ function mergeWithDefaults(persisted) {
   if (!s.moonMemory || typeof s.moonMemory !== 'object') {
     s.moonMemory = { ...DEFAULT_STATE.moonMemory }
   }
+  if (!Array.isArray(s.mcpServers)) s.mcpServers = []
   return s
 }
 
@@ -596,6 +599,28 @@ export const useStore = create((set, get) => ({
       return { moonMemory }
     })
   },
+  addMcpServer: (server) => {
+    const item = {
+      id: uuid(), name: '', url: '', authType: 'none', bearerToken: '',
+      enabled: true, allowWrites: false, tools: [], ...server,
+    }
+    set((s) => {
+      const mcpServers = [...s.mcpServers, item]
+      savePersistedState({ ...s, mcpServers })
+      return { mcpServers }
+    })
+    return item
+  },
+  updateMcpServer: (id, patch) => set((s) => {
+    const mcpServers = s.mcpServers.map((server) => server.id === id ? { ...server, ...patch } : server)
+    savePersistedState({ ...s, mcpServers })
+    return { mcpServers }
+  }),
+  deleteMcpServer: (id) => set((s) => {
+    const mcpServers = s.mcpServers.filter((server) => server.id !== id)
+    savePersistedState({ ...s, mcpServers })
+    return { mcpServers }
+  }),
   setInjectMode: (v) => set((s) => { savePersistedState({ ...s, injectMode: v }); return { injectMode: v } }),
   setInjectPrompt: (v) => set((s) => { savePersistedState({ ...s, injectPrompt: v }); return { injectPrompt: v } }),
   addMemoryItem: (content) => {

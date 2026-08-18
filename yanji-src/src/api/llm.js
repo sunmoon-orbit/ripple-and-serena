@@ -9,6 +9,7 @@ import { TAROT_TOOL_DEF, executeTarot } from './tarot'
 import { NOWHERE_TOOL_DEFS, executeNowhereTool } from './nowhere'
 import { buildMoodFxPrompt } from '../utils/moodFx'
 import { normalizeGenerationConfig } from '../utils/generationConfig'
+import { executeMcpTool, getEnabledMcpToolDefinitions } from './mcp'
 
 export function normalizeProvider(raw) {
   const v = (raw || '').toString().toLowerCase()
@@ -70,7 +71,7 @@ export function checkToolSupport(provider, model) {
 
 // ─── Tool definitions registry ─────────────────────────────────────────────
 
-function getAllTools(searchConfig, moonMemoryConfig, onFile) {
+function getAllTools(searchConfig, moonMemoryConfig, onFile, mcpServers) {
   const tools = []
   if (onFile) {
     // 做文件工具：产物通过 onFile 回调交给 UI 渲染成文件卡片（可下载，html 可预览）
@@ -115,6 +116,7 @@ function getAllTools(searchConfig, moonMemoryConfig, onFile) {
   if (moonMemoryConfig?.enabled && moonMemoryConfig?.apiToken) tools.push(TAROT_TOOL_DEF)
 
   tools.push(...NOWHERE_TOOL_DEFS)
+  tools.push(...getEnabledMcpToolDefinitions(mcpServers))
   return tools
 }
 
@@ -155,7 +157,11 @@ async function executeTool(name, args, ctx) {
   }
 }
 
-async function executeToolRaw(name, args, { searchConfig, moonMemoryConfig, onStatus, onFile }) {
+async function executeToolRaw(name, args, { searchConfig, moonMemoryConfig, mcpServers, onStatus, onFile }) {
+  if (name.startsWith('mcp_')) {
+    onStatus?.('调用 MCP 工具…')
+    return await executeMcpTool(name, args, mcpServers)
+  }
   if (name === 'make_file') {
     onStatus?.('生成文件...')
     const { filename, content } = args || {}
@@ -367,6 +373,7 @@ export async function sendMessage({
   generationConfig,
   searchConfig,
   moonMemoryConfig,
+  mcpServers,
   autoTools,
   onChunk,
   onThinking,
@@ -383,14 +390,14 @@ export async function sendMessage({
   // 各家严格线路会把它当成非法请求直接 400，所以请求出口必须再兜一次底。
   const safeGenerationConfig = normalizeGenerationConfig(generationConfig)
 
-  const tools = autoTools !== false ? getAllTools(searchConfig, moonMemoryConfig, onFile) : []
+  const tools = autoTools !== false ? getAllTools(searchConfig, moonMemoryConfig, onFile, mcpServers) : []
   const hasTools = tools.length > 0 && checkToolSupport(provider, usedModel)
 
   if (hasTools) {
     return await callWithTools({
       connection, messages, systemPrompt: systemPrompt ? systemPrompt + '\n\n' + TOOL_BATCH_PROMPT : TOOL_BATCH_PROMPT,
       dynamicContext, model: usedModel, generationConfig: safeGenerationConfig,
-      tools, provider, searchConfig, moonMemoryConfig, onChunk, onThinking, onStatus, onToolCall, onFile, cacheKey,
+      tools, provider, searchConfig, moonMemoryConfig, mcpServers, onChunk, onThinking, onStatus, onToolCall, onFile, cacheKey,
     })
   }
   return await callStream({
@@ -507,7 +514,7 @@ function providerHttpError(provider, status, raw, body, details) {
 
 async function callWithTools({
   connection, messages, systemPrompt, dynamicContext, model, generationConfig,
-  tools, provider, searchConfig, moonMemoryConfig, onChunk, onThinking, onStatus, onToolCall, onFile, cacheKey,
+  tools, provider, searchConfig, moonMemoryConfig, mcpServers, onChunk, onThinking, onStatus, onToolCall, onFile, cacheKey,
 }) {
   const { temperature = 0.7, maxTokens = 4096 } = generationConfig || {}
   const safeTemp = provider === 'anthropic' ? Math.min(temperature, 1) : Math.min(temperature, 2)
@@ -618,7 +625,7 @@ async function callWithTools({
             })
             continue
           }
-          const result = compressToolResult(await executeTool(tc.function.name, args, { searchConfig, moonMemoryConfig, onStatus, onFile }))
+          const result = compressToolResult(await executeTool(tc.function.name, args, { searchConfig, moonMemoryConfig, mcpServers, onStatus, onFile }))
           convo.push({ role: 'tool', tool_call_id: tc.id, content: result })
         }
         continue
@@ -630,7 +637,7 @@ async function callWithTools({
         if (textTc) {
           onToolCall?.([textTc.name])
           try {
-            const result = compressToolResult(await executeTool(textTc.name, textTc.args, { searchConfig, moonMemoryConfig, onStatus, onFile }))
+            const result = compressToolResult(await executeTool(textTc.name, textTc.args, { searchConfig, moonMemoryConfig, mcpServers, onStatus, onFile }))
             const cleanPrefix = stripFakeToolResult(textTc.remaining)
             finalText = cleanPrefix ? `${cleanPrefix}\n\n${result}` : result
           } catch (e) {
@@ -699,7 +706,7 @@ async function callWithTools({
         convo.push({ role: 'assistant', content: data.content })
         const results = []
         for (const tb of toolBlocks) {
-          const result = compressToolResult(await executeTool(tb.name, tb.input || {}, { searchConfig, moonMemoryConfig, onStatus, onFile }))
+          const result = compressToolResult(await executeTool(tb.name, tb.input || {}, { searchConfig, moonMemoryConfig, mcpServers, onStatus, onFile }))
           results.push({ type: 'tool_result', tool_use_id: tb.id, content: result })
         }
         convo.push({ role: 'user', content: results })
@@ -744,7 +751,7 @@ async function callWithTools({
         const fc = fcPart.functionCall
         onToolCall?.([fc.name])
         convo.push({ role: 'assistant', content: '', functionCall: fc })
-        const result = compressToolResult(await executeTool(fc.name, fc.args || {}, { searchConfig, moonMemoryConfig, onStatus, onFile }))
+        const result = compressToolResult(await executeTool(fc.name, fc.args || {}, { searchConfig, moonMemoryConfig, mcpServers, onStatus, onFile }))
         convo.push({ role: 'function', content: result, functionResponse: { name: fc.name, response: { result } } })
         continue
       }
