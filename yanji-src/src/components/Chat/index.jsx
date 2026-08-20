@@ -168,6 +168,70 @@ const MID_STREAM_CUT_RE = /network ?error|failed to fetch|load failed|connection
 // ⚠️[译:] 是新方括号标签，已同步进 TTS 清洗（VoiceCall.stripForTts + MessageBubble.playTts，0709 规矩）
 const BILINGUAL_NOTE = '[双语通话模式：现在是语音通话，请直接用口语化、自然的英文回复她（你的声音说英文更好听），保持简短（2-4 句）；然后另起一行，用 [译:这里放中文翻译] 在末尾附上这段话的完整中文翻译。方括号里只放翻译文本，不要嵌套贴图、点歌等其他标签。]'
 
+
+function RetryDecisionDialog({ onCancel, onConfirm }) {
+  const cancelButtonRef = useRef(null)
+
+  useEffect(() => {
+    const previousFocus = document.activeElement
+    cancelButtonRef.current?.focus()
+    const handleKeyDown = (event) => {
+      if (event.key === 'Escape') onCancel()
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown)
+      previousFocus?.focus?.()
+    }
+  }, [onCancel])
+
+  return createPortal(
+    <div className="retry-dialog-backdrop">
+      <section
+        className="retry-dialog"
+        role="alertdialog"
+        aria-modal="true"
+        aria-labelledby="retry-dialog-title"
+        aria-describedby="retry-dialog-description"
+      >
+        <svg className="retry-dialog-sky" viewBox="0 0 360 108" aria-hidden="true">
+          <path className="retry-dialog-orbit orbit-back" d="M18 82C86 22 229 6 342 65" />
+          <path className="retry-dialog-orbit" d="M-8 98C87 37 221 28 371 76" />
+          <circle className="retry-dialog-dot dot-one" cx="292" cy="31" r="2.2" />
+          <circle className="retry-dialog-dot dot-two" cx="316" cy="54" r="1.5" />
+          <path className="retry-dialog-star" d="M257 21l1.8 4.6 4.7 1.8-4.7 1.8-1.8 4.6-1.8-4.6-4.7-1.8 4.7-1.8z" />
+          <path className="retry-dialog-moon" d="M75 31a18 18 0 1 0 20 25A19.5 19.5 0 1 1 75 31Z" />
+        </svg>
+
+        <div className="retry-dialog-kicker">连接中断</div>
+        <h2 id="retry-dialog-title">这一轮没有收到正文</h2>
+        <p id="retry-dialog-description">
+          请求可能已经生成并计费。现在重试一次，可能会再次产生费用。
+        </p>
+
+        <div className="retry-dialog-note">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <circle cx="12" cy="12" r="8.5" />
+            <path d="M12 10.5v5" />
+            <circle cx="12" cy="7.6" r=".7" fill="currentColor" stroke="none" />
+          </svg>
+          <span>选择“先不重试”会停在这里，并保留错误信息。</span>
+        </div>
+
+        <div className="retry-dialog-actions">
+          <button ref={cancelButtonRef} className="retry-dialog-cancel" type="button" onClick={onCancel}>
+            先不重试
+          </button>
+          <button className="retry-dialog-confirm" type="button" onClick={onConfirm}>
+            重试一次
+          </button>
+        </div>
+      </section>
+    </div>,
+    document.body
+  )
+}
+
 export default function Chat() {
   // 不能订阅整个 store：草稿每敲一个字、流式回复每来一个 chunk 都会改 store。
   // 整体订阅会让聊天页（连同全部历史气泡）跟着重渲染，窗口越长越卡。
@@ -264,6 +328,19 @@ export default function Chat() {
   const [incomingCall, setIncomingCall] = useState(null) // 来电响铃中：{ chatId, msgId, reason }
   const [dialing, setDialing] = useState(null) // 拨号中：{ status, text }
   const [egg, setEgg] = useState(null) // 完成彩蛋：回复结束后小概率冒出的像素小家伙
+  const [retryPromptOpen, setRetryPromptOpen] = useState(false)
+  const retryDecisionRef = useRef(null)
+  const askRetry = useCallback(() => new Promise((resolve) => {
+    retryDecisionRef.current?.(false)
+    retryDecisionRef.current = resolve
+    setRetryPromptOpen(true)
+  }), [])
+  const finishRetryPrompt = useCallback((shouldRetry) => {
+    const resolve = retryDecisionRef.current
+    retryDecisionRef.current = null
+    setRetryPromptOpen(false)
+    resolve?.(shouldRetry)
+  }, [])
   const [bgImage, setBgImage] = useState(() => localStorage.getItem('yanji-bg-image') || '')
   const bgFileRef = useRef(null)
   const importFileRef = useRef(null)
@@ -744,11 +821,7 @@ export default function Chat() {
         // 一个字都没出来就断线时，上游可能已经生成并计费。以前这里会直接再请求一次；
         // 缓存通常能让第二次很便宜，但中转不保证命中，最坏会再扣一遍。
         // 把决定交给阿颖：确认才重试，取消就保留报错和诊断，不悄悄花第二笔。
-        const shouldRetry = window.confirm(
-          '这次请求可能已经生成并计费，但言叽没有收到正文。\n\n' +
-          '现在重试可能再次扣费。要重试一次吗？\n\n' +
-          '点“确定”重试；点“取消”停止并保留错误信息。'
-        )
+        const shouldRetry = await askRetry()
         if (shouldRetry) {
           removeLastEmptyAssistant(chat.id)
           setStatus('按你的选择重试中…')
@@ -821,7 +894,7 @@ export default function Chat() {
       setStatus('')
     }
   }, [connections, globalInstruction, memoryItems,
-      generationConfig, searchConfig, moonMemory, autoTools, customStickers])
+      generationConfig, searchConfig, moonMemory, autoTools, customStickers, askRetry])
   generateReplyRef.current = generateReply
 
   // ── Send ─────────────────────────────────────────────────────────────────
@@ -1720,6 +1793,12 @@ export default function Chat() {
           </div>
         </div>,
         document.body
+      )}
+      {retryPromptOpen && (
+        <RetryDecisionDialog
+          onCancel={() => finishRetryPrompt(false)}
+          onConfirm={() => finishRetryPrompt(true)}
+        />
       )}
       {annCard && (
         <AnniversaryCard

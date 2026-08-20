@@ -5104,3 +5104,208 @@ body.mp-active .scroll-bottom-btn { bottom: 139px; }
 .tarot-ency-sec b { display: inline-block; margin-right: 7px; color: var(--accent); font-size: 11px; }
 .tarot-ency-sec.rev b { color: var(--text-muted); }
 .tarot-ency-sec p { margin: 4px 0 0; font-size: 12.5px; line-height: 1.75; color: var(--text-mid); }
+
+/* ===== 断线重试确认：跟随主题的柔和站内弹窗 ===== */
+.retry-dialog-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 9000;
+  display: grid;
+  place-items: center;
+  padding: max(20px, env(safe-area-inset-top)) 18px max(20px, env(safe-area-inset-bottom));
+  background: rgba(30, 24, 38, 0.28);
+  backdrop-filter: blur(8px) saturate(0.92);
+  -webkit-backdrop-filter: blur(8px) saturate(0.92);
+  animation: retry-backdrop-in 180ms ease-out both;
+}
+
+.retry-dialog {
+  position: relative;
+  width: min(392px, 100%);
+  overflow: hidden;
+  padding: 78px 24px 22px;
+  border: 1px solid color-mix(in srgb, var(--accent) 24%, var(--border-md));
+  border-radius: 26px;
+  background:
+    radial-gradient(circle at 86% 0%, var(--accent-dim), transparent 42%),
+    linear-gradient(155deg, color-mix(in srgb, var(--card) 96%, var(--accent-dim)), var(--card));
+  box-shadow:
+    0 24px 64px rgba(45, 35, 60, 0.18),
+    0 4px 18px color-mix(in srgb, var(--accent) 14%, transparent),
+    inset 0 1px 0 rgba(255, 255, 255, 0.74);
+  color: var(--text);
+  animation: retry-dialog-in 220ms cubic-bezier(.22, .8, .24, 1) both;
+}
+
+.retry-dialog::after {
+  content: '';
+  position: absolute;
+  right: -34px;
+  top: 46px;
+  width: 110px;
+  height: 110px;
+  border-radius: 50%;
+  background: var(--accent-dim);
+  filter: blur(20px);
+  opacity: .62;
+  pointer-events: none;
+}
+
+.retry-dialog-sky {
+  position: absolute;
+  inset: 0 0 auto;
+  width: 100%;
+  height: 108px;
+  color: var(--accent);
+  pointer-events: none;
+}
+
+.retry-dialog-orbit {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.25;
+  stroke-linecap: round;
+  opacity: .42;
+}
+
+.retry-dialog-orbit.orbit-back {
+  stroke-dasharray: 3 8;
+  opacity: .26;
+}
+
+.retry-dialog-moon { fill: currentColor; opacity: .42; }
+.retry-dialog-star { fill: currentColor; opacity: .62; }
+.retry-dialog-dot { fill: currentColor; opacity: .48; }
+.retry-dialog-dot.dot-two { opacity: .28; }
+
+.retry-dialog-kicker {
+  position: relative;
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  min-height: 25px;
+  padding: 4px 10px;
+  border: 1px solid color-mix(in srgb, var(--accent) 28%, var(--border));
+  border-radius: 999px;
+  background: var(--accent-dim);
+  color: var(--text-mid);
+  font-size: 11px;
+  font-weight: 650;
+  letter-spacing: .12em;
+}
+
+.retry-dialog h2 {
+  position: relative;
+  z-index: 1;
+  margin: 14px 0 9px;
+  color: var(--text);
+  font-size: 20px;
+  font-weight: 680;
+  letter-spacing: -.02em;
+}
+
+.retry-dialog > p {
+  position: relative;
+  z-index: 1;
+  margin: 0;
+  color: var(--text-mid);
+  font-size: 14px;
+  line-height: 1.75;
+}
+
+.retry-dialog-note {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  margin-top: 17px;
+  padding: 11px 12px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--accent-dim) 62%, var(--card));
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1.55;
+}
+
+.retry-dialog-note svg {
+  flex: 0 0 17px;
+  width: 17px;
+  height: 17px;
+  margin-top: 1px;
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 1.6;
+  stroke-linecap: round;
+}
+
+.retry-dialog-actions {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: 1fr 1.12fr;
+  gap: 10px;
+  margin-top: 20px;
+}
+
+.retry-dialog-actions button {
+  min-height: 47px;
+  border-radius: 15px;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 650;
+  cursor: pointer;
+  transition: transform 140ms ease, box-shadow 140ms ease, filter 140ms ease;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.retry-dialog-actions button:active { transform: scale(.98); }
+
+.retry-dialog-actions button:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--accent) 72%, var(--text));
+  outline-offset: 2px;
+}
+
+.retry-dialog-cancel {
+  border: 1px solid var(--border-md);
+  background: color-mix(in srgb, var(--card) 88%, var(--accent-dim));
+  color: var(--text-mid);
+}
+
+.retry-dialog-confirm {
+  border: 1px solid color-mix(in srgb, var(--accent) 54%, var(--border-md));
+  background: linear-gradient(135deg, var(--accent-soft), var(--accent));
+  color: color-mix(in srgb, var(--text) 90%, #000);
+  box-shadow: 0 7px 18px color-mix(in srgb, var(--accent) 24%, transparent);
+}
+
+@media (hover: hover) {
+  .retry-dialog-actions button:hover { filter: brightness(1.025); }
+  .retry-dialog-confirm:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 9px 22px color-mix(in srgb, var(--accent) 28%, transparent);
+  }
+}
+
+@media (max-width: 420px) {
+  .retry-dialog { padding: 74px 20px 20px; border-radius: 23px; }
+  .retry-dialog h2 { font-size: 19px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .retry-dialog-backdrop,
+  .retry-dialog { animation: none; }
+  .retry-dialog-actions button { transition: none; }
+}
+
+@keyframes retry-backdrop-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes retry-dialog-in {
+  from { opacity: 0; transform: translateY(12px) scale(.975); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
