@@ -50,6 +50,7 @@ export default function ChatInput({ onSend, disabled, onImageAdd, images, onImag
   const [historyOpen, setHistoryOpen] = useState(false)
   const [historyQ, setHistoryQ] = useState('')
   const [historyResults, setHistoryResults] = useState([])
+  const [historyTotal, setHistoryTotal] = useState(null)
   const [historyLoading, setHistoryLoading] = useState(false)
   const [attachedTexts, setAttachedTexts] = useState([])
   const [listening, setListening] = useState(false)     // 录音中
@@ -111,12 +112,20 @@ export default function ChatInput({ onSend, disabled, onImageAdd, images, onImag
   const searchHistory = useCallback(async (q) => {
     if (!q.trim() || !moonMemory?.enabled || !moonMemory?.apiToken) return
     setHistoryLoading(true)
+    setHistoryResults([])
+    setHistoryTotal(null)
     try {
       const base = (moonMemory.baseUrl || 'https://memory.ravenlove.cc').replace(/\/$/, '')
-      const resp = await fetch(`${base}/archive/search?q=${encodeURIComponent(q)}&limit=10`, {
+      const resp = await fetch(`${base}/archive/search?q=${encodeURIComponent(q)}&limit=100`, {
         headers: { Authorization: `Bearer ${moonMemory.apiToken}` }
       })
-      if (resp.ok) setHistoryResults(await resp.json())
+      if (resp.ok) {
+        const data = await resp.json()
+        const resultItems = Array.isArray(data) ? data : (data?.items || data?.results)
+        const items = Array.isArray(resultItems) ? resultItems : []
+        setHistoryResults(items)
+        setHistoryTotal(Number.isFinite(data?.total) ? data.total : (items.length >= 100 ? '100+' : items.length))
+      }
     } catch {}
     setHistoryLoading(false)
   }, [moonMemory])
@@ -364,9 +373,12 @@ export default function ChatInput({ onSend, disabled, onImageAdd, images, onImag
               {historyLoading ? '…' : '搜'}
             </button>
           </div>
+          {historyTotal !== null && !historyLoading && (
+            <div className="history-result-count">共 {historyTotal} 条</div>
+          )}
           <div className="history-results">
             {historyResults.length === 0 && !historyLoading && (
-              <div className="history-empty">输入关键词后按搜索</div>
+              <div className="history-empty">{historyTotal === 0 ? '没有找到相关对话' : '输入关键词后按搜索'}</div>
             )}
             {historyResults.map((item) => (
               <div key={item.id} className="history-item" onClick={() => attachHistory(item)}>

@@ -1728,6 +1728,12 @@ textarea.form-input { display: block; margin: 8px 16px 12px; }
   font-size: 13px; cursor: pointer; flex-shrink: 0;
 }
 .history-search-btn:disabled { opacity: 0.5; }
+.history-result-count {
+  width: fit-content; margin: 0 2px 8px auto; padding: 2px 8px;
+  border: 1px solid var(--border-sm); border-radius: 999px;
+  background: var(--bg-soft); color: var(--text-faint);
+  font-size: 11px; line-height: 1.5;
+}
 .history-results { max-height: 240px; overflow-y: auto; display: flex; flex-direction: column; gap: 6px; }
 .history-empty { font-size: 13px; color: var(--text-faint); text-align: center; padding: 12px 0; }
 .history-item {
