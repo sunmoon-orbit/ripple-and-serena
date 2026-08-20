@@ -15,7 +15,7 @@ class YanjiWidget : AppWidgetProvider() {
         val date = beijingDateStr()
         val days = daysTogether(date)
         val card = computeCard("阿颖", date)
-        val bgRes = WidgetAppearance.background(context, WidgetAppearance.Kind.FORTUNE)
+        val bgRes = WidgetAppearance.background(context)
 
         for (id in ids) {
             val views = RemoteViews(context.packageName, R.layout.widget_layout)
