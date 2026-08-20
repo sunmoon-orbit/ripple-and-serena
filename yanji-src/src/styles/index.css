@@ -356,6 +356,8 @@ html, body, #root {
   background: var(--bg);
   color: var(--text);
   overflow: hidden;
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
   -webkit-font-smoothing: antialiased;
 }
 button { font-family: inherit; cursor: pointer; }
@@ -2636,6 +2638,79 @@ textarea.form-input { display: block; margin: 8px 16px 12px; }
   .dream-content { max-width: 680px; padding: 24px 28px; }
   .settings-content { max-width: 680px; padding: 24px 28px 40px; }
   .chat-sidebar { width: 280px; }
+}
+
+/* ── 横屏手机 / 中等宽屏 ───────────────────────────────────────────
+   旧断点把 700–900px 的横屏手机仍当竖屏：底部 Tab 吃掉短边高度，
+   主区又再减 52px，视觉上像整页被缩小。中等宽度改用侧边导航；
+   聊天列表仍保留抽屉，避免在手机横屏里同时挤进两条侧栏。 */
+@media (min-width: 700px) and (max-width: 900px),
+       (orientation: landscape) and (min-width: 600px) and (max-width: 699px) and (max-height: 600px) {
+  .icon-nav {
+    position: relative;
+    inset: auto;
+    width: var(--nav-w);
+    height: 100dvh;
+    flex: 0 0 var(--nav-w);
+    flex-direction: column;
+    justify-content: flex-start;
+    align-items: center;
+    padding: 8px 0;
+    border-top: none;
+    border-right: 1px solid var(--border);
+    background: var(--bg-sidebar);
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+  .icon-nav-logo { display: block; padding: 4px 0 8px; }
+  .icon-nav-items {
+    width: auto;
+    height: auto;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-start;
+    align-items: center;
+    gap: 4px;
+  }
+  .icon-nav-btn {
+    flex: 0 0 40px;
+    width: 40px;
+    height: 40px;
+    flex-direction: row;
+    border-radius: var(--r-sm);
+  }
+  .icon-nav-label { display: none; }
+
+  .app-shell { padding-bottom: 0; }
+  .main-area,
+  .chat-panel,
+  .panel-shell { height: 100dvh; }
+
+  .chat-sidebar {
+    width: min(42vw, 300px);
+    max-width: none;
+  }
+  .messages-list { max-width: 860px; padding-inline: 18px; }
+  .chat-input-area { padding-inline: 18px; }
+  .settings-content,
+  .dream-content { max-width: 720px; margin-inline: auto; width: 100%; }
+}
+
+/* 手机横屏短边很宝贵：只压缩空白和控件高度，不缩正文与输入文字。 */
+@media (orientation: landscape) and (max-width: 900px) and (max-height: 600px) {
+  .chat-topbar { height: 46px; }
+  .messages-list { padding-block: 9px; gap: 9px; }
+  .chat-input-area { padding-top: 6px; padding-bottom: 7px; }
+  .chat-input-row { padding-block: 4px; }
+
+  .pinyin-keyboard { margin-top: 4px; padding: 5px; }
+  .pinyin-candidate-bar { min-height: 32px; padding-bottom: 3px; margin-bottom: 2px; }
+  .pinyin-candidate { height: 28px; }
+  .pinyin-letter-rows { gap: 3px; }
+  .pinyin-key-row { gap: 3px; }
+  .pinyin-key { height: 30px; }
+  .pinyin-function-row { margin-top: 3px; }
+  .pinyin-symbol-grid { min-height: 90px; }
 }
 
 /* ===== 开场动画 ===== */

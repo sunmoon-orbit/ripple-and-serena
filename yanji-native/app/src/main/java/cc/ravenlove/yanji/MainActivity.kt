@@ -80,6 +80,11 @@ class MainActivity : AppCompatActivity() {
             domStorageEnabled = true
             mediaPlaybackRequiresUserGesture = false
             allowFileAccess = true
+            // 响应式页面自己按 viewport / CSS 断点排版。明确关闭 overview，避免
+            // 部分 WebView 在横屏旋转后为了“整页塞进宽度”把内容二次缩小。
+            useWideViewPort = true
+            loadWithOverviewMode = false
+            textZoom = 100
             mixedContentMode = WebSettings.MIXED_CONTENT_NEVER_ALLOW
             cacheMode = WebSettings.LOAD_DEFAULT
             databaseEnabled = true
