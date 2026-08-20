@@ -14,7 +14,7 @@ class EmotionWidget : AppWidgetProvider() {
         val prefs = context.getSharedPreferences("yanji_emotion", Context.MODE_PRIVATE)
         val slotsJson = prefs.getString("slots", null)
         val dominant = findDominant(slotsJson)
-        val bgRes = WidgetAppearance.background(context, WidgetAppearance.Kind.EMOTION)
+        val bgRes = WidgetAppearance.background(context)
 
         for (id in ids) {
             val views = RemoteViews(context.packageName, R.layout.emotion_widget_layout)

@@ -27,7 +27,7 @@ class PressWidget : AppWidgetProvider() {
     }
 
     override fun onUpdate(context: Context, manager: AppWidgetManager, ids: IntArray) {
-        val bgRes = WidgetAppearance.background(context, WidgetAppearance.Kind.PRESS)
+        val bgRes = WidgetAppearance.background(context)
         for (id in ids) {
             val views = RemoteViews(context.packageName, R.layout.press_widget_layout)
             views.setInt(R.id.press_widget_root, "setBackgroundResource", bgRes)
