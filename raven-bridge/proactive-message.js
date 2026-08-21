@@ -39,7 +39,7 @@ async function main() {
   const st = await moonGet('/emotion/state')
   if (!st.synced) return done('skip', '还没有情绪快照')
   if (!st.timeAwareness) return done('skip', '岁聿关着')
-  if (!st.longingPush) return done('skip', '主动消息开关关着')
+  if (st.longingPush === false) return done('skip', '主动消息开关关着')
   if (st.hoursAway < MIN_HOURS_AWAY) return done('skip', `才离开 ${st.hoursAway.toFixed(1)}h，不到 ${MIN_HOURS_AWAY}h`)
   if (st.projectedLonging < MIN_LONGING) return done('skip', `思念 ${st.projectedLonging}，不到 ${MIN_LONGING}`)
 
