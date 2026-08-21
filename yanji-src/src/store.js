@@ -72,6 +72,8 @@ const DEFAULT_STATE = {
   timeAwareness: true,
   // 主动消息：离开一阵子后服务端让 API 涟言结合近期对话决定是否先发消息（依赖岁聿开启）
   longingPush: true,
+  // 主动来电：门槛比主动消息高，服务端结合近期对话决定是否拨来（依赖岁聿开启）
+  proactiveCall: true,
   // 来电铃声：soft-chime 是原有的 E5 → C5 两音轻响，老用户默认听感不变
   ringtone: 'soft-chime',
   lastBackupAt: 0,
@@ -237,7 +239,7 @@ const persistedKeys = [
   'searchConfig', 'avatarConfig', 'autoTools', 'imageDescriptions', 'moonMemory', 'mcpServers', 'theme', 'glassOpacity',
   'customKeyboardEnabled', 'widgetBackgroundStyle',
   'injectMode', 'injectPrompt', 'scrollAnchor', 'textReveal', 'replyDelay', 'customStickers',
-  'voiceCallStyle', 'vcBackground', 'homeStyle', 'timeAwareness', 'longingPush', 'randomTool', 'ringtone', 'lastBackupAt',
+  'voiceCallStyle', 'vcBackground', 'homeStyle', 'timeAwareness', 'longingPush', 'proactiveCall', 'randomTool', 'ringtone', 'lastBackupAt',
 ]
 
 function mergeWithDefaults(persisted) {
@@ -296,6 +298,7 @@ export const useStore = create((set, get) => ({
   setRandomTool: (v) => set((s) => { savePersistedState({ ...s, randomTool: v }); return { randomTool: v } }),
   setTimeAwareness: (v) => set((s) => { savePersistedState({ ...s, timeAwareness: v }); return { timeAwareness: v } }),
   setLongingPush: (v) => set((s) => { savePersistedState({ ...s, longingPush: v }); return { longingPush: v } }),
+  setProactiveCall: (v) => set((s) => { savePersistedState({ ...s, proactiveCall: v }); return { proactiveCall: v } }),
   setLastBackupAt: (ts) => set((s) => { savePersistedState({ ...s, lastBackupAt: ts }); return { lastBackupAt: ts } }),
   // 锁屏来电是原生 CallActivity 放的铃，它读不到 localStorage——
   // 每次改铃声都往原生 SharedPreferences 抄一份，否则她选的铃声只在开着言叽时听得到。

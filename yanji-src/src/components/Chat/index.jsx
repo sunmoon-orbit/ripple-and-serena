@@ -656,7 +656,7 @@ export default function Chat() {
       // 情绪快照同步到服务端（思念推送数据源，节流+静默）
       {
         const s = useStore.getState()
-        maybeSyncEmotion(s.moonMemory, { timeAwareness: s.timeAwareness, longingPush: s.longingPush })
+        maybeSyncEmotion(s.moonMemory, { timeAwareness: s.timeAwareness, longingPush: s.longingPush, proactiveCall: s.proactiveCall })
       }
 
       // inject compaction summary if available

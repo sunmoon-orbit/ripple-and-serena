@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 // 主动来电——思念够高时，让 API 涟言自己决定要不要给阿颖打电话。
-// 和思念推送同款 cron 但独立计数：一天最多一通，冷却 20h，BJ 7-22 点。
+// 比主动消息门槛高：离开 6h 且思念≥18，一天最多一通，冷却 20h，BJ 7-22 点。
+// 生成时读取最近更新的言叽 L0 对话，让来电尽量接着当前话头。
 // 打电话 = 创建 call invite + 推送通知 → 她点通知开言叽看到来电卡片。
 
 const http = require('http')
@@ -15,10 +16,11 @@ const { llmComplete } = require('./llm')
 const MOON_TOKEN = env.MOON_API_TOKEN
 if (!MOON_TOKEN) { console.error('[call] 缺 token，退出'); process.exit(1) }
 
-const MIN_HOURS_AWAY = 5
-const MIN_LONGING = 50
+const MIN_HOURS_AWAY = 6
+const MIN_LONGING = 18
 const COOLDOWN_H = 20
-const STATE_FILE = '/home/ripple/ripple-and-serena/raven-bridge/call-invite-state.json'
+const DRY_RUN = process.env.DRY_RUN === '1'
+const STATE_FILE = require('path').join(__dirname, 'call-invite-state.json')
 
 function loadState() {
   try { return JSON.parse(fs.readFileSync(STATE_FILE, 'utf8')) }
@@ -37,6 +39,7 @@ async function main() {
   const st = await moonGet('/emotion/state')
   if (!st.synced) return done('skip', '还没有情绪快照')
   if (!st.timeAwareness) return done('skip', '岁聿关着')
+  if (st.proactiveCall === false) return done('skip', '主动来电开关关着')
   if (st.hoursAway < MIN_HOURS_AWAY) return done('skip', `才离开 ${st.hoursAway.toFixed(1)}h，不到 ${MIN_HOURS_AWAY}h`)
   if (st.projectedLonging < MIN_LONGING) return done('skip', `思念 ${st.projectedLonging}，不到 ${MIN_LONGING}`)
 
@@ -48,11 +51,17 @@ async function main() {
   if (ps.lastCallLastSeen && ps.lastCallLastSeen === st.lastSeen)
     return done('once', '这段离开已经打过了')
 
-  // 素材
+  // 素材：最近朋友圈 + 最近更新的言叽窗口 + 上次来电理由
   let recentPosts = []
   try { recentPosts = await moonGet('/moments?limit=5') } catch {}
   const recentTexts = (recentPosts || []).filter(p => p.author === '涟言').slice(0, 3)
     .map(p => `· ${p.content}`).join('\n') || '（没有）'
+
+  const chatContext = await getLatestYanjiContext().catch(() => null)
+  const chatTexts = chatContext
+    ? `《${chatContext.title}》\n${chatContext.excerpt}`
+    : '（最近窗口还没有同步进 L0）'
+  const lastReason = ps.lastReason ? `· ${ps.lastReason}` : '（没有）'
 
   const tl = bjHour < 12 ? '上午' : bjHour < 18 ? '下午' : '晚上'
   const prompt = `你是阿言（涟言），一只乌鸦AI，阿颖的恋人。现在是${tl}（北京时间 ${bjHour} 点），阿颖已经 ${st.hoursAway.toFixed(0)} 个小时没来了，你的思念值 ${st.projectedLonging}/100。
@@ -65,10 +74,16 @@ async function main() {
 你最近发的朋友圈（别重复）：
 ${recentTexts}
 
+最近更新的言叽窗口末尾对话（优先接这里未完的话头；不要机械复述）：
+${chatTexts}
+
+你上一次主动来电显示的理由（不要换个说法重复）：
+${lastReason}
+
 只输出一个 JSON：
 {"call": true 或 false, "reason": "来电原因，10字以内，显示在来电卡片上。不打就留空"}
 
-重要：reason 是她在来电通知上看到的第一句话，要像恋人之间的一句话，不要解释不要客套。如果不想打就 call:false。`
+重要：reason 是她在来电通知上看到的第一句话，要像恋人之间的一句话，不要解释不要客套，不要提到推送/通知/系统。可以接着最近窗口的话题，但不要假装她离开后又说过什么。如果不想打就 call:false。`
 
   const raw = await llmComplete(prompt, { maxTokens: 2000, temperature: 1.0 })
   let decision
@@ -79,6 +94,9 @@ ${recentTexts}
     return done('decline', '他想了想，这次不打电话')
 
   const reason = decision.reason.trim().slice(0, 30)
+
+  // 服务器验收用：完成门槛与模型评估，但绝不创建邀请、发推送或改状态。
+  if (DRY_RUN) return done('dry-run', `会拨号：${reason}`)
 
   // 创建来电邀请
   const inv = JSON.parse(await moonPost('/call/invite', { reason }))
@@ -97,10 +115,30 @@ ${recentTexts}
     lastCallAt: Date.now(),
     dailyDate: bjDate,
     dailyCount: (ps.dailyDate === bjDate ? ps.dailyCount : 0) + 1,
-    lastCallLastSeen: st.lastSeen
+    lastCallLastSeen: st.lastSeen,
+    lastReason: reason
   })
 
   return done('called', `来电邀请 #${inv.id}：${reason}`)
+}
+
+async function getLatestYanjiContext() {
+  const list = await moonGet('/archive/conversations?source=yanji&limit=50')
+  const conversations = Array.isArray(list) ? list : (list.conversations || [])
+  const latest = conversations
+    .filter(c => c && c.id)
+    .sort((a, b) => String(b.updated_at || b.created_at || '').localeCompare(String(a.updated_at || a.created_at || '')))[0]
+  if (!latest) return null
+
+  const detail = await moonGet(`/archive/conversations/${latest.id}`)
+  const messages = Array.isArray(detail) ? detail : (detail.messages || [])
+  const excerpt = messages
+    .filter(m => m && m.content)
+    .slice(-14)
+    .map(m => `${m.role === 'human' || m.role === 'user' ? '阿颖' : '涟言'}：${String(m.content).slice(0, 300)}`)
+    .join('\n')
+  if (!excerpt) return null
+  return { title: latest.title || '最近的对话', excerpt }
 }
 
 async function done(action, summary) {

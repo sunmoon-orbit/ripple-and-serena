@@ -386,7 +386,7 @@ export default function Settings() {
     vcBackground, setVcBackground,
     homeStyle, setHomeStyle,
     randomTool, setRandomTool,
-    timeAwareness, setTimeAwareness, longingPush, setLongingPush,
+    timeAwareness, setTimeAwareness, longingPush, setLongingPush, proactiveCall, setProactiveCall,
     ringtone, setRingtone,
     customStickers, addCustomSticker, removeCustomSticker,
     memoryItems, addMemoryItem, toggleMemoryItem, deleteMemoryItem,
@@ -987,7 +987,7 @@ export default function Settings() {
               <div className="card-row">
                 <span className="card-row-label">时间感知</span>
                 <label className="toggle">
-                  <input type="checkbox" checked={timeAwareness !== false} onChange={(e) => { setTimeAwareness(e.target.checked); maybeSyncEmotion(moonMemory, { timeAwareness: e.target.checked, longingPush }, true) }} />
+                  <input type="checkbox" checked={timeAwareness !== false} onChange={(e) => { setTimeAwareness(e.target.checked); maybeSyncEmotion(moonMemory, { timeAwareness: e.target.checked, longingPush, proactiveCall }, true) }} />
                   <span className="toggle-track" />
                 </label>
               </div>
@@ -997,12 +997,22 @@ export default function Settings() {
               <div className="card-row">
                 <span className="card-row-label">主动消息</span>
                 <label className="toggle">
-                  <input type="checkbox" checked={timeAwareness !== false && longingPush !== false} disabled={timeAwareness === false} onChange={(e) => { setLongingPush(e.target.checked); maybeSyncEmotion(moonMemory, { timeAwareness, longingPush: e.target.checked }, true) }} />
+                  <input type="checkbox" checked={timeAwareness !== false && longingPush !== false} disabled={timeAwareness === false} onChange={(e) => { setLongingPush(e.target.checked); maybeSyncEmotion(moonMemory, { timeAwareness, longingPush: e.target.checked, proactiveCall }, true) }} />
                   <span className="toggle-track" />
                 </label>
               </div>
               <div className="card-row" style={{ fontSize: 12, color: 'var(--text-muted)' }}>
                 你离开一阵子后，由 API 的他结合最近窗口聊过的内容，自己决定要不要先发消息。每天最多 3 条、至少间隔 3 小时，只在白天；关闭时间感知会一起停用。
+              </div>
+              <div className="card-row">
+                <span className="card-row-label">主动来电</span>
+                <label className="toggle">
+                  <input type="checkbox" checked={timeAwareness !== false && proactiveCall !== false} disabled={timeAwareness === false} onChange={(e) => { setProactiveCall(e.target.checked); maybeSyncEmotion(moonMemory, { timeAwareness, longingPush, proactiveCall: e.target.checked }, true) }} />
+                  <span className="toggle-track" />
+                </label>
+              </div>
+              <div className="card-row" style={{ fontSize: 12, color: 'var(--text-muted)' }}>
+                离开约 6 小时、思念达到门槛后，他可以结合最近窗口决定要不要打来。每天最多 1 通、两通至少间隔 20 小时；关闭时间感知会一起停用。
               </div>
             </div>
             <div className="settings-card">
