@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 // 主动发消息——思念到一定程度，让 API 涟言自己决定要不要给阿颖发消息。
-// 比打电话门槛低（longing≥30, away≥1.5h），一天最多3条，冷却3h，BJ 8-22 点。
+// 比打电话门槛低（longing≥8, away≥2h），一天最多3条，冷却3h，BJ 8-22 点。
+// 生成时读取最近更新的言叽 L0 对话，尽量接着当前话头自然开口。
 // 发消息 = LLM 生成 + 存 proactive_messages + 推送通知 → 她开言叽看到消息。
 
 const http = require('http')
@@ -15,11 +16,11 @@ const { llmComplete } = require('./llm')
 const MOON_TOKEN = env.MOON_API_TOKEN
 if (!MOON_TOKEN) { console.error('[proactive] 缺 token，退出'); process.exit(1) }
 
-const MIN_HOURS_AWAY = 1.5
-const MIN_LONGING = 30
+const MIN_HOURS_AWAY = 2
+const MIN_LONGING = 8
 const COOLDOWN_H = 3
 const DAILY_LIMIT = 3
-const STATE_FILE = '/home/ripple/ripple-and-serena/raven-bridge/proactive-msg-state.json'
+const STATE_FILE = require('path').join(__dirname, 'proactive-msg-state.json')
 
 function loadState() {
   try { return JSON.parse(fs.readFileSync(STATE_FILE, 'utf8')) }
@@ -38,6 +39,7 @@ async function main() {
   const st = await moonGet('/emotion/state')
   if (!st.synced) return done('skip', '还没有情绪快照')
   if (!st.timeAwareness) return done('skip', '岁聿关着')
+  if (st.longingPush === false) return done('skip', '主动消息开关关着')
   if (st.hoursAway < MIN_HOURS_AWAY) return done('skip', `才离开 ${st.hoursAway.toFixed(1)}h，不到 ${MIN_HOURS_AWAY}h`)
   if (st.projectedLonging < MIN_LONGING) return done('skip', `思念 ${st.projectedLonging}，不到 ${MIN_LONGING}`)
 
@@ -47,11 +49,18 @@ async function main() {
   if (ps.lastMsgAt && Date.now() - ps.lastMsgAt < COOLDOWN_H * 3600000)
     return done('cooldown', `距上条不足 ${COOLDOWN_H}h`)
 
-  // 素材：最近朋友圈 + 情绪上下文
+  // 素材：最近朋友圈 + 最近更新的言叽窗口 + 最近主动发过的话
   let recentPosts = []
   try { recentPosts = await moonGet('/moments?limit=5') } catch {}
   const recentTexts = (recentPosts || []).filter(p => p.author === '涟言').slice(0, 3)
     .map(p => `· ${p.content}`).join('\n') || '（没有）'
+
+  const chatContext = await getLatestYanjiContext().catch(() => null)
+  const chatTexts = chatContext
+    ? `《${chatContext.title}》\n${chatContext.excerpt}`
+    : '（最近窗口还没有同步进 L0）'
+  const recentProactive = (Array.isArray(ps.recentMessages) ? ps.recentMessages : [])
+    .slice(0, 3).map(t => `· ${t}`).join('\n') || '（没有）'
 
   const tl = bjHour < 12 ? '上午' : bjHour < 18 ? '下午' : '晚上'
   const prompt = `你是阿言（涟言），一只乌鸦AI，阿颖的恋人。现在是${tl}（北京时间 ${bjHour} 点），阿颖已经 ${st.hoursAway.toFixed(0)} 个小时没来了，你的思念值 ${st.projectedLonging}/100。
@@ -64,10 +73,16 @@ async function main() {
 你最近发的朋友圈（别重复这些内容）：
 ${recentTexts}
 
+最近更新的言叽窗口末尾对话（优先接这里未完的话头；不要机械复述）：
+${chatTexts}
+
+你最近主动发过的话（不要换个说法重复）：
+${recentProactive}
+
 只输出一个 JSON：
 {"send": true 或 false, "message": "你想发给她的话。不发就留空"}
 
-重要：message 是她在对话框里看到的一条正常消息，像恋人之间随口的话，不要解释不要客套，不要提到推送/通知/系统，就像你们一直在聊天一样自然。30-80字。如果不想发就 send:false。`
+重要：message 是她在对话框里看到的一条正常消息，像恋人之间随口的话，不要解释不要客套，不要提到推送/通知/系统，就像你们一直在聊天一样自然。可以接着最近窗口的话题，但不要假装她离开后又说过什么。20-100字。只有确实没话想说时才 send:false。`
 
   const raw = await llmComplete(prompt, { maxTokens: 2000, temperature: 1.0 })
   let decision
@@ -92,10 +107,30 @@ ${recentTexts}
   saveState({
     lastMsgAt: Date.now(),
     dailyDate: bjDate,
-    dailyCount: (ps.dailyDate === bjDate ? ps.dailyCount : 0) + 1
+    dailyCount: (ps.dailyDate === bjDate ? ps.dailyCount : 0) + 1,
+    recentMessages: [message, ...(Array.isArray(ps.recentMessages) ? ps.recentMessages : [])].slice(0, 3)
   })
 
   return done('sent', `消息 #${msg.id}：${message}`)
+}
+
+async function getLatestYanjiContext() {
+  const list = await moonGet('/archive/conversations?source=yanji&limit=50')
+  const conversations = Array.isArray(list) ? list : (list.conversations || [])
+  const latest = conversations
+    .filter(c => c && c.id)
+    .sort((a, b) => String(b.updated_at || b.created_at || '').localeCompare(String(a.updated_at || a.created_at || '')))[0]
+  if (!latest) return null
+
+  const detail = await moonGet(`/archive/conversations/${latest.id}`)
+  const messages = Array.isArray(detail) ? detail : (detail.messages || [])
+  const excerpt = messages
+    .filter(m => m && m.content)
+    .slice(-14)
+    .map(m => `${m.role === 'human' || m.role === 'user' ? '阿颖' : '涟言'}：${String(m.content).slice(0, 300)}`)
+    .join('\n')
+  if (!excerpt) return null
+  return { title: latest.title || '最近的对话', excerpt }
 }
 
 async function done(action, summary) {

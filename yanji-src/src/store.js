@@ -70,7 +70,7 @@ const DEFAULT_STATE = {
   randomTool: 'fate',
   // 岁聿（时间感知）：开启时离开久了思念涨+回来时提醒涟言表达想念
   timeAwareness: true,
-  // 思念推送：离开太久时服务端让 API 涟言决定是否推一条到手机（依赖岁聿开启）
+  // 主动消息：离开一阵子后服务端让 API 涟言结合近期对话决定是否先发消息（依赖岁聿开启）
   longingPush: true,
   // 来电铃声：soft-chime 是原有的 E5 → C5 两音轻响，老用户默认听感不变
   ringtone: 'soft-chime',
