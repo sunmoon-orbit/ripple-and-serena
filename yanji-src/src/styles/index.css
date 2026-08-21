@@ -259,10 +259,11 @@
   --border-md: rgba(28,28,28,0.17);
   --shadow-sm: 0 1px 3px rgba(28,28,28,0.05);
   --shadow-md: 0 2px 12px rgba(28,28,28,0.07), 0 8px 24px rgba(28,28,28,0.05);
-  --bubble-user-rgb: 232, 232, 229;
-  --bubble-user-grad-rgb: 242, 242, 239;
-  --bubble-asst-rgb: 255, 255, 255;
-  --bubble-asst-grad-rgb: 250, 250, 248;
+  /* 同是纸张色，但把两个人分成暖纸与冷纸；即使叠着背景图也能一眼认出说话方。 */
+  --bubble-user-rgb: 218, 211, 201;
+  --bubble-user-grad-rgb: 233, 228, 220;
+  --bubble-asst-rgb: 244, 247, 250;
+  --bubble-asst-grad-rgb: 232, 238, 244;
 }
 /* 让白纸占据主要面积，黑色只留给字和轮廓；低透明度下也不会出现白字看不清。 */
 [data-theme="chensi"] .bubble-user {
@@ -270,7 +271,7 @@
     rgba(var(--bubble-user-rgb), var(--bubble-opacity)) 0%,
     rgba(var(--bubble-user-grad-rgb), var(--bubble-opacity)) 100%);
   color: var(--text);
-  border: 1px solid var(--border);
+  border: 1px solid rgba(78,70,58,0.16);
   box-shadow: none;
 }
 [data-theme="chensi"] .bubble-assistant {
@@ -278,7 +279,7 @@
     rgba(var(--bubble-asst-rgb), var(--bubble-opacity)) 0%,
     rgba(var(--bubble-asst-grad-rgb), var(--bubble-opacity)) 100%);
   color: var(--text);
-  border-color: var(--border-md);
+  border-color: rgba(71,84,96,0.18);
   box-shadow: var(--shadow-sm);
 }
 [data-theme="chensi"] .message.user .message-bubble a { color: #222; }
@@ -5330,4 +5331,3 @@ body.mp-active .scroll-bottom-btn { bottom: 139px; }
   from { opacity: 0; transform: translateY(12px) scale(.975); }
   to { opacity: 1; transform: translateY(0) scale(1); }
 }
-
