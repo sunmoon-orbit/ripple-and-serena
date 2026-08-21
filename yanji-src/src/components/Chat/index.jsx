@@ -1111,6 +1111,8 @@ export default function Chat() {
     if (!bigReady) return
     const tryNudge = () => {
       if (document.visibilityState !== 'visible') return
+      const awareness = useStore.getState()
+      if (awareness.timeAwareness === false || awareness.longingPush === false) return
       if (nudgeGuardRef.current) return // 一次可见期内只判一次，防 visibilitychange 抖动
       nudgeGuardRef.current = true
       setTimeout(() => { nudgeGuardRef.current = false }, 60_000)
