@@ -51,6 +51,7 @@ export default function ChatInput({ onSend, disabled, onImageAdd, images, onImag
   const [historyQ, setHistoryQ] = useState('')
   const [historyResults, setHistoryResults] = useState([])
   const [historyTotal, setHistoryTotal] = useState(null)
+  const [historySort, setHistorySort] = useState('recent')
   const [historyLoading, setHistoryLoading] = useState(false)
   const [attachedTexts, setAttachedTexts] = useState([])
   const [listening, setListening] = useState(false)     // 录音中
@@ -340,6 +341,14 @@ export default function ChatInput({ onSend, disabled, onImageAdd, images, onImag
   }
 
   const canSearchHistory = moonMemory?.enabled && moonMemory?.apiToken
+  const sortedHistoryResults = [...historyResults].sort((a, b) => {
+    const aTime = Date.parse(a.created_at || a.conv_date || '')
+    const bTime = Date.parse(b.created_at || b.conv_date || '')
+    if (!Number.isFinite(aTime) && !Number.isFinite(bTime)) return 0
+    if (!Number.isFinite(aTime)) return 1
+    if (!Number.isFinite(bTime)) return -1
+    return historySort === 'recent' ? bTime - aTime : aTime - bTime
+  })
 
   return (
     <div className="chat-input-area">
@@ -374,13 +383,27 @@ export default function ChatInput({ onSend, disabled, onImageAdd, images, onImag
             </button>
           </div>
           {historyTotal !== null && !historyLoading && (
-            <div className="history-result-count">共 {historyTotal} 条</div>
+            <div className="history-result-tools">
+              <div className="history-result-count">共 {historyTotal} 条</div>
+              <button
+                type="button"
+                className="history-sort-btn"
+                onClick={() => setHistorySort((sort) => sort === 'recent' ? 'oldest' : 'recent')}
+                aria-label={historySort === 'recent' ? '切换为久远优先' : '切换为近期优先'}
+                title={historySort === 'recent' ? '点击切换为久远优先' : '点击切换为近期优先'}
+              >
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M7 4v16M4 7l3-3 3 3M17 20V4M14 17l3 3 3-3" />
+                </svg>
+                <span>{historySort === 'recent' ? '近期优先' : '久远优先'}</span>
+              </button>
+            </div>
           )}
           <div className="history-results">
             {historyResults.length === 0 && !historyLoading && (
               <div className="history-empty">{historyTotal === 0 ? '没有找到相关对话' : '输入关键词后按搜索'}</div>
             )}
-            {historyResults.map((item) => (
+            {sortedHistoryResults.map((item) => (
               <div key={item.id} className="history-item" onClick={() => attachHistory(item)}>
                 <div className="history-item-meta">
                   <span className="history-item-role">{item.role === 'human' ? '阿颖' : '阿言'}</span>
