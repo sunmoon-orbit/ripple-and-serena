@@ -143,7 +143,7 @@ async function getLatestYanjiContext() {
 
 async function done(action, summary) {
   console.log(`[call] ${action}: ${summary}`)
-  if (['called', 'decline', 'error'].includes(action)) {
+  if (!DRY_RUN && ['called', 'decline', 'error'].includes(action)) {
     try { await moonPost('/idle/log', { action: `主动来电-${action === 'called' ? '已拨号' : action === 'decline' ? '没打' : '出错'}`, summary }) } catch {}
   }
   process.exit(action === 'error' ? 1 : 0)
