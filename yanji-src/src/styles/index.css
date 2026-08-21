@@ -259,19 +259,19 @@
   --border-md: rgba(28,28,28,0.17);
   --shadow-sm: 0 1px 3px rgba(28,28,28,0.05);
   --shadow-md: 0 2px 12px rgba(28,28,28,0.07), 0 8px 24px rgba(28,28,28,0.05);
-  /* 同是纸张色，但把两个人分成暖纸与冷纸；即使叠着背景图也能一眼认出说话方。 */
-  --bubble-user-rgb: 218, 211, 201;
-  --bubble-user-grad-rgb: 233, 228, 220;
-  --bubble-asst-rgb: 244, 247, 250;
-  --bubble-asst-grad-rgb: 232, 238, 244;
+  /* 右侧是黑纸落款，左侧是白纸正文：长回复不会铺成沉重的黑墙。 */
+  --bubble-user-rgb: 36, 36, 36;
+  --bubble-user-grad-rgb: 50, 50, 50;
+  --bubble-asst-rgb: 255, 255, 255;
+  --bubble-asst-grad-rgb: 247, 247, 244;
 }
-/* 让白纸占据主要面积，黑色只留给字和轮廓；低透明度下也不会出现白字看不清。 */
+/* 用户短消息用黑底白字形成落款；助手长回复仍是白底黑字，保证大段阅读轻盈。 */
 [data-theme="chensi"] .bubble-user {
   background: linear-gradient(135deg,
     rgba(var(--bubble-user-rgb), var(--bubble-opacity)) 0%,
     rgba(var(--bubble-user-grad-rgb), var(--bubble-opacity)) 100%);
-  color: var(--text);
-  border: 1px solid rgba(78,70,58,0.16);
+  color: #fff;
+  border: 1px solid rgba(0,0,0,0.32);
   box-shadow: none;
 }
 [data-theme="chensi"] .bubble-assistant {
@@ -279,13 +279,17 @@
     rgba(var(--bubble-asst-rgb), var(--bubble-opacity)) 0%,
     rgba(var(--bubble-asst-grad-rgb), var(--bubble-opacity)) 100%);
   color: var(--text);
-  border-color: rgba(71,84,96,0.18);
+  border-color: var(--border-md);
   box-shadow: var(--shadow-sm);
 }
-[data-theme="chensi"] .message.user .message-bubble a { color: #222; }
+[data-theme="chensi"] .message.user .message-bubble a { color: rgba(255,255,255,0.9); }
 [data-theme="chensi"] .message.user .message-bubble pre {
-  background: rgba(28,28,28,0.05);
-  border-color: var(--border-md);
+  background: rgba(255,255,255,0.10);
+  border-color: rgba(255,255,255,0.18);
+}
+[data-theme="chensi"] .message.user .message-bubble blockquote {
+  color: rgba(255,255,255,0.82);
+  border-left-color: rgba(255,255,255,0.55);
 }
 [data-theme="chensi"] pre {
   background: #f1f1ee;
