@@ -1,6 +1,7 @@
 import React from 'react'
 import ReactDOM from 'react-dom/client'
 import App from './App'
+import { ThemedConfirmProvider } from './components/ThemedConfirmDialog'
 import './styles/index.css'
 
 class ErrorBoundary extends React.Component {
@@ -29,7 +30,9 @@ class ErrorBoundary extends React.Component {
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
     <ErrorBoundary>
-      <App />
+      <ThemedConfirmProvider>
+        <App />
+      </ThemedConfirmProvider>
     </ErrorBoundary>
   </React.StrictMode>
 )

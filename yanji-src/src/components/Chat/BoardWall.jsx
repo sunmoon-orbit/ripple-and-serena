@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import { useStore } from '../../store'
 import { fetchBoardMessages, postBoardMessage, deleteBoardMessage } from '../../api/moonMemory'
+import { useThemedConfirm } from '../ThemedConfirmDialog'
 
 // 便利贴墙（阿颖的主意，2026-07-19）
 // 留言板 0713 从 Roost 撤走后一直只有三端工具能写、没地方能看——
@@ -22,6 +23,7 @@ function fmtDate(s) {
 const TILTS = [-2.4, 1.8, -1.2, 2.6, -3, 1.2, -1.8, 2.2]
 
 export default function BoardWall({ onClose }) {
+  const confirmAction = useThemedConfirm()
   const moonMemory = useStore((s) => s.moonMemory)
   const cfg = { baseUrl: moonMemory?.baseUrl, apiToken: moonMemory?.apiToken }
   const [notes, setNotes] = useState(null)
@@ -54,7 +56,13 @@ export default function BoardWall({ onClose }) {
   }
 
   const remove = async (id) => {
-    if (!window.confirm('把这张便利贴撕下来？')) return
+    if (!await confirmAction({
+      kicker: '便利贴墙',
+      title: '把这张便利贴撕下来？',
+      description: '撕下后，这条留言会从墙上删除。',
+      cancelLabel: '先留着',
+      confirmLabel: '撕下来',
+    })) return
     try {
       await deleteBoardMessage(cfg, id)
       setNotes((prev) => prev.filter((n) => n.id !== id))

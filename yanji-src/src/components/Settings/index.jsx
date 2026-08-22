@@ -10,6 +10,7 @@ import { DELAY_MODES } from '../../utils/replyDelay'
 import { DEFAULT_RINGTONE_ID, RINGTONES, playRingtone } from '../../utils/ringtones'
 import { squareDownscale } from '../../utils/squareDownscale'
 import McpSettings from './McpSettings'
+import { useThemedConfirm } from '../ThemedConfirmDialog'
 
 function Section({ title, children }) {
   return (
@@ -218,6 +219,7 @@ function CallAvatarUpload({ value, onChange }) {
 }
 
 function ConnectionCard({ conn, onSave, onDelete, onActivate, isActive }) {
+  const confirmAction = useThemedConfirm()
   const [editing, setEditing] = useState(false)
   const [form, setForm] = useState({ ...conn })
   const [fetchedModels, setFetchedModels] = useState([])
@@ -269,7 +271,15 @@ function ConnectionCard({ conn, onSave, onDelete, onActivate, isActive }) {
               )}
               {isActive && <span className="conn-active-badge">当前</span>}
               <button className="btn-sm btn-ghost" onClick={() => { setForm({ ...conn }); setEditing(true) }}>编辑</button>
-              <button className="btn-sm btn-ghost danger" onClick={() => { if (confirm('删除连接？')) onDelete(conn.id) }}>删除</button>
+              <button className="btn-sm btn-ghost danger" onClick={async () => {
+                if (await confirmAction({
+                  kicker: '连接设置',
+                  title: '删除这个连接？',
+                  description: `“${conn.name || '未命名'}”的连接配置会从这台设备移除。`,
+                  cancelLabel: '先留着',
+                  confirmLabel: '删除连接',
+                })) onDelete(conn.id)
+              }}>删除</button>
             </div>
           </div>
         </>

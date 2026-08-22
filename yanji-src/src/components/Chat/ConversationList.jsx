@@ -2,8 +2,10 @@ import { useState, useEffect, useRef } from 'react'
 import { useStore } from '../../store'
 import { formatTime } from '../../utils'
 import { applyDecayAndGet, getEmotionState, POSITIVE_SLOTS, NEGATIVE_SLOTS, SLOT_LABELS } from '../../utils/emotion'
+import { useThemedConfirm } from '../ThemedConfirmDialog'
 
 export default function ConversationList({ onClose, onStartCall, onOpenGames, onOpenMusic, onOpenWheel, onOpenFate, onOpenTarot, onOpenFortune, onOpenChecklist, onOpenHealth, onOpenPeriod, onOpenAlbum, onOpenIdleJournal, onOpenBoard, onOpenWallet, onOpenCalls }) {
+  const confirmAction = useThemedConfirm()
   const chats = useStore((s) => s.chats)
   const connections = useStore((s) => s.connections)
   const activeChatId = useStore((s) => s.activeChatId)
@@ -108,9 +110,16 @@ export default function ConversationList({ onClose, onStartCall, onOpenGames, on
     setRenamingId(null)
   }
 
-  function handleDelete(id, e) {
+  async function handleDelete(id, e) {
     e.stopPropagation()
-    if (confirm('删除这个对话？')) deleteChat(id)
+    if (await confirmAction({
+      kicker: '删除对话',
+      title: '删除这个对话？',
+      description: '这扇对话窗口和其中的本地消息会被删除。',
+      note: '删除后无法恢复。',
+      cancelLabel: '先留着',
+      confirmLabel: '删除对话',
+    })) deleteChat(id)
   }
 
   function openNote(chat, e) {
@@ -124,8 +133,15 @@ export default function ConversationList({ onClose, onStartCall, onOpenGames, on
     setNoteChatId(null)
   }
 
-  function clearNote() {
-    if (!confirm('清空这份接续笔记？\n\n清空后这段对话的早期背景就没有了，涟言只能看到还留在窗口里的消息。下次压缩会重新攒一份。')) return
+  async function clearNote() {
+    if (!await confirmAction({
+      kicker: '接续笔记',
+      title: '清空这份笔记？',
+      description: '清空后，这段对话的早期背景会暂时消失。',
+      note: '涟言只能看到窗口里仍保留的消息；下次压缩时会重新攒一份。',
+      cancelLabel: '先不清空',
+      confirmLabel: '清空笔记',
+    })) return
     if (noteChatId) setSummary(noteChatId, '')
     setNoteChatId(null)
   }
