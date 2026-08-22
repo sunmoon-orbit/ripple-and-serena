@@ -10,6 +10,7 @@ import { maybeSyncEmotion } from '../../utils/emotionSync'
 import { shouldNudge, recordNudge, buildNudgeText } from '../../utils/nudge'
 import { decideReplyDelay, getPendingReply, setPendingReply, clearPendingReply } from '../../utils/replyDelay'
 import { getLightConn } from '../../utils/lightConn'
+import { CHAT_TITLE_SYSTEM_PROMPT, buildChatTitleRequest, normalizeChatTitle, fallbackChatTitle } from '../../utils/chatTitle'
 import { drainNative } from '../../utils/nativeInbox'
 import { syncChatsToL0 } from '../../utils/l0Sync'
 import { createStreamUpdateScheduler } from '../../utils/streamUpdateScheduler'
@@ -66,6 +67,43 @@ async function describeImages(chatId, messageId, images, conn, updateMessage, re
     // 图片通常四条后才降级，这个小概率代价比改动已量化的缓存分界线更可控。
     updateMessage(chatId, messageId, { imageDesc })
   } catch { /* 识图失败不影响聊天，老图片自然退回普通占位符 */ }
+}
+
+// 新对话标题也走轻连接：等涟言真正回完第一轮，再用她自己的口吻留下一句标题。
+// 失败时退回旧版的「截取阿颖首句」，聊天列表不能因为一次轻任务失败永远叫“新对话”。
+async function generateRoleChatTitle(chatId, userText, assistantText, conn, recordTokenUsage) {
+  const fallback = fallbackChatTitle(userText)
+  const renameIfUntouched = (title) => {
+    const state = useStore.getState()
+    const current = state.chats.find((item) => item.id === chatId)
+    // 标题请求在后台跑；期间阿颖若已经手动改名，绝不能拿模型结果盖回去。
+    if (current?.title === '新对话') state.renameChat(chatId, title)
+  }
+
+  try {
+    const state = useStore.getState()
+    const current = state.chats.find((item) => item.id === chatId)
+    if (current?.title !== '新对话') return
+    const recentTitles = state.chats
+      .filter((item) => item.id !== chatId && item.title && item.title !== '新对话')
+      .sort((a, b) => Number(b.updatedAt || 0) - Number(a.updatedAt || 0))
+      .slice(0, 8)
+      .map((item) => item.title)
+    const lightConn = getLightConn(conn)
+    const result = await sendMessage({
+      connection: lightConn,
+      messages: [{ role: 'user', content: buildChatTitleRequest({ userText, assistantText, recentTitles }) }],
+      systemPrompt: CHAT_TITLE_SYSTEM_PROMPT,
+      model: lightConn.defaultModel,
+      generationConfig: { maxTokens: 2000, temperature: 0.9 },
+      autoTools: false,
+    })
+    if (result.usage) recordTokenUsage(conn.id, result.usage)
+    renameIfUntouched(normalizeChatTitle(result.text) || fallback)
+  } catch (error) {
+    console.warn('[chat-title] 角色式标题生成失败，退回首句:', error?.message)
+    renameIfUntouched(fallback)
+  }
 }
 
 // 这个判据只用来挡「轻模型的拒答文案/报错」——0711 那次就是拒答文案直接进了她眼前。
@@ -788,10 +826,9 @@ export default function Chat() {
       const eggSvg = pickEgg()
       if (eggSvg) setEgg(eggSvg)
 
-      // Auto-title first message（主动开口的隐藏触发文本不能拿来当标题）
-      if (allMsgs.length <= 2 && chat.title === '新对话' && titleText && !hidden) {
-        const short = titleText.slice(0, 30).trim()
-        store.renameChat(chat.id, short || '新对话')
+      // 自动标题：主动开口的隐藏触发文本不能拿来当标题；轻任务后台跑，不拖慢正文落地。
+      if (chat.title === '新对话' && titleText && !hidden) {
+        void generateRoleChatTitle(chat.id, titleText, finalText, conn, recordTokenUsage)
       }
     } catch (e) {
       streamUi.cancel()
@@ -966,8 +1003,7 @@ export default function Chat() {
       if ((pending && pending.chatId === chat.id) || delayMs > 0) {
         if (!pending) setPendingReply(chat.id, Date.now() + delayMs)
         touchChat(chat.id)
-        // 生成被推迟了，标题在这里就定下来
-        if (chat.title === '新对话' && text) store.renameChat(chat.id, text.slice(0, 30).trim() || '新对话')
+        // 标题也等涟言真正回完后再起，不能先拿阿颖的原话顶上去。
         return
       }
     }
