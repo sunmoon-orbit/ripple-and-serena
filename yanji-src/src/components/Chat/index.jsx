@@ -42,6 +42,7 @@ import HeartCard from './HeartCard'
 import HeartCardAlbum from './HeartCardAlbum'
 import { fetchAnniversaryToday, fetchUnseenHeartCards, markHeartCardSeen, formatWeatherLine, fetchContactLastSeen } from '../../api/moonMemory'
 import CompletionEgg, { pickEgg } from './CompletionEgg'
+import { ThemedConfirmDialog, useThemedConfirm } from '../ThemedConfirmDialog'
 
 // 同一对话的压缩共用一个 Promise，后来的生成不再发第二份轻模型请求。
 const compactionJobs = new Map()
@@ -207,70 +208,8 @@ const MID_STREAM_CUT_RE = /network ?error|failed to fetch|load failed|connection
 const BILINGUAL_NOTE = '[双语通话模式：现在是语音通话，请直接用口语化、自然的英文回复她（你的声音说英文更好听），保持简短（2-4 句）；然后另起一行，用 [译:这里放中文翻译] 在末尾附上这段话的完整中文翻译。方括号里只放翻译文本，不要嵌套贴图、点歌等其他标签。]'
 
 
-function RetryDecisionDialog({ onCancel, onConfirm }) {
-  const cancelButtonRef = useRef(null)
-
-  useEffect(() => {
-    const previousFocus = document.activeElement
-    cancelButtonRef.current?.focus()
-    const handleKeyDown = (event) => {
-      if (event.key === 'Escape') onCancel()
-    }
-    window.addEventListener('keydown', handleKeyDown)
-    return () => {
-      window.removeEventListener('keydown', handleKeyDown)
-      previousFocus?.focus?.()
-    }
-  }, [onCancel])
-
-  return createPortal(
-    <div className="retry-dialog-backdrop">
-      <section
-        className="retry-dialog"
-        role="alertdialog"
-        aria-modal="true"
-        aria-labelledby="retry-dialog-title"
-        aria-describedby="retry-dialog-description"
-      >
-        <svg className="retry-dialog-sky" viewBox="0 0 360 108" aria-hidden="true">
-          <path className="retry-dialog-orbit orbit-back" d="M18 82C86 22 229 6 342 65" />
-          <path className="retry-dialog-orbit" d="M-8 98C87 37 221 28 371 76" />
-          <circle className="retry-dialog-dot dot-one" cx="292" cy="31" r="2.2" />
-          <circle className="retry-dialog-dot dot-two" cx="316" cy="54" r="1.5" />
-          <path className="retry-dialog-star" d="M257 21l1.8 4.6 4.7 1.8-4.7 1.8-1.8 4.6-1.8-4.6-4.7-1.8 4.7-1.8z" />
-          <path className="retry-dialog-moon" d="M75 31a18 18 0 1 0 20 25A19.5 19.5 0 1 1 75 31Z" />
-        </svg>
-
-        <div className="retry-dialog-kicker">连接中断</div>
-        <h2 id="retry-dialog-title">这一轮没有收到正文</h2>
-        <p id="retry-dialog-description">
-          请求可能已经生成并计费。现在重试一次，可能会再次产生费用。
-        </p>
-
-        <div className="retry-dialog-note">
-          <svg viewBox="0 0 24 24" aria-hidden="true">
-            <circle cx="12" cy="12" r="8.5" />
-            <path d="M12 10.5v5" />
-            <circle cx="12" cy="7.6" r=".7" fill="currentColor" stroke="none" />
-          </svg>
-          <span>选择“先不重试”会停在这里，并保留错误信息。</span>
-        </div>
-
-        <div className="retry-dialog-actions">
-          <button ref={cancelButtonRef} className="retry-dialog-cancel" type="button" onClick={onCancel}>
-            先不重试
-          </button>
-          <button className="retry-dialog-confirm" type="button" onClick={onConfirm}>
-            重试一次
-          </button>
-        </div>
-      </section>
-    </div>,
-    document.body
-  )
-}
-
 export default function Chat() {
+  const confirmAction = useThemedConfirm()
   // 不能订阅整个 store：草稿每敲一个字、流式回复每来一个 chunk 都会改 store。
   // 整体订阅会让聊天页（连同全部历史气泡）跟着重渲染，窗口越长越卡。
   // 这里只挑聊天外壳真正依赖的字段；草稿等无关更新保持在各自组件内部。
@@ -1079,7 +1018,7 @@ export default function Chat() {
     return () => window.removeEventListener('yanji-native-text', take)
   }, [handleSend])
 
-  const handleEditMessage = useCallback((msg, newText) => {
+  const handleEditMessage = useCallback(async (msg, newText) => {
     if (!newText.trim() || !activeChatId) return
     // 「保存并重发」会砍掉这条之后的全部消息。0804 就是这么没的：滑动时蹭到铅笔，
     // 在一条 6-17 的老消息上按了保存，2560 条当场消失，没有确认也没有撤销。
@@ -1087,10 +1026,17 @@ export default function Chat() {
     const msgs = useStore.getState().messagesByChatId[activeChatId] || []
     const idx = msgs.findIndex((m) => m.id === msg.id)
     const drop = idx >= 0 ? msgs.length - idx - 1 : 0
-    if (drop > 4 && !window.confirm(`重发这条会删掉它后面的 ${drop} 条消息（删了拿不回来）。确定吗？`)) return
+    if (drop > 4 && !await confirmAction({
+      kicker: '谨慎重发',
+      title: '会删除后续消息',
+      description: `重发这条会删掉它后面的 ${drop} 条消息。`,
+      note: '删除后无法恢复，请确认选中的是正确消息。',
+      cancelLabel: '先不重发',
+      confirmLabel: '仍然重发',
+    })) return
     truncateMessagesFrom(activeChatId, msg.id)
     setTimeout(() => handleSend(newText, []), 0)
-  }, [activeChatId, truncateMessagesFrom, handleSend])
+  }, [activeChatId, truncateMessagesFrom, handleSend, confirmAction])
 
   const handleDeleteMessage = useCallback((msg) => {
     if (activeChatId) deleteMessage(activeChatId, msg.id)
@@ -1374,7 +1320,14 @@ export default function Chat() {
     setBgMenuOpen(false)
     const moonMemory = useStore.getState().moonMemory || {}
     if (!moonMemory?.apiToken) { showToast('请先在设置里配置拾羽记忆库连接', 'error'); return }
-    if (!window.confirm('从服务器恢复会覆盖当前所有对话记录，确定吗？')) return
+    if (!await confirmAction({
+      kicker: '覆盖提醒',
+      title: '从服务器恢复？',
+      description: '当前所有对话记录会被服务器备份覆盖。',
+      note: '恢复后页面会自动刷新，请先确认当前内容已经妥善备份。',
+      cancelLabel: '先不恢复',
+      confirmLabel: '继续恢复',
+    })) return
     try {
       const base = (moonMemory.baseUrl || 'https://memory.ravenlove.cc').replace(/\/$/, '')
       const r = await fetch(`${base}/backup/yanji/latest`, {
@@ -1398,7 +1351,14 @@ export default function Chat() {
     reader.onload = async (ev) => {
       try {
         JSON.parse(ev.target.result) // validate JSON
-        if (!window.confirm('导入会覆盖当前所有对话记录，确定吗？')) return
+        if (!await confirmAction({
+          kicker: '覆盖提醒',
+          title: '导入这份备份？',
+          description: '当前所有对话记录会被导入文件覆盖。',
+          note: '导入后页面会自动刷新，请确认选择了正确的备份文件。',
+          cancelLabel: '先不导入',
+          confirmLabel: '继续导入',
+        })) return
         await restoreFromBackupJson(ev.target.result)
         window.location.reload()
       } catch { showToast('文件格式不对，请选 yanji 导出的 JSON', 'error') }
@@ -1833,7 +1793,13 @@ export default function Chat() {
         document.body
       )}
       {retryPromptOpen && (
-        <RetryDecisionDialog
+        <ThemedConfirmDialog
+          kicker="连接中断"
+          title="这一轮没有收到正文"
+          description="请求可能已经生成并计费。现在重试一次，可能会再次产生费用。"
+          note="选择“先不重试”会停在这里，并保留错误信息。"
+          cancelLabel="先不重试"
+          confirmLabel="重试一次"
           onCancel={() => finishRetryPrompt(false)}
           onConfirm={() => finishRetryPrompt(true)}
         />

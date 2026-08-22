@@ -2,9 +2,11 @@ import { useState, useEffect, useCallback } from 'react'
 import { createPortal } from 'react-dom'
 import { useStore } from '../../store'
 import { showToast } from '../Toast'
+import { useThemedConfirm } from '../ThemedConfirmDialog'
 import { playTrack, setQueue } from '../../utils/player'
 
 export default function MusicRoom({ onClose }) {
+  const confirmAction = useThemedConfirm()
   const moonMemory = useStore((s) => s.moonMemory)
   const base = (moonMemory?.baseUrl || 'https://memory.ravenlove.cc').replace(/\/$/, '')
   const token = moonMemory?.apiToken
@@ -52,7 +54,13 @@ export default function MusicRoom({ onClose }) {
   }
 
   async function removePick(id) {
-    if (!confirm('从记录里删掉这首？')) return
+    if (!await confirmAction({
+      kicker: '删除记录',
+      title: '删掉这首歌？',
+      description: '这首歌会从点歌记录中移除。',
+      cancelLabel: '先留着',
+      confirmLabel: '删掉',
+    })) return
     try {
       await fetch(`${base}/music/picks/${id}`, { method: 'DELETE', headers: auth })
       setPicks((list) => list.filter((x) => x.id !== id))
@@ -80,7 +88,13 @@ export default function MusicRoom({ onClose }) {
   }
 
   async function deletePlaylist(id) {
-    if (!confirm('删除这个歌单？')) return
+    if (!await confirmAction({
+      kicker: '删除歌单',
+      title: '删除这个歌单？',
+      description: '歌单会被移除，其中的点歌记录仍会保留。',
+      cancelLabel: '先留着',
+      confirmLabel: '删除',
+    })) return
     try {
       await fetch(`${base}/music/playlists/${id}`, { method: 'DELETE', headers: auth })
       setPlaylists(prev => prev.filter(p => p.id !== id))

@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { createPortal } from 'react-dom'
 import { useStore } from '../../store'
 import { showToast } from '../Toast'
+import { useThemedConfirm } from '../ThemedConfirmDialog'
 
 const PLAYER_LABELS = { cc: '服务器·阿言', chat: '对话·阿言', api: '言叽·阿言' }
 const STATUS_LABELS = { playing: '进行中', paused: '暂停', ended: '已结束' }
@@ -18,6 +19,7 @@ function parseAttrs(raw) {
 const emptyForm = { name: '', icon: '🎮', player: 'chat', status: 'playing', summary: '', progress: '', attrs: [] }
 
 export default function GamesRoom({ onClose }) {
+  const confirmAction = useThemedConfirm()
   const moonMemory = useStore((s) => s.moonMemory)
   const base = (moonMemory?.apiUrl || 'https://memory.ravenlove.cc').replace(/\/$/, '')
   const token = moonMemory?.apiToken
@@ -89,7 +91,14 @@ export default function GamesRoom({ onClose }) {
   }
 
   async function removeGame(id) {
-    if (!confirm('确定删除这个游戏档案吗？进度记录也会一起删掉')) return
+    if (!await confirmAction({
+      kicker: '删除档案',
+      title: '删除这个游戏档案？',
+      description: '游戏档案和其中的进度记录会一起删除。',
+      note: '删除后无法恢复。',
+      cancelLabel: '先留着',
+      confirmLabel: '删除档案',
+    })) return
     try {
       await fetch(`${base}/games/${id}`, { method: 'DELETE', headers: auth })
       await loadList(); setView('list')

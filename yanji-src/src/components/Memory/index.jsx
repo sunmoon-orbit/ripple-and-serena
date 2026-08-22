@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { useStore } from '../../store'
 import { fetchMemories, createMemory, updateMemory, trashMemory, fetchHeatmap } from '../../api/moonMemory'
 import { showToast } from '../Toast'
+import { useThemedConfirm } from '../ThemedConfirmDialog'
 import { formatTime } from '../../utils'
 
 const SCOPE_LABELS = { shared: '共享', 'private_阿颖': '私密·阿颖', 'private_阿言': '私密·阿言' }
@@ -26,6 +27,7 @@ function HeatmapCell({ count, date }) {
 }
 
 export default function Memory() {
+  const confirmAction = useThemedConfirm()
   const moonMemory = useStore((s) => s.moonMemory)
   const [memories, setMemories] = useState([])
   const [heatmap, setHeatmap] = useState({})
@@ -86,7 +88,14 @@ export default function Memory() {
   }
 
   async function handleTrash(id) {
-    if (!confirm('将此记忆移入回收站？')) return
+    if (!await confirmAction({
+      kicker: '记忆整理',
+      title: '移入回收站？',
+      description: '这条记忆会离开当前记忆列表。',
+      note: '它不会立刻永久删除，之后仍可在回收站中处理。',
+      cancelLabel: '先留着',
+      confirmLabel: '移入回收站',
+    })) return
     try {
       await trashMemory(cfg, id)
       showToast('已移入回收站', 'info')

@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom'
 import { useStore } from '../../store'
 import { fetchPeriod, logPeriodStart, logPeriodEnd, deletePeriodLog } from '../../api/moonMemory'
 import { showToast } from '../Toast'
+import { useThemedConfirm } from '../ThemedConfirmDialog'
 
 // 小月历 · 月经周期（阿颖的主意，2026-07-10）
 // 三端共用一张表：她在这里记/看，涟言在聊天里也能帮记（period_tracker 工具），
@@ -15,6 +16,7 @@ function fmtDate(s) {
 }
 
 export default function PeriodCard({ onClose }) {
+  const confirmAction = useThemedConfirm()
   const moonMemory = useStore((s) => s.moonMemory)
   const cfg = { baseUrl: moonMemory?.baseUrl, apiToken: moonMemory?.apiToken }
   const [data, setData] = useState(null)
@@ -52,7 +54,13 @@ export default function PeriodCard({ onClose }) {
   }
 
   async function remove(log) {
-    if (!confirm(`删掉 ${log.start_date} 这条记录？`)) return
+    if (!await confirmAction({
+      kicker: '周期记录',
+      title: '删掉这条记录？',
+      description: `${log.start_date} 的周期记录会被删除。`,
+      cancelLabel: '先留着',
+      confirmLabel: '删除',
+    })) return
     try { setData(await deletePeriodLog(cfg, log.id)) } catch { showToast('删除失败', 'error') }
   }
 

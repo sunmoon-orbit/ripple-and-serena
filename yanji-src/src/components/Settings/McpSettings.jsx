@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useStore } from '../../store'
 import { discoverMcpTools, MCP_EXTERNAL_TOOL_LIMIT } from '../../api/mcp'
 import { showToast } from '../Toast'
+import { useThemedConfirm } from '../ThemedConfirmDialog'
 
 const EMPTY_SERVER = { name: '', url: '', authType: 'none', bearerToken: '' }
 
@@ -97,6 +98,7 @@ function ServerCard({ server, selectedCount, onUpdate, onDelete, busy, onDiscove
 }
 
 export default function McpSettings() {
+  const confirmAction = useThemedConfirm()
   const mcpServers = useStore((state) => state.mcpServers)
   const autoTools = useStore((state) => state.autoTools)
   const addMcpServer = useStore((state) => state.addMcpServer)
@@ -155,8 +157,14 @@ export default function McpSettings() {
           busy={busyId === server.id}
           onUpdate={(patch) => updateMcpServer(server.id, patch)}
           onDiscover={() => discover(server)}
-          onDelete={() => {
-            if (window.confirm(`删除 MCP 服务“${server.name || '未命名'}”？`)) deleteMcpServer(server.id)
+          onDelete={async () => {
+            if (await confirmAction({
+              kicker: 'MCP 设置',
+              title: '删除这个 MCP 服务？',
+              description: `“${server.name || '未命名'}”及其工具配置会被移除。`,
+              cancelLabel: '先留着',
+              confirmLabel: '删除服务',
+            })) deleteMcpServer(server.id)
           }}
         />
       ))}
