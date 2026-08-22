@@ -1012,7 +1012,7 @@ export default function Settings() {
                 </label>
               </div>
               <div className="card-row" style={{ fontSize: 12, color: 'var(--text-muted)' }}>
-                离开约 6 小时、思念达到门槛后，他可以结合最近窗口决定要不要打来。每天最多 1 通、两通至少间隔 20 小时；关闭时间感知会一起停用。
+                第一通会在离开约 6 小时、思念达到门槛后，由他结合最近窗口决定要不要打来。之后当天也可以隔一阵再拨，每天最多 3 通、至少间隔 2 小时；关闭主动来电就不再拨号。
               </div>
             </div>
             <div className="settings-card">
