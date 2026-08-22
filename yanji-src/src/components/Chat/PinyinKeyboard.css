@@ -1,0 +1,59 @@
+.pinyin-keyboard { position: relative; }
+
+.pinyin-expand-btn svg {
+  width: 16px; height: 16px; display: block; margin: auto;
+  fill: none; stroke: currentColor; stroke-width: 1.8;
+  stroke-linecap: round; stroke-linejoin: round;
+}
+.pinyin-expand-btn.active { background: var(--accent-dim); color: var(--accent); }
+
+.pinyin-candidate-panel {
+  position: absolute; z-index: 8; top: 48px; left: 6px; right: 6px;
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(54px, 1fr)); gap: 4px;
+  max-height: min(36vh, 224px); padding: 8px; overflow-y: auto;
+  border: 1px solid var(--border-md); border-radius: 0 0 12px 12px;
+  background: color-mix(in srgb, var(--card) 97%, var(--accent) 3%);
+  box-shadow: 0 10px 24px color-mix(in srgb, var(--text) 16%, transparent);
+  overscroll-behavior: contain; scrollbar-width: thin; scrollbar-color: var(--accent) transparent;
+}
+.pinyin-candidate-panel .pinyin-candidate {
+  width: 100%; min-width: 0; height: 38px; padding-inline: 4px;
+  background: color-mix(in srgb, var(--bg) 82%, transparent);
+}
+.pinyin-candidate-panel::-webkit-scrollbar { width: 3px; }
+.pinyin-candidate-panel::-webkit-scrollbar-thumb { background: var(--accent); border-radius: 999px; }
+
+.pinyin-punctuation-row {
+  display: flex; gap: 4px; margin: 0 1px 6px; overflow-x: auto;
+  scrollbar-width: none; overscroll-behavior-x: contain;
+}
+.pinyin-punctuation-row::-webkit-scrollbar { display: none; }
+.pinyin-punctuation-row button {
+  flex: 1 0 34px; height: 27px; padding: 0 7px;
+  border: 1px solid color-mix(in srgb, var(--border-md) 66%, transparent);
+  border-radius: 8px; background: color-mix(in srgb, var(--bg) 70%, transparent);
+  color: var(--text-muted); font: 500 14px/1 inherit;
+}
+.pinyin-punctuation-row button:active { background: var(--accent-dim); color: var(--accent); }
+
+.pinyin-function-row .pinyin-layout-key { color: var(--accent); }
+.pinyin-t9-grid {
+  display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 5px;
+}
+.pinyin-t9-grid .pinyin-t9-key {
+  width: 100%; height: 42px; display: flex;
+  align-items: center; justify-content: center; gap: 8px;
+}
+.pinyin-t9-key strong { font-size: 17px; font-weight: 650; }
+.pinyin-t9-key span { color: var(--text-faint); font-size: 9px; letter-spacing: 0.08em; }
+.pinyin-t9-grid .pinyin-t9-action { color: var(--text-muted); font-size: 12px; }
+
+.pinyin-keyboard .pinyin-symbol-grid {
+  max-height: 170px; align-content: start; overflow-y: auto;
+  overscroll-behavior: contain; scrollbar-width: thin; scrollbar-color: var(--accent) transparent;
+}
+
+@media (max-width: 420px) {
+  .pinyin-t9-grid .pinyin-t9-key { height: 39px; }
+  .pinyin-punctuation-row { gap: 3px; }
+}
