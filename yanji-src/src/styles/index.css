@@ -4806,6 +4806,7 @@ body.mp-active .scroll-bottom-btn { bottom: 139px; }
   display: flex; align-items: center; justify-content: center;
   background: var(--accent-dim);
   color: var(--accent);
+  border-radius: 50%;
   overflow: hidden;
 }
 .incall-avatar img { width: 100%; height: 100%; object-fit: cover; }
