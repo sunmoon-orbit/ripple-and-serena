@@ -28,6 +28,7 @@ import androidx.core.app.RemoteInput
 import androidx.core.content.ContextCompat
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
+import org.json.JSONObject
 
 class MainActivity : AppCompatActivity() {
 
@@ -62,6 +63,7 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
         IntentIdentity.migrateOnce(this)
+        NativeCallActionQueue.flush(this)
 
         // edge-to-edge
         ViewCompat.setOnApplyWindowInsetsListener(findViewById(android.R.id.content)) { v, insets ->
@@ -234,6 +236,7 @@ class MainActivity : AppCompatActivity() {
 
         // 处理来电/分享/通知栏回复 intent
         handleCallAction(intent)
+        handleConversationOpen(intent)
         handleShareIntent(intent)
         handleQuickReply(intent)
 
@@ -280,6 +283,7 @@ class MainActivity : AppCompatActivity() {
             return
         }
         handleCallAction(intent)
+        handleConversationOpen(intent)
         handleShareIntent(intent)
         handleQuickReply(intent)
     }
@@ -413,7 +417,15 @@ class MainActivity : AppCompatActivity() {
                 .cancel(YanjiFCMService.CALL_NOTIFICATION_ID)
             // 她在原生来电页/通知上已经按过一次接听了，进来不该再让她按第二次。
             // 前端收到这一声就自动接起当前那通（拿不到就等轮询到 invite 再自动接，见前端）。
-            callWeb("__yanjiAnswerCall", "native")
+            val payload = JSONObject()
+                .put("source", "native")
+                .put("callId", intent.getStringExtra(CallActivity.EXTRA_CALL_ID))
+                .put("expiresAt", intent.getStringExtra(CallActivity.EXTRA_EXPIRES_AT))
+                .put("conversationId", intent.getStringExtra(CallActivity.EXTRA_CONVERSATION_ID))
+                .put("conversationExternalId",
+                    intent.getStringExtra(CallActivity.EXTRA_CONVERSATION_EXTERNAL_ID))
+                .toString()
+            callWeb("__yanjiAnswerCall", payload)
         }
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
             setShowWhenLocked(true)
@@ -423,6 +435,15 @@ class MainActivity : AppCompatActivity() {
                 .requestDismissKeyguard(this, null)
         }
         intent.removeExtra("call_action")   // 别让转屏/重建时再亮一次屏
+    }
+
+    private fun handleConversationOpen(intent: Intent?) {
+        if (intent?.action != IntentIdentity.ACTION_CHAT_OPEN &&
+            intent?.getBooleanExtra("quick_reply", false) != true) return
+        val externalId = intent.getStringExtra(CallActivity.EXTRA_CONVERSATION_EXTERNAL_ID)
+            ?.takeIf { it.isNotBlank() } ?: return
+        callWeb("__yanjiOpenConversation", externalId)
+        intent.removeExtra(CallActivity.EXTRA_CONVERSATION_EXTERNAL_ID)
     }
 
     // 安卓 14 起「全屏通知」是单独一项权限，只有系统认定的通话/闹钟类 app 默认给，

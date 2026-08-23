@@ -67,4 +67,5 @@ dependencies {
 
     // coroutines：媒体通知 + 想你键小组件
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.9.0")
+    testImplementation("junit:junit:4.13.2")
 }

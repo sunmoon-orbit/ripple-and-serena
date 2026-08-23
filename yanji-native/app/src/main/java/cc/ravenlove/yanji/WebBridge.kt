@@ -82,6 +82,20 @@ class WebBridge(private val activity: MainActivity) {
             .edit()
             .putString("moon_token", token)
             .apply()
+        NativeCallActionQueue.flush(activity)
+    }
+
+    // 新壳同步 token 时同时带上它所属的 HTTPS 后端，避免把自定义后端凭据送往默认主机。
+    @JavascriptInterface
+    fun saveMoonConnection(baseUrl: String, token: String) {
+        val normalizedBaseUrl = NativeMoonEndpoint.normalize(baseUrl) ?: return
+        if (token.isEmpty()) return
+        activity.getSharedPreferences("yanji_native", Context.MODE_PRIVATE)
+            .edit()
+            .putString("moon_base_url", normalizedBaseUrl)
+            .putString("moon_token", token)
+            .apply()
+        NativeCallActionQueue.flush(activity)
     }
 
     // 铃声选择存在网页端的 localStorage 里，锁屏来电的 CallActivity 读不到——
