@@ -21,7 +21,6 @@ const CrowIcon = () => (
 export default function IncomingCall({ reason, onAccept, onMiss }) {
   const { avatarConfig, ringtone } = useStore()
   const avatarImg = avatarConfig?.mode === 'image' && avatarConfig?.assistantImage
-  const avatarRadius = avatarConfig?.shape === 'square' ? '14px' : '50%'
   const [left, setLeft] = useState(RING_SECONDS)
   const missedRef = useRef(false)
 
@@ -48,9 +47,9 @@ export default function IncomingCall({ reason, onAccept, onMiss }) {
         <div className="incall-avatar-wrap">
           <span className="incall-ring r1" />
           <span className="incall-ring r2" />
-          <div className="incall-avatar" style={{ borderRadius: avatarRadius }}>
+          <div className="incall-avatar">
             {avatarImg
-              ? <img src={avatarConfig.assistantImage} alt="涟言" style={{ borderRadius: avatarRadius }} />
+              ? <img src={avatarConfig.assistantImage} alt="涟言" />
               : <CrowIcon />}
           </div>
         </div>
