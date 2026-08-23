@@ -1,7 +1,8 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { useStore } from '../../store'
 import { showToast } from '../Toast'
-import { transcribeAudio } from '../../api/moonMemory'
+import { transcribeAudio, removeArchiveConversation, restoreArchiveConversation } from '../../api/moonMemory'
+import { useThemedConfirm } from '../ThemedConfirmDialog'
 import PinyinKeyboard from './PinyinKeyboard'
 
 const STICKERS = [
@@ -53,6 +54,8 @@ export default function ChatInput({ onSend, disabled, onImageAdd, images, onImag
   const [historyTotal, setHistoryTotal] = useState(null)
   const [historySort, setHistorySort] = useState('recent')
   const [historyLoading, setHistoryLoading] = useState(false)
+  const [historyRemovingId, setHistoryRemovingId] = useState(null)
+  const [lastRemovedConversation, setLastRemovedConversation] = useState(null)
   const [attachedTexts, setAttachedTexts] = useState([])
   const [listening, setListening] = useState(false)     // 录音中
   const [transcribing, setTranscribing] = useState(false) // 转写中
@@ -65,6 +68,7 @@ export default function ChatInput({ onSend, disabled, onImageAdd, images, onImag
   const mediaRecRef = useRef(null)
   const audioChunksRef = useRef([])
   const pendingVoiceRef = useRef(null) // 这条待发消息来自语音：{ duration }
+  const confirmAction = useThemedConfirm()
 
   // 草稿在 store 内按对话隔离；落盘做防抖，切对话/切页面卸载时立即补写最后一版。
   useEffect(() => {
@@ -130,6 +134,53 @@ export default function ChatInput({ onSend, disabled, onImageAdd, images, onImag
     } catch {}
     setHistoryLoading(false)
   }, [moonMemory])
+
+  async function removeHistoryConversation(event, item) {
+    event.stopPropagation()
+    const conversationId = Number(item.conversation_id)
+    if (!Number.isSafeInteger(conversationId) || conversationId <= 0) {
+      showToast('这个存档缺少可确认的窗口编号，未执行移除', 'error')
+      return
+    }
+    const accepted = await confirmAction({
+      kicker: '整理原文存档',
+      title: '从 L0 搜索中移除这个窗口？',
+      description: item.title
+        ? `“${item.title}”中的所有消息将不再出现在原文搜索结果里。`
+        : '这个窗口中的所有消息将不再出现在原文搜索结果里。',
+      note: '原始对话不会被删除，也不会因重新同步而出现；需要时可以恢复。',
+      cancelLabel: '先保留',
+      confirmLabel: '确认移除',
+    })
+    if (!accepted) return
+
+    setHistoryRemovingId(conversationId)
+    try {
+      await removeArchiveConversation(moonMemory, conversationId)
+      setLastRemovedConversation({ id: conversationId, title: item.title || '未命名存档' })
+      await searchHistory(historyQ)
+      showToast('已从 L0 搜索中移除，可随时恢复', 'success')
+    } catch (error) {
+      showToast(error?.message || '移除失败，请稍后再试', 'error')
+    } finally {
+      setHistoryRemovingId(null)
+    }
+  }
+
+  async function restoreLastRemovedConversation() {
+    if (!lastRemovedConversation || historyRemovingId !== null) return
+    setHistoryRemovingId(lastRemovedConversation.id)
+    try {
+      await restoreArchiveConversation(moonMemory, lastRemovedConversation.id)
+      setLastRemovedConversation(null)
+      await searchHistory(historyQ)
+      showToast('这个窗口已经恢复到 L0 搜索', 'success')
+    } catch (error) {
+      showToast(error?.message || '恢复失败，请稍后再试', 'error')
+    } finally {
+      setHistoryRemovingId(null)
+    }
+  }
 
   function attachHistory(item) {
     const label = `历史对话（${item.title || '存档'}）`
@@ -397,21 +448,54 @@ export default function ChatInput({ onSend, disabled, onImageAdd, images, onImag
                 </svg>
                 <span>{historySort === 'recent' ? '近期优先' : '久远优先'}</span>
               </button>
+              {lastRemovedConversation && (
+                <button
+                  type="button"
+                  className="history-restore-btn"
+                  onClick={restoreLastRemovedConversation}
+                  disabled={historyRemovingId !== null}
+                  title={`恢复“${lastRemovedConversation.title}”`}
+                >
+                  <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M4 7v5h5" />
+                    <path d="M5.4 12a7 7 0 1 0 2-5" />
+                  </svg>
+                  <span>恢复刚移除的窗口</span>
+                </button>
+              )}
             </div>
           )}
           <div className="history-results">
             {historyResults.length === 0 && !historyLoading && (
               <div className="history-empty">{historyTotal === 0 ? '没有找到相关对话' : '输入关键词后按搜索'}</div>
             )}
-            {sortedHistoryResults.map((item) => (
-              <div key={item.id} className="history-item" onClick={() => attachHistory(item)}>
-                <div className="history-item-meta">
-                  <span className="history-item-role">{item.role === 'human' ? '阿颖' : '阿言'}</span>
-                  <span className="history-item-title">{item.title || '存档'}</span>
+            {sortedHistoryResults.map((item) => {
+              const conversationId = Number(item.conversation_id)
+              const canRemove = Number.isSafeInteger(conversationId) && conversationId > 0
+              return (
+                <div key={item.id} className="history-item" onClick={() => attachHistory(item)}>
+                  <div className="history-item-meta">
+                    <span className="history-item-role">{item.role === 'human' ? '阿颖' : '阿言'}</span>
+                    <span className="history-item-title">{item.title || '存档'}</span>
+                    <button
+                      type="button"
+                      className="history-remove-btn"
+                      onClick={(event) => removeHistoryConversation(event, item)}
+                      disabled={!canRemove || historyRemovingId === conversationId}
+                      aria-label={canRemove ? `从 L0 移除${item.title || '这个窗口'}` : '无法移除：缺少窗口编号'}
+                      title={canRemove ? '从 L0 搜索中移除整个窗口' : '这个结果缺少窗口编号'}
+                    >
+                      <svg viewBox="0 0 24 24" aria-hidden="true">
+                        <path d="M3 12s3.5-6 9-6 9 6 9 6-3.5 6-9 6-9-6-9-6Z" />
+                        <path d="m4 4 16 16" />
+                      </svg>
+                      <span>{historyRemovingId === conversationId ? '处理中' : '移除'}</span>
+                    </button>
+                  </div>
+                  <div className="history-item-content">{(item.content || '').slice(0, 120)}{(item.content || '').length > 120 ? '…' : ''}</div>
                 </div>
-                <div className="history-item-content">{(item.content || '').slice(0, 120)}{(item.content || '').length > 120 ? '…' : ''}</div>
-              </div>
-            ))}
+              )
+            })}
           </div>
         </div>
       )}

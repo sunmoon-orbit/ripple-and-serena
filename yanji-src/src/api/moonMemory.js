@@ -155,6 +155,24 @@ export async function fetchArchiveConversation(config, id) {
   return request(baseUrl, `/archive/conversations/${id}`, { headers: headers(apiToken) })
 }
 
+export async function removeArchiveConversation(config, id) {
+  const { baseUrl, apiToken } = config
+  return request(baseUrl, `/archive/conversations/${id}/remove`, {
+    method: 'POST',
+    headers: headers(apiToken),
+    body: JSON.stringify({ confirm: true }),
+  })
+}
+
+export async function restoreArchiveConversation(config, id) {
+  const { baseUrl, apiToken } = config
+  return request(baseUrl, `/archive/conversations/${id}/restore`, {
+    method: 'POST',
+    headers: headers(apiToken),
+    body: JSON.stringify({ confirm: true }),
+  })
+}
+
 export async function fetchAnnotations(config, convId) {
   const { baseUrl, apiToken } = config
   return request(baseUrl, `/archive/conversations/${convId}/annotations`, { headers: headers(apiToken) })
