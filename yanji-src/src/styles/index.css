@@ -1765,8 +1765,33 @@ textarea.form-input { display: block; margin: 8px 16px 12px; }
 .history-item:hover { background: rgba(150,140,180,0.08); }
 .history-item-meta { display: flex; gap: 6px; align-items: center; margin-bottom: 3px; }
 .history-item-role { font-size: 11px; font-weight: 600; color: var(--accent); }
-.history-item-title { font-size: 11px; color: var(--text-faint); }
+.history-item-title {
+  min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  font-size: 11px; color: var(--text-faint);
+}
 .history-item-content { font-size: 12px; color: var(--text-mid); line-height: 1.5; }
+.history-remove-btn,
+.history-restore-btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 4px;
+  border: 1px solid var(--border-sm); border-radius: 999px;
+  background: var(--bg-soft); color: var(--text-faint);
+  font: inherit; font-size: 11px; line-height: 1.5; cursor: pointer;
+}
+.history-remove-btn {
+  flex-shrink: 0; margin-left: auto; padding: 2px 7px;
+}
+.history-restore-btn { padding: 2px 8px; color: var(--accent); }
+.history-remove-btn svg,
+.history-restore-btn svg {
+  width: 12px; height: 12px; fill: none; stroke: currentColor;
+  stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round;
+}
+.history-remove-btn:hover,
+.history-restore-btn:hover { border-color: var(--border-md); color: var(--accent); }
+.history-remove-btn:active,
+.history-restore-btn:active { transform: translateY(1px); }
+.history-remove-btn:disabled,
+.history-restore-btn:disabled { opacity: 0.45; cursor: default; transform: none; }
 
 /* Model panel (overlay) */
 .model-panel-overlay {
@@ -3680,6 +3705,26 @@ textarea.form-input { display: block; margin: 8px 16px 12px; }
   background: color-mix(in srgb, var(--accent) 14%, transparent);
 }
 .coread-conv-date { font-size: 11px; color: var(--text-faint); }
+.coread-remove-btn,
+.coread-restore-btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 4px;
+  border: 1px solid var(--border-sm); border-radius: 999px;
+  background: var(--bg-soft); color: var(--text-faint);
+  font: inherit; font-size: 11px; line-height: 1.5; cursor: pointer;
+}
+.coread-remove-btn { flex-shrink: 0; margin-left: auto; padding: 2px 7px; }
+.coread-restore-btn { margin: 0 0 10px auto; padding: 3px 9px; color: var(--accent); }
+.coread-remove-btn svg,
+.coread-restore-btn svg {
+  width: 12px; height: 12px; fill: none; stroke: currentColor;
+  stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round;
+}
+.coread-remove-btn:hover,
+.coread-restore-btn:hover { border-color: var(--border-md); color: var(--accent); }
+.coread-remove-btn:active,
+.coread-restore-btn:active { transform: translateY(1px); }
+.coread-remove-btn:disabled,
+.coread-restore-btn:disabled { opacity: 0.45; cursor: default; transform: none; }
 
 .coread-back { background: none; border: none; color: var(--accent); font-size: 13px; cursor: pointer; padding: 0; }
 .coread-reader-title { font-size: 14px; font-weight: 500; max-width: 60%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
