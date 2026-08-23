@@ -3,9 +3,12 @@ import { useStore } from '../../store'
 import { showToast } from '../Toast'
 import {
   fetchArchiveConversations, fetchArchiveConversation,
+  removeArchiveConversation, restoreArchiveConversation,
   fetchAnnotations, createAnnotation, deleteAnnotation,
   fetchBookmark, saveBookmark,
 } from '../../api/moonMemory'
+import { useThemedConfirm } from '../ThemedConfirmDialog'
+import { hideCoreadConversation, restoreCoreadConversation } from './coreadConversationList'
 
 const COLORS = [
   { id: 'yellow', hex: '#f5d76e' },
@@ -25,8 +28,11 @@ function roleName(role) {
 export default function CoRead({ onClose }) {
   const moonMemory = useStore((s) => s.moonMemory)
   const cfg = { baseUrl: (moonMemory?.baseUrl || 'https://memory.ravenlove.cc').replace(/\/$/, ''), apiToken: moonMemory?.apiToken }
+  const confirmAction = useThemedConfirm()
 
   const [convs, setConvs] = useState(null)   // null=loading
+  const [removingId, setRemovingId] = useState(null)
+  const [lastRemoved, setLastRemoved] = useState(null)
   const [active, setActive] = useState(null) // 选中的对话 {id,title,...}
   const [messages, setMessages] = useState([])
   const [annos, setAnnos] = useState([])     // 当前对话的标注
@@ -39,13 +45,21 @@ export default function CoRead({ onClose }) {
   const [bookmark, setBookmark] = useState(null)
   const msgRefs = useRef({})
 
-  // 加载对话列表
+  const loadConversations = useCallback(async () => {
+    if (!cfg.apiToken) {
+      setConvs([])
+      return []
+    }
+    const list = await fetchArchiveConversations(cfg)
+    const next = Array.isArray(list) ? list : []
+    setConvs(next)
+    return next
+  }, [cfg.apiToken, cfg.baseUrl])
+
+  // 每次重新打开共读都从服务端取 active tombstone 过滤后的真实列表。
   useEffect(() => {
-    if (!cfg.apiToken) { setConvs([]); return }
-    fetchArchiveConversations(cfg)
-      .then((list) => setConvs(Array.isArray(list) ? list : []))
-      .catch(() => setConvs([]))
-  }, [])
+    loadConversations().catch(() => setConvs([]))
+  }, [loadConversations])
 
   const openConv = useCallback(async (conv) => {
     setActive(conv)
@@ -103,6 +117,65 @@ export default function CoRead({ onClose }) {
     } catch { showToast('书签保存失败', 'error') }
   }
 
+  async function removeConversation(event, conversation) {
+    event.stopPropagation()
+    const conversationId = Number(conversation.id)
+    if (!Number.isSafeInteger(conversationId) || conversationId <= 0) {
+      showToast('这个窗口缺少可确认的编号，未执行移除', 'error')
+      return
+    }
+    const accepted = await confirmAction({
+      kicker: '整理共读窗口',
+      title: '从共读移除此窗口？',
+      description: conversation.title
+        ? `“${conversation.title}”将不再出现在共读列表中。`
+        : '此窗口将不再出现在共读列表中。',
+      note: '原始对话、消息、批注和书签都不会删除；需要时可以恢复。',
+      cancelLabel: '先保留',
+      confirmLabel: '确认移除',
+    })
+    if (!accepted) return
+
+    const previousIndex = Math.max(0, convs?.findIndex((item) => Number(item.id) === conversationId) ?? 0)
+    setRemovingId(conversationId)
+    try {
+      await removeArchiveConversation(cfg, conversationId)
+      setConvs((current) => hideCoreadConversation(current, conversationId))
+      setLastRemoved({ conversation, index: previousIndex })
+      showToast('已从共读移除，可随时恢复', 'success')
+      try {
+        await loadConversations()
+      } catch {
+        showToast('窗口已移除，列表刷新失败；重新打开共读会再次同步', 'error')
+      }
+    } catch (error) {
+      showToast(error?.message || '移除失败，请稍后再试', 'error')
+    } finally {
+      setRemovingId(null)
+    }
+  }
+
+  async function restoreLastRemoved() {
+    if (!lastRemoved || removingId !== null) return
+    const conversationId = Number(lastRemoved.conversation.id)
+    setRemovingId(conversationId)
+    try {
+      await restoreArchiveConversation(cfg, conversationId)
+      setConvs((current) => restoreCoreadConversation(current, lastRemoved.conversation, lastRemoved.index))
+      setLastRemoved(null)
+      showToast('此窗口已恢复到共读', 'success')
+      try {
+        await loadConversations()
+      } catch {
+        showToast('窗口已恢复，列表刷新失败；重新打开共读会再次同步', 'error')
+      }
+    } catch (error) {
+      showToast(error?.message || '恢复失败，请稍后再试', 'error')
+    } finally {
+      setRemovingId(null)
+    }
+  }
+
   // ── 对话列表视图 ──
   if (!active) {
     return (
@@ -113,6 +186,21 @@ export default function CoRead({ onClose }) {
             <button className="roost-modal-close" onClick={onClose}>✕</button>
           </div>
           <div className="roost-modal-body">
+            {lastRemoved && (
+              <button
+                type="button"
+                className="coread-restore-btn"
+                onClick={restoreLastRemoved}
+                disabled={removingId !== null}
+                title={`恢复“${lastRemoved.conversation.title || '无题窗口'}”`}
+              >
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M4 7v5h5" />
+                  <path d="M5.4 12a7 7 0 1 0 2-5" />
+                </svg>
+                <span>恢复刚移除的窗口</span>
+              </button>
+            )}
             {convs === null && <div className="roost-empty">加载中……</div>}
             {convs?.length === 0 && <div className="roost-empty">还没有可共读的对话（先导入历史记录）</div>}
             <div className="coread-conv-list">
@@ -122,6 +210,20 @@ export default function CoRead({ onClose }) {
                   <div className="coread-conv-meta">
                     <span className="coread-conv-source">{SOURCE_LABEL[c.source] || c.source}</span>
                     <span className="coread-conv-date">{(c.created_at || '').slice(0, 10)}</span>
+                    <button
+                      type="button"
+                      className="coread-remove-btn"
+                      onClick={(event) => removeConversation(event, c)}
+                      disabled={removingId === Number(c.id)}
+                      aria-label={`从共读移除${c.title || '此窗口'}`}
+                      title="从共读移除此窗口"
+                    >
+                      <svg viewBox="0 0 24 24" aria-hidden="true">
+                        <path d="M3 12s3.5-6 9-6 9 6 9 6-3.5 6-9 6-9-6-9-6Z" />
+                        <path d="m4 4 16 16" />
+                      </svg>
+                      <span>{removingId === Number(c.id) ? '处理中' : '移除'}</span>
+                    </button>
                   </div>
                 </div>
               ))}
