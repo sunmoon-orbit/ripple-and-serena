@@ -8,6 +8,13 @@ on:
       - 'yanji-src/**'
       - 'yanji-native/**'
       - '.github/workflows/verify-proactive-contact.yml'
+  pull_request:
+    branches:
+      - main
+    paths:
+      - 'yanji-src/**'
+      - 'yanji-native/**'
+      - '.github/workflows/verify-proactive-contact.yml'
 
 permissions:
   contents: read
