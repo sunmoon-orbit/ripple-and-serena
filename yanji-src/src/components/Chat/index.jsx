@@ -12,6 +12,7 @@ import { decideReplyDelay, getPendingReply, setPendingReply, clearPendingReply }
 import { getLightConn } from '../../utils/lightConn'
 import { CHAT_TITLE_SYSTEM_PROMPT, buildChatTitleRequest, normalizeChatTitle, fallbackChatTitle } from '../../utils/chatTitle'
 import { drainNative } from '../../utils/nativeInbox'
+import { findConversationChat, hasProactiveMessage, pendingCallMatches } from '../../utils/proactiveRouting'
 import { syncChatsToL0 } from '../../utils/l0Sync'
 import { createStreamUpdateScheduler } from '../../utils/streamUpdateScheduler'
 import { pickAutoPostTrigger, markAutoPosted, postMoment, fetchAutopostSetting } from '../../api/moments'
@@ -1116,7 +1117,8 @@ export default function Chat() {
 
   // ── 主动来电 + 主动消息：服务端 cron 发来后，前端轮询 → 来电弹卡片 / 消息注入对话 ──
   const callPollRef = useRef(false)
-  const autoAnswerRef = useRef(0)   // 原生来电页按过接听的时间戳（见下面那个 effect）
+  const proactivePollRef = useRef(false)
+  const autoAnswerRef = useRef(null)   // 原生来电页按过接听的来电关联（见下面那个 effect）
   useEffect(() => {
     if (!moonMemory?.enabled || !moonMemory?.apiToken) return
     const base = (moonMemory.baseUrl || 'https://memory.ravenlove.cc').replace(/\/$/, '')
@@ -1131,22 +1133,26 @@ export default function Chat() {
         if (inv.status !== 'pending') return
         const seen = localStorage.getItem(seenKey)
         if (seen === String(inv.id)) return
+        let chat = findConversationChat(useStore.getState().chats, inv.conversationExternalId)
+        if (!chat) chat = getActiveChat()
+        if (!chat) chat = createChat()
+        if (!chat) return
         localStorage.setItem(seenKey, String(inv.id))
         callPollRef.current = true
-        let chat = getActiveChat()
-        if (!chat) chat = createChat()
         if (chat.id !== activeChatId) setActiveChat(chat.id)
         const msg = addMessage(chat.id, {
           role: 'assistant',
           content: `[涟言发起了语音通话邀请：${inv.reason || '想你了'}]`,
           callInvite: { status: 'ringing', reason: inv.reason || '想你了', serverId: inv.id },
         })
-        const ic = { chatId: chat.id, msgId: msg.id, reason: inv.reason || '想你了', serverId: inv.id }
+        const ic = { chatId: chat.id, msgId: msg.id, reason: inv.reason || '想你了', serverId: inv.id,
+          conversationExternalId: inv.conversationExternalId }
         setIncomingCall(ic)
         setTimeout(() => { callPollRef.current = false }, 120_000)
         // 她在原生来电页上已经按过接听了（app 是被那一下拉起来的）：直接接，别再弹一次卡片让她按
-        if (autoAnswerRef.current && Date.now() - autoAnswerRef.current < 60_000) {
-          autoAnswerRef.current = 0
+        if (autoAnswerRef.current && Date.now() - autoAnswerRef.current.at < 60_000 &&
+            pendingCallMatches(autoAnswerRef.current, ic)) {
+          autoAnswerRef.current = null
           acceptIncomingCall(ic)
         }
       } catch { /* 静默 */ }
@@ -1173,7 +1179,8 @@ export default function Chat() {
         markCallHandled(maxId)   // 无论补不补，水位线都推上去，别下次又扫一遍
         const m = missed[0]
         if (!m) return
-        let chat = getActiveChat()
+        let chat = findConversationChat(useStore.getState().chats, m.conversationExternalId)
+        if (!chat) chat = getActiveChat()
         if (!chat) chat = createChat()
         if (chat.id !== activeChatId) setActiveChat(chat.id)
         addMessage(chat.id, {
@@ -1189,23 +1196,37 @@ export default function Chat() {
       } catch { /* 静默 */ }
     }
     const checkProactive = async () => {
+      if (proactivePollRef.current) return
+      proactivePollRef.current = true
       try {
         const res = await fetch(`${base}/proactive/pending`, auth)
         if (!res.ok) return
         const msgs = await res.json()
         if (!Array.isArray(msgs) || !msgs.length) return
-        let chat = getActiveChat()
-        if (!chat) chat = createChat()
-        if (chat.id !== activeChatId) setActiveChat(chat.id)
+        let fallbackChat = null
+        const deliveredIds = []
         for (const pm of msgs) {
-          addMessage(chat.id, { role: 'assistant', content: pm.content, proactive: true })
+          const state = useStore.getState()
+          let chat = findConversationChat(state.chats, pm.conversationExternalId)
+          if (!chat) {
+            fallbackChat = fallbackChat || state.getActiveChat()
+            if (!fallbackChat) fallbackChat = createChat()
+            chat = fallbackChat
+          }
+          if (!chat) continue
+          if (!hasProactiveMessage(useStore.getState().messagesByChatId[chat.id], pm.id)) {
+            addMessage(chat.id, { role: 'assistant', content: pm.content, proactive: true, proactiveId: pm.id })
+          }
+          deliveredIds.push(pm.id)
         }
+        if (!deliveredIds.length) return
         await fetch(`${base}/proactive/delivered`, {
           method: 'POST',
           headers: { Authorization: `Bearer ${moonMemory.apiToken}`, 'Content-Type': 'application/json' },
-          body: JSON.stringify({ ids: msgs.map(m => m.id) }),
+          body: JSON.stringify({ ids: deliveredIds }),
         })
       } catch { /* 静默 */ }
+      finally { proactivePollRef.current = false }
     }
     const check = () => { checkCall(); checkProactive() }
     check()
@@ -1220,15 +1241,23 @@ export default function Chat() {
 
   // ── 原生来电页按了「接听」：进来直接接起，不用她在网页里再按一次 ──
   useEffect(() => {
-    const onAnswer = () => {
-      autoAnswerRef.current = Date.now()
+    const onAnswer = (event) => {
+      const pending = event?.detail || window.__yanjiAnswerCallPending || { at: Date.now() }
+      window.__yanjiAnswerCallPending = null
+      autoAnswerRef.current = { ...pending, at: pending.at || Date.now() }
       // 卡片已经在响了就当场接；还没轮询到 invite 的话，checkCall 拿到后会看这个时间戳
-      if (incomingCall) { autoAnswerRef.current = 0; acceptIncomingCall() }
+      if (incomingCall && pendingCallMatches(autoAnswerRef.current, incomingCall)) {
+        if (incomingCall.chatId !== useStore.getState().activeChatId) setActiveChat(incomingCall.chatId)
+        autoAnswerRef.current = null
+        acceptIncomingCall()
+      }
     }
-    // 原生壳可能在 Chat 挂载之前就喊过了，补看一次时间戳
-    if (window.__yanjiAnswerCallAt && Date.now() - window.__yanjiAnswerCallAt < 60_000) {
-      window.__yanjiAnswerCallAt = 0
-      onAnswer()
+    // 原生壳可能在 Chat 挂载之前就喊过了，补看一次持久到页面生命周期内的关联信息
+    if (window.__yanjiAnswerCallPending &&
+        Date.now() - window.__yanjiAnswerCallPending.at < 60_000) {
+      const pending = window.__yanjiAnswerCallPending
+      window.__yanjiAnswerCallPending = null
+      onAnswer({ detail: pending })
     }
     window.addEventListener('yanji-answer-call', onAnswer)
     return () => window.removeEventListener('yanji-answer-call', onAnswer)
@@ -1368,10 +1397,10 @@ export default function Chat() {
   }
 
   // ── Export ───────────────────────────────────────────────────────────────
-  function openCall(skipDial) {
-    if (activeChatId) {
-      const m = addMessage(activeChatId, { role: 'user', call: { status: 'ongoing' }, content: '[语音通话]' })
-      callMarkerRef.current = { chatId: activeChatId, msgId: m.id, startedAt: Date.now() }
+  function openCall(skipDial, targetChatId = activeChatId) {
+    if (targetChatId) {
+      const m = addMessage(targetChatId, { role: 'user', call: { status: 'ongoing' }, content: '[语音通话]' })
+      callMarkerRef.current = { chatId: targetChatId, msgId: m.id, startedAt: Date.now() }
     }
     setDialing(null)
     setCallOpen(true)
@@ -1453,6 +1482,7 @@ export default function Chat() {
     const ic = (arg && arg.msgId) ? arg : incomingCall
     setIncomingCall(null)
     if (!ic) return
+    if (ic.chatId !== useStore.getState().activeChatId) setActiveChat(ic.chatId)
     if (ic.serverId) markCallHandled(ic.serverId)
     updateMessage(ic.chatId, ic.msgId, {
       callInvite: { status: 'accepted', reason: ic.reason },
@@ -1465,7 +1495,7 @@ export default function Chat() {
         body: JSON.stringify({ id: ic.serverId, action: 'accept' }),
       }).catch(() => {})
     }
-    openCall()
+    openCall(false, ic.chatId)
   }
 
   function missIncomingCall(how) {

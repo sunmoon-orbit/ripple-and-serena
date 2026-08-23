@@ -46,11 +46,17 @@ class CallActivity : AppCompatActivity() {
     private val synthesizedRingtone = NativeRingtonePlayer()
     private var vibrator: Vibrator? = null
     private var currentCallId: String? = null
+    private var currentExpiresAt: String? = null
+    private var currentConversationId: String? = null
+    private var currentConversationExternalId: String? = null
     private val timeout = Handler(Looper.getMainLooper())
 
     companion object {
         const val EXTRA_REASON = "reason"
         const val EXTRA_CALL_ID = "call_id"
+        const val EXTRA_EXPIRES_AT = "expires_at"
+        const val EXTRA_CONVERSATION_ID = "conversation_id"
+        const val EXTRA_CONVERSATION_EXTERNAL_ID = "conversation_external_id"
         const val ACTION_STOP_CALL = "cc.ravenlove.yanji.action.STOP_CALL"
         // 和通知的 setTimeoutAfter(90_000)、服务端 invite ttl:90 对齐
         private const val RING_MS = 90_000L
@@ -82,6 +88,9 @@ class CallActivity : AppCompatActivity() {
         timeout.removeCallbacksAndMessages(null)
         stopRinging()
         currentCallId = intent.getStringExtra(EXTRA_CALL_ID)
+        currentExpiresAt = intent.getStringExtra(EXTRA_EXPIRES_AT)
+        currentConversationId = intent.getStringExtra(EXTRA_CONVERSATION_ID)
+        currentConversationExternalId = intent.getStringExtra(EXTRA_CONVERSATION_EXTERNAL_ID)
         findViewById<TextView>(R.id.call_reason).text =
             intent.getStringExtra(EXTRA_REASON)?.takeIf { it.isNotBlank() } ?: "想你了"
         startRinging()
@@ -266,6 +275,10 @@ class CallActivity : AppCompatActivity() {
                 Intent.FLAG_ACTIVITY_NEW_TASK
             putExtra("call_action", "answer")
             putExtra(EXTRA_CALL_ID, currentCallId)
+            putExtra(EXTRA_REASON, intent.getStringExtra(EXTRA_REASON))
+            putExtra(EXTRA_EXPIRES_AT, currentExpiresAt)
+            putExtra(EXTRA_CONVERSATION_ID, currentConversationId)
+            putExtra(EXTRA_CONVERSATION_EXTERNAL_ID, currentConversationExternalId)
         })
         // 有密码锁时 requestDismissKeyguard 让她解锁后直接落在言叽里，不用再点一次图标
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
@@ -275,8 +288,7 @@ class CallActivity : AppCompatActivity() {
     }
 
     private fun decline() {
-        // 「挂断」不写服务端：她按挂断的意思是现在不方便，留言照样要留，
-        // 由前端下次打开言叽时统一补（和 90 秒没人接走的是同一条路）。
+        NativeCallActionQueue.enqueueDecline(this, currentCallId)
         dismiss()
     }
 
@@ -310,6 +322,6 @@ class CallActivity : AppCompatActivity() {
     // 来电页不能用返回键划走——按返回等于挂断，别让它悄悄退到后台还在响
     @Suppress("DEPRECATION")
     override fun onBackPressed() {
-        dismiss()
+        decline()
     }
 }

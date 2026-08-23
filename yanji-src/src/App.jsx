@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useStore } from './store'
 import { pushNative } from './utils/nativeInbox'
+import { findConversationChat } from './utils/proactiveRouting'
 import { squareDownscale } from './utils/squareDownscale'
 import { refreshNativePushToken } from './api/push'
 import IconNav from './components/IconNav'
@@ -64,14 +65,31 @@ export default function App() {
     window.__yanjiShareText = enter('draft')   // 系统分享：填进输入框，等她补一句
     // 原生来电页/通知上按了「接听」：她已经按过一次了，进来别再让她按第二次。
     // 这里只负责把她带到对话页，真正接起来的动作在 Chat 里（它才有 incomingCall）。
-    window.__yanjiAnswerCall = () => {
+    window.__yanjiOpenConversation = (externalId) => {
+      const target = findConversationChat(useStore.getState().chats, externalId)
+      if (!target) return
       fromNativeRef.current = true
       setShowSplash(false)
       setShowHome(false)
-      useStore.setState({ activePanel: 'chat' })
-      // Chat 可能还没挂载完，事件会丢——所以同时留一个时间戳，Chat 挂上后自己去看
-      window.__yanjiAnswerCallAt = Date.now()
-      window.dispatchEvent(new Event('yanji-answer-call'))
+      useStore.setState({ activePanel: 'chat', activeChatId: target.id })
+    }
+    window.__yanjiAnswerCall = (raw) => {
+      let payload = {}
+      try { payload = JSON.parse(raw || '{}') || {} } catch { /* old native shells passed a plain marker */ }
+      const target = findConversationChat(useStore.getState().chats, payload.conversationExternalId)
+      fromNativeRef.current = true
+      setShowSplash(false)
+      setShowHome(false)
+      useStore.setState({ activePanel: 'chat', ...(target ? { activeChatId: target.id } : {}) })
+      // Chat 可能还没挂载完，事件会丢——所以同时留一份不含正文的关联信息。
+      window.__yanjiAnswerCallPending = { ...payload, at: Date.now() }
+      window.dispatchEvent(new CustomEvent('yanji-answer-call', { detail: window.__yanjiAnswerCallPending }))
+    }
+    return () => {
+      delete window.__yanjiQuickReply
+      delete window.__yanjiShareText
+      delete window.__yanjiOpenConversation
+      delete window.__yanjiAnswerCall
     }
   }, [])
 

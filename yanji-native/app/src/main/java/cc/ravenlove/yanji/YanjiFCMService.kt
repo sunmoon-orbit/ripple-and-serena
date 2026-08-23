@@ -37,12 +37,11 @@ class YanjiFCMService : FirebaseMessagingService() {
         val body = message.data["body"] ?: message.notification?.body ?: return
 
         val callChannel = createChannels()
-        val isCall = message.data["type"] == "call" ||
-            (message.data["type"] == null && title == "涟言来电话了")
-        if (isCall) {
-            showCallNotification(title, body, message.data["inviteId"], callChannel)
+        val call = IncomingCallPayload.from(message.data, title, body)
+        if (call != null) {
+            showCallNotification(title, call, callChannel)
         } else {
-            showNotification(title, body)
+            showNotification(title, body, message.data["conversationExternalId"])
         }
     }
 
@@ -131,13 +130,18 @@ class YanjiFCMService : FirebaseMessagingService() {
 
     // 不用 CallStyle：国产 ROM 只给系统认证的通话应用完整待遇，CallStyle+setOngoing
     // 会被压进通知中心不弹横幅。照抄能正常弹的聊天通知写法，只加接听/挂断按钮。
-    private fun showCallNotification(title: String, body: String, callId: String?, channelId: String) {
+    private fun showCallNotification(title: String, call: IncomingCallPayload, channelId: String) {
+        val callId = call.callId
         val answerIntent = PendingIntent.getBroadcast(
             this, callRequestCode(IntentIdentity.REQUEST_CALL_ANSWER, callId),
             Intent(this, CallActionReceiver::class.java).apply {
                 action = IntentIdentity.ACTION_CALL_ANSWER
                 data = callIntentData("answer", callId)
                 putExtra(CallActivity.EXTRA_CALL_ID, callId)
+                putExtra(CallActivity.EXTRA_REASON, call.reason)
+                putExtra(CallActivity.EXTRA_EXPIRES_AT, call.expiresAt)
+                putExtra(CallActivity.EXTRA_CONVERSATION_ID, call.conversationId)
+                putExtra(CallActivity.EXTRA_CONVERSATION_EXTERNAL_ID, call.conversationExternalId)
             },
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
@@ -148,6 +152,10 @@ class YanjiFCMService : FirebaseMessagingService() {
                 action = IntentIdentity.ACTION_CALL_DECLINE
                 data = callIntentData("decline", callId)
                 putExtra(CallActivity.EXTRA_CALL_ID, callId)
+                putExtra(CallActivity.EXTRA_REASON, call.reason)
+                putExtra(CallActivity.EXTRA_EXPIRES_AT, call.expiresAt)
+                putExtra(CallActivity.EXTRA_CONVERSATION_ID, call.conversationId)
+                putExtra(CallActivity.EXTRA_CONVERSATION_EXTERNAL_ID, call.conversationExternalId)
             },
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
@@ -163,8 +171,11 @@ class YanjiFCMService : FirebaseMessagingService() {
                 flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
                 action = IntentIdentity.ACTION_CALL_FULLSCREEN
                 data = callIntentData("fullscreen", callId)
-                putExtra(CallActivity.EXTRA_REASON, body)
+                putExtra(CallActivity.EXTRA_REASON, call.reason)
                 putExtra(CallActivity.EXTRA_CALL_ID, callId)
+                putExtra(CallActivity.EXTRA_EXPIRES_AT, call.expiresAt)
+                putExtra(CallActivity.EXTRA_CONVERSATION_ID, call.conversationId)
+                putExtra(CallActivity.EXTRA_CONVERSATION_EXTERNAL_ID, call.conversationExternalId)
             },
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
@@ -172,8 +183,8 @@ class YanjiFCMService : FirebaseMessagingService() {
         val notification = NotificationCompat.Builder(this, channelId)
             .setSmallIcon(android.R.drawable.ic_menu_call)
             .setContentTitle(title)
-            .setContentText(body)
-            .setStyle(NotificationCompat.BigTextStyle().bigText(body))
+            .setContentText(call.reason)
+            .setStyle(NotificationCompat.BigTextStyle().bigText(call.reason))
             .setCategory(NotificationCompat.CATEGORY_CALL)
             .setAutoCancel(true)
             .setTimeoutAfter(90_000)
@@ -201,14 +212,16 @@ class YanjiFCMService : FirebaseMessagingService() {
         .appendPath(callId ?: "without-id")
         .build()
 
-    private fun showNotification(title: String, body: String) {
+    private fun showNotification(title: String, body: String, conversationExternalId: String?) {
         val notifId = System.currentTimeMillis().toInt()
 
         val tapIntent = PendingIntent.getActivity(
-            this, IntentIdentity.REQUEST_CHAT_OPEN,
+            this, notifId,
             Intent(this, MainActivity::class.java).apply {
                 action = IntentIdentity.ACTION_CHAT_OPEN
+                data = Uri.Builder().scheme("yanji").authority("chat").appendPath(notifId.toString()).build()
                 flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
+                putExtra(CallActivity.EXTRA_CONVERSATION_EXTERNAL_ID, conversationExternalId)
             },
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
@@ -230,6 +243,7 @@ class YanjiFCMService : FirebaseMessagingService() {
                 flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
                 putExtra("quick_reply", true)
                 putExtra("notif_id", notifId)
+                putExtra(CallActivity.EXTRA_CONVERSATION_EXTERNAL_ID, conversationExternalId)
             },
             // ⚠️ 必须 MUTABLE：RemoteInput 要往 Intent 里塞她输入的文字，IMMUTABLE 就传不进来
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_MUTABLE
