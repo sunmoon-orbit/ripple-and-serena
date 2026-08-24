@@ -42,6 +42,13 @@ class WebBridge(private val activity: MainActivity) {
         activity.runOnUiThread { activity.retryFcmToken() }
     }
 
+    // 前端推送开关的原生镜像。Firebase 在 WebView 关闭时轮换 token，原生端只有
+    // 知道她确实开着推送，才可以自行补传；关闭后绝不偷偷重新订阅。
+    @JavascriptInterface
+    fun setFcmEnabled(enabled: Boolean) {
+        NativeFcmTokenSync.setEnabled(activity, enabled)
+    }
+
     // 给页面一个「喊一声」的口子。通知栏快捷回复这条路上有好几段只有页面自己知道
     // 走没走到（注入的 JS 有没有等到函数、handleSend 有没有真发出去），
     // 出问题时全是静默的——0726 靠日志猜了三轮都没猜中。有灯才好修。
@@ -96,6 +103,7 @@ class WebBridge(private val activity: MainActivity) {
             .putString("moon_token", token)
             .apply()
         NativeCallActionQueue.flush(activity)
+        NativeFcmTokenSync.flush(activity)
     }
 
     // 铃声选择存在网页端的 localStorage 里，锁屏来电的 CallActivity 读不到——

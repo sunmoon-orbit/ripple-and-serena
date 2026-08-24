@@ -575,7 +575,8 @@ class MainActivity : AppCompatActivity() {
         try {
             com.google.firebase.messaging.FirebaseMessaging.getInstance().token
                 .addOnSuccessListener { token ->
-                    prefs.edit().putString("token", token).remove("error").apply()
+                    prefs.edit().remove("error").apply()
+                    NativeFcmTokenSync.recordToken(this, token)
                 }
                 .addOnFailureListener { e ->
                     // 失败原因写 prefs，前端诊断行直接显示（SERVICE_NOT_AVAILABLE=网络不通等）
