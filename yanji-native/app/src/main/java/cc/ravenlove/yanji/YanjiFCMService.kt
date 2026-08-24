@@ -27,8 +27,7 @@ class YanjiFCMService : FirebaseMessagingService() {
     override fun onNewToken(token: String) {
         super.onNewToken(token)
         // 存 prefs，前端下次打开时通过 WebBridge.getFcmToken() 读到新 token 重新上报
-        getSharedPreferences("yanji_fcm", android.content.Context.MODE_PRIVATE)
-            .edit().putString("token", token).apply()
+        NativeFcmTokenSync.recordToken(this, token)
     }
 
     override fun onMessageReceived(message: RemoteMessage) {
