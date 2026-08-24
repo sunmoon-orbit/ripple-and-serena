@@ -12,7 +12,7 @@ import { decideReplyDelay, getPendingReply, setPendingReply, clearPendingReply }
 import { getLightConn } from '../../utils/lightConn'
 import { CHAT_TITLE_SYSTEM_PROMPT, buildChatTitleRequest, normalizeChatTitle, fallbackChatTitle } from '../../utils/chatTitle'
 import { drainNative } from '../../utils/nativeInbox'
-import { findConversationChat, hasProactiveMessage, pendingCallMatches } from '../../utils/proactiveRouting'
+import { findConversationChat, hasProactiveMessage, parseProactiveCreatedAt, pendingCallMatches } from '../../utils/proactiveRouting'
 import { syncChatsToL0 } from '../../utils/l0Sync'
 import { createStreamUpdateScheduler } from '../../utils/streamUpdateScheduler'
 import { pickAutoPostTrigger, markAutoPosted, postMoment, fetchAutopostSetting } from '../../api/moments'
@@ -1215,7 +1215,11 @@ export default function Chat() {
           }
           if (!chat) continue
           if (!hasProactiveMessage(useStore.getState().messagesByChatId[chat.id], pm.id)) {
-            addMessage(chat.id, { role: 'assistant', content: pm.content, proactive: true, proactiveId: pm.id })
+            const createdAt = parseProactiveCreatedAt(pm.created_at)
+            addMessage(chat.id, {
+              role: 'assistant', content: pm.content, proactive: true, proactiveId: pm.id,
+              ...(createdAt ? { createdAt } : {}),
+            })
           }
           deliveredIds.push(pm.id)
         }
