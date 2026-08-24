@@ -41,6 +41,7 @@ export function getNativePushToken() {
 export async function refreshNativePushToken(moonConfig) {
   if (!isKotlinApp()) return null
   if (!getNativePushToken()) return null              // 没开过推送，不多事
+  window.YanjiNative?.setFcmEnabled?.(true)             // 让原生端接住今后的 token 轮换
   if (!moonConfig?.apiUrl || !moonConfig?.apiToken) return null
 
   // 这里**不能**调 retryFcmToken 后干等 15 秒：开机路径上不该阻塞。
@@ -90,6 +91,7 @@ export async function subscribeNativePush(moonMemoryConfig) {
     }
     const data = await resp.json().catch(() => ({}))
     try { localStorage.setItem(FCM_TOKEN_KEY, token) } catch { /* noop */ }
+    window.YanjiNative?.setFcmEnabled?.(true)
     if (data.fcmConfigured === false) throw new Error('token 已保存，但服务器 FCM 尚未配置完成')
     return token
   }
@@ -132,6 +134,7 @@ export async function subscribeNativePush(moonMemoryConfig) {
 }
 
 export async function unsubscribeNativePush(moonMemoryConfig) {
+  window.YanjiNative?.setFcmEnabled?.(false)
   const token = getNativePushToken()
   const { apiUrl, apiToken } = moonMemoryConfig
   if (token) {
