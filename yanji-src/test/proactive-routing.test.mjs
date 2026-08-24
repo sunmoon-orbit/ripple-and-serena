@@ -3,6 +3,7 @@ import assert from 'node:assert/strict'
 
 import {
   findConversationChat, hasProactiveMessage, normalizeConversationExternalId, pendingCallMatches,
+  parseProactiveCreatedAt,
 } from '../src/utils/proactiveRouting.js'
 
 test('主动内容按稳定 external id 找到窗口且不会改变当前窗口', () => {
@@ -30,4 +31,12 @@ test('原生接听只匹配同一来电，旧壳无 id 时保持兼容', () => {
   assert.equal(pendingCallMatches({ callId: '31' }, invite), true)
   assert.equal(pendingCallMatches({ callId: '32' }, invite), false)
   assert.equal(pendingCallMatches({ at: Date.now() }, invite), true)
+})
+
+
+test('主动消息保留服务端真实发送时间，兼容 SQLite UTC 与 ISO 时间', () => {
+  assert.equal(parseProactiveCreatedAt('2026-08-24 03:15:00'), Date.parse('2026-08-24T03:15:00Z'))
+  assert.equal(parseProactiveCreatedAt('2026-08-24T11:15:00+08:00'), Date.parse('2026-08-24T11:15:00+08:00'))
+  assert.equal(parseProactiveCreatedAt(''), null)
+  assert.equal(parseProactiveCreatedAt('not-a-time'), null)
 })
