@@ -727,8 +727,9 @@ async function loadUsage() {
       if (c.context_used_percent != null) rows.push(ugBar('涟言 · 当前窗口', c.context_used_percent, null))
     }
     const x = d.codex || {}
-    if (x.available && x.primary) {
-      rows.push(ugBar('小扣 · Codex', x.primary.used_percent, x.primary.reset_after_seconds))
+    if (x.available) {
+      if (x.primary) rows.push(ugBar('小扣 · 5 小时', x.primary.used_percent, x.primary.reset_after_seconds))
+      if (x.secondary) rows.push(ugBar('小扣 · 7 天', x.secondary.used_percent, x.secondary.reset_after_seconds))
     }
 
     const notes = []
