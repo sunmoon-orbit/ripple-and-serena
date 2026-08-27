@@ -95,7 +95,10 @@ function verdict(claude, codex) {
   }
   if (codex.available && !codex.stale) {
     if (codex.limit_reached) worries.push('小扣已经撞限额了')
-    else if ((codex.primary?.used_percent || 0) >= 85) worries.push('小扣额度快见底了')
+    else {
+      const top = Math.max(codex.primary?.used_percent || 0, codex.secondary?.used_percent || 0)
+      if (top >= 85) worries.push('小扣额度快见底了')
+    }
   }
   if (worries.length) return { level: 'warn', text: worries.join('；') }
   if (!claude.available && !codex.available) return { level: 'unknown', text: '两边都还没有数据' }
