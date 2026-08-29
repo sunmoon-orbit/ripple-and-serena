@@ -920,18 +920,38 @@ input, textarea, select { font-family: inherit; font-size: 15px; color: var(--in
   box-shadow: 0 0 7px currentColor;
 }
 
-/* 星图详情卡（复用 .modal-overlay/.modal 底部抽屉）*/
-.starmap-detail { background: #131A2A; color: #D6E0F2; }
-.starmap-detail-head { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
+/* 星图详情卡：卡片固定在安全可视区内，只让正文滚动，避免长记忆被导航截断。 */
+.starmap-detail {
+  height: min(82dvh, 760px);
+  max-height: calc(100dvh - 72px);
+  display: flex; flex-direction: column;
+  overflow: hidden;
+  background: #131A2A; color: #D6E0F2;
+}
+.starmap-detail-head {
+  display: flex; align-items: center; gap: 8px;
+  flex: 0 0 auto; margin-bottom: 12px;
+}
 .starmap-detail-type {
   font-size: 12px; font-weight: 600; padding: 2px 10px; border-radius: 20px;
 }
 .starmap-detail-meta { font-size: 12px; color: rgba(200,212,238,0.5); }
 .starmap-detail-body {
   font-size: 14px; line-height: 1.75; white-space: pre-wrap; word-break: break-word;
-  max-height: 52vh; overflow-y: auto;
+  flex: 1 1 auto; min-height: 0; max-height: none;
+  overflow-y: auto; overscroll-behavior: contain;
+  padding: 2px 12px 18px 0;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(180, 201, 240, 0.34) rgba(255, 255, 255, 0.04);
 }
-.starmap-detail-tags { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 12px; }
+.starmap-detail-body::-webkit-scrollbar { width: 6px; }
+.starmap-detail-body::-webkit-scrollbar-track { background: rgba(255, 255, 255, 0.04); border-radius: 6px; }
+.starmap-detail-body::-webkit-scrollbar-thumb { background: rgba(180, 201, 240, 0.34); border-radius: 6px; }
+.starmap-detail-tags {
+  display: flex; flex: 0 0 auto; flex-wrap: wrap; gap: 5px;
+  margin-top: 10px; padding-top: 10px;
+  border-top: 1px solid rgba(180, 201, 240, 0.08);
+}
 .starmap-detail-tags .tag { background: rgba(150,170,215,0.14); color: rgba(200,212,238,0.75); }
 
 /* ── 桌面端适配 ── */
@@ -960,5 +980,12 @@ input, textarea, select { font-family: inherit; font-size: 15px; color: var(--in
     padding: 8px 12px;
   }
   .starmap-legend-item { font-size: 11px; padding-inline: 9px; }
-  .starmap-detail { max-width: 520px; }
+  .starmap-wrap .modal-overlay { align-items: center; padding: 28px; }
+  .starmap-detail {
+    width: min(680px, calc(100vw - 56px)); max-width: 680px;
+    height: min(78dvh, 820px); max-height: calc(100dvh - 56px);
+    border-radius: 22px;
+    padding: 26px 28px;
+  }
+  .starmap-detail-body { font-size: 15px; line-height: 1.8; }
 }
