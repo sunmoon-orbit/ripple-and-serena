@@ -20,6 +20,7 @@ const TYPE_LABELS = {
   treasure: '宝藏', deep: '深层', anchor: '锚点',
 }
 const LEGEND = ['memory', 'tech', 'dream', 'diary', 'treasure', 'deep', 'anchor']
+const DUST_COUNT = 180
 
 function colorOf(type) { return TYPE_COLORS[type] || OTHER_COLOR }
 
@@ -104,6 +105,12 @@ export default function StarMapPanel() {
       const edges = g.edges
         .map(([a, b, s]) => ({ a: idx.get(a), b: idx.get(b), s }))
         .filter((e) => e.a != null && e.b != null)
+      const degrees = new Array(nodes.length).fill(0)
+      for (const edge of edges) {
+        degrees[edge.a] += 1
+        degrees[edge.b] += 1
+      }
+      nodes.forEach((node, i) => { node.degree = degrees[i] })
       worldRef.current = { nodes, edges, iter: 0 }
       setStats({ n: nodes.length, e: edges.length })
     } catch (e) {
@@ -184,12 +191,39 @@ export default function StarMapPanel() {
       const { tx, ty, k } = viewRef.current
       const cx = W / 2 + tx, cy = H / 2 + ty
 
-      // 夜空底色（无论什么主题，星图都是夜空）
-      const grad = ctx.createRadialGradient(W / 2, H * 0.4, 0, W / 2, H * 0.4, Math.max(W, H))
-      grad.addColorStop(0, '#101726')
-      grad.addColorStop(1, '#070B14')
+      // 深空底色：中心略亮，边缘压暗，星群会像悬在空间里而不是贴在平面上。
+      const grad = ctx.createRadialGradient(W * 0.48, H * 0.45, 0, W * 0.48, H * 0.45, Math.max(W, H) * 0.85)
+      grad.addColorStop(0, '#10192d')
+      grad.addColorStop(0.48, '#080f20')
+      grad.addColorStop(1, '#02050d')
       ctx.fillStyle = grad
       ctx.fillRect(0, 0, W, H)
+
+      // 两层极淡星云，给大屏留出纵深；手机上不会盖住主星群。
+      ctx.globalCompositeOperation = 'screen'
+      const nebulaA = ctx.createRadialGradient(W * 0.30, H * 0.58, 0, W * 0.30, H * 0.58, Math.max(W, H) * 0.42)
+      nebulaA.addColorStop(0, 'rgba(66,112,211,0.105)')
+      nebulaA.addColorStop(0.38, 'rgba(90,70,170,0.045)')
+      nebulaA.addColorStop(1, 'rgba(0,0,0,0)')
+      ctx.fillStyle = nebulaA; ctx.fillRect(0, 0, W, H)
+      const nebulaB = ctx.createRadialGradient(W * 0.70, H * 0.38, 0, W * 0.70, H * 0.38, Math.max(W, H) * 0.32)
+      nebulaB.addColorStop(0, 'rgba(80,190,190,0.045)')
+      nebulaB.addColorStop(1, 'rgba(0,0,0,0)')
+      ctx.fillStyle = nebulaB; ctx.fillRect(0, 0, W, H)
+
+      // 远景星尘使用稳定随机数，拖动时只有轻微视差，不会每帧闪跳。
+      for (let i = 0; i < DUST_COUNT; i++) {
+        const depth = 0.12 + seeded(i + 7, 91) * 0.28
+        const x = ((seeded(i + 19, 92) * W + tx * depth) % (W + 40) + W + 40) % (W + 40) - 20
+        const y = ((seeded(i + 29, 93) * H + ty * depth) % (H + 40) + H + 40) % (H + 40) - 20
+        const pulse = 0.35 + 0.35 * Math.sin(t / (1700 + i % 9 * 120) + i)
+        const radius = 0.35 + seeded(i + 41, 94) * 0.75
+        ctx.globalAlpha = (0.18 + pulse * 0.28) * (0.65 + depth)
+        ctx.fillStyle = i % 13 === 0 ? '#a9c8ff' : '#e8eeff'
+        ctx.beginPath(); ctx.arc(x, y, radius, 0, Math.PI * 2); ctx.fill()
+      }
+      ctx.globalAlpha = 1
+      ctx.globalCompositeOperation = 'source-over'
 
       // ── 背景星座（视差 0.35，不随缩放，像远处的天幕）──
       const px = tx * 0.35, py = ty * 0.35
@@ -217,39 +251,47 @@ export default function StarMapPanel() {
       const { nodes, edges } = worldRef.current
       if (nodes.length) {
         // ── 连线 ──
-        ctx.lineWidth = Math.max(0.5, 0.8 * k)
+        const hover = hoverRef.current
+        ctx.lineWidth = Math.max(0.35, 0.62 * Math.sqrt(k))
         for (const e of edges) {
           const a = nodes[e.a], b = nodes[e.b]
           const ax = cx + a.x * k, ay = cy + a.y * k
           const bx2 = cx + b.x * k, by2 = cy + b.y * k
           if ((ax < -50 && bx2 < -50) || (ax > W + 50 && bx2 > W + 50)) continue
           if ((ay < -50 && by2 < -50) || (ay > H + 50 && by2 > H + 50)) continue
-          const alpha = 0.05 + (e.s - 0.45) * 0.5
-          ctx.strokeStyle = `rgba(140,165,215,${Math.min(0.35, Math.max(0.05, alpha))})`
+          const isHoverEdge = hover != null && (e.a === hover || e.b === hover)
+          const alpha = isHoverEdge ? 0.42 : 0.018 + Math.max(0, e.s - 0.55) * 0.24
+          ctx.strokeStyle = `rgba(125,158,215,${Math.min(0.42, alpha)})`
           ctx.beginPath(); ctx.moveTo(ax, ay); ctx.lineTo(bx2, by2); ctx.stroke()
         }
         // ── 星星 ──
-        const hover = hoverRef.current
+        ctx.globalCompositeOperation = 'lighter'
         for (let i = 0; i < nodes.length; i++) {
           const p = nodes[i]
           const x = cx + p.x * k, y = cy + p.y * k
           if (x < -20 || x > W + 20 || y < -20 || y > H + 20) continue
-          const twinkle = 0.75 + 0.25 * Math.sin(t / 900 + p.phase)
-          const r = (1.5 + p.importance * 0.45) * Math.sqrt(k) * (i === hover ? 1.5 : 1)
+          const twinkle = 0.72 + 0.28 * Math.sin(t / (1050 + (i % 7) * 90) + p.phase)
+          const hierarchy = Math.min(2.6, Math.log2(1 + (p.degree || 0)) * 0.28)
+          const r = Math.max(1.05, (1.15 + p.importance * 0.28 + hierarchy) * Math.sqrt(k)) * (i === hover ? 1.55 : 1)
           const c = colorOf(p.type)
-          // 光晕：置顶 or 高重要度 or hover
-          if (p.pinned || p.importance >= 8 || i === hover) {
-            const g = ctx.createRadialGradient(x, y, 0, x, y, r * 4)
-            g.addColorStop(0, c + '55')
-            g.addColorStop(1, c + '00')
-            ctx.fillStyle = g
-            ctx.beginPath(); ctx.arc(x, y, r * 4, 0, Math.PI * 2); ctx.fill()
+          const prominent = p.pinned || p.importance >= 8 || p.degree >= 7 || i === hover
+          // 每颗记忆都有柔光，重要节点再多一层大范围 bloom。
+          ctx.globalAlpha = (prominent ? 0.14 : 0.065) * twinkle
+          ctx.fillStyle = c
+          ctx.beginPath(); ctx.arc(x, y, r * (prominent ? 4.8 : 2.8), 0, Math.PI * 2); ctx.fill()
+          if (prominent) {
+            ctx.globalAlpha = 0.18 * twinkle
+            ctx.beginPath(); ctx.arc(x, y, r * 2.25, 0, Math.PI * 2); ctx.fill()
           }
-          ctx.globalAlpha = twinkle
+          ctx.globalAlpha = 0.88 * twinkle
           ctx.fillStyle = c
           ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill()
+          ctx.globalAlpha = 0.72 * twinkle
+          ctx.fillStyle = '#ffffff'
+          ctx.beginPath(); ctx.arc(x - r * 0.18, y - r * 0.18, Math.max(0.45, r * 0.34), 0, Math.PI * 2); ctx.fill()
           ctx.globalAlpha = 1
         }
+        ctx.globalCompositeOperation = 'source-over'
         // hover 标题
         if (hover != null && nodes[hover]) {
           const p = nodes[hover]
