@@ -9,6 +9,7 @@ import android.view.Gravity
 import android.view.WindowManager
 import android.widget.EditText
 import android.widget.TextView
+import android.widget.ImageView
 import android.widget.Toast
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -25,12 +26,16 @@ class WidgetComposeActivity : Activity() {
         window.addFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND)
         window.attributes = window.attributes.apply {
             width = (resources.displayMetrics.widthPixels * 0.88f).toInt()
+            height = WindowManager.LayoutParams.WRAP_CONTENT
             dimAmount = 0.62f
             gravity = Gravity.CENTER
+            y = (18 * resources.displayMetrics.density).toInt()
         }
 
         val palette = palette()
         findViewById<android.view.View>(R.id.widget_compose_card).background = rounded(palette.card, 26f)
+        findViewById<ImageView>(R.id.widget_compose_decor_top).setColorFilter(palette.accent)
+        findViewById<ImageView>(R.id.widget_compose_decor_bottom).setColorFilter(palette.accent)
         findViewById<TextView>(R.id.widget_compose_kicker).apply {
             text = if (mode == MODE_CHECKLIST) "DAILY RECEIPT" else "A LITTLE NOTE"
             setTextColor(palette.accent)
@@ -71,7 +76,7 @@ class WidgetComposeActivity : Activity() {
             }
         }
         input.requestFocus()
-        window.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_VISIBLE)
+        window.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_VISIBLE or WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE)
     }
 
     private data class Palette(val card: Int, val input: Int, val text: Int, val muted: Int, val faint: Int, val accent: Int, val stroke: Int)
