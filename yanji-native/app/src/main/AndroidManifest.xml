@@ -122,7 +122,7 @@
                 android:resource="@xml/press_widget_info" />
         </receiver>
 
-        <activity android:name=".WidgetComposeActivity" android:exported="false" android:theme="@style/Theme.AppCompat.Dialog" />
+        <activity android:name=".WidgetComposeActivity" android:exported="false" android:theme="@style/Theme.Yanji.WidgetDialog" />
 
         <receiver android:name=".ChecklistWidget" android:exported="true">
             <intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE" /></intent-filter>

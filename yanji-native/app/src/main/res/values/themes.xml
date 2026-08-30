@@ -12,4 +12,13 @@
         <item name="android:windowLightStatusBar">false</item>
         <item name="android:windowBackground">@drawable/call_bg</item>
     </style>
+
+    <style name="Theme.Yanji.WidgetDialog" parent="Theme.Material3.DayNight.NoActionBar">
+        <item name="android:windowIsTranslucent">true</item>
+        <item name="android:windowBackground">@android:color/transparent</item>
+        <item name="android:colorAccent">#8878B0</item>
+        <item name="android:windowNoTitle">true</item>
+        <item name="android:windowCloseOnTouchOutside">true</item>
+        <item name="android:windowActionModeOverlay">true</item>
+    </style>
 </resources>
