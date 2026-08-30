@@ -1,6 +1,10 @@
 package cc.ravenlove.yanji
 
 import android.content.Context
+import android.graphics.BitmapFactory
+import android.view.View
+import android.widget.RemoteViews
+import java.io.File
 
 /**
  * 三种 RemoteViews 小组件共用的主题/透明度解析器。
@@ -14,6 +18,20 @@ object WidgetAppearance {
         val theme = prefs.getString("theme", "default") ?: "default"
         val translucent = prefs.getString("widget_background_style", "solid") == "translucent"
         return themeBackground(theme, translucent)
+    }
+
+    fun apply(context: Context, views: RemoteViews, rootId: Int, imageId: Int) {
+        val prefs = context.getSharedPreferences("yanji_theme", Context.MODE_PRIVATE)
+        val imageMode = prefs.getString("widget_background_style", "solid") == "image"
+        val file = File(context.filesDir, "widget_background.jpg")
+        if (imageMode && file.exists()) {
+            views.setInt(rootId, "setBackgroundResource", android.R.color.transparent)
+            views.setViewVisibility(imageId, View.VISIBLE)
+            views.setImageViewBitmap(imageId, BitmapFactory.decodeFile(file.absolutePath))
+        } else {
+            views.setViewVisibility(imageId, View.GONE)
+            views.setInt(rootId, "setBackgroundResource", background(context))
+        }
     }
 
     private fun themeBackground(theme: String, translucent: Boolean): Int = when (theme) {

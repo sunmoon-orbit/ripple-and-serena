@@ -195,7 +195,7 @@ class WebBridge(private val activity: MainActivity) {
 
     @JavascriptInterface
     fun updateWidgetBackgroundStyle(style: String) {
-        val safeStyle = if (style == "translucent") "translucent" else "solid"
+        val safeStyle = if (style == "translucent" || style == "image") style else "solid"
         activity.getSharedPreferences("yanji_theme", Context.MODE_PRIVATE)
             .edit()
             .putString("widget_background_style", safeStyle)
@@ -204,18 +204,23 @@ class WebBridge(private val activity: MainActivity) {
         refreshAllWidgets()
     }
 
-    private fun refreshAllWidgets() {
-        val manager = AppWidgetManager.getInstance(activity)
-        for (cls in arrayOf(YanjiWidget::class.java, EmotionWidget::class.java, PressWidget::class.java)) {
-            val ids = manager.getAppWidgetIds(ComponentName(activity, cls))
-            if (ids.isNotEmpty()) {
-                val intent = Intent(activity, cls).apply {
-                    action = AppWidgetManager.ACTION_APPWIDGET_UPDATE
-                    putExtra(AppWidgetManager.EXTRA_APPWIDGET_IDS, ids)
+    @JavascriptInterface
+    fun saveWidgetBackground(base64: String) {
+        avatarWriter.execute {
+            try {
+                val target = File(activity.filesDir, "widget_background.jpg")
+                if (base64.isEmpty()) target.delete()
+                else {
+                    val bytes = Base64.decode(base64.substringAfter(',', base64), Base64.DEFAULT)
+                    if (bytes.size <= 3 * 1024 * 1024) target.writeBytes(bytes)
                 }
-                activity.sendBroadcast(intent)
-            }
+                activity.runOnUiThread { refreshAllWidgets() }
+            } catch (e: Exception) { Log.w("YanjiWidget", "保存组件底图失败", e) }
         }
+    }
+
+    private fun refreshAllWidgets() {
+        WidgetRefresh.all(activity)
     }
 
     companion object {

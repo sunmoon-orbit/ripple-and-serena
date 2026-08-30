@@ -48,7 +48,7 @@ object IntentIdentity {
             PendingIntent.FLAG_NO_CREATE or PendingIntent.FLAG_IMMUTABLE
         )?.cancel()
         val manager = AppWidgetManager.getInstance(context)
-        listOf(YanjiWidget::class.java, EmotionWidget::class.java, PressWidget::class.java).forEach { cls ->
+        WidgetRefresh.classes.forEach { cls ->
             val component = ComponentName(context, cls)
             val ids = manager.getAppWidgetIds(component)
             if (ids.isNotEmpty()) {

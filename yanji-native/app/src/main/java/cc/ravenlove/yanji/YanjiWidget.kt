@@ -20,7 +20,7 @@ class YanjiWidget : AppWidgetProvider() {
         for (id in ids) {
             val views = RemoteViews(context.packageName, R.layout.widget_layout)
 
-            views.setInt(R.id.widget_root, "setBackgroundResource", bgRes)
+            WidgetAppearance.apply(context, views, R.id.widget_root, R.id.widget_background)
             views.setTextViewText(R.id.widget_days, "在一起第 $days 天")
             views.setTextViewText(R.id.widget_date, "${date.replace("-", ".")} · 今日${card.level}")
             views.setTextViewText(R.id.widget_detail, "宜 ${card.yi.take(2).joinToString(" · ")}  ✦ ${card.lucky}")

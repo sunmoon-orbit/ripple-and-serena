@@ -48,7 +48,7 @@ const DEFAULT_STATE = {
   glassOpacity: 1,
   // 言叽自己的 26 键拼音键盘：默认关闭，避免第一次更新就替换她已经习惯的系统输入法。
   customKeyboardEnabled: false,
-  // 原生桌面小组件背景：solid=实色，translucent=半透明。网页端保留设置，原生桥负责落到 SharedPreferences。
+  // 原生桌面小组件背景：solid=实色，translucent=半透明，image=自定义底图。
   widgetBackgroundStyle: 'solid',
   // 官端滚动模型：发送后自己的消息滚到视口顶端，回复在下方往下长（外观设置里可关）
   scrollAnchor: true,
@@ -284,7 +284,7 @@ export const useStore = create((set, get) => ({
     return { customKeyboardEnabled }
   }),
   setWidgetBackgroundStyle: (v) => set((s) => {
-    const widgetBackgroundStyle = v === 'translucent' ? 'translucent' : 'solid'
+    const widgetBackgroundStyle = ['translucent', 'image'].includes(v) ? v : 'solid'
     savePersistedState({ ...s, widgetBackgroundStyle })
     try { window.YanjiNative?.updateWidgetBackgroundStyle?.(widgetBackgroundStyle) } catch { /* 网页版没有这个桥 */ }
     return { widgetBackgroundStyle }

@@ -21,6 +21,66 @@ function Section({ title, children }) {
   )
 }
 
+function WidgetBackgroundPicker({ style, setStyle }) {
+  const [image, setImage] = useState(() => localStorage.getItem('yanji-widget-bg-source') || '')
+  const [zoom, setZoom] = useState(() => Number(localStorage.getItem('yanji-widget-bg-zoom')) || 1)
+  const [x, setX] = useState(() => Number(localStorage.getItem('yanji-widget-bg-x')) || 50)
+  const [y, setY] = useState(() => Number(localStorage.getItem('yanji-widget-bg-y')) || 50)
+  const [blur, setBlur] = useState(() => Number(localStorage.getItem('yanji-widget-bg-blur')) || 0)
+  const [shade, setShade] = useState(() => Number(localStorage.getItem('yanji-widget-bg-shade')) || 35)
+  const fileRef = useRef(null)
+
+  function choose(event) {
+    const file = event.target.files?.[0]
+    if (!file) return
+    const reader = new FileReader()
+    reader.onload = () => {
+      const value = String(reader.result || '')
+      try { localStorage.setItem('yanji-widget-bg-source', value) } catch { showToast('图片太大了，请换一张', 'error'); return }
+      setImage(value); setStyle('image')
+    }
+    reader.readAsDataURL(file)
+    event.target.value = ''
+  }
+
+  async function apply() {
+    if (!image) return
+    const img = new Image()
+    img.src = image
+    await img.decode()
+    const canvas = document.createElement('canvas'); canvas.width = 1200; canvas.height = 600
+    const ctx = canvas.getContext('2d')
+    const cover = Math.max(canvas.width / img.width, canvas.height / img.height) * zoom
+    const w = img.width * cover; const h = img.height * cover
+    const dx = (canvas.width - w) * (x / 100); const dy = (canvas.height - h) * (y / 100)
+    ctx.filter = `blur(${blur}px)`
+    ctx.drawImage(img, dx, dy, w, h)
+    ctx.filter = 'none'; ctx.fillStyle = `rgba(18,16,24,${shade / 100})`; ctx.fillRect(0, 0, canvas.width, canvas.height)
+    const output = canvas.toDataURL('image/jpeg', 0.86)
+    window.YanjiNative?.saveWidgetBackground?.(output)
+    ;[['yanji-widget-bg-zoom', zoom], ['yanji-widget-bg-x', x], ['yanji-widget-bg-y', y], ['yanji-widget-bg-blur', blur], ['yanji-widget-bg-shade', shade]].forEach(([k, v]) => localStorage.setItem(k, String(v)))
+    setStyle('image'); showToast('小组件底图已应用', 'success')
+  }
+
+  function clear() {
+    localStorage.removeItem('yanji-widget-bg-source'); setImage('')
+    window.YanjiNative?.saveWidgetBackground?.(''); setStyle('solid')
+  }
+
+  return <>
+    <div className="card-row"><span className="card-row-label">小组件背景</span><div className="avatar-mode-toggle">
+      {[['solid', '实色'], ['translucent', '半透明'], ['image', '自定义底图']].map(([id, label]) => <button key={id} className={'avatar-mode-btn' + (style === id ? ' active' : '')} onClick={() => id === 'image' && !image ? fileRef.current?.click() : setStyle(id)}>{label}</button>)}
+    </div></div>
+    {image && <div style={{ marginTop: 12 }}>
+      <div style={{ height: 118, borderRadius: 14, backgroundImage: `linear-gradient(rgba(18,16,24,${shade / 100}),rgba(18,16,24,${shade / 100})),url(${image})`, backgroundSize: `${zoom * 100}% auto`, backgroundPosition: `${x}% ${y}%`, filter: blur ? `blur(${Math.min(blur, 4)}px)` : undefined, border: '1px solid var(--border)' }} />
+      {[['缩放', zoom, setZoom, 1, 2, .05], ['左右位置', x, setX, 0, 100, 1], ['上下位置', y, setY, 0, 100, 1], ['模糊', blur, setBlur, 0, 16, 1], ['暗色蒙层', shade, setShade, 0, 75, 1]].map(([label, value, setter, min, max, step]) => <div className="card-row" key={label}><span className="card-row-label">{label}</span><input aria-label={label} type="range" min={min} max={max} step={step} value={value} onChange={e => setter(Number(e.target.value))} style={{ width: 150, accentColor: 'var(--accent)' }} /></div>)}
+      <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}><button className="btn-sm btn-ghost" onClick={() => fileRef.current?.click()}>换一张</button><button className="btn-sm btn-ghost" onClick={clear}>移除</button><button className="btn-sm btn-primary" onClick={apply}>应用效果</button></div>
+    </div>}
+    <input ref={fileRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={choose} />
+    <p className="card-hint">自定义图片会先裁成横向底图；缩放和位置负责裁剪，模糊与蒙层保证桌面文字清楚。</p>
+  </>
+}
+
 function RingtoneSection({ value, onChange }) {
   const stopPreviewRef = useRef(null)
   useEffect(() => () => stopPreviewRef.current?.(), [])
@@ -1248,20 +1308,8 @@ export default function Settings() {
             {isNativeApp() && (
               <Section title="桌面小组件">
                 <div className="settings-card">
-                  <div className="card-row">
-                    <span className="card-row-label">小组件背景</span>
-                    <div className="avatar-mode-toggle">
-                      <button
-                        className={'avatar-mode-btn' + ((widgetBackgroundStyle || 'solid') === 'solid' ? ' active' : '')}
-                        onClick={() => setWidgetBackgroundStyle('solid')}
-                      >实色</button>
-                      <button
-                        className={'avatar-mode-btn' + (widgetBackgroundStyle === 'translucent' ? ' active' : '')}
-                        onClick={() => setWidgetBackgroundStyle('translucent')}
-                      >半透明</button>
-                    </div>
-                  </div>
-                  <p className="card-hint">纪念日、心情和“想你键”三种原生小组件一起切换；颜色仍跟随言叽主题。</p>
+                  <WidgetBackgroundPicker style={widgetBackgroundStyle || 'solid'} setStyle={setWidgetBackgroundStyle} />
+                  <p className="card-hint">纪念日、心情、想你键、今日小票、便利贴和小月历会一起切换；纯色仍跟随言叽主题。</p>
                 </div>
               </Section>
             )}
