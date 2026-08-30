@@ -5,6 +5,7 @@ import android.appwidget.AppWidgetProvider
 import android.content.Context
 import android.content.Intent
 import android.app.PendingIntent
+import android.os.Bundle
 import android.widget.RemoteViews
 import kotlinx.coroutines.*
 import org.json.JSONObject
@@ -18,6 +19,10 @@ class PeriodWidget : AppWidgetProvider() {
             ids.forEach { manager.updateAppWidget(it, render(context, data)) }
             pending.finish()
         }
+    }
+
+    override fun onAppWidgetOptionsChanged(context: Context, manager: AppWidgetManager, appWidgetId: Int, newOptions: Bundle) {
+        onUpdate(context, manager, intArrayOf(appWidgetId))
     }
 
     private fun render(context: Context, data: JSONObject?): RemoteViews {
