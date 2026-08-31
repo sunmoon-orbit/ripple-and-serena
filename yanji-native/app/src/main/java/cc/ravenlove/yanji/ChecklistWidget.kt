@@ -18,6 +18,7 @@ class ChecklistWidget : AppWidgetProvider() {
         ids.forEach { manager.updateAppWidget(it, loading(context, manager, it)) }
         val pending = goAsync()
         CoroutineScope(Dispatchers.IO).launch {
+            ChecklistRecurrence.materializeToday(context)
             val rows = try { JSONArray(WidgetApi.request(context, "/checklist")) } catch (_: Exception) { null }
             ids.forEach { manager.updateAppWidget(it, render(context, rows, manager, it)) }
             pending.finish()
@@ -70,7 +71,9 @@ class ChecklistWidget : AppWidgetProvider() {
             views.setViewVisibility(viewId, if (row == null) View.GONE else View.VISIBLE)
             if (row != null) {
                 val done = row.optInt("done") != 0
-                views.setTextViewText(viewId, (if (done) "✓  " else "○  ") + row.optString("text"))
+                val text = row.optString("text")
+                val repeatMark = if (ChecklistRecurrence.contains(context, text)) "  ↻" else ""
+                views.setTextViewText(viewId, (if (done) "✓  " else "○  ") + text + repeatMark)
                 val toggle = Intent(context, ChecklistWidget::class.java).apply {
                     action = ACTION_TOGGLE; putExtra(EXTRA_ID, row.optInt("id")); putExtra(EXTRA_DONE, !done)
                 }
