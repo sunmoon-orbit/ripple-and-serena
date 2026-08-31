@@ -80,10 +80,11 @@ export default function StarMapPanel() {
   const setMemoryView = useStore((s) => s.setMemoryView)
   const canvasRef = useRef(null)
   const wrapRef = useRef(null)
-  const worldRef = useRef({ nodes: [], edges: [], iter: 0 })
+  const worldRef = useRef({ nodes: [], edges: [], iter: 0, settled: false, revealStart: 0 })
   const viewRef = useRef({ tx: 0, ty: 0, k: 1 })
   const hoverRef = useRef(null)
   const [loading, setLoading] = useState(true)
+  const [settling, setSettling] = useState(false)
   const [error, setError] = useState('')
   const [stats, setStats] = useState(null)
   const [detail, setDetail] = useState(null)       // 点开的记忆详情
@@ -91,7 +92,7 @@ export default function StarMapPanel() {
 
   // ── 拉数据 + 初始布点 ──
   const load = useCallback(async () => {
-    setLoading(true); setError('')
+    setLoading(true); setSettling(true); setError('')
     try {
       const g = await api.graph()
       const idx = new Map()
@@ -111,10 +112,12 @@ export default function StarMapPanel() {
         degrees[edge.b] += 1
       }
       nodes.forEach((node, i) => { node.degree = degrees[i] })
-      worldRef.current = { nodes, edges, iter: 0 }
+      worldRef.current = { nodes, edges, iter: 0, settled: nodes.length === 0, revealStart: 0 }
       setStats({ n: nodes.length, e: edges.length })
+      if (nodes.length === 0) setSettling(false)
     } catch (e) {
       setError(e.message)
+      setSettling(false)
       showToast('星图加载失败：' + e.message, 'error')
     } finally { setLoading(false) }
   }, [])
@@ -141,9 +144,16 @@ export default function StarMapPanel() {
     resize()
     window.addEventListener('resize', resize)
 
-    function stepPhysics() {
+    function stepPhysics(t) {
       const w = worldRef.current
-      if (!w.nodes.length || w.iter >= 260) return
+      if (!w.nodes.length || w.iter >= 260) {
+        if (w.nodes.length && !w.settled) {
+          w.settled = true
+          w.revealStart = t
+          setSettling(false)
+        }
+        return
+      }
       const { nodes, edges } = w
       const n = nodes.length
       // 每帧最多跑 3 轮，482 节点 O(n²) 一轮 ~23 万次，够快
@@ -182,6 +192,11 @@ export default function StarMapPanel() {
           p.y += Math.max(-14, Math.min(14, p.vy))
           p.vx *= 0.82; p.vy *= 0.82
         }
+      }
+      if (w.iter >= 260 && !w.settled) {
+        w.settled = true
+        w.revealStart = t
+        setSettling(false)
       }
     }
 
@@ -248,7 +263,9 @@ export default function StarMapPanel() {
         ctx.fillText(ast.name, bx + bw * 0.42, by + bh + 14)
       }
 
-      const { nodes, edges } = worldRef.current
+      const world = worldRef.current
+      const { nodes, edges } = world
+      const reveal = world.settled ? Math.min(1, Math.max(0, (t - world.revealStart) / 900)) : 0
       if (nodes.length) {
         // ── 连线 ──
         const hover = hoverRef.current
@@ -260,7 +277,7 @@ export default function StarMapPanel() {
           if ((ax < -50 && bx2 < -50) || (ax > W + 50 && bx2 > W + 50)) continue
           if ((ay < -50 && by2 < -50) || (ay > H + 50 && by2 > H + 50)) continue
           const isHoverEdge = hover != null && (e.a === hover || e.b === hover)
-          const alpha = isHoverEdge ? 0.42 : 0.018 + Math.max(0, e.s - 0.55) * 0.24
+          const alpha = (isHoverEdge ? 0.42 : 0.018 + Math.max(0, e.s - 0.55) * 0.24) * reveal
           ctx.strokeStyle = `rgba(125,158,215,${Math.min(0.42, alpha)})`
           ctx.beginPath(); ctx.moveTo(ax, ay); ctx.lineTo(bx2, by2); ctx.stroke()
         }
@@ -276,24 +293,24 @@ export default function StarMapPanel() {
           const c = colorOf(p.type)
           const prominent = p.pinned || p.importance >= 8 || p.degree >= 7 || i === hover
           // 每颗记忆都有柔光，重要节点再多一层大范围 bloom。
-          ctx.globalAlpha = (prominent ? 0.14 : 0.065) * twinkle
+          ctx.globalAlpha = (prominent ? 0.14 : 0.065) * twinkle * reveal
           ctx.fillStyle = c
           ctx.beginPath(); ctx.arc(x, y, r * (prominent ? 4.8 : 2.8), 0, Math.PI * 2); ctx.fill()
           if (prominent) {
-            ctx.globalAlpha = 0.18 * twinkle
+            ctx.globalAlpha = 0.18 * twinkle * reveal
             ctx.beginPath(); ctx.arc(x, y, r * 2.25, 0, Math.PI * 2); ctx.fill()
           }
-          ctx.globalAlpha = 0.88 * twinkle
+          ctx.globalAlpha = 0.88 * twinkle * reveal
           ctx.fillStyle = c
           ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill()
-          ctx.globalAlpha = 0.72 * twinkle
+          ctx.globalAlpha = 0.72 * twinkle * reveal
           ctx.fillStyle = '#ffffff'
           ctx.beginPath(); ctx.arc(x - r * 0.18, y - r * 0.18, Math.max(0.45, r * 0.34), 0, Math.PI * 2); ctx.fill()
           ctx.globalAlpha = 1
         }
         ctx.globalCompositeOperation = 'source-over'
         // hover 标题
-        if (hover != null && nodes[hover]) {
+        if (reveal > 0.85 && hover != null && nodes[hover]) {
           const p = nodes[hover]
           const x = cx + p.x * k, y = cy + p.y * k
           ctx.font = '12px system-ui'
@@ -311,7 +328,7 @@ export default function StarMapPanel() {
 
     function loop(t) {
       if (!running) return
-      stepPhysics()
+      stepPhysics(t)
       draw(t)
       raf = requestAnimationFrame(loop)
     }
@@ -440,7 +457,12 @@ export default function StarMapPanel() {
         <button className="starmap-btn" onClick={() => setMemoryView('list')} title="回列表视图"><List size={15} /></button>
       </div>
 
-      {loading && <div className="starmap-hint">正在点亮星空…</div>}
+      {(loading || settling) && (
+        <div className="starmap-hint starmap-settling">
+          <span className="starmap-settling-mark" aria-hidden="true" />
+          <span>{loading ? '正在翻开记忆…' : '正在把记忆放回夜空…'}</span>
+        </div>
+      )}
       {error && !loading && <div className="starmap-hint">加载失败了：{error}</div>}
 
       <div className="starmap-legend">
