@@ -1,6 +1,7 @@
 package cc.ravenlove.yanji
 
 import android.app.Activity
+import android.app.AlertDialog
 import android.graphics.Color
 import android.graphics.drawable.GradientDrawable
 import android.os.Bundle
@@ -8,6 +9,7 @@ import android.text.InputFilter
 import android.view.Gravity
 import android.view.WindowManager
 import android.widget.EditText
+import android.widget.CheckBox
 import android.widget.TextView
 import android.widget.ImageView
 import android.widget.Toast
@@ -55,6 +57,47 @@ class WidgetComposeActivity : Activity() {
             background = rounded(palette.input, 17f, palette.stroke)
             filters = arrayOf(InputFilter.LengthFilter(if (mode == MODE_CHECKLIST) 200 else 2000))
         }
+        val repeat = findViewById<CheckBox>(R.id.widget_compose_repeat).apply {
+            visibility = if (mode == MODE_CHECKLIST) android.view.View.VISIBLE else android.view.View.GONE
+            setTextColor(palette.muted)
+            buttonTintList = android.content.res.ColorStateList(
+                arrayOf(intArrayOf(android.R.attr.state_checked), intArrayOf()),
+                intArrayOf(palette.accent, palette.faint),
+            )
+        }
+        val manageRepeat = findViewById<TextView>(R.id.widget_compose_manage_repeat).apply {
+            setTextColor(palette.accent)
+            visibility = if (mode == MODE_CHECKLIST && ChecklistRecurrence.texts(this@WidgetComposeActivity).isNotEmpty()) {
+                android.view.View.VISIBLE
+            } else {
+                android.view.View.GONE
+            }
+            setOnClickListener {
+                val items = ChecklistRecurrence.texts(this@WidgetComposeActivity)
+                if (items.isEmpty()) {
+                    visibility = android.view.View.GONE
+                    return@setOnClickListener
+                }
+                AlertDialog.Builder(this@WidgetComposeActivity)
+                    .setTitle("停止哪一项每日重复？")
+                    .setItems(items.toTypedArray()) { _, which ->
+                        val selected = items[which]
+                        AlertDialog.Builder(this@WidgetComposeActivity)
+                            .setMessage("停止重复「$selected」？\n今天已经印出的小票不会被删除。")
+                            .setNegativeButton("继续保留", null)
+                            .setPositiveButton("停止重复") { _, _ ->
+                                ChecklistRecurrence.remove(this@WidgetComposeActivity, selected)
+                                if (ChecklistRecurrence.texts(this@WidgetComposeActivity).isEmpty()) {
+                                    visibility = android.view.View.GONE
+                                }
+                                Toast.makeText(this@WidgetComposeActivity, "以后不会再自动出现啦", Toast.LENGTH_SHORT).show()
+                            }
+                            .show()
+                    }
+                    .setNegativeButton("取消", null)
+                    .show()
+            }
+        }
         findViewById<TextView>(R.id.widget_compose_cancel).apply {
             setTextColor(palette.muted)
             background = rounded(Color.TRANSPARENT, 15f, palette.stroke)
@@ -71,7 +114,7 @@ class WidgetComposeActivity : Activity() {
                 } else {
                     isEnabled = false
                     text = if (mode == MODE_CHECKLIST) "印着……" else "贴着……"
-                    submit(mode, value)
+                    submit(mode, value, repeat.isChecked)
                 }
             }
         }
@@ -100,13 +143,14 @@ class WidgetComposeActivity : Activity() {
         if (stroke != null) setStroke((resources.displayMetrics.density).toInt().coerceAtLeast(1), stroke)
     }
 
-    private fun submit(mode: String, text: String) {
+    private fun submit(mode: String, text: String, repeatDaily: Boolean) {
         if (text.isEmpty()) { finish(); return }
         CoroutineScope(Dispatchers.IO).launch {
             val message = try {
                 if (mode == MODE_CHECKLIST) {
                     WidgetApi.request(this@WidgetComposeActivity, "/checklist", "POST", JSONObject()
                         .put("text", text).put("added_by", "阿颖"))
+                    if (repeatDaily) ChecklistRecurrence.add(this@WidgetComposeActivity, text)
                 } else {
                     WidgetApi.request(this@WidgetComposeActivity, "/board", "POST", JSONObject()
                         .put("text", text).put("author", "阿颖").put("source", "yanji-widget"))
