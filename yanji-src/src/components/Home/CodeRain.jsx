@@ -11,7 +11,7 @@ const RAIN_INKS = [
   [157, 137, 181], // 中层：香芋紫
   [190, 166, 149], // 近层：暖奶茶光
 ]
-const MAX_RIPPLES = 9
+const MAX_RIPPLES = 12
 const TEXT_DELAY = 320
 
 function randChar() {
@@ -135,12 +135,18 @@ export default function CodeRain({ text, onReady, soundMode = 'drops' }) {
       const speed = [74, 104, 142][layer] * (0.78 + Math.random() * 0.5)
       const fontSize = [9.5, 11.5, 13][layer]
       const tailLength = [4, 6, 8][layer] + Math.floor(Math.random() * 3)
-      const targetY = h * (0.59 + Math.random() * 0.13)
+      const x = 10 + Math.random() * Math.max(1, w - 20)
+      // 所有雨滴落在同一片不可见水面上；两组缓慢曲线让它有自然起伏，
+      // 但不再让每滴各抽一个高度、从别人的波纹中间穿过去。
+      const surface = 0.655
+        + Math.sin((x / Math.max(1, w)) * Math.PI * 2.2) * 0.011
+        + Math.sin((x / Math.max(1, w)) * Math.PI * 5.1 + 0.8) * 0.005
+      const targetY = h * (surface + (Math.random() - 0.5) * 0.006)
       const y = initial
         ? -tailLength * fontSize + Math.random() * targetY
         : -28 - Math.random() * h * 0.5
       return {
-        x: 10 + Math.random() * Math.max(1, w - 20),
+        x,
         y,
         speed,
         fontSize,
@@ -292,19 +298,20 @@ export default function CodeRain({ text, onReady, soundMode = 'drops' }) {
         }
 
         if (drop.y >= drop.targetY) {
-          if (ripples.length < MAX_RIPPLES && (drop.layer > 0 || Math.random() < 0.4)) {
-            ripples.push({
-              x: drop.x,
-              y: drop.targetY,
-              r: 1.5,
-              maxR: 32 + drop.layer * 16 + Math.random() * 38,
-              speed: 34 + Math.random() * 18,
-              alpha: 0.16 + drop.layer * 0.08,
-              ink: RAIN_INKS[drop.layer],
-            })
-            playDropSound(drop.layer, drop.x, w, now)
-            revealFromImpact(now)
-          }
+          // 每次真正落水都必须有响应；满额时让最老的波纹先退场，
+          // 不能因为达到上限就让新雨滴无声穿过水面。
+          if (ripples.length >= MAX_RIPPLES) ripples.shift()
+          ripples.push({
+            x: drop.x,
+            y: drop.targetY,
+            r: 0.7,
+            maxR: 24 + drop.layer * 15 + Math.random() * 30,
+            speed: 34 + Math.random() * 18,
+            alpha: 0.11 + drop.layer * 0.075,
+            ink: RAIN_INKS[drop.layer],
+          })
+          playDropSound(drop.layer, drop.x, w, now)
+          revealFromImpact(now)
           Object.assign(drop, makeDrop(w, h, false))
         }
       }
