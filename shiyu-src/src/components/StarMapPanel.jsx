@@ -319,27 +319,25 @@ export default function StarMapPanel() {
           const r = Math.max(1.05, (1.15 + p.importance * 0.28 + hierarchy) * Math.sqrt(k)) * (i === hover ? 1.55 : 1)
           const c = colorOf(p.type)
           const prominent = p.pinned || p.importance >= 8 || p.degree >= 7 || i === hover
-          // 一颗连续的同色光点：没有白芯、实色圆和外圈三层结构。
-          // 重要节点只扩大柔光，并添一缕极淡星芒。
-          const glowR = r * (prominent ? 4.2 : 2.85) * bloom
-          const star = ctx.createRadialGradient(x, y, 0, x, y, glowR)
-          star.addColorStop(0, c + 'F2')
-          star.addColorStop(0.1, c + 'D8')
-          star.addColorStop(0.36, c + (prominent ? '72' : '64'))
-          star.addColorStop(0.7, c + (prominent ? '24' : '18'))
-          star.addColorStop(1, c + '00')
-          ctx.globalAlpha = twinkle * glowIn * coreIn
-          ctx.fillStyle = star
-          ctx.beginPath(); ctx.arc(x, y, glowR, 0, Math.PI * 2); ctx.fill()
+          // 清晰的同色星点，用 shadowBlur 只添一圈克制柔光；不再铺大块雾状渐变。
+          const starR = r * (0.68 + coreIn * 0.32)
+          ctx.save()
+          ctx.globalAlpha = (0.78 + twinkle * 0.22) * coreIn
+          ctx.fillStyle = c
+          ctx.shadowColor = c
+          ctx.shadowBlur = (prominent ? 7 : 3.5) * glowIn * Math.sqrt(k)
+          ctx.beginPath(); ctx.arc(x, y, starR, 0, Math.PI * 2); ctx.fill()
           if (prominent) {
-            const ray = ctx.createLinearGradient(x, y - r * 3.2, x, y + r * 3.2)
-            ray.addColorStop(0, c + '00')
-            ray.addColorStop(0.5, c + '46')
-            ray.addColorStop(1, c + '00')
-            ctx.globalAlpha = 0.42 * twinkle * glowIn
-            ctx.fillStyle = ray
-            ctx.fillRect(x - 0.35, y - r * 3.2, 0.7, r * 6.4)
+            ctx.shadowBlur = 0
+            ctx.globalAlpha = 0.28 * twinkle * glowIn
+            ctx.strokeStyle = c
+            ctx.lineWidth = 0.65
+            ctx.beginPath()
+            ctx.moveTo(x, y - r * 2.25); ctx.lineTo(x, y + r * 2.25)
+            ctx.moveTo(x - r * 1.45, y); ctx.lineTo(x + r * 1.45, y)
+            ctx.stroke()
           }
+          ctx.restore()
           ctx.globalAlpha = 1
         }
         ctx.globalCompositeOperation = 'source-over'
