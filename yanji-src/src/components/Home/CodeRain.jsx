@@ -5,9 +5,13 @@ import { useRef, useEffect } from 'react'
 // - 雨滴分远中近三层，落点不再共用一条僵硬的“水面”；
 // - 每次入水涟漪都会唤醒一小组开场语，文字随落雨轻轻跳入。
 const CHARS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789{}[]()<>=;:+-*/&|!?#@~^%$涟言鸦颖月'
-const INK = [172, 202, 184]
+const RAIN_INKS = [
+  [130, 133, 151], // 远层：银灰
+  [157, 137, 181], // 中层：香芋紫
+  [190, 166, 149], // 近层：暖奶茶光
+]
 const MAX_RIPPLES = 9
-const TEXT_DELAY = 520
+const TEXT_DELAY = 320
 
 function randChar() {
   return CHARS[Math.floor(Math.random() * CHARS.length)]
@@ -54,9 +58,9 @@ export default function CodeRain({ text, onReady }) {
     function makeDrop(w, h, initial = false) {
       const layerRoll = Math.random()
       const layer = layerRoll < 0.48 ? 0 : layerRoll < 0.86 ? 1 : 2
-      const speed = [42, 70, 104][layer] * (0.76 + Math.random() * 0.55)
+      const speed = [74, 104, 142][layer] * (0.78 + Math.random() * 0.5)
       const fontSize = [9.5, 11.5, 13][layer]
-      const tailLength = [5, 7, 9][layer] + Math.floor(Math.random() * 3)
+      const tailLength = [4, 6, 8][layer] + Math.floor(Math.random() * 3)
       const targetY = h * (0.59 + Math.random() * 0.13)
       const y = initial
         ? -tailLength * fontSize + Math.random() * targetY
@@ -69,7 +73,7 @@ export default function CodeRain({ text, onReady }) {
         tailLength,
         targetY,
         layer,
-        alpha: [0.16, 0.32, 0.58][layer] * (0.76 + Math.random() * 0.35),
+        alpha: [0.13, 0.27, 0.48][layer] * (0.78 + Math.random() * 0.32),
         chars: Array.from({ length: tailLength }, randChar),
         mutateIn: 120 + Math.random() * 420,
       }
@@ -84,7 +88,7 @@ export default function CodeRain({ text, onReady }) {
       cvs.style.height = `${h}px`
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
       layout = null
-      drops = Array.from({ length: Math.max(11, Math.floor(w / 27)) }, () => makeDrop(w, h, true))
+      drops = Array.from({ length: Math.max(13, Math.floor(w / 24)) }, () => makeDrop(w, h, true))
       ripples = []
       motes = makeMotes(w, h)
     }
@@ -159,9 +163,10 @@ export default function CodeRain({ text, onReady }) {
     function revealFromImpact(now) {
       if (!layout || now - startedAt < TEXT_DELAY || revealed >= layout.glyphs.length) return
       const remaining = layout.glyphs.length - revealed
-      const count = remaining > 16 ? 2 : 1
+      // 一滴带出一小组字；组内错峰连跳，既看得到因果，也不会像蜗牛。
+      const count = remaining > 14 ? 4 : remaining > 6 ? 3 : 2
       for (let i = 0; i < count && revealed < layout.glyphs.length; i++) {
-        revealTimes[revealed] = now + i * 65
+        revealTimes[revealed] = now + i * 54
         revealed++
       }
       if (revealed >= layout.glyphs.length && !readyCalled) {
@@ -171,18 +176,18 @@ export default function CodeRain({ text, onReady }) {
     }
 
     function drawBackground(w, h) {
-      ctx.fillStyle = '#020504'
+      ctx.fillStyle = '#ebe6ef'
       ctx.fillRect(0, 0, w, h)
 
       const glow = ctx.createRadialGradient(w * 0.5, h * 0.38, 0, w * 0.5, h * 0.4, Math.max(w, h) * 0.72)
-      glow.addColorStop(0, 'rgba(19, 31, 25, 0.34)')
-      glow.addColorStop(0.45, 'rgba(6, 13, 10, 0.18)')
-      glow.addColorStop(1, 'rgba(0, 0, 0, 0)')
+      glow.addColorStop(0, 'rgba(255, 250, 244, 0.78)')
+      glow.addColorStop(0.44, 'rgba(236, 228, 242, 0.44)')
+      glow.addColorStop(1, 'rgba(190, 183, 204, 0.28)')
       ctx.fillStyle = glow
       ctx.fillRect(0, 0, w, h)
 
       for (const mote of motes) {
-        ctx.fillStyle = `rgba(${INK[0]},${INK[1]},${INK[2]},${mote.a})`
+        ctx.fillStyle = `rgba(112,101,126,${mote.a * 1.4})`
         ctx.beginPath()
         ctx.arc(mote.x, mote.y, mote.r, 0, Math.PI * 2)
         ctx.fill()
@@ -202,12 +207,13 @@ export default function CodeRain({ text, onReady }) {
         ctx.font = `${drop.fontSize}px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace`
         ctx.textAlign = 'center'
         ctx.textBaseline = 'middle'
+        const ink = RAIN_INKS[drop.layer]
         for (let i = 0; i < drop.chars.length; i++) {
           const y = drop.y - i * drop.fontSize * 1.16
           if (y < -drop.fontSize || y > drop.targetY) continue
           const fade = Math.pow(1 - i / drop.chars.length, 1.55)
           const head = i === 0 ? 1.38 : 1
-          ctx.fillStyle = `rgba(${INK[0]},${INK[1]},${INK[2]},${Math.min(0.86, drop.alpha * fade * head)})`
+          ctx.fillStyle = `rgba(${ink[0]},${ink[1]},${ink[2]},${Math.min(0.72, drop.alpha * fade * head)})`
           ctx.fillText(drop.chars[i], drop.x, y)
         }
 
@@ -220,6 +226,7 @@ export default function CodeRain({ text, onReady }) {
               maxR: 32 + drop.layer * 16 + Math.random() * 38,
               speed: 34 + Math.random() * 18,
               alpha: 0.16 + drop.layer * 0.08,
+              ink: RAIN_INKS[drop.layer],
             })
             revealFromImpact(now)
           }
@@ -240,12 +247,13 @@ export default function CodeRain({ text, onReady }) {
           continue
         }
         const alpha = ripple.alpha * Math.pow(1 - progress, 1.65)
-        ctx.strokeStyle = `rgba(${INK[0]},${INK[1]},${INK[2]},${alpha})`
+        const ink = ripple.ink || RAIN_INKS[1]
+        ctx.strokeStyle = `rgba(${ink[0]},${ink[1]},${ink[2]},${alpha})`
         ctx.beginPath()
         ctx.ellipse(ripple.x, ripple.y, ripple.r, ripple.r * 0.19, 0, 0, Math.PI * 2)
         ctx.stroke()
         if (ripple.r > 12) {
-          ctx.strokeStyle = `rgba(${INK[0]},${INK[1]},${INK[2]},${alpha * 0.32})`
+          ctx.strokeStyle = `rgba(${ink[0]},${ink[1]},${ink[2]},${alpha * 0.32})`
           ctx.beginPath()
           ctx.ellipse(ripple.x, ripple.y, ripple.r * 0.58, ripple.r * 0.11, 0, 0, Math.PI * 2)
           ctx.stroke()
@@ -258,8 +266,8 @@ export default function CodeRain({ text, onReady }) {
 
       // 留给开场语的一小块“静水”，压低穿过正文的雨，不做可见卡片。
       const hush = ctx.createRadialGradient(w / 2, h * 0.4, 0, w / 2, h * 0.4, w * 0.48)
-      hush.addColorStop(0, 'rgba(1, 5, 3, 0.72)')
-      hush.addColorStop(0.72, 'rgba(1, 4, 3, 0.28)')
+      hush.addColorStop(0, 'rgba(247, 242, 249, 0.82)')
+      hush.addColorStop(0.72, 'rgba(239, 233, 244, 0.36)')
       hush.addColorStop(1, 'rgba(0, 0, 0, 0)')
       ctx.fillStyle = hush
       ctx.fillRect(0, h * 0.19, w, h * 0.43)
@@ -269,17 +277,19 @@ export default function CodeRain({ text, onReady }) {
       for (let i = 0; i < revealed; i++) {
         const glyph = layout.glyphs[i]
         const bornAt = revealTimes[i] ?? startedAt
-        const raw = Math.max(0, Math.min(1, (now - bornAt) / 560))
+        const raw = Math.max(0, Math.min(1, (now - bornAt) / 470))
         const eased = easeOutBack(raw)
-        const yOffset = (1 - eased) * -11
-        const alpha = Math.min(1, raw * 1.75) * (glyph.sub ? 0.72 : 1)
+        // 从雨窗下面被“弹”上来，轻微越过终点后落稳。
+        const yOffset = (1 - eased) * 14
+        const alpha = Math.min(1, raw * 2.1) * (glyph.sub ? 0.72 : 1)
         ctx.save()
         ctx.globalAlpha = alpha
         ctx.translate(glyph.x, glyph.y + yOffset)
-        ctx.scale(0.92 + eased * 0.08, 0.92 + eased * 0.08)
-        ctx.fillStyle = glyph.sub ? '#b8c7bd' : '#e4ece6'
-        ctx.shadowColor = 'rgba(174, 207, 187, 0.17)'
-        ctx.shadowBlur = glyph.sub ? 4 : 8
+        const scale = 0.74 + eased * 0.26
+        ctx.scale(scale, scale)
+        ctx.fillStyle = glyph.sub ? '#71677a' : '#3d3549'
+        ctx.shadowColor = 'rgba(255, 252, 255, 0.58)'
+        ctx.shadowBlur = glyph.sub ? 3 : 7
         ctx.font = `${glyph.sub ? 400 : 500} ${glyph.size}px "Noto Serif SC", "Songti SC", serif`
         ctx.fillText(glyph.ch, 0, 0)
         ctx.restore()
