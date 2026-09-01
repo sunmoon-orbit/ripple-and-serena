@@ -59,6 +59,7 @@ export default function Home({ onEnter }) {
   const [anniv, setAnniv] = useState(null)
   const [weather, setWeather] = useState(null)
   const homeStyle = useStore((s) => s.homeStyle || 'minimal')
+  const rainSound = useStore((s) => s.rainSound || 'drops')
   const avatarConfig = useStore((s) => s.avatarConfig)
   const messagesByChatId = useStore((s) => s.messagesByChatId)
   const moonMemory = useStore((s) => s.moonMemory)
@@ -144,7 +145,7 @@ export default function Home({ onEnter }) {
 
   return (
     <div className={'home-screen home-screen-rain' + (fading ? ' home-fade-out' : '')} onClick={handleEnter}>
-      <CodeRain text={rainText} />
+      <CodeRain text={rainText} soundMode={rainSound} />
       <div className="home-rain-overlay">
         <div className="home-time home-rain-time">{timeStr}</div>
         {weather && (

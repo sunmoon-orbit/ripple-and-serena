@@ -454,7 +454,7 @@ export default function Settings() {
     textReveal, setTextReveal,
     voiceCallStyle, setVoiceCallStyle,
     vcBackground, setVcBackground,
-    homeStyle, setHomeStyle,
+    homeStyle, setHomeStyle, rainSound, setRainSound,
     randomTool, setRandomTool,
     timeAwareness, setTimeAwareness, longingPush, setLongingPush, proactiveCall, setProactiveCall,
     ringtone, setRingtone,
@@ -1482,6 +1482,22 @@ export default function Settings() {
                   </div>
                 </div>
                 <p className="card-hint">涟漪代码雨：代码字符从天空落下，落到水面泛起涟漪，涟漪聚成文字。纪念卡：两个人的头像、在一起的天数、消息数、纪念日倒数。</p>
+                {homeStyle !== 'couple' && (
+                  <div className="card-row">
+                    <span className="card-row-label">代码雨的声音</span>
+                    <div className="avatar-mode-toggle">
+                      <button
+                        className={'avatar-mode-btn' + ((rainSound || 'drops') === 'drops' ? ' active' : '')}
+                        onClick={() => setRainSound('drops')}
+                      >雨滴咚咚</button>
+                      <button
+                        className={'avatar-mode-btn' + (rainSound === 'ambience' ? ' active' : '')}
+                        onClick={() => setRainSound('ambience')}
+                      >窗外雨声</button>
+                    </div>
+                  </div>
+                )}
+                {homeStyle !== 'couple' && <p className="card-hint">咚咚会跟随每颗雨滴的落点；窗外雨声是一层柔和、连续的白噪音雨幕。</p>}
               </div>
             </Section>
             <Section title="抽签工具">

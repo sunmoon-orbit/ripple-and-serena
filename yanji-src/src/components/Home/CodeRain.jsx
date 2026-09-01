@@ -23,7 +23,7 @@ function easeOutBack(t) {
   return 1 + c3 * Math.pow(t - 1, 3) + c1 * Math.pow(t - 1, 2)
 }
 
-export default function CodeRain({ text, onReady }) {
+export default function CodeRain({ text, onReady, soundMode = 'drops' }) {
   const canvasRef = useRef(null)
 
   useEffect(() => {
@@ -49,10 +49,41 @@ export default function CodeRain({ text, onReady }) {
     const AudioContext = window.AudioContext || window.webkitAudioContext
     const audio = AudioContext && !reduceMotion ? new AudioContext() : null
     const master = audio?.createGain()
+    let rainBed = null
     if (master) {
       master.gain.value = 0.32
       master.connect(audio.destination)
       audio.resume().catch(() => {})
+    }
+
+    if (audio && master && soundMode === 'ambience') {
+      // 两秒一循环的柔和噪声，经高低通削掉刺耳高频与闷重低频，像隔窗听雨。
+      const length = Math.max(1, Math.floor(audio.sampleRate * 2))
+      const buffer = audio.createBuffer(1, length, audio.sampleRate)
+      const channel = buffer.getChannelData(0)
+      let brown = 0
+      for (let i = 0; i < length; i++) {
+        const white = Math.random() * 2 - 1
+        brown = (brown + 0.028 * white) / 1.028
+        channel[i] = brown * 3.2 + white * 0.11
+      }
+      const source = audio.createBufferSource()
+      const highpass = audio.createBiquadFilter()
+      const lowpass = audio.createBiquadFilter()
+      const gain = audio.createGain()
+      source.buffer = buffer
+      source.loop = true
+      highpass.type = 'highpass'
+      highpass.frequency.value = 260
+      lowpass.type = 'lowpass'
+      lowpass.frequency.value = 3900
+      gain.gain.value = 0.12
+      source.connect(highpass)
+      highpass.connect(lowpass)
+      lowpass.connect(gain)
+      gain.connect(master)
+      source.start()
+      rainBed = { source, highpass, lowpass, gain }
     }
 
     function resumeAudio() {
@@ -60,7 +91,7 @@ export default function CodeRain({ text, onReady }) {
     }
 
     function playDropSound(layer, x, w, now) {
-      if (!audio || !master || audio.state !== 'running') return
+      if (soundMode !== 'drops' || !audio || !master || audio.state !== 'running') return
       // 留一点空气，不让密集雨滴变成连续的电子提示音。
       const minGap = layer === 2 ? 92 : 128
       if (now - lastSoundAt < minGap || Math.random() > (layer === 2 ? 0.82 : 0.58)) return
@@ -396,9 +427,16 @@ export default function CodeRain({ text, onReady }) {
       cancelAnimationFrame(raf)
       window.removeEventListener('resize', resize)
       window.removeEventListener('pointerdown', resumeAudio)
+      if (rainBed) {
+        try { rainBed.source.stop() } catch {}
+        rainBed.source.disconnect()
+        rainBed.highpass.disconnect()
+        rainBed.lowpass.disconnect()
+        rainBed.gain.disconnect()
+      }
       audio?.close().catch(() => {})
     }
-  }, [text, onReady])
+  }, [text, onReady, soundMode])
 
   return <canvas ref={canvasRef} className="coderain-canvas" />
 }
