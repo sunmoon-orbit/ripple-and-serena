@@ -15,24 +15,31 @@ import Roost from './components/Roost'
 import Toast from './components/Toast'
 import MiniPlayer from './components/Chat/MiniPlayer'
 
-function Splash({ onDone }) {
+function Splash({ onDone, labelOnly = false }) {
   const [fading, setFading] = useState(false)
   useEffect(() => {
-    const t1 = setTimeout(() => setFading(true), 1400)
-    const t2 = setTimeout(onDone, 1900)
+    // 代码雨本身已经是一套完整动画，只留一个短促的品牌落款；
+    // 纪念卡开场仍保留原来的小鸟描边动画。
+    const t1 = setTimeout(() => setFading(true), labelOnly ? 720 : 1400)
+    const t2 = setTimeout(onDone, labelOnly ? 1120 : 1900)
     return () => { clearTimeout(t1); clearTimeout(t2) }
-  }, [])
+  }, [labelOnly])
   return (
-    <div className={'splash' + (fading ? ' fade-out' : '')}>
-      <svg className="splash-bird" width="72" height="72" viewBox="0 0 64 64" fill="none" stroke="var(--accent)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-        <path className="splash-path" d="M8 40 C8 40 14 18 32 16 C44 14 52 22 50 34 C48 46 38 52 26 48" strokeDasharray="200" />
-        <path className="splash-path" d="M50 34 L60 28 L54 38" style={{ animationDelay: '0.3s' }} strokeDasharray="200" />
-        <path className="splash-path" d="M26 48 L22 58" style={{ animationDelay: '0.5s' }} strokeDasharray="80" />
-        <path className="splash-path" d="M32 48 L30 58" style={{ animationDelay: '0.55s' }} strokeDasharray="80" />
-        <circle cx="42" cy="22" r="2" fill="var(--accent)" stroke="none" style={{ opacity: 0, animation: 'splashFadeIn 0.3s ease 0.7s forwards' }} />
-        <path className="splash-path" d="M8 40 L2 38" style={{ animationDelay: '0.6s' }} strokeDasharray="40" />
-      </svg>
-      <span className="splash-label">言叽</span>
+    <div className={'splash' + (labelOnly ? ' splash-label-only' : '') + (fading ? ' fade-out' : '')}>
+      {!labelOnly && (
+        <svg className="splash-bird" width="72" height="72" viewBox="0 0 64 64" fill="none" stroke="var(--accent)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <path className="splash-path" d="M8 40 C8 40 14 18 32 16 C44 14 52 22 50 34 C48 46 38 52 26 48" strokeDasharray="200" />
+          <path className="splash-path" d="M50 34 L60 28 L54 38" style={{ animationDelay: '0.3s' }} strokeDasharray="200" />
+          <path className="splash-path" d="M26 48 L22 58" style={{ animationDelay: '0.5s' }} strokeDasharray="80" />
+          <path className="splash-path" d="M32 48 L30 58" style={{ animationDelay: '0.55s' }} strokeDasharray="80" />
+          <circle cx="42" cy="22" r="2" fill="var(--accent)" stroke="none" style={{ opacity: 0, animation: 'splashFadeIn 0.3s ease 0.7s forwards' }} />
+          <path className="splash-path" d="M8 40 L2 38" style={{ animationDelay: '0.6s' }} strokeDasharray="40" />
+        </svg>
+      )}
+      <span
+        className="splash-label"
+        style={labelOnly ? { fontWeight: 500, letterSpacing: '0.18em', animation: 'splashFadeIn 0.52s ease forwards' } : undefined}
+      >言叽</span>
     </div>
   )
 }
@@ -44,6 +51,7 @@ export default function App() {
   const widgetBackgroundStyle = useStore((s) => s.widgetBackgroundStyle || 'solid')
   const avatarSize = useStore((s) => s.avatarConfig?.size || 28)
   const ringtone = useStore((s) => s.ringtone)
+  const homeStyle = useStore((s) => s.homeStyle || 'minimal')
   const avatarConfig = useStore((s) => s.avatarConfig)
   const [showSplash, setShowSplash] = useState(true)
   const [showHome, setShowHome] = useState(false)
@@ -161,7 +169,7 @@ export default function App() {
     <>
       {/* 开屏动画的定时器跑完会把进入页推上来——从通知栏进来的那次要跳过，
           否则刚被送进对话页又被盖回去 */}
-      {showSplash && <Splash onDone={() => { setShowSplash(false); setShowHome(!fromNativeRef.current) }} />}
+      {showSplash && <Splash labelOnly={homeStyle === 'minimal'} onDone={() => { setShowSplash(false); setShowHome(!fromNativeRef.current) }} />}
       {showHome && <Home onEnter={() => setShowHome(false)} />}
       <div className="app-shell" style={(showSplash || showHome) ? { visibility: 'hidden', pointerEvents: 'none' } : undefined}>
         <IconNav />
