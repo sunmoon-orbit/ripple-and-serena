@@ -532,20 +532,19 @@ input, textarea, select { font-family: inherit; font-size: 15px; color: var(--in
 .feather-svg {
   width: 52px; height: 52px; color: var(--ink); display: block;
   overflow: visible;
-  filter: drop-shadow(0 4px 5px color-mix(in srgb, var(--ink) 12%, transparent));
+  filter: drop-shadow(0 2px 3px color-mix(in srgb, var(--ink) 8%, transparent));
   /* 触水化开：落地一瞬向下塌成一滴液体，融进水面 */
   transform-origin: 50% 100%;
   animation: feather-melt 0.55s ease-in 2.3s forwards;
 }
 .feather-vane { filter: blur(0.18px); }
 .feather-fibres {
-  stroke-width: 1.55;
-  opacity: 0.72;
+  stroke-width: 0.72;
+  opacity: 0.28;
 }
-.feather-fibres path:first-child { opacity: 0.82; }
-.feather-fibres path:last-child { opacity: 0.58; stroke-width: 1.35; }
-.feather-shaft { stroke-width: 2.05; opacity: 0.9; }
-.feather-shine { stroke-width: 0.55; opacity: 0.46; }
+.feather-fibres path:first-child { opacity: 0.38; }
+.feather-shaft { stroke-width: 1.45; opacity: 0.7; }
+.feather-shine { stroke-width: 0.42; opacity: 0.3; }
 
 @keyframes feather-fall {
   0%   { transform: translateY(-58vh); }

@@ -1,5 +1,5 @@
 // 一根羽毛（内联 SVG，开屏和密码门共用同一根——开屏飘落的就是门口躺着的这根）
-// 不再用一整块实心剪影：淡羽片托底，羽轴与一束束羽枝叠出柔软的纤维感。
+// 一根柔软的小羽毛：不画整排羽枝，避免变成叶脉或鱼骨。
 export default function Feather({ className }) {
   return (
     <svg className={className} viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
@@ -10,20 +10,19 @@ export default function Feather({ className }) {
           <stop offset="1" stopColor="currentColor" stopOpacity="0.15" />
         </linearGradient>
       </defs>
-      {/* 一层很薄的羽片底色，边缘刻意留出几处细小缺口。 */}
+      {/* 不对称的薄羽片，轮廓留几处天然的小豁口。 */}
       <path
         className="feather-vane"
-        d="M53.8 6.8C43.2 5.7 29.1 14.8 20 27.1c-5.6 7.6-9.6 16.3-9.5 24.8.1 2.2.7 3.4 1.8 3.5 7.7.7 17.2-3 25-8.1 12.4-8.1 19.5-21.2 19.2-34.4-.1-3.3-.9-4.3-2.7-4.1Z"
+        d="M53.4 7.1c-8.7-1.2-20 5.3-28.5 15.1-7.4 8.5-12 18-13.4 28.2-.4 2.7-.1 4.3.9 4.7 2.1.8 7.7-.9 13.9-4.4l-3.2-.1c5-2.6 8.8-5.2 12.3-8.5l-3.1.8c4.1-3.5 7.7-7.8 10.6-12.3l-2.5 1.1c4-5.7 6.2-10.8 7.4-15.5l-1.8 1.5c2.2-4.9 1.5-9.9-2.6-10.6Z"
         fill="url(#feather-wash)"
       />
-      <g className="feather-fibres" fill="none" stroke="currentColor" strokeLinecap="round">
-        {/* 羽枝并非严格对称，长短和透明度略有变化才像自然生长。 */}
-        <path d="M46.8 13.7 35.4 16.2M43.5 17.4 29.7 21M39.7 21.5 25.4 25.8M35.8 25.7 21.3 30.8M31.9 30 17.9 35.9M27.8 34.5 15.2 40.7M23.8 39 12.9 45.2" />
-        <path d="M49.1 15.2 51.6 24.5M45.4 19.1 48.8 30M41.7 23.1 45.1 35.1M37.8 27.3 40.6 39.8M33.8 31.5 36 44M29.7 36 31 47.8M25.4 40.7 25.7 50.6" />
+      <g className="feather-fibres" fill="none" stroke="var(--bg, #fff)" strokeLinecap="round">
+        {/* 只露三缕弯曲的纤维，像光从羽片间透过去。 */}
+        <path d="M38.8 20.4c-4.7 1.1-8.8 3-12.5 5.5M31.2 29.4c-4.5 1.7-8.2 4-11.4 7M24.6 38.5c-3.1 1.7-5.7 3.7-7.8 5.9" />
       </g>
       {/* 羽轴和尾杆是一条连续的、略带粗细变化的曲线。 */}
-      <path className="feather-shaft" d="M52 10.2C42.4 20.2 31 33.1 12.2 54.8L7.4 59.4" fill="none" stroke="currentColor" strokeLinecap="round" />
-      <path className="feather-shine" d="M49.8 12.3C39.8 22.9 28.2 36.3 14.2 52.4" fill="none" stroke="var(--bg, #fff)" strokeLinecap="round" />
+      <path className="feather-shaft" d="M51.5 10.4C42.1 20.4 31 33.4 12.3 54.8l-4.9 4.6" fill="none" stroke="currentColor" strokeLinecap="round" />
+      <path className="feather-shine" d="M49.4 12.8C39.7 23.2 28.2 36.4 14.3 52.5" fill="none" stroke="var(--bg, #fff)" strokeLinecap="round" />
     </svg>
   )
 }

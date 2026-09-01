@@ -312,28 +312,34 @@ export default function StarMapPanel() {
           if (x < -20 || x > W + 20 || y < -20 || y > H + 20) continue
           const twinkle = 0.72 + 0.28 * Math.sin(t / (1050 + (i % 7) * 90) + p.phase)
           const hierarchy = Math.min(2.6, Math.log2(1 + (p.degree || 0)) * 0.28)
-          const coreIn = smoothstep(0, 0.38, reveal)
-          const bodyIn = smoothstep(0.12, 0.72, reveal)
-          const haloIn = smoothstep(0.42, 1, reveal)
+          const coreIn = smoothstep(0, 0.44, reveal)
+          const glowIn = smoothstep(0.16, 1, reveal)
           // 轻微越界再回落，像星体被“点亮”，而不是普通透明度淡入。
           const bloom = 1 + Math.sin(reveal * Math.PI) * 0.16
           const r = Math.max(1.05, (1.15 + p.importance * 0.28 + hierarchy) * Math.sqrt(k)) * (i === hover ? 1.55 : 1)
           const c = colorOf(p.type)
           const prominent = p.pinned || p.importance >= 8 || p.degree >= 7 || i === hover
-          // 每颗记忆都有柔光，重要节点再多一层大范围 bloom。
-          ctx.globalAlpha = (prominent ? 0.14 : 0.065) * twinkle * haloIn
-          ctx.fillStyle = c
-          ctx.beginPath(); ctx.arc(x, y, r * (prominent ? 4.8 : 2.8) * bloom, 0, Math.PI * 2); ctx.fill()
+          // 一颗连续的同色光点：没有白芯、实色圆和外圈三层结构。
+          // 重要节点只扩大柔光，并添一缕极淡星芒。
+          const glowR = r * (prominent ? 4.2 : 2.85) * bloom
+          const star = ctx.createRadialGradient(x, y, 0, x, y, glowR)
+          star.addColorStop(0, c + 'F2')
+          star.addColorStop(0.1, c + 'D8')
+          star.addColorStop(0.36, c + (prominent ? '72' : '64'))
+          star.addColorStop(0.7, c + (prominent ? '24' : '18'))
+          star.addColorStop(1, c + '00')
+          ctx.globalAlpha = twinkle * glowIn * coreIn
+          ctx.fillStyle = star
+          ctx.beginPath(); ctx.arc(x, y, glowR, 0, Math.PI * 2); ctx.fill()
           if (prominent) {
-            ctx.globalAlpha = 0.18 * twinkle * haloIn
-            ctx.beginPath(); ctx.arc(x, y, r * 2.25 * bloom, 0, Math.PI * 2); ctx.fill()
+            const ray = ctx.createLinearGradient(x, y - r * 3.2, x, y + r * 3.2)
+            ray.addColorStop(0, c + '00')
+            ray.addColorStop(0.5, c + '46')
+            ray.addColorStop(1, c + '00')
+            ctx.globalAlpha = 0.42 * twinkle * glowIn
+            ctx.fillStyle = ray
+            ctx.fillRect(x - 0.35, y - r * 3.2, 0.7, r * 6.4)
           }
-          ctx.globalAlpha = 0.88 * twinkle * bodyIn
-          ctx.fillStyle = c
-          ctx.beginPath(); ctx.arc(x, y, r * (0.72 + bodyIn * 0.28), 0, Math.PI * 2); ctx.fill()
-          ctx.globalAlpha = 0.72 * twinkle * coreIn
-          ctx.fillStyle = '#ffffff'
-          ctx.beginPath(); ctx.arc(x - r * 0.18, y - r * 0.18, Math.max(0.45, r * 0.34) * coreIn, 0, Math.PI * 2); ctx.fill()
           ctx.globalAlpha = 1
         }
         ctx.globalCompositeOperation = 'source-over'
