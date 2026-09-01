@@ -265,10 +265,11 @@ export default function CodeRain({ text, onReady }) {
       if (!layout) layout = layoutText(w, h)
 
       // 留给开场语的一小块“静水”，压低穿过正文的雨，不做可见卡片。
-      const hush = ctx.createRadialGradient(w / 2, h * 0.4, 0, w / 2, h * 0.4, w * 0.48)
-      hush.addColorStop(0, 'rgba(247, 242, 249, 0.82)')
-      hush.addColorStop(0.72, 'rgba(239, 233, 244, 0.36)')
-      hush.addColorStop(1, 'rgba(0, 0, 0, 0)')
+      const hush = ctx.createRadialGradient(w / 2, h * 0.4, 0, w / 2, h * 0.4, w * 0.56)
+      hush.addColorStop(0, 'rgba(247, 242, 249, 0.68)')
+      hush.addColorStop(0.68, 'rgba(239, 233, 244, 0.24)')
+      // 必须用同色透明；透明黑在部分 Android WebView 会插值出一圈灰色脏边。
+      hush.addColorStop(1, 'rgba(239, 233, 244, 0)')
       ctx.fillStyle = hush
       ctx.fillRect(0, h * 0.19, w, h * 0.43)
 
