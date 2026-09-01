@@ -540,6 +540,16 @@ input, textarea, select { font-family: inherit; font-size: 15px; color: var(--in
 .feather-vane { filter: blur(0.1px); }
 .feather-shaft { stroke-width: 1.65; opacity: 0.84; }
 .feather-shine { stroke-width: 0.48; opacity: 0.34; }
+.feather-body {
+  transform-box: fill-box;
+  transform-origin: 13% 88%;
+  animation: feather-flex 0.92s ease-in-out infinite alternate;
+}
+@keyframes feather-flex {
+  0% { transform: skewX(-1.8deg) scaleX(0.985); }
+  55% { transform: skewX(1.2deg) scaleX(1.008); }
+  100% { transform: skewX(2.6deg) scaleX(1.018); }
+}
 
 @keyframes feather-fall {
   0%   { transform: translateY(-58vh); }

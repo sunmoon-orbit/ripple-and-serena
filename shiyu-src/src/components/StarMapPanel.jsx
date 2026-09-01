@@ -313,31 +313,14 @@ export default function StarMapPanel() {
           const twinkle = 0.72 + 0.28 * Math.sin(t / (1050 + (i % 7) * 90) + p.phase)
           const hierarchy = Math.min(2.6, Math.log2(1 + (p.degree || 0)) * 0.28)
           const coreIn = smoothstep(0, 0.44, reveal)
-          const glowIn = smoothstep(0.16, 1, reveal)
-          // 轻微越界再回落，像星体被“点亮”，而不是普通透明度淡入。
-          const bloom = 1 + Math.sin(reveal * Math.PI) * 0.16
           const r = Math.max(1.05, (1.15 + p.importance * 0.28 + hierarchy) * Math.sqrt(k)) * (i === hover ? 1.55 : 1)
           const c = colorOf(p.type)
-          const prominent = p.pinned || p.importance >= 8 || p.degree >= 7 || i === hover
-          // 清晰的同色星点，用 shadowBlur 只添一圈克制柔光；不再铺大块雾状渐变。
+          // 清晰的同色星点。手机 Canvas 的逐星 shadowBlur 很昂贵，也会把星群画糊，
+          // 因此只用实体大小与透明度表达层级，不再添加十字星芒或逐星模糊。
           const starR = r * (0.68 + coreIn * 0.32)
-          ctx.save()
           ctx.globalAlpha = (0.78 + twinkle * 0.22) * coreIn
           ctx.fillStyle = c
-          ctx.shadowColor = c
-          ctx.shadowBlur = (prominent ? 7 : 3.5) * glowIn * Math.sqrt(k)
           ctx.beginPath(); ctx.arc(x, y, starR, 0, Math.PI * 2); ctx.fill()
-          if (prominent) {
-            ctx.shadowBlur = 0
-            ctx.globalAlpha = 0.28 * twinkle * glowIn
-            ctx.strokeStyle = c
-            ctx.lineWidth = 0.65
-            ctx.beginPath()
-            ctx.moveTo(x, y - r * 2.25); ctx.lineTo(x, y + r * 2.25)
-            ctx.moveTo(x - r * 1.45, y); ctx.lineTo(x + r * 1.45, y)
-            ctx.stroke()
-          }
-          ctx.restore()
           ctx.globalAlpha = 1
         }
         ctx.globalCompositeOperation = 'source-over'
@@ -358,10 +341,15 @@ export default function StarMapPanel() {
       }
     }
 
+    let lastDraw = 0
     function loop(t) {
       if (!running) return
       stepPhysics(t)
-      draw(t)
+      // 约 30fps 已足够承载轻微闪烁和拖动，同时把手机端 Canvas 压力减半。
+      if (t - lastDraw >= 32) {
+        draw(t)
+        lastDraw = t
+      }
       raf = requestAnimationFrame(loop)
     }
     raf = requestAnimationFrame(loop)

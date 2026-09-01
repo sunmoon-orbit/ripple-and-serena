@@ -10,6 +10,7 @@ export default function Feather({ className }) {
           <stop offset="1" stopColor="currentColor" stopOpacity="0.46" />
         </linearGradient>
       </defs>
+      <g className="feather-body">
       {/* 宽而不对称的羽片，轮廓上的折点是自然分开的羽绒。 */}
       <path
         className="feather-vane"
@@ -19,6 +20,7 @@ export default function Feather({ className }) {
       {/* 羽轴和尾杆是一条连续的、略带粗细变化的曲线。 */}
       <path className="feather-shaft" d="M51.5 10.4C42.1 20.4 31 33.4 12.3 54.8l-4.9 4.6" fill="none" stroke="currentColor" strokeLinecap="round" />
       <path className="feather-shine" d="M49.4 12.8C39.7 23.2 28.2 36.4 14.3 52.5" fill="none" stroke="var(--bg, #fff)" strokeLinecap="round" />
+      </g>
     </svg>
   )
 }
