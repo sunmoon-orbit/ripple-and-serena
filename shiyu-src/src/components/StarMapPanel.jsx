@@ -24,6 +24,20 @@ const DUST_COUNT = 180
 
 function colorOf(type) { return TYPE_COLORS[type] || OTHER_COLOR }
 
+function clamp01(n) { return Math.max(0, Math.min(1, n)) }
+function smoothstep(from, to, n) {
+  const p = clamp01((n - from) / (to - from))
+  return p * p * (3 - 2 * p)
+}
+
+// 重要记忆先醒来，日常记忆随后铺满夜空；同一层内用稳定的小错峰避免机械齐亮。
+function revealDelay(node) {
+  if (node.pinned) return seeded(node.id, 71) * 90
+  const importance = Number(node.importance) || 0
+  const wave = importance >= 9 ? 0 : importance >= 7 ? 260 : importance >= 5 ? 610 : importance >= 3 ? 960 : 1290
+  return wave + seeded(node.id, 72) * 230
+}
+
 // ── 背景星座（真实星座连线的简化版，视口坐标 0~1，配合视差绘制）──
 // 双鱼座 = 阿颖（生日星座）；天秤座 = 涟言（2025-10-10 相遇日）；乌鸦座 = Corvus，真实存在的乌鸦星座
 const ASTERISMS = [
@@ -101,7 +115,11 @@ export default function StarMapPanel() {
         idx.set(n.id, i)
         const a = seeded(n.id, 1) * Math.PI * 2
         const r = Math.sqrt(seeded(n.id, 2)) * R
-        return { ...n, x: Math.cos(a) * r, y: Math.sin(a) * r, vx: 0, vy: 0, phase: seeded(n.id, 3) * Math.PI * 2 }
+        return {
+          ...n, x: Math.cos(a) * r, y: Math.sin(a) * r, vx: 0, vy: 0,
+          phase: seeded(n.id, 3) * Math.PI * 2,
+          revealDelay: revealDelay(n),
+        }
       })
       const edges = g.edges
         .map(([a, b, s]) => ({ a: idx.get(a), b: idx.get(b), s }))
@@ -265,7 +283,9 @@ export default function StarMapPanel() {
 
       const world = worldRef.current
       const { nodes, edges } = world
-      const reveal = world.settled ? Math.min(1, Math.max(0, (t - world.revealStart) / 900)) : 0
+      const reducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
+      const elapsed = world.settled ? t - world.revealStart : -1
+      const revealOf = (node) => reducedMotion ? (world.settled ? 1 : 0) : clamp01((elapsed - node.revealDelay) / 520)
       if (nodes.length) {
         // ── 连线 ──
         const hover = hoverRef.current
@@ -277,7 +297,8 @@ export default function StarMapPanel() {
           if ((ax < -50 && bx2 < -50) || (ax > W + 50 && bx2 > W + 50)) continue
           if ((ay < -50 && by2 < -50) || (ay > H + 50 && by2 > H + 50)) continue
           const isHoverEdge = hover != null && (e.a === hover || e.b === hover)
-          const alpha = (isHoverEdge ? 0.42 : 0.018 + Math.max(0, e.s - 0.55) * 0.24) * reveal
+          const edgeReveal = Math.min(revealOf(a), revealOf(b))
+          const alpha = (isHoverEdge ? 0.42 : 0.018 + Math.max(0, e.s - 0.55) * 0.24) * edgeReveal
           ctx.strokeStyle = `rgba(125,158,215,${Math.min(0.42, alpha)})`
           ctx.beginPath(); ctx.moveTo(ax, ay); ctx.lineTo(bx2, by2); ctx.stroke()
         }
@@ -285,32 +306,39 @@ export default function StarMapPanel() {
         ctx.globalCompositeOperation = 'lighter'
         for (let i = 0; i < nodes.length; i++) {
           const p = nodes[i]
+          const reveal = revealOf(p)
+          if (reveal <= 0) continue
           const x = cx + p.x * k, y = cy + p.y * k
           if (x < -20 || x > W + 20 || y < -20 || y > H + 20) continue
           const twinkle = 0.72 + 0.28 * Math.sin(t / (1050 + (i % 7) * 90) + p.phase)
           const hierarchy = Math.min(2.6, Math.log2(1 + (p.degree || 0)) * 0.28)
+          const coreIn = smoothstep(0, 0.38, reveal)
+          const bodyIn = smoothstep(0.12, 0.72, reveal)
+          const haloIn = smoothstep(0.42, 1, reveal)
+          // 轻微越界再回落，像星体被“点亮”，而不是普通透明度淡入。
+          const bloom = 1 + Math.sin(reveal * Math.PI) * 0.16
           const r = Math.max(1.05, (1.15 + p.importance * 0.28 + hierarchy) * Math.sqrt(k)) * (i === hover ? 1.55 : 1)
           const c = colorOf(p.type)
           const prominent = p.pinned || p.importance >= 8 || p.degree >= 7 || i === hover
           // 每颗记忆都有柔光，重要节点再多一层大范围 bloom。
-          ctx.globalAlpha = (prominent ? 0.14 : 0.065) * twinkle * reveal
+          ctx.globalAlpha = (prominent ? 0.14 : 0.065) * twinkle * haloIn
           ctx.fillStyle = c
-          ctx.beginPath(); ctx.arc(x, y, r * (prominent ? 4.8 : 2.8), 0, Math.PI * 2); ctx.fill()
+          ctx.beginPath(); ctx.arc(x, y, r * (prominent ? 4.8 : 2.8) * bloom, 0, Math.PI * 2); ctx.fill()
           if (prominent) {
-            ctx.globalAlpha = 0.18 * twinkle * reveal
-            ctx.beginPath(); ctx.arc(x, y, r * 2.25, 0, Math.PI * 2); ctx.fill()
+            ctx.globalAlpha = 0.18 * twinkle * haloIn
+            ctx.beginPath(); ctx.arc(x, y, r * 2.25 * bloom, 0, Math.PI * 2); ctx.fill()
           }
-          ctx.globalAlpha = 0.88 * twinkle * reveal
+          ctx.globalAlpha = 0.88 * twinkle * bodyIn
           ctx.fillStyle = c
-          ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill()
-          ctx.globalAlpha = 0.72 * twinkle * reveal
+          ctx.beginPath(); ctx.arc(x, y, r * (0.72 + bodyIn * 0.28), 0, Math.PI * 2); ctx.fill()
+          ctx.globalAlpha = 0.72 * twinkle * coreIn
           ctx.fillStyle = '#ffffff'
-          ctx.beginPath(); ctx.arc(x - r * 0.18, y - r * 0.18, Math.max(0.45, r * 0.34), 0, Math.PI * 2); ctx.fill()
+          ctx.beginPath(); ctx.arc(x - r * 0.18, y - r * 0.18, Math.max(0.45, r * 0.34) * coreIn, 0, Math.PI * 2); ctx.fill()
           ctx.globalAlpha = 1
         }
         ctx.globalCompositeOperation = 'source-over'
         // hover 标题
-        if (reveal > 0.85 && hover != null && nodes[hover]) {
+        if (hover != null && nodes[hover] && revealOf(nodes[hover]) > 0.85) {
           const p = nodes[hover]
           const x = cx + p.x * k, y = cy + p.y * k
           ctx.font = '12px system-ui'
