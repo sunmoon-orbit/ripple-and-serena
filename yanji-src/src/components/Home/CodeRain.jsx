@@ -41,7 +41,71 @@ export default function CodeRain({ text, onReady }) {
     let readyCalled = false
     const startedAt = performance.now()
     let lastAt = startedAt
+    let lastSoundAt = 0
     let raf
+
+    // 雨滴声直接用 Web Audio 合成，避免额外下载音频，也能让音高与落点同步。
+    // 原生壳允许媒体自动播放；普通浏览器若拦截，则在第一次触碰后安静恢复。
+    const AudioContext = window.AudioContext || window.webkitAudioContext
+    const audio = AudioContext && !reduceMotion ? new AudioContext() : null
+    const master = audio?.createGain()
+    if (master) {
+      master.gain.value = 0.32
+      master.connect(audio.destination)
+      audio.resume().catch(() => {})
+    }
+
+    function resumeAudio() {
+      if (audio?.state === 'suspended') audio.resume().catch(() => {})
+    }
+
+    function playDropSound(layer, x, w, now) {
+      if (!audio || !master || audio.state !== 'running') return
+      // 留一点空气，不让密集雨滴变成连续的电子提示音。
+      const minGap = layer === 2 ? 92 : 128
+      if (now - lastSoundAt < minGap || Math.random() > (layer === 2 ? 0.82 : 0.58)) return
+      lastSoundAt = now
+
+      const at = audio.currentTime
+      const base = [760, 610, 470][layer] * (0.9 + Math.random() * 0.2)
+      const pan = Math.max(-0.72, Math.min(0.72, (x / Math.max(1, w)) * 1.44 - 0.72))
+      const voice = audio.createGain()
+      const panner = audio.createStereoPanner?.()
+      if (panner) {
+        panner.pan.value = pan
+        voice.connect(panner)
+        panner.connect(master)
+      } else {
+        voice.connect(master)
+      }
+
+      voice.gain.setValueAtTime(0.0001, at)
+      voice.gain.exponentialRampToValueAtTime(0.042 + layer * 0.009, at + 0.008)
+      voice.gain.exponentialRampToValueAtTime(0.0001, at + 0.18 + layer * 0.025)
+
+      // 主音向下滑，像一滴水轻轻碰到水面；一丝高泛音补出清亮的边缘。
+      ;[
+        { ratio: 1, volume: 1, duration: 0.2 },
+        { ratio: 1.72, volume: 0.2, duration: 0.1 },
+      ].forEach(({ ratio, volume, duration }) => {
+        const osc = audio.createOscillator()
+        const partial = audio.createGain()
+        osc.type = 'sine'
+        osc.frequency.setValueAtTime(base * ratio, at)
+        osc.frequency.exponentialRampToValueAtTime(base * ratio * 0.58, at + duration)
+        partial.gain.value = volume
+        osc.connect(partial)
+        partial.connect(voice)
+        osc.start(at)
+        osc.stop(at + duration + 0.02)
+      })
+
+      // 等尾音结束再断开短命节点，避免长时间开屏积攒连接。
+      window.setTimeout(() => {
+        voice.disconnect()
+        panner?.disconnect()
+      }, 280)
+    }
 
     const W = () => cvs.width / dpr
     const H = () => cvs.height / dpr
@@ -228,6 +292,7 @@ export default function CodeRain({ text, onReady }) {
               alpha: 0.16 + drop.layer * 0.08,
               ink: RAIN_INKS[drop.layer],
             })
+            playDropSound(drop.layer, drop.x, w, now)
             revealFromImpact(now)
           }
           Object.assign(drop, makeDrop(w, h, false))
@@ -324,11 +389,14 @@ export default function CodeRain({ text, onReady }) {
 
     resize()
     window.addEventListener('resize', resize)
+    window.addEventListener('pointerdown', resumeAudio, { passive: true })
     raf = requestAnimationFrame(frame)
 
     return () => {
       cancelAnimationFrame(raf)
       window.removeEventListener('resize', resize)
+      window.removeEventListener('pointerdown', resumeAudio)
+      audio?.close().catch(() => {})
     }
   }, [text, onReady])
 
