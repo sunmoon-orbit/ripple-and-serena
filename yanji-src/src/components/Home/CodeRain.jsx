@@ -1,4 +1,5 @@
 import { useRef, useEffect } from 'react'
+import rainWindowUrl from '../../assets/rain-on-window-cc0.mp3'
 
 // 涟漪代码雨开屏 v3：
 // - 每帧重绘明确的字符尾迹，不再靠半透明画布把单字糊成长柱；
@@ -47,47 +48,25 @@ export default function CodeRain({ text, onReady, soundMode = 'drops' }) {
     // 雨滴声直接用 Web Audio 合成，避免额外下载音频，也能让音高与落点同步。
     // 原生壳允许媒体自动播放；普通浏览器若拦截，则在第一次触碰后安静恢复。
     const AudioContext = window.AudioContext || window.webkitAudioContext
-    const audio = AudioContext && !reduceMotion ? new AudioContext() : null
+    const audio = AudioContext && !reduceMotion && soundMode === 'drops' ? new AudioContext() : null
     const master = audio?.createGain()
-    let rainBed = null
+    const rainBed = !reduceMotion && soundMode === 'ambience' ? new Audio(rainWindowUrl) : null
     if (master) {
       master.gain.value = 0.32
       master.connect(audio.destination)
       audio.resume().catch(() => {})
     }
 
-    if (audio && master && soundMode === 'ambience') {
-      // 两秒一循环的柔和噪声，经高低通削掉刺耳高频与闷重低频，像隔窗听雨。
-      const length = Math.max(1, Math.floor(audio.sampleRate * 2))
-      const buffer = audio.createBuffer(1, length, audio.sampleRate)
-      const channel = buffer.getChannelData(0)
-      let brown = 0
-      for (let i = 0; i < length; i++) {
-        const white = Math.random() * 2 - 1
-        brown = (brown + 0.028 * white) / 1.028
-        channel[i] = brown * 3.2 + white * 0.11
-      }
-      const source = audio.createBufferSource()
-      const highpass = audio.createBiquadFilter()
-      const lowpass = audio.createBiquadFilter()
-      const gain = audio.createGain()
-      source.buffer = buffer
-      source.loop = true
-      highpass.type = 'highpass'
-      highpass.frequency.value = 260
-      lowpass.type = 'lowpass'
-      lowpass.frequency.value = 3900
-      gain.gain.value = 0.12
-      source.connect(highpass)
-      highpass.connect(lowpass)
-      lowpass.connect(gain)
-      gain.connect(master)
-      source.start()
-      rainBed = { source, highpass, lowpass, gain }
+    if (rainBed) {
+      // 真实的轻雨打在天窗上（CC0）；原生壳允许自动播放，浏览器则在首次触碰后恢复。
+      rainBed.loop = true
+      rainBed.volume = 0.28
+      rainBed.play().catch(() => {})
     }
 
     function resumeAudio() {
       if (audio?.state === 'suspended') audio.resume().catch(() => {})
+      if (rainBed?.paused) rainBed.play().catch(() => {})
     }
 
     function playDropSound(layer, x, w, now) {
@@ -428,11 +407,9 @@ export default function CodeRain({ text, onReady, soundMode = 'drops' }) {
       window.removeEventListener('resize', resize)
       window.removeEventListener('pointerdown', resumeAudio)
       if (rainBed) {
-        try { rainBed.source.stop() } catch {}
-        rainBed.source.disconnect()
-        rainBed.highpass.disconnect()
-        rainBed.lowpass.disconnect()
-        rainBed.gain.disconnect()
+        rainBed.pause()
+        rainBed.removeAttribute('src')
+        rainBed.load()
       }
       audio?.close().catch(() => {})
     }

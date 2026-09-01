@@ -50,6 +50,7 @@ export default function App() {
   // 只有纪念卡模式继续保留网页的小鸟品牌动画。
   const [showSplash, setShowSplash] = useState(() => homeStyle !== 'minimal')
   const [showHome, setShowHome] = useState(() => homeStyle === 'minimal')
+  const [homeEntering, setHomeEntering] = useState(false)
   const fromNativeRef = useRef(false)
 
   // 原生壳送文字进来的两个入口（通知栏快捷回复 / 系统分享）。
@@ -165,8 +166,8 @@ export default function App() {
       {/* 开屏动画的定时器跑完会把进入页推上来——从通知栏进来的那次要跳过，
           否则刚被送进对话页又被盖回去 */}
       {showSplash && <Splash onDone={() => { setShowSplash(false); setShowHome(!fromNativeRef.current) }} />}
-      {showHome && <Home onEnter={() => setShowHome(false)} />}
-      <div className="app-shell" style={(showSplash || showHome) ? { visibility: 'hidden', pointerEvents: 'none' } : undefined}>
+      {showHome && <Home onBeginEnter={() => setHomeEntering(true)} onEnter={() => { setShowHome(false); setHomeEntering(false) }} />}
+      <div className="app-shell" style={(showSplash || (showHome && !homeEntering)) ? { visibility: 'hidden', pointerEvents: 'none' } : undefined}>
         <IconNav />
         <div className="main-area">
           {activePanel === 'roost' && <Roost />}

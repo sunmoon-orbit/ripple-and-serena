@@ -50,7 +50,7 @@ function nextAnniversary(list, now) {
   return best
 }
 
-export default function Home({ onEnter }) {
+export default function Home({ onEnter, onBeginEnter }) {
   const [time, setTime] = useState(new Date())
   // 开屏语在挂载时抽定一条（时钟每秒 tick 重渲染，不锁住会每秒换一句）
   // 语料=阿言亲笔（api/greeting.js）：时段桶+周末池+特殊日子优先（2026-07-19 从浮条挪回开屏）
@@ -90,8 +90,10 @@ export default function Home({ onEnter }) {
   }, [])
 
   function handleEnter() {
+    if (fading) return
+    onBeginEnter?.()
     setFading(true)
-    setTimeout(onEnter, 400)
+    setTimeout(onEnter, 680)
   }
 
   const days = getDaysTogether()
