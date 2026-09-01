@@ -2870,8 +2870,8 @@ textarea.form-input { display: block; margin: 8px 16px 12px; }
   border: 1px solid color-mix(in srgb, var(--accent) 25%, transparent);
 }
 .home-couple-hint { margin-top: 0; }
-/* 进入页·代码雨样式 */
-.home-screen-rain { background: #000; }
+/* 进入页·雾紫雨窗：保留代码雨的结构，彻底离开黑底绿字的传统语法 */
+.home-screen-rain { background: #ebe6ef; }
 .coderain-canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
 .home-rain-overlay {
   position: absolute; inset: 0; display: flex; flex-direction: column;
@@ -2879,12 +2879,12 @@ textarea.form-input { display: block; margin: 8px 16px 12px; }
   pointer-events: none; z-index: 1;
 }
 .home-rain-time {
-  font-size: 14px; font-weight: 300; color: rgba(180,210,180,0.5);
+  font-size: 14px; font-weight: 400; color: rgba(67,57,78,0.68);
   letter-spacing: 0.1em;
 }
-.home-rain-weather { color: rgba(180,210,180,0.5); }
-.home-rain-weather svg { color: rgba(180,210,180,0.5); }
-.home-rain-hint { color: rgba(180,210,180,0.35); }
+.home-rain-weather { color: rgba(67,57,78,0.62); }
+.home-rain-weather svg { color: rgba(123,101,145,0.68); }
+.home-rain-hint { color: rgba(67,57,78,0.48); }
 /* 进入页天气行：她头顶那片天（方案b，2026-07-16） */
 .home-weather {
   display: inline-flex; align-items: center; gap: 5px;
