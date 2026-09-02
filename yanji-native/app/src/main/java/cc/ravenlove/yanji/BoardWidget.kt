@@ -27,7 +27,7 @@ class BoardWidget : AppWidgetProvider() {
 
     private fun render(context: Context, note: Pair<String, String>?, manager: AppWidgetManager, appWidgetId: Int): RemoteViews =
         RemoteViews(context.packageName, R.layout.board_widget_layout).apply {
-            WidgetAppearance.apply(context, this, R.id.board_root, R.id.board_background)
+            WidgetAppearance.apply(context, this, R.id.board_root, R.id.board_background, manager, appWidgetId)
             setTextViewText(R.id.board_text, note?.first ?: "留一句话在这里……")
             setTextViewText(R.id.board_author, note?.second?.let { "— $it" } ?: "")
             val height = manager.getAppWidgetOptions(appWidgetId).getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT, 110)

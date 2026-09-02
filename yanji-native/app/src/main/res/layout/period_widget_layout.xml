@@ -3,9 +3,36 @@
     android:id="@+id/period_root" android:layout_width="match_parent" android:layout_height="match_parent"
     android:background="@drawable/widget_bg">
     <ImageView android:id="@+id/period_background" android:layout_width="match_parent" android:layout_height="match_parent" android:scaleType="centerCrop" android:visibility="gone" />
-    <LinearLayout android:layout_width="match_parent" android:layout_height="match_parent" android:orientation="vertical" android:gravity="center" android:padding="16dp">
+    <LinearLayout android:id="@+id/period_compact" android:layout_width="match_parent" android:layout_height="match_parent" android:orientation="vertical" android:gravity="center" android:padding="16dp">
     <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="小 月 历" android:textColor="#FFFFFFFF" android:textStyle="bold" android:textSize="15sp" />
     <TextView android:id="@+id/period_status" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="8dp" android:textColor="#F2FFFFFF" android:textStyle="bold" android:textSize="14sp" />
     <TextView android:id="@+id/period_cycle" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="4dp" android:textColor="#B8FFFFFF" android:textSize="10sp" />
+    </LinearLayout>
+    <LinearLayout android:id="@+id/period_expanded" android:layout_width="match_parent" android:layout_height="match_parent"
+        android:orientation="vertical" android:padding="24dp" android:visibility="gone">
+        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:gravity="center_vertical">
+            <TextView android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:text="小 月 历" android:textColor="#FFFFFFFF" android:textStyle="bold" android:textSize="15sp" />
+            <TextView android:id="@+id/period_expanded_date" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textColor="#B8FFFFFF" android:textSize="11sp" />
+        </LinearLayout>
+        <LinearLayout android:layout_width="match_parent" android:layout_height="0dp" android:layout_weight="1" android:gravity="center" android:orientation="vertical">
+            <TextView android:id="@+id/period_countdown" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textColor="#FFFFFFFF" android:textStyle="bold" android:textSize="34sp" />
+            <TextView android:id="@+id/period_countdown_label" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="2dp" android:textColor="#D8FFFFFF" android:textSize="11sp" />
+            <ProgressBar android:id="@+id/period_progress" style="?android:attr/progressBarStyleHorizontal" android:layout_width="180dp" android:layout_height="5dp" android:layout_marginTop="14dp" android:max="100" android:progressBackgroundTint="#33FFFFFF" android:progressTint="#E8FFFFFF" />
+            <TextView android:id="@+id/period_expanded_status" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="9dp" android:textColor="#B8FFFFFF" android:textSize="10sp" />
+        </LinearLayout>
+        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:gravity="center">
+            <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:gravity="center" android:orientation="vertical">
+                <TextView android:id="@+id/period_day_value" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textColor="#FFFFFFFF" android:textStyle="bold" android:textSize="13sp" />
+                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="周期位置" android:textColor="#99FFFFFF" android:textSize="9sp" />
+            </LinearLayout>
+            <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:gravity="center" android:orientation="vertical">
+                <TextView android:id="@+id/period_avg_cycle_value" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textColor="#FFFFFFFF" android:textStyle="bold" android:textSize="13sp" />
+                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="平均周期" android:textColor="#99FFFFFF" android:textSize="9sp" />
+            </LinearLayout>
+            <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:gravity="center" android:orientation="vertical">
+                <TextView android:id="@+id/period_avg_duration_value" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textColor="#FFFFFFFF" android:textStyle="bold" android:textSize="13sp" />
+                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="平均经期" android:textColor="#99FFFFFF" android:textSize="9sp" />
+            </LinearLayout>
+        </LinearLayout>
     </LinearLayout>
 </FrameLayout>

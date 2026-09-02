@@ -2,7 +2,10 @@ package cc.ravenlove.yanji
 
 import android.content.Context
 import android.graphics.BitmapFactory
+import android.os.Build
+import android.util.TypedValue
 import android.view.View
+import android.appwidget.AppWidgetManager
 import android.widget.RemoteViews
 import java.io.File
 
@@ -20,7 +23,14 @@ object WidgetAppearance {
         return themeBackground(theme, translucent)
     }
 
-    fun apply(context: Context, views: RemoteViews, rootId: Int, imageId: Int) {
+    fun apply(
+        context: Context,
+        views: RemoteViews,
+        rootId: Int,
+        imageId: Int,
+        manager: AppWidgetManager? = null,
+        appWidgetId: Int? = null
+    ) {
         val prefs = context.getSharedPreferences("yanji_theme", Context.MODE_PRIVATE)
         val imageMode = prefs.getString("widget_background_style", "solid") == "image"
         val file = File(context.filesDir, "widget_background.jpg")
@@ -32,6 +42,23 @@ object WidgetAppearance {
             views.setViewVisibility(imageId, View.GONE)
             views.setInt(rootId, "setBackgroundResource", background(context))
         }
+
+        // Launcher hosts do not always respect a drawable's corners after stretching a
+        // RemoteViews widget. Give the host an explicit outline and clip custom photos too.
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            val radius = if (manager != null && appWidgetId != null && isLarge(manager, appWidgetId)) 30f else 22f
+            views.setViewOutlinePreferredRadius(rootId, radius, TypedValue.COMPLEX_UNIT_DIP)
+            views.setBoolean(rootId, "setClipToOutline", true)
+            views.setViewOutlinePreferredRadius(imageId, radius, TypedValue.COMPLEX_UNIT_DIP)
+            views.setBoolean(imageId, "setClipToOutline", true)
+        }
+    }
+
+    fun isLarge(manager: AppWidgetManager, appWidgetId: Int): Boolean {
+        val options = manager.getAppWidgetOptions(appWidgetId)
+        val width = options.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH, 0)
+        val height = options.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT, 0)
+        return width >= 220 || height >= 170
     }
 
     private fun themeBackground(theme: String, translucent: Boolean): Int = when (theme) {

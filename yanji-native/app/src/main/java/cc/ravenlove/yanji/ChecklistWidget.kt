@@ -47,7 +47,7 @@ class ChecklistWidget : AppWidgetProvider() {
     }
 
     private fun loading(context: Context, manager: AppWidgetManager, appWidgetId: Int) = RemoteViews(context.packageName, R.layout.checklist_widget_layout).apply {
-        WidgetAppearance.apply(context, this, R.id.checklist_root, R.id.checklist_background)
+        WidgetAppearance.apply(context, this, R.id.checklist_root, R.id.checklist_background, manager, appWidgetId)
         setTextViewText(R.id.checklist_summary, "正在打印今日小票……")
         applyCompactRows(this, rowLimit(manager, appWidgetId))
         bindAdd(context, this)
@@ -55,7 +55,7 @@ class ChecklistWidget : AppWidgetProvider() {
 
     private fun render(context: Context, rows: JSONArray?, manager: AppWidgetManager, appWidgetId: Int): RemoteViews {
         val views = RemoteViews(context.packageName, R.layout.checklist_widget_layout)
-        WidgetAppearance.apply(context, views, R.id.checklist_root, R.id.checklist_background)
+        WidgetAppearance.apply(context, views, R.id.checklist_root, R.id.checklist_background, manager, appWidgetId)
         val rowLimit = rowLimit(manager, appWidgetId)
         val visible = mutableListOf<JSONObject>()
         var doneCount = 0

@@ -30,7 +30,7 @@ class PressWidget : AppWidgetProvider() {
         val bgRes = WidgetAppearance.background(context)
         for (id in ids) {
             val views = RemoteViews(context.packageName, R.layout.press_widget_layout)
-            WidgetAppearance.apply(context, views, R.id.press_widget_root, R.id.press_widget_background)
+            WidgetAppearance.apply(context, views, R.id.press_widget_root, R.id.press_widget_background, manager, id)
             val intent = Intent(context, PressWidget::class.java).apply { action = ACTION_PRESS }
             val pi = PendingIntent.getBroadcast(
                 context, 0, intent,

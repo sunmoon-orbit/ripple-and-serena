@@ -19,7 +19,7 @@ class EmotionWidget : AppWidgetProvider() {
         for (id in ids) {
             val views = RemoteViews(context.packageName, R.layout.emotion_widget_layout)
 
-            WidgetAppearance.apply(context, views, R.id.emotion_widget_root, R.id.emotion_widget_background)
+            WidgetAppearance.apply(context, views, R.id.emotion_widget_root, R.id.emotion_widget_background, manager, id)
             views.setTextViewText(R.id.emotion_emoji, dominant.emoji)
             views.setTextViewText(R.id.emotion_label, dominant.label)
             views.setTextViewText(R.id.emotion_sub, dominant.sub)
