@@ -3,10 +3,11 @@ import { useStore } from '../../store'
 import { showToast } from '../Toast'
 import {
   fetchBooks, fetchBook, fetchBookChapter, createBook, appendBookChapters,
-  createBookAnnotation, deleteBookAnnotation, saveBookBookmark,
+  deleteBook, createBookAnnotation, deleteBookAnnotation, saveBookBookmark,
   sendReadingHeartbeat, fetchBookChat, createBookChatMessage, stampBook, unstampBook,
 } from '../../api/moonMemory'
 import { sendMessage } from '../../api/llm'
+import { useThemedConfirm } from '../ThemedConfirmDialog'
 
 const COLORS = [
   { id: 'yellow', hex: '#f5d76e' },
@@ -23,10 +24,25 @@ const SHELF_ORDER = ['闲书层', '正经层', '工具层']
 
 // 读 txt 文件：先按 UTF-8 严格解码，失败退 GBK（国内 txt 大多是 GBK，直接 readAsText 会乱码）
 async function readTxtFile(file) {
+  if (!/\.(txt|text)$/i.test(file.name)) {
+    const ext = file.name.split('.').pop()?.toUpperCase() || '未知格式'
+    throw new Error(`这是 ${ext} 文件，书架目前只支持 TXT`)
+  }
   const buf = await file.arrayBuffer()
+  const bytes = new Uint8Array(buf)
+  const head = new TextDecoder('latin1').decode(bytes.slice(0, 96))
+  if (head.startsWith('PK\u0003\u0004') || head.includes('BOOKMOBI') || head.startsWith('%PDF-')) {
+    throw new Error('这个文件不是纯文本，请先转换成 TXT')
+  }
+  if (bytes[0] === 0xff && bytes[1] === 0xfe) return new TextDecoder('utf-16le').decode(buf)
+  if (bytes[0] === 0xfe && bytes[1] === 0xff) return new TextDecoder('utf-16be').decode(buf)
   try {
     return new TextDecoder('utf-8', { fatal: true }).decode(buf)
   } catch {
+    const controls = bytes.slice(0, 4096).reduce((n, b) => n + (b < 32 && b !== 9 && b !== 10 && b !== 13 ? 1 : 0), 0)
+    if (controls > Math.max(8, Math.min(bytes.length, 4096) * 0.02)) {
+      throw new Error('检测到二进制内容，请先转换成 TXT')
+    }
     return new TextDecoder('gbk').decode(buf)
   }
 }
@@ -95,6 +111,7 @@ function savePos(bookId, ch, scroll) {
 }
 
 export default function BookRead({ onClose }) {
+  const confirmAction = useThemedConfirm()
   const moonMemory = useStore((s) => s.moonMemory)
   const connections = useStore((s) => s.connections)
   const activeConnectionId = useStore((s) => s.activeConnectionId)
@@ -343,7 +360,7 @@ export default function BookRead({ onClose }) {
         chapters,
         title: prev.title || file.name.replace(/\.(txt|text)$/i, '').trim(),
       }))
-    } catch { showToast('读取文件失败', 'error') }
+    } catch (error) { showToast(error?.message || '读取文件失败', 'error') }
     e.target.value = ''
   }
 
@@ -383,6 +400,39 @@ export default function BookRead({ onClose }) {
       const list = await fetchBooks(cfg).catch(() => null)
       if (Array.isArray(list)) setBooks(list)
     } catch { showToast('上架失败（文件太大或网络问题）', 'error') } finally { setSaving(false) }
+  }
+
+  async function removeBook(event, book) {
+    event.stopPropagation()
+    const bookId = Number(book.id)
+    if (!Number.isSafeInteger(bookId) || bookId <= 0) {
+      showToast('这本书缺少可确认的编号，未执行删除', 'error')
+      return
+    }
+    const accepted = await confirmAction({
+      kicker: '整理书架',
+      title: `删除《${book.title}》？`,
+      description: `将删除整本书及其 ${book.chapter_count || 0} 个章节。`,
+      note: book.anno_count > 0
+        ? `这本书还有 ${book.anno_count} 处划线；正文、批注、书签及关联记录都会一并删除，且无法撤销。`
+        : '正文、书签及关联记录都会一并删除，且无法撤销。',
+      cancelLabel: '先留着',
+      confirmLabel: '确认删除',
+    })
+    if (!accepted) return
+    try {
+      const result = await deleteBook(cfg, bookId)
+      if (!result?.ok) throw new Error('服务端没有确认删除')
+      setBooks((current) => current?.filter((item) => Number(item.id) !== bookId) ?? current)
+      try {
+        const positions = JSON.parse(localStorage.getItem(POS_KEY) || '{}')
+        delete positions[bookId]
+        localStorage.setItem(POS_KEY, JSON.stringify(positions))
+      } catch { /* ignore local progress cleanup */ }
+      showToast('已经从书架删除', 'success')
+    } catch (error) {
+      showToast(error?.message || '删除失败，请稍后再试', 'error')
+    }
   }
 
   // ── 上架新书视图 ──
@@ -473,6 +523,11 @@ export default function BookRead({ onClose }) {
               className="bookread-append-link"
               onClick={(e) => { e.stopPropagation(); setUpload({ appendTo: b.id, appendTitle: b.title }) }}
             >＋追更</span>
+            <span
+              className="bookread-append-link"
+              style={{ color: 'var(--danger, #b3453f)' }}
+              onClick={(e) => removeBook(e, b)}
+            >删除</span>
           </div>
         </div>
         {b.stamps?.length > 0 && (
