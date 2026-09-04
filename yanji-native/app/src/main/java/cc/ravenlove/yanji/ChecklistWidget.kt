@@ -12,6 +12,9 @@ import android.widget.Toast
 import kotlinx.coroutines.*
 import org.json.JSONArray
 import org.json.JSONObject
+import java.text.SimpleDateFormat
+import java.util.Calendar
+import java.util.Locale
 
 class ChecklistWidget : AppWidgetProvider() {
     override fun onUpdate(context: Context, manager: AppWidgetManager, ids: IntArray) {
@@ -20,7 +23,12 @@ class ChecklistWidget : AppWidgetProvider() {
         CoroutineScope(Dispatchers.IO).launch {
             ChecklistRecurrence.materializeToday(context)
             val rows = try { JSONArray(WidgetApi.request(context, "/checklist")) } catch (_: Exception) { null }
-            ids.forEach { manager.updateAppWidget(it, render(context, rows, manager, it)) }
+            val habits = try {
+                val cal = Calendar.getInstance(); val fmt = SimpleDateFormat("yyyy-MM-dd", Locale.US)
+                val to = fmt.format(cal.time); cal.add(Calendar.DAY_OF_YEAR, -6); val from = fmt.format(cal.time)
+                JSONArray(WidgetApi.request(context, "/habits?from=$from&to=$to"))
+            } catch (_: Exception) { null }
+            ids.forEach { manager.updateAppWidget(it, render(context, rows, habits, manager, it)) }
             pending.finish()
         }
     }
@@ -53,10 +61,11 @@ class ChecklistWidget : AppWidgetProvider() {
         bindAdd(context, this)
     }
 
-    private fun render(context: Context, rows: JSONArray?, manager: AppWidgetManager, appWidgetId: Int): RemoteViews {
+    private fun render(context: Context, rows: JSONArray?, habits: JSONArray?, manager: AppWidgetManager, appWidgetId: Int): RemoteViews {
         val views = RemoteViews(context.packageName, R.layout.checklist_widget_layout)
         WidgetAppearance.apply(context, views, R.id.checklist_root, R.id.checklist_background, manager, appWidgetId)
         val rowLimit = rowLimit(manager, appWidgetId)
+        views.setViewVisibility(R.id.checklist_habit_week, if (rowLimit >= 2) View.VISIBLE else View.GONE)
         val visible = mutableListOf<JSONObject>()
         var doneCount = 0
         if (rows != null) for (i in 0 until rows.length()) {
@@ -65,6 +74,19 @@ class ChecklistWidget : AppWidgetProvider() {
             if (visible.size < rowLimit) visible += row
         }
         views.setTextViewText(R.id.checklist_summary, if (rows == null) "暂时取不到小票" else "${doneCount}/${rows.length()} 已完成")
+        val fmt = SimpleDateFormat("yyyy-MM-dd", Locale.US)
+        val cal = Calendar.getInstance().apply { add(Calendar.DAY_OF_YEAR, -6) }
+        val marks = (0..6).map {
+            val day = fmt.format(cal.time); cal.add(Calendar.DAY_OF_YEAR, 1)
+            var hit = false
+            if (habits != null) for (h in 0 until habits.length()) {
+                val dates = habits.optJSONObject(h)?.optJSONArray("checkins") ?: continue
+                for (j in 0 until dates.length()) if (dates.optString(j) == day) { hit = true; break }
+                if (hit) break
+            }
+            if (hit) "●" else "·"
+        }.joinToString("  ")
+        views.setTextViewText(R.id.checklist_habit_week, marks)
         val lineIds = intArrayOf(R.id.checklist_item_1, R.id.checklist_item_2, R.id.checklist_item_3)
         lineIds.forEachIndexed { index, viewId ->
             val row = visible.getOrNull(index)
@@ -99,6 +121,7 @@ class ChecklistWidget : AppWidgetProvider() {
         lineIds.forEachIndexed { index, viewId ->
             views.setViewVisibility(viewId, if (index < visibleRows) View.VISIBLE else View.GONE)
         }
+        views.setViewVisibility(R.id.checklist_habit_week, if (visibleRows >= 2) View.VISIBLE else View.GONE)
     }
 
     private fun bindAdd(context: Context, views: RemoteViews) {
@@ -107,6 +130,12 @@ class ChecklistWidget : AppWidgetProvider() {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE))
         val intent = Intent(context, WidgetComposeActivity::class.java).putExtra(WidgetComposeActivity.EXTRA_MODE, WidgetComposeActivity.MODE_CHECKLIST)
         views.setOnClickPendingIntent(R.id.checklist_add, PendingIntent.getActivity(context, 60_001, intent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE))
+        val calendar = Intent(context, MainActivity::class.java).apply {
+            action = IntentIdentity.ACTION_WIDGET_OPEN
+            putExtra("open_habits", true)
+        }
+        views.setOnClickPendingIntent(R.id.checklist_calendar, PendingIntent.getActivity(context, 60_002, calendar,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE))
     }
 

@@ -89,11 +89,20 @@ export default function App() {
       window.__yanjiAnswerCallPending = { ...payload, at: Date.now() }
       window.dispatchEvent(new CustomEvent('yanji-answer-call', { detail: window.__yanjiAnswerCallPending }))
     }
+    window.__yanjiOpenHabits = () => {
+      fromNativeRef.current = true
+      setShowSplash(false)
+      setShowHome(false)
+      useStore.setState({ activePanel: 'chat' })
+      // Chat 需要先挂载，下一帧再掀开小票的习惯面。
+      setTimeout(() => window.dispatchEvent(new Event('yanji-open-habits')), 80)
+    }
     return () => {
       delete window.__yanjiQuickReply
       delete window.__yanjiShareText
       delete window.__yanjiOpenConversation
       delete window.__yanjiAnswerCall
+      delete window.__yanjiOpenHabits
     }
   }, [])
 

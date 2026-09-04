@@ -341,6 +341,36 @@ export async function deleteChecklistItem(config, id) {
   return request(baseUrl, `/checklist/${id}`, { method: 'DELETE', headers: headers(apiToken) })
 }
 
+// ─── 习惯足迹：定义与每日打卡分开保存，避免靠待办文字猜历史 ─────────────
+export async function fetchHabits(config, from, to) {
+  const { baseUrl, apiToken } = config
+  const qs = new URLSearchParams()
+  if (from) qs.set('from', from)
+  if (to) qs.set('to', to)
+  return request(baseUrl, `/habits${qs.toString() ? `?${qs}` : ''}`, { headers: headers(apiToken) })
+}
+
+export async function createHabit(config, body) {
+  const { baseUrl, apiToken } = config
+  return request(baseUrl, '/habits', {
+    method: 'POST', headers: headers(apiToken), body: JSON.stringify(body),
+  })
+}
+
+export async function toggleHabitDay(config, id, day, done) {
+  const { baseUrl, apiToken } = config
+  return request(baseUrl, `/habits/${id}/checkins/${day}`, {
+    method: 'PUT', headers: headers(apiToken), body: JSON.stringify({ done }),
+  })
+}
+
+export async function archiveHabit(config, id) {
+  const { baseUrl, apiToken } = config
+  return request(baseUrl, `/habits/${id}`, {
+    method: 'PATCH', headers: headers(apiToken), body: JSON.stringify({ active: false }),
+  })
+}
+
 // 便利贴墙（留言板 UI 回归，2026-07-19 阿颖的主意）——服务端 /board 三端共用
 export async function fetchBoardMessages(config, limit = 100) {
   const { baseUrl, apiToken } = config

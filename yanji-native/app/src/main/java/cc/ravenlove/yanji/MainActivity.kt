@@ -239,6 +239,7 @@ class MainActivity : AppCompatActivity() {
         handleConversationOpen(intent)
         handleShareIntent(intent)
         handleQuickReply(intent)
+        handleHabitOpen(intent)
 
         // 全屏来电权限（安卓14+）。延后 3 秒：先让她看到 app 起来，别一点图标就被踹进设置页
         webView.postDelayed({ promptFullScreenIntentPermission() }, 3000)
@@ -285,6 +286,7 @@ class MainActivity : AppCompatActivity() {
         handleCallAction(intent)
         handleConversationOpen(intent)
         handleShareIntent(intent)
+        handleHabitOpen(intent)
         handleQuickReply(intent)
     }
 
@@ -377,6 +379,12 @@ class MainActivity : AppCompatActivity() {
         runOnUiThread {
             if (pageReady) webView.evaluateJavascript(js, null) else pendingJs.add(js)
         }
+    }
+
+    private fun handleHabitOpen(intent: Intent?) {
+        if (intent?.getBooleanExtra("open_habits", false) != true) return
+        intent.removeExtra("open_habits")
+        callWeb("__yanjiOpenHabits", "")
     }
 
     // 通知栏快捷回复：把她在通知里打的字带进 app 直接发出去。

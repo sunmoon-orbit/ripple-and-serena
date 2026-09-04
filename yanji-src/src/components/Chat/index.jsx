@@ -294,6 +294,13 @@ export default function Chat() {
   const [bgMenuOpen, setBgMenuOpen] = useState(false)
   const [calendarOpen, setCalendarOpen] = useState(false)
   const [checklistOpen, setChecklistOpen] = useState(false)
+  const [checklistView, setChecklistView] = useState('receipt')
+
+  useEffect(() => {
+    const openHabits = () => { setChecklistView('habits'); setChecklistOpen(true) }
+    window.addEventListener('yanji-open-habits', openHabits)
+    return () => window.removeEventListener('yanji-open-habits', openHabits)
+  }, [])
   const [healthOpen, setHealthOpen] = useState(false)
   const [walletOpen, setWalletOpen] = useState(false) // 乌鸦钱包：0713 从 Roost 搬来
   const [callsOpen, setCallsOpen] = useState(false) // 通话记录：阿颖的主意 0716
@@ -1768,7 +1775,7 @@ export default function Chat() {
       {fateOpen && <FateDeck onClose={() => setFateOpen(false)} onSend={handleSend} />}
       {tarotOpen && <Tarot onClose={() => setTarotOpen(false)} onSend={handleSend} />}
       {fortuneOpen && <DailyFortune onClose={() => setFortuneOpen(false)} />}
-      {checklistOpen && <DailyChecklist onClose={() => setChecklistOpen(false)} />}
+      {checklistOpen && <DailyChecklist initialView={checklistView} onClose={() => { setChecklistOpen(false); setChecklistView('receipt') }} />}
       {healthOpen && <HealthCard onClose={() => setHealthOpen(false)} />}
       {walletOpen && <WalletCard onClose={() => setWalletOpen(false)} />}
       {callsOpen && (
