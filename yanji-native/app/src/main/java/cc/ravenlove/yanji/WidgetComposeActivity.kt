@@ -39,19 +39,19 @@ class WidgetComposeActivity : Activity() {
         findViewById<ImageView>(R.id.widget_compose_decor_top).setColorFilter(palette.accent)
         findViewById<ImageView>(R.id.widget_compose_decor_bottom).setColorFilter(palette.accent)
         findViewById<TextView>(R.id.widget_compose_kicker).apply {
-            text = if (mode == MODE_CHECKLIST) "DAILY RECEIPT" else "A LITTLE NOTE"
+            text = when (mode) { MODE_CHECKLIST -> "DAILY RECEIPT"; MODE_HABIT -> "HABIT FOOTPRINT"; else -> "A LITTLE NOTE" }
             setTextColor(palette.accent)
         }
         findViewById<TextView>(R.id.widget_compose_title).apply {
-            text = if (mode == MODE_CHECKLIST) "添一件今日要做的事" else "贴一张新的便利贴"
+            text = when (mode) { MODE_CHECKLIST -> "添一件今日要做的事"; MODE_HABIT -> "种下一个新习惯"; else -> "贴一张新的便利贴" }
             setTextColor(palette.text)
         }
         findViewById<TextView>(R.id.widget_compose_hint).apply {
-            text = if (mode == MODE_CHECKLIST) "写下来，就不用一直放在脑袋里。" else "想说又不着急说的话，留在这里等对方路过。"
+            text = when (mode) { MODE_CHECKLIST -> "写下来，就不用一直放在脑袋里。"; MODE_HABIT -> "从想慢慢坚持的一件小事开始。"; else -> "想说又不着急说的话，留在这里等对方路过。" }
             setTextColor(palette.muted)
         }
         val input = findViewById<EditText>(R.id.widget_compose_input).apply {
-            hint = if (mode == MODE_CHECKLIST) "例如：给小猫添粮……" else "写给他，或者写给未来的自己……"
+            hint = when (mode) { MODE_CHECKLIST -> "例如：给小猫添粮……"; MODE_HABIT -> "例如：运动十分钟……"; else -> "写给他，或者写给未来的自己……" }
             setHintTextColor(palette.faint)
             setTextColor(palette.text)
             background = rounded(palette.input, 17f, palette.stroke)
@@ -104,7 +104,7 @@ class WidgetComposeActivity : Activity() {
             setOnClickListener { finish() }
         }
         findViewById<TextView>(R.id.widget_compose_submit).apply {
-            text = if (mode == MODE_CHECKLIST) "印到小票" else "贴上去"
+            text = when (mode) { MODE_CHECKLIST -> "印到小票"; MODE_HABIT -> "种下"; else -> "贴上去" }
             setTextColor(Color.WHITE)
             background = rounded(palette.accent, 15f)
             setOnClickListener {
@@ -113,7 +113,7 @@ class WidgetComposeActivity : Activity() {
                     input.error = "先写一点什么吧"
                 } else {
                     isEnabled = false
-                    text = if (mode == MODE_CHECKLIST) "印着……" else "贴着……"
+                    text = when (mode) { MODE_CHECKLIST -> "印着……"; MODE_HABIT -> "种着……"; else -> "贴着……" }
                     submit(mode, value, repeat.isChecked)
                 }
             }
@@ -150,13 +150,18 @@ class WidgetComposeActivity : Activity() {
                 if (mode == MODE_CHECKLIST) {
                     WidgetApi.request(this@WidgetComposeActivity, "/checklist", "POST", JSONObject()
                         .put("text", text).put("added_by", "阿颖"))
-                    if (repeatDaily) ChecklistRecurrence.add(this@WidgetComposeActivity, text)
+                    if (repeatDaily) {
+                        ChecklistRecurrence.add(this@WidgetComposeActivity, text)
+                        ensureHabit(text)
+                    }
+                } else if (mode == MODE_HABIT) {
+                    ensureHabit(text)
                 } else {
                     WidgetApi.request(this@WidgetComposeActivity, "/board", "POST", JSONObject()
                         .put("text", text).put("author", "阿颖").put("source", "yanji-widget"))
                 }
                 WidgetRefresh.all(this@WidgetComposeActivity)
-                if (mode == MODE_CHECKLIST) "已经印到今日小票上" else "便利贴贴好啦"
+                when (mode) { MODE_CHECKLIST -> "已经印到今日小票上"; MODE_HABIT -> "新习惯种好啦"; else -> "便利贴贴好啦" }
             } catch (_: Exception) { "没写进去，检查一下网络和代理" }
             withContext(Dispatchers.Main) {
                 Toast.makeText(this@WidgetComposeActivity, message, Toast.LENGTH_LONG).show()
@@ -165,9 +170,16 @@ class WidgetComposeActivity : Activity() {
         }
     }
 
+    private fun ensureHabit(name: String) {
+        val existing = try { org.json.JSONArray(WidgetApi.request(this, "/habits")) } catch (_: Exception) { org.json.JSONArray() }
+        for (i in 0 until existing.length()) if (existing.optJSONObject(i)?.optString("name") == name) return
+        WidgetApi.request(this, "/habits", "POST", JSONObject().put("name", name).put("icon", "leaf"))
+    }
+
     companion object {
         const val EXTRA_MODE = "mode"
         const val MODE_CHECKLIST = "checklist"
+        const val MODE_HABIT = "habit"
         const val MODE_BOARD = "board"
     }
 }
