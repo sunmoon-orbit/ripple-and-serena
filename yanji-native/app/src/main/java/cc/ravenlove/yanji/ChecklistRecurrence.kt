@@ -15,6 +15,7 @@ import java.time.LocalDate
 object ChecklistRecurrence {
     private const val PREFS = "yanji_checklist_recurrence"
     private const val KEY_TEMPLATES = "templates"
+    private const val KEY_CHECKINS = "habit_checkins"
 
     fun add(context: Context, text: String) {
         val clean = text.trim()
@@ -36,6 +37,21 @@ object ChecklistRecurrence {
 
     fun remove(context: Context, text: String) {
         write(context, read(context).filterNot { it.optString("text") == text })
+    }
+
+    fun setDone(context: Context, text: String, day: String = LocalDate.now().toString(), done: Boolean) {
+        val all = readCheckins(context)
+        val days = all.optJSONArray(text) ?: JSONArray()
+        val kept = mutableListOf<String>()
+        for (i in 0 until days.length()) if (days.optString(i) != day) kept += days.optString(i)
+        if (done) kept += day
+        all.put(text, JSONArray(kept.distinct().sorted()))
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putString(KEY_CHECKINS, all.toString()).apply()
+    }
+
+    fun doneDays(context: Context, text: String): List<String> {
+        val days = readCheckins(context).optJSONArray(text) ?: JSONArray()
+        return List(days.length()) { days.optString(it) }.filter { it.isNotEmpty() }
     }
 
     fun materializeToday(context: Context) {
@@ -71,5 +87,10 @@ object ChecklistRecurrence {
         items.forEach(array::put)
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
             .edit().putString(KEY_TEMPLATES, array.toString()).apply()
+    }
+
+    private fun readCheckins(context: Context): JSONObject {
+        val raw = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getString(KEY_CHECKINS, "{}") ?: "{}"
+        return try { JSONObject(raw) } catch (_: Exception) { JSONObject() }
     }
 }

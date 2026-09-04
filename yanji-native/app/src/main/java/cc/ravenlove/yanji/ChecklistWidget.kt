@@ -56,11 +56,13 @@ class ChecklistWidget : AppWidgetProvider() {
         if (intent.action != ACTION_TOGGLE) return
         val id = intent.getIntExtra(EXTRA_ID, -1)
         val done = intent.getBooleanExtra(EXTRA_DONE, false)
+        val text = intent.getStringExtra(EXTRA_TEXT).orEmpty()
         if (id < 0) return
         val pending = goAsync()
         CoroutineScope(Dispatchers.IO).launch {
             val message = try {
                 WidgetApi.request(context, "/checklist/$id", "PATCH", JSONObject().put("done", done))
+                if (ChecklistRecurrence.contains(context, text)) ChecklistRecurrence.setDone(context, text, done = done)
                 WidgetRefresh.all(context); if (done) "勾好啦" else "重新放回小票"
             } catch (_: Exception) { "没勾上，检查一下网络" }
             withContext(Dispatchers.Main) { Toast.makeText(context, message, Toast.LENGTH_SHORT).show() }
@@ -70,9 +72,12 @@ class ChecklistWidget : AppWidgetProvider() {
 
     private fun loading(context: Context, manager: AppWidgetManager, appWidgetId: Int) = RemoteViews(context.packageName, R.layout.checklist_widget_layout).apply {
         WidgetAppearance.apply(context, this, R.id.checklist_root, R.id.checklist_background, manager, appWidgetId)
-        setTextViewText(R.id.checklist_summary, "正在打印今日小票……")
+        val habitFace = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getBoolean("habit_face_$appWidgetId", false)
+        setTextViewText(R.id.checklist_title, if (habitFace) "习 惯 足 迹" else "今 日 小 票")
+        setTextViewText(R.id.checklist_summary, if (habitFace) "正在摊开足迹……" else "正在打印今日小票……")
+        setViewVisibility(R.id.checklist_add, View.VISIBLE)
         applyCompactRows(this, rowLimit(manager, appWidgetId))
-        bindActions(context, this, appWidgetId, false)
+        bindActions(context, this, appWidgetId, habitFace)
     }
 
     private fun render(context: Context, rows: JSONArray?, habits: JSONArray?, manager: AppWidgetManager, appWidgetId: Int, habitFace: Boolean): RemoteViews {
@@ -115,7 +120,7 @@ class ChecklistWidget : AppWidgetProvider() {
                 val repeatMark = if (ChecklistRecurrence.contains(context, text)) "  ↻" else ""
                 views.setTextViewText(viewId, (if (done) "✓  " else "○  ") + text + repeatMark)
                 val toggle = Intent(context, ChecklistWidget::class.java).apply {
-                    action = ACTION_TOGGLE; putExtra(EXTRA_ID, row.optInt("id")); putExtra(EXTRA_DONE, !done)
+                    action = ACTION_TOGGLE; putExtra(EXTRA_ID, row.optInt("id")); putExtra(EXTRA_DONE, !done); putExtra(EXTRA_TEXT, text)
                 }
                 views.setOnClickPendingIntent(viewId, PendingIntent.getBroadcast(context, 61_000 + row.optInt("id"), toggle,
                     PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE))
@@ -132,11 +137,16 @@ class ChecklistWidget : AppWidgetProvider() {
         val week = mutableListOf<String>()
         val cal = Calendar.getInstance().apply { add(Calendar.DAY_OF_YEAR, -6) }
         repeat(7) { week += fmt.format(cal.time); cal.add(Calendar.DAY_OF_YEAR, 1) }
+        val visibleHabits = if (habits != null && habits.length() > 0) habits else JSONArray().apply {
+            ChecklistRecurrence.texts(context).forEachIndexed { index, name ->
+                put(JSONObject().put("id", -(index + 1)).put("name", name).put("checkins", JSONArray(ChecklistRecurrence.doneDays(context, name))))
+            }
+        }
         var completedDays = 0
         week.forEach { day ->
             var done = false
-            if (habits != null) for (i in 0 until habits.length()) {
-                val checks = habits.optJSONObject(i)?.optJSONArray("checkins") ?: continue
+            for (i in 0 until visibleHabits.length()) {
+                val checks = visibleHabits.optJSONObject(i)?.optJSONArray("checkins") ?: continue
                 for (j in 0 until checks.length()) if (checks.optString(j) == day) { done = true; break }
                 if (done) break
             }
@@ -145,7 +155,7 @@ class ChecklistWidget : AppWidgetProvider() {
         views.setTextViewText(R.id.checklist_summary, "近七日留下 $completedDays 天足迹")
         val lineIds = intArrayOf(R.id.checklist_item_1, R.id.checklist_item_2, R.id.checklist_item_3)
         lineIds.forEachIndexed { index, viewId ->
-            val habit = if (habits != null && index < habits.length() && index < rowLimit) habits.optJSONObject(index) else null
+            val habit = if (index < visibleHabits.length() && index < rowLimit) visibleHabits.optJSONObject(index) else null
             views.setViewVisibility(viewId, if (habit == null) View.GONE else View.VISIBLE)
             if (habit != null) {
                 val checks = habit.optJSONArray("checkins") ?: JSONArray()
@@ -186,10 +196,15 @@ class ChecklistWidget : AppWidgetProvider() {
         if (rows != null) for (r in 0 until rows.length()) {
             val row = rows.optJSONObject(r) ?: continue
             if (row.optInt("done") == 0 || row.optString("text") !in repeated) continue
+            ChecklistRecurrence.setDone(context, row.optString("text"), today, true)
             for (h in 0 until synced.length()) {
                 val habit = synced.optJSONObject(h) ?: continue
                 if (habit.optString("name") != row.optString("text")) continue
                 try { WidgetApi.request(context, "/habits/${habit.optInt("id")}/checkins/$today", "PUT", JSONObject().put("done", true)) } catch (_: Exception) { }
+                val dates = habit.optJSONArray("checkins") ?: JSONArray().also { habit.put("checkins", it) }
+                var already = false
+                for (j in 0 until dates.length()) if (dates.optString(j) == today) { already = true; break }
+                if (!already) dates.put(today)
             }
         }
         return synced
@@ -232,5 +247,6 @@ class ChecklistWidget : AppWidgetProvider() {
         private const val ACTION_TOGGLE_VIEW = "cc.ravenlove.yanji.widget.CHECKLIST_VIEW"
         private const val EXTRA_ID = "id"
         private const val EXTRA_DONE = "done"
+        private const val EXTRA_TEXT = "text"
     }
 }

@@ -152,10 +152,11 @@ class WidgetComposeActivity : Activity() {
                         .put("text", text).put("added_by", "阿颖"))
                     if (repeatDaily) {
                         ChecklistRecurrence.add(this@WidgetComposeActivity, text)
-                        ensureHabit(text)
+                        try { ensureHabit(text) } catch (_: Exception) { }
                     }
                 } else if (mode == MODE_HABIT) {
-                    ensureHabit(text)
+                    ChecklistRecurrence.add(this@WidgetComposeActivity, text)
+                    try { ensureHabit(text) } catch (_: Exception) { }
                 } else {
                     WidgetApi.request(this@WidgetComposeActivity, "/board", "POST", JSONObject()
                         .put("text", text).put("author", "阿颖").put("source", "yanji-widget"))
