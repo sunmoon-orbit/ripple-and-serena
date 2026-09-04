@@ -347,28 +347,54 @@ export async function fetchHabits(config, from, to) {
   const qs = new URLSearchParams()
   if (from) qs.set('from', from)
   if (to) qs.set('to', to)
-  return request(baseUrl, `/habits${qs.toString() ? `?${qs}` : ''}`, { headers: headers(apiToken) })
+  try {
+    return await request(baseUrl, `/habits${qs.toString() ? `?${qs}` : ''}`, { headers: headers(apiToken) })
+  } catch (error) {
+    if (window.YanjiNative?.listLocalHabits) return JSON.parse(window.YanjiNative.listLocalHabits(from || '', to || '') || '[]')
+    throw error
+  }
 }
 
 export async function createHabit(config, body) {
   const { baseUrl, apiToken } = config
-  return request(baseUrl, '/habits', {
-    method: 'POST', headers: headers(apiToken), body: JSON.stringify(body),
-  })
+  try {
+    return await request(baseUrl, '/habits', {
+      method: 'POST', headers: headers(apiToken), body: JSON.stringify(body),
+    })
+  } catch (error) {
+    if (window.YanjiNative?.addLocalHabit) return JSON.parse(window.YanjiNative.addLocalHabit(body?.name || '', body?.icon || 'leaf') || '{}')
+    throw error
+  }
 }
 
-export async function toggleHabitDay(config, id, day, done) {
+export async function toggleHabitDay(config, id, day, done, name = '') {
   const { baseUrl, apiToken } = config
-  return request(baseUrl, `/habits/${id}/checkins/${day}`, {
-    method: 'PUT', headers: headers(apiToken), body: JSON.stringify({ done }),
-  })
+  try {
+    return await request(baseUrl, `/habits/${id}/checkins/${day}`, {
+      method: 'PUT', headers: headers(apiToken), body: JSON.stringify({ done }),
+    })
+  } catch (error) {
+    if (window.YanjiNative?.setLocalHabitDone && name) {
+      window.YanjiNative.setLocalHabitDone(name, day, done)
+      return { habit_id: id, day, done: done ? 1 : 0 }
+    }
+    throw error
+  }
 }
 
-export async function archiveHabit(config, id) {
+export async function archiveHabit(config, id, name = '') {
   const { baseUrl, apiToken } = config
-  return request(baseUrl, `/habits/${id}`, {
-    method: 'PATCH', headers: headers(apiToken), body: JSON.stringify({ active: false }),
-  })
+  try {
+    return await request(baseUrl, `/habits/${id}`, {
+      method: 'PATCH', headers: headers(apiToken), body: JSON.stringify({ active: false }),
+    })
+  } catch (error) {
+    if (window.YanjiNative?.archiveLocalHabit && name) {
+      window.YanjiNative.archiveLocalHabit(name)
+      return { id, active: 0 }
+    }
+    throw error
+  }
 }
 
 // 便利贴墙（留言板 UI 回归，2026-07-19 阿颖的主意）——服务端 /board 三端共用

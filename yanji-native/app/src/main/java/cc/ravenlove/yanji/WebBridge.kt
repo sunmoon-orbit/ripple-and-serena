@@ -9,6 +9,9 @@ import android.util.Log
 import android.webkit.JavascriptInterface
 import java.io.File
 import java.util.concurrent.Executors
+import org.json.JSONArray
+import org.json.JSONObject
+import kotlin.math.absoluteValue
 
 class WebBridge(private val activity: MainActivity) {
 
@@ -201,6 +204,46 @@ class WebBridge(private val activity: MainActivity) {
             .putString("widget_background_style", safeStyle)
             .apply()
 
+        refreshAllWidgets()
+    }
+
+    // 习惯足迹的离线桥。网页优先走服务器；服务器尚未部署 /habits 或临时断网时，
+    // 直接读写与桌面组件共用的本机账本，不让「种下」按钮变成联网装饰品。
+    @JavascriptInterface
+    fun listLocalHabits(from: String, to: String): String {
+        val result = JSONArray()
+        ChecklistRecurrence.texts(activity).forEach { name ->
+            val dates = ChecklistRecurrence.doneDays(activity, name)
+                .filter { (from.isEmpty() || it >= from) && (to.isEmpty() || it <= to) }
+            val id = -name.hashCode().toLong().absoluteValue.coerceAtLeast(1L)
+            result.put(JSONObject().put("id", id).put("name", name).put("icon", ChecklistRecurrence.icon(activity, name))
+                .put("color", "#e8a5b8").put("active", 1).put("checkins", JSONArray(dates)))
+        }
+        return result.toString()
+    }
+
+    @JavascriptInterface
+    fun addLocalHabit(name: String, icon: String): String {
+        val clean = name.trim().take(30)
+        if (clean.isEmpty()) return "{}"
+        ChecklistRecurrence.add(activity, clean, icon.ifEmpty { "leaf" })
+        refreshAllWidgets()
+        val id = -clean.hashCode().toLong().absoluteValue.coerceAtLeast(1L)
+        return JSONObject().put("id", id).put("name", clean).put("icon", icon.ifEmpty { "leaf" })
+            .put("color", "#e8a5b8").put("active", 1).put("checkins", JSONArray()).toString()
+    }
+
+    @JavascriptInterface
+    fun setLocalHabitDone(name: String, day: String, done: Boolean) {
+        if (name.isBlank() || day.isBlank()) return
+        ChecklistRecurrence.setDone(activity, name, day, done)
+        refreshAllWidgets()
+    }
+
+    @JavascriptInterface
+    fun archiveLocalHabit(name: String) {
+        if (name.isBlank()) return
+        ChecklistRecurrence.remove(activity, name)
         refreshAllWidgets()
     }
 

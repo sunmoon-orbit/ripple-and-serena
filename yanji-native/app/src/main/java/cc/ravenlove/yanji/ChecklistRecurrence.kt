@@ -17,13 +17,13 @@ object ChecklistRecurrence {
     private const val KEY_TEMPLATES = "templates"
     private const val KEY_CHECKINS = "habit_checkins"
 
-    fun add(context: Context, text: String) {
+    fun add(context: Context, text: String, icon: String = "leaf") {
         val clean = text.trim()
         if (clean.isEmpty()) return
         val today = LocalDate.now().toString()
         val items = read(context)
         val existing = items.indexOfFirst { it.optString("text") == clean }
-        val row = JSONObject().put("text", clean).put("last_day", today)
+        val row = JSONObject().put("text", clean).put("last_day", today).put("icon", icon.ifEmpty { "leaf" })
         if (existing >= 0) items[existing] = row else items += row
         write(context, items)
     }
@@ -34,6 +34,9 @@ object ChecklistRecurrence {
     fun texts(context: Context): List<String> = read(context)
         .map { it.optString("text").trim() }
         .filter { it.isNotEmpty() }
+
+    fun icon(context: Context, text: String): String = read(context)
+        .firstOrNull { it.optString("text") == text }?.optString("icon", "leaf") ?: "leaf"
 
     fun remove(context: Context, text: String) {
         write(context, read(context).filterNot { it.optString("text") == text })

@@ -100,13 +100,13 @@ export default function DailyChecklist({ onClose, initialView = 'receipt' }) {
     setHabits((all) => all.map((h) => h.id === habit.id
       ? { ...h, checkins: wasDone ? h.checkins.filter((x) => x !== day) : [...(h.checkins || []), day] }
       : h))
-    try { await toggleHabitDay(cfg, habit.id, day, !wasDone) }
+    try { await toggleHabitDay(cfg, habit.id, day, !wasDone, habit.name) }
     catch { await loadHabits(); showToast('这一枚脚印没盖上', 'error') }
   }
 
   async function removeHabit(habit) {
     if (!confirm(`把「${habit.name}」收进旧习惯？历史会保留。`)) return
-    try { await archiveHabit(cfg, habit.id); setHabits((all) => all.filter((h) => h.id !== habit.id)) }
+    try { await archiveHabit(cfg, habit.id, habit.name); setHabits((all) => all.filter((h) => h.id !== habit.id)) }
     catch { showToast('暂时收不起来', 'error') }
   }
 
