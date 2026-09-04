@@ -687,7 +687,7 @@ export default function BookRead({ onClose }) {
             </div>
           </section>
         )}
-        {!chatOpen && chapter && (
+        {!chatOpen && chapter && !pending && (
           <button className="bookread-chat-fab" onClick={() => setChatOpen(true)} aria-label="打开随读随聊" title="和涟言聊这一页">聊</button>
         )}
 
