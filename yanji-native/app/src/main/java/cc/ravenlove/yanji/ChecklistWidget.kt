@@ -77,6 +77,7 @@ class ChecklistWidget : AppWidgetProvider() {
         setTextViewText(R.id.checklist_summary, if (habitFace) "正在摊开足迹……" else "正在打印今日小票……")
         setViewVisibility(R.id.checklist_add, View.VISIBLE)
         applyCompactRows(this, rowLimit(manager, appWidgetId))
+        setViewVisibility(R.id.checklist_habit_week, if (habitFace) View.VISIBLE else View.GONE)
         bindActions(context, this, appWidgetId, habitFace)
     }
 
@@ -84,7 +85,7 @@ class ChecklistWidget : AppWidgetProvider() {
         val views = RemoteViews(context.packageName, R.layout.checklist_widget_layout)
         WidgetAppearance.apply(context, views, R.id.checklist_root, R.id.checklist_background, manager, appWidgetId)
         val rowLimit = rowLimit(manager, appWidgetId)
-        views.setViewVisibility(R.id.checklist_habit_week, if (rowLimit >= 2) View.VISIBLE else View.GONE)
+        views.setViewVisibility(R.id.checklist_habit_week, View.GONE)
         if (habitFace) return renderHabitFace(context, views, habits, rowLimit, appWidgetId)
         // RemoteViews 会在部分启动器里保留上一面的属性；翻回时必须逐项复位。
         views.setTextViewText(R.id.checklist_title, "今 日 小 票")
@@ -110,7 +111,7 @@ class ChecklistWidget : AppWidgetProvider() {
             if (hit) "●" else "·"
         }.joinToString("  ")
         views.setTextViewText(R.id.checklist_habit_week, marks)
-        val lineIds = intArrayOf(R.id.checklist_item_1, R.id.checklist_item_2, R.id.checklist_item_3)
+        val lineIds = lineIds()
         lineIds.forEachIndexed { index, viewId ->
             val row = visible.getOrNull(index)
             views.setViewVisibility(viewId, if (row == null) View.GONE else View.VISIBLE)
@@ -153,7 +154,7 @@ class ChecklistWidget : AppWidgetProvider() {
             if (done) completedDays++
         }
         views.setTextViewText(R.id.checklist_summary, "近七日留下 $completedDays 天足迹")
-        val lineIds = intArrayOf(R.id.checklist_item_1, R.id.checklist_item_2, R.id.checklist_item_3)
+        val lineIds = lineIds()
         lineIds.forEachIndexed { index, viewId ->
             val habit = if (index < visibleHabits.length() && index < rowLimit) visibleHabits.optJSONObject(index) else null
             views.setViewVisibility(viewId, if (habit == null) View.GONE else View.VISIBLE)
@@ -168,7 +169,15 @@ class ChecklistWidget : AppWidgetProvider() {
                 views.setOnClickPendingIntent(viewId, null)
             }
         }
-        views.setTextViewText(R.id.checklist_habit_week, "再点右上角，翻回今日小票")
+        val weekNames = arrayOf("日", "一", "二", "三", "四", "五", "六")
+        val labelCal = Calendar.getInstance().apply { add(Calendar.DAY_OF_YEAR, -6) }
+        val labels = (0..6).joinToString("  ") { index ->
+            val label = if (index == 6) "今" else weekNames[labelCal.get(Calendar.DAY_OF_WEEK) - 1]
+            labelCal.add(Calendar.DAY_OF_YEAR, 1)
+            label
+        }
+        views.setTextViewText(R.id.checklist_habit_week, labels)
+        views.setViewVisibility(R.id.checklist_habit_week, View.VISIBLE)
         bindActions(context, views, appWidgetId, true)
         return views
     }
@@ -212,20 +221,20 @@ class ChecklistWidget : AppWidgetProvider() {
 
     private fun rowLimit(manager: AppWidgetManager, appWidgetId: Int): Int {
         val height = manager.getAppWidgetOptions(appWidgetId).getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT, 110)
-        return when {
-            height < 105 -> 1
-            height < 145 -> 2
-            else -> 3
-        }
+        return ((height - 70) / 34).coerceIn(1, 6)
     }
 
     private fun applyCompactRows(views: RemoteViews, visibleRows: Int) {
-        val lineIds = intArrayOf(R.id.checklist_item_1, R.id.checklist_item_2, R.id.checklist_item_3)
+        val lineIds = lineIds()
         lineIds.forEachIndexed { index, viewId ->
             views.setViewVisibility(viewId, if (index < visibleRows) View.VISIBLE else View.GONE)
         }
-        views.setViewVisibility(R.id.checklist_habit_week, if (visibleRows >= 2) View.VISIBLE else View.GONE)
     }
+
+    private fun lineIds() = intArrayOf(
+        R.id.checklist_item_1, R.id.checklist_item_2, R.id.checklist_item_3,
+        R.id.checklist_item_4, R.id.checklist_item_5, R.id.checklist_item_6,
+    )
 
     private fun bindActions(context: Context, views: RemoteViews, appWidgetId: Int, habitFace: Boolean) {
         views.setOnClickPendingIntent(R.id.checklist_root, null)

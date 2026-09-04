@@ -13,6 +13,9 @@
     <TextView android:id="@+id/checklist_item_1" style="@style/WidgetLine" />
     <TextView android:id="@+id/checklist_item_2" style="@style/WidgetLine" />
     <TextView android:id="@+id/checklist_item_3" style="@style/WidgetLine" />
+    <TextView android:id="@+id/checklist_item_4" style="@style/WidgetLine" />
+    <TextView android:id="@+id/checklist_item_5" style="@style/WidgetLine" />
+    <TextView android:id="@+id/checklist_item_6" style="@style/WidgetLine" />
     <TextView android:id="@+id/checklist_habit_week" android:layout_width="match_parent" android:layout_height="wrap_content" android:gravity="center" android:text="·  ·  ·  ·  ·  ·  ·" android:textColor="#CCFFFFFF" android:textSize="11sp" android:letterSpacing="0.08" android:layout_marginTop="3dp" />
     </LinearLayout>
 </FrameLayout>
