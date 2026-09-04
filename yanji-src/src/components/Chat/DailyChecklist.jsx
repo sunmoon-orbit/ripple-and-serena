@@ -8,7 +8,20 @@ import { showToast } from '../Toast'
 // 「我今天要扫地」→ 记一条；做完了 → 划掉。涟言在聊天里也能帮她记（daily_checklist 工具）。
 
 const WEEK_CN = ['日', '一', '二', '三', '四', '五', '六']
-const HABIT_ICONS = ['🌱', '💊', '🏃', '📖', '💧', '🌙', '🧘', '✨']
+const HABIT_ICONS = [
+  { id: 'leaf', label: '生长', path: <><path d="M6 18C7 10 12 5 19 4c0 7-4 12-11 13"/><path d="M5 20c3-5 7-8 12-11"/></> },
+  { id: 'pill', label: '吃药', path: <><path d="m8 16 8-8a4 4 0 0 1 5 5l-8 8a4 4 0 0 1-5-5Z"/><path d="m11 13 5 5"/></> },
+  { id: 'move', label: '运动', path: <><circle cx="15" cy="5" r="2"/><path d="m9 21 3-7-3-3 4-3 3 4 4 1M12 14l5 2-2 5"/></> },
+  { id: 'book', label: '读书', path: <><path d="M4 5a7 7 0 0 1 8 2v13a7 7 0 0 0-8-2Z"/><path d="M20 5a7 7 0 0 0-8 2v13a7 7 0 0 1 8-2Z"/></> },
+  { id: 'drop', label: '喝水', path: <path d="M12 3S6 10 6 15a6 6 0 0 0 12 0c0-5-6-12-6-12Z"/> },
+  { id: 'moon', label: '睡眠', path: <path d="M20 15.5A8 8 0 0 1 8.5 4 8.5 8.5 0 1 0 20 15.5Z"/> },
+  { id: 'breathe', label: '放松', path: <><path d="M12 21V9M12 14c-4 0-7-2-8-6 4 0 7 2 8 6ZM12 11c4 0 7-2 8-6-4 0-7 2-8 6Z"/></> },
+  { id: 'spark', label: '其他', path: <path d="m12 3 1.5 5.5L19 10l-5.5 1.5L12 17l-1.5-5.5L5 10l5.5-1.5Z"/> },
+]
+function HabitGlyph({ id, title }) {
+  const icon = HABIT_ICONS.find((x) => x.id === id) || HABIT_ICONS[0]
+  return <svg className="habit-glyph" viewBox="0 0 24 24" aria-label={title || icon.label}>{icon.path}</svg>
+}
 const dayKey = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 
 export default function DailyChecklist({ onClose, initialView = 'receipt' }) {
@@ -20,7 +33,7 @@ export default function DailyChecklist({ onClose, initialView = 'receipt' }) {
   const [view, setView] = useState(initialView)
   const [habits, setHabits] = useState([])
   const [habitName, setHabitName] = useState('')
-  const [habitIcon, setHabitIcon] = useState('🌱')
+  const [habitIcon, setHabitIcon] = useState('leaf')
   const [month, setMonth] = useState(() => new Date(new Date().getFullYear(), new Date().getMonth(), 1))
 
   const load = useCallback(async () => {
@@ -164,7 +177,7 @@ export default function DailyChecklist({ onClose, initialView = 'receipt' }) {
             <div className="habit-today">
               {habits.length === 0 && <div className="receipt-empty">还没有种下习惯<br />先从一件想慢慢坚持的小事开始</div>}
               {habits.map((habit) => <div className="habit-row" key={habit.id}>
-                <button className={'habit-dot' + (habit.checkins?.includes(today) ? ' done' : '')} onClick={() => toggleHabit(habit)}>{habit.icon}</button>
+                <button className={'habit-dot' + (habit.checkins?.includes(today) ? ' done' : '')} onClick={() => toggleHabit(habit)}><HabitGlyph id={habit.icon} title={habit.name}/></button>
                 <span onClick={() => toggleHabit(habit)}>{habit.name}</span>
                 <button className="habit-archive" onClick={() => removeHabit(habit)}>收起</button>
               </div>)}
@@ -178,11 +191,11 @@ export default function DailyChecklist({ onClose, initialView = 'receipt' }) {
             <div className="habit-calendar">
               {monthDays.map((d, i) => d ? <div key={dayKey(d)} className={'habit-day' + (dayKey(d) === today ? ' today' : '')}>
                 <b>{d.getDate()}</b>
-                <span>{habits.filter((h) => h.checkins?.includes(dayKey(d))).slice(0, 3).map((h) => h.icon).join('')}</span>
+                <span>{habits.filter((h) => h.checkins?.includes(dayKey(d))).slice(0, 3).map((h) => <i key={h.id} />)}</span>
               </div> : <div key={`blank-${i}`} />)}
             </div>
             <div className="habit-add">
-              <div className="habit-icon-pick">{HABIT_ICONS.map((icon) => <button key={icon} className={habitIcon === icon ? 'active' : ''} onClick={() => setHabitIcon(icon)}>{icon}</button>)}</div>
+              <div className="habit-icon-pick">{HABIT_ICONS.map((icon) => <button key={icon.id} title={icon.label} className={habitIcon === icon.id ? 'active' : ''} onClick={() => setHabitIcon(icon.id)}><HabitGlyph id={icon.id}/></button>)}</div>
               <div className="receipt-add"><input value={habitName} onChange={(e) => setHabitName(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && addHabit()} placeholder="想养成什么习惯？" maxLength={30}/><button disabled={busy || !habitName.trim()} onClick={addHabit}>种下</button></div>
             </div>
             <div className="habit-kind-note">只记录你主动种下的习惯 · 普通待办不会被算进来</div>

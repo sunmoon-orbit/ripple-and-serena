@@ -4489,6 +4489,7 @@ body.mp-active .scroll-bottom-btn { bottom: 139px; }
 .habit-row > span { flex:1; cursor:pointer; }
 .habit-dot { width:27px; height:27px; border:1px solid #ddd2c8; border-radius:50%; background:#f7f2ed; filter:grayscale(.65); cursor:pointer; }
 .habit-dot.done { background:#f1dce4; border-color:#d6a1b0; filter:none; box-shadow:0 0 0 3px rgba(214,161,176,.14); }
+.habit-glyph { width:16px; height:16px; fill:none; stroke:currentColor; stroke-width:1.65; stroke-linecap:round; stroke-linejoin:round; vertical-align:middle; }
 .habit-archive { border:0; background:none; color:#b3aaa0; font:10px inherit; cursor:pointer; }
 .habit-month-head { display:flex; align-items:center; justify-content:space-between; margin:8px 0 5px; font-size:11px; }
 .habit-month-head button { border:0; background:none; font-size:19px; color:#8e6c72; cursor:pointer; }
@@ -4497,11 +4498,13 @@ body.mp-active .scroll-bottom-btn { bottom: 139px; }
 .habit-day { min-height:35px; padding:3px 2px; border-radius:5px; background:#f6f3ed; text-align:center; overflow:hidden; }
 .habit-day.today { box-shadow:inset 0 0 0 1px #d6a1b0; background:#fff7f8; }
 .habit-day b { display:block; font-size:9px; font-weight:400; color:#777067; }
-.habit-day span { display:block; height:16px; white-space:nowrap; font-size:10px; letter-spacing:-2px; margin-top:1px; }
+.habit-day span { display:flex; height:16px; align-items:center; justify-content:center; gap:2px; margin-top:1px; }
+.habit-day span i { width:4px; height:4px; border-radius:50%; background:#d99aae; box-shadow:0 0 0 1px rgba(217,154,174,.16); }
 .habit-add { margin-top:10px; border-top:1px dashed #c9c4b8; padding-top:8px; }
 .habit-icon-pick { display:flex; justify-content:space-between; gap:2px; }
 .habit-icon-pick button { border:0; background:transparent; width:29px; height:27px; border-radius:8px; cursor:pointer; filter:grayscale(.55); }
 .habit-icon-pick button.active { background:#f1dce4; filter:none; transform:translateY(-1px); }
+.habit-icon-pick button { color:#756a65; }
 .habit-kind-note { text-align:center; color:#aaa297; font-size:9px; margin:7px 0 1px; }
 /* 底部锯齿撕边 */
 .receipt-serration {
