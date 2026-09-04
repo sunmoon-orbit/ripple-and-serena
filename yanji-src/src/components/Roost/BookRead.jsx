@@ -123,6 +123,7 @@ export default function BookRead({ onClose }) {
   const [books, setBooks] = useState(null)      // null=loading
   const [active, setActive] = useState(null)    // 选中的书（列表项）
   const [chapter, setChapter] = useState(null)  // {idx,title,content,annotations}
+  const [chapterViewKey, setChapterViewKey] = useState(0) // 只在真正打开章节时触发阅读位置恢复
   const [chapterCount, setChapterCount] = useState(1)
   const [loading, setLoading] = useState(false)
   const [pending, setPending] = useState(null)  // 选中待批注 {start,end,quote}
@@ -178,6 +179,7 @@ export default function BookRead({ onClose }) {
       ])
       restoreScrollRef.current = restoreScroll
       setChapter(ch)
+      setChapterViewKey((key) => key + 1)
       setChatMessages(Array.isArray(messages) ? messages : [])
       savePos(book.id, idx, restoreScroll)
       sendReadingHeartbeat(cfg, book.id, '阿颖', idx, 0).catch(() => {})
@@ -265,7 +267,7 @@ export default function BookRead({ onClose }) {
     if (!chapter || !bodyRef.current) return
     bodyRef.current.scrollTop = restoreScrollRef.current
     restoreScrollRef.current = 0
-  }, [chapter])
+  }, [chapterViewKey])
 
   // 滚动时静默记进度（防抖 300ms；savePos 只写 localStorage，组件卸载后落笔也安全）
   function onBodyScroll(e) {
