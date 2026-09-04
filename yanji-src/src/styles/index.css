@@ -2877,6 +2877,20 @@ textarea.form-input { display: block; margin: 8px 16px 12px; }
 /* 进入页·雾紫雨窗：保留代码雨的结构，彻底离开黑底绿字的传统语法 */
 .home-screen-rain { background: #ebe6ef; }
 .coderain-canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
+.coderain-sound-toggle {
+  position: absolute; right: max(18px, env(safe-area-inset-right)); bottom: max(20px, env(safe-area-inset-bottom));
+  z-index: 3; width: 38px; height: 38px; padding: 9px;
+  display: grid; place-items: center; border-radius: 50%; cursor: pointer;
+  color: rgba(78,68,91,0.46); background: rgba(255,252,255,0.18);
+  border: 1px solid rgba(94,80,110,0.14); backdrop-filter: blur(7px);
+  -webkit-backdrop-filter: blur(7px); transition: color .2s, background .2s, border-color .2s, transform .2s;
+}
+.coderain-sound-toggle:active { transform: scale(.93); }
+.coderain-sound-toggle.is-active {
+  color: rgba(111,87,137,0.78); background: rgba(247,240,250,0.38);
+  border-color: rgba(132,108,155,0.24);
+}
+.coderain-sound-toggle svg { width: 100%; height: 100%; fill: none; stroke: currentColor; stroke-width: 1.45; stroke-linecap: round; stroke-linejoin: round; }
 .home-rain-overlay {
   position: absolute; inset: 0; display: flex; flex-direction: column;
   align-items: center; justify-content: flex-end; padding-bottom: 15vh;
