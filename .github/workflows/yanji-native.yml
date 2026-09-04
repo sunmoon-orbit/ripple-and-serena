@@ -73,7 +73,9 @@ jobs:
           test -n "$apk_path"
           test -s "$apk_path"
           cp "$apk_path" app-debug.apk
+          cp "$apk_path" yanji-habits-offline-20260904.apk
           test -s app-debug.apk
+          test -s yanji-habits-offline-20260904.apk
           ls -lh app-debug.apk
 
       - name: Upload build log on failure
@@ -103,6 +105,8 @@ jobs:
             3. 首次打开允许通知权限
 
             更新：固定签名已启用（2026-07-19 起），以后直接安装新包覆盖即可，不用卸载。
-          files: app-debug.apk
+          files: |
+            app-debug.apk
+            yanji-habits-offline-20260904.apk
           fail_on_unmatched_files: true
           overwrite_files: true
