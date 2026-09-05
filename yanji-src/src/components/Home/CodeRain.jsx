@@ -1,4 +1,4 @@
-import { useRef, useEffect, useState } from 'react'
+import { useRef, useEffect } from 'react'
 import rainWindowUrl from '../../assets/rain-on-window-cc0.mp3'
 
 // 涟漪代码雨开屏 v3：
@@ -26,8 +26,6 @@ function easeOutBack(t) {
 
 export default function CodeRain({ text, onReady, soundMode = 'drops' }) {
   const canvasRef = useRef(null)
-  const soundControlRef = useRef(null)
-  const [soundActive, setSoundActive] = useState(false)
 
   useEffect(() => {
     const cvs = canvasRef.current
@@ -67,30 +65,18 @@ export default function CodeRain({ text, onReady, soundMode = 'drops' }) {
     }
 
     async function resumeAudio() {
-      let active = false
       if (audio) {
         try {
           if (audio.state === 'suspended') await audio.resume()
-          active = audio.state === 'running'
         } catch { /* Desktop browsers may require an explicit gesture. */ }
       }
       if (rainBed) {
         try {
           if (rainBed.paused) await rainBed.play()
-          active = !rainBed.paused
-        } catch { /* Keep the unlock control visible for another gesture. */ }
+        } catch { /* Desktop browsers may require an explicit gesture. */ }
       }
-      setSoundActive(active)
-      return active
     }
 
-    function pauseAudio() {
-      if (audio?.state === 'running') audio.suspend().catch(() => {})
-      if (rainBed && !rainBed.paused) rainBed.pause()
-      setSoundActive(false)
-    }
-
-    soundControlRef.current = { resume: resumeAudio, pause: pauseAudio }
     resumeAudio()
 
     function playDropSound(layer, x, w, now) {
@@ -437,7 +423,6 @@ export default function CodeRain({ text, onReady, soundMode = 'drops' }) {
       cancelAnimationFrame(raf)
       window.removeEventListener('resize', resize)
       window.removeEventListener('pointerdown', resumeAudio)
-      soundControlRef.current = null
       if (rainBed) {
         rainBed.pause()
         rainBed.removeAttribute('src')
@@ -447,33 +432,5 @@ export default function CodeRain({ text, onReady, soundMode = 'drops' }) {
     }
   }, [text, onReady, soundMode])
 
-  function handleSoundToggle(event) {
-    event.preventDefault()
-    event.stopPropagation()
-    const control = soundControlRef.current
-    if (!control) return
-    if (soundActive) control.pause()
-    else control.resume()
-  }
-
-  return (
-    <>
-      <canvas ref={canvasRef} className="coderain-canvas" />
-      <button
-        type="button"
-        className={'coderain-sound-toggle' + (soundActive ? ' is-active' : '')}
-        aria-label={soundActive ? '关闭雨声' : '开启雨声'}
-        title={soundActive ? '关闭雨声' : '开启雨声'}
-        onPointerDown={(event) => event.stopPropagation()}
-        onClick={handleSoundToggle}
-      >
-        <svg viewBox="0 0 24 24" aria-hidden="true">
-          <path d="M12 3.2c-2.8 3.4-5.1 6.2-5.1 9.2a5.1 5.1 0 0 0 10.2 0c0-3-2.3-5.8-5.1-9.2Z" />
-          {soundActive
-            ? <><path d="M18.1 8.8c1.2 1.1 1.2 5.3 0 6.4" /><path d="M20.4 6.4c2.3 2.4 2.3 8.8 0 11.2" /></>
-            : <path d="m17.5 8.5 4 7m0-7-4 7" />}
-        </svg>
-      </button>
-    </>
-  )
+  return <canvas ref={canvasRef} className="coderain-canvas" />
 }
