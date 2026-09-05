@@ -724,7 +724,10 @@ async function loadUsage() {
       // stale = 状态栏好久没刷新了，多半是涟言没在跑。宁可说「不知道」也别给她一个旧数字
       if (c.five_hour) rows.push(ugBar('涟言 · 5 小时', c.five_hour.used_percent, c.five_hour.reset_after_seconds))
       if (c.seven_day) rows.push(ugBar('涟言 · 7 天', c.seven_day.used_percent, c.seven_day.reset_after_seconds))
-      if (c.context_used_percent != null) rows.push(ugBar('涟言 · 当前窗口', c.context_used_percent, null))
+      if (c.context_used_percent != null) {
+        const windowLabel = c.context_window_size ? ` · ${Math.round(c.context_window_size / 1000)}K` : ''
+        rows.push(ugBar('涟言 · 当前上下文', c.context_used_percent, null, windowLabel))
+      }
     }
     const x = d.codex || {}
     if (x.available) {

@@ -2,11 +2,12 @@
 const fs = require('fs')
 const path = require('path')
 const crypto = require('crypto')
+const { modelCatalog, validModel } = require('./claude-runtime')
 const MAX_BYTES = 256 * 1024
 const hash = s => crypto.createHash('sha256').update(s).digest('hex')
 const fail = (status, message) => Object.assign(new Error(message), { status })
 
-function createStore({ project, home, backups }) {
+function createStore({ project, home, backups, claudeState = path.join(home, '.claude.json'), usageSnapshot = path.join(home, '.claude', 'rate_limits_latest.json') }) {
   const targets = {
     project: path.join(project, 'CLAUDE.md'),
     global: path.join(home, '.claude', 'CLAUDE.md'),
@@ -56,7 +57,17 @@ function createStore({ project, home, backups }) {
   return {
     readDocument(scope) { if (!['project', 'global'].includes(scope)) throw fail(400, '未知范围'); return read(scope) },
     saveDocument(scope, content, revision) { if (!['project', 'global'].includes(scope)) throw fail(400, '未知范围'); return save(scope, content, revision) },
-    readModel() { const { settings, item } = model(); return { model: settings.model || '', revision: item.revision, applies: 'next_session' } },
+    readModel() {
+      const { settings, item } = model()
+      const snapshot = (() => { try { return JSON.parse(fs.readFileSync(usageSnapshot, 'utf8')) } catch { return null } })()
+      return {
+        model: settings.model || '',
+        currentModel: validModel(snapshot?.model) ? snapshot.model : '',
+        models: modelCatalog({ stateFile: claudeState, settingsFile: targets.model, usageFile: usageSnapshot }),
+        revision: item.revision,
+        applies: 'next_session',
+      }
+    },
     saveModel(value, revision) {
       if (typeof value !== 'string' || (value && !/^[a-zA-Z0-9][a-zA-Z0-9._:[\]-]{0,159}$/.test(value))) throw fail(400, '模型名称无效')
       const { settings } = model()
@@ -67,7 +78,7 @@ function createStore({ project, home, backups }) {
   }
 }
 
-function createHandler(store, authenticate) {
+function createHandler(store, authenticate, { switchModel } = {}) {
   return async function handle(req, res, url) {
     const send = (status, data) => {
       res.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' })
@@ -90,7 +101,14 @@ function createHandler(store, authenticate) {
       let body
       try { body = JSON.parse(Buffer.concat(chunks).toString('utf8')) } catch { throw fail(400, '请求格式不正确') }
       if (!body || typeof body !== 'object') throw fail(400, '请求格式不正确')
-      const data = body.kind === 'model' ? store.saveModel(body.model, body.revision) : store.saveDocument(body.scope, body.content, body.revision)
+      let data
+      if (body.kind === 'model-switch') {
+        if (!validModel(body.model)) throw fail(400, '模型名称无效')
+        if (typeof switchModel !== 'function' || !switchModel(body.model)) throw fail(409, '当前没有可接收切换指令的 Claude Code 会话')
+        data = { model: body.model, applied: 'current_session', queued: true }
+      } else {
+        data = body.kind === 'model' ? store.saveModel(body.model, body.revision) : store.saveDocument(body.scope, body.content, body.revision)
+      }
       send(200, data)
     } catch (e) { send(e.status || 500, { error: e.status ? e.message : '读取或保存失败，请稍后重试；原文件未被主动删除' }) }
   }

@@ -3,14 +3,27 @@ const assert = require('node:assert/strict')
 const fs = require('fs')
 const os = require('os')
 const path = require('path')
-const http = require('http')
+const { Readable } = require('stream')
 const { createStore, createHandler } = require('../cc-settings')
 function fixture(t) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'cc-settings-test-'))
   const project = path.join(root, 'project'), home = path.join(root, 'home'), backups = path.join(root, 'backups')
   fs.mkdirSync(project); fs.mkdirSync(home)
   t.after(() => fs.rmSync(root, { recursive: true, force: true }))
-  return { root, project, home, backups, store: createStore({ project, home, backups }) }
+  const claudeState = path.join(root, 'claude-state.json'), usageSnapshot = path.join(root, 'usage.json')
+  return { root, project, home, backups, claudeState, usageSnapshot, store: createStore({ project, home, backups, claudeState, usageSnapshot }) }
+}
+async function request(handler, { method = 'GET', token = '', body, query = '' } = {}) {
+  const req = Readable.from(body === undefined ? [] : [Buffer.from(body)])
+  req.method = method
+  req.headers = { authorization: token ? `Bearer ${token}` : '' }
+  let status, headers, text
+  const res = {
+    writeHead(code, nextHeaders) { status = code; headers = nextHeaders },
+    end(value = '') { text = value },
+  }
+  await handler(req, res, new URL(`/raven/cc-settings${query}`, 'http://localhost'))
+  return { status, headers, body: JSON.parse(text) }
 }
 test('document edits preserve originals and reject stale edits and arbitrary paths', t => {
   const { store, backups } = fixture(t)
@@ -44,15 +57,20 @@ test('symlink files cannot be edited through the panel', t => {
 test('HTTP requires login even on localhost and supports round-trip save', async t => {
   const { store } = fixture(t)
   const handler = createHandler(store, token => token === 'fixture-only')
-  const server = http.createServer((req, res) => handler(req, res, new URL(req.url, 'http://localhost')))
-  await new Promise(resolve => server.listen(0, '127.0.0.1', resolve))
-  t.after(() => { server.closeAllConnections(); server.close() })
-  const url = `http://127.0.0.1:${server.address().port}/raven/cc-settings`
-  assert.equal((await fetch(url)).status, 401)
-  const headers = { Authorization: 'Bearer fixture-only', 'Content-Type': 'application/json' }
-  const first = await (await fetch(url, { headers })).json()
-  const response = await fetch(url, { method: 'POST', headers, body: JSON.stringify({ scope: 'project', content: 'hello', revision: first.revision }) })
+  assert.equal((await request(handler)).status, 401)
+  const first = (await request(handler, { token: 'fixture-only' })).body
+  const response = await request(handler, { method: 'POST', token: 'fixture-only', body: JSON.stringify({ scope: 'project', content: 'hello', revision: first.revision }) })
   assert.equal(response.status, 200)
-  assert.equal((await response.json()).content, 'hello')
-  assert.equal((await fetch(url, { method: 'POST', headers, body: '{' })).status, 400)
+  assert.equal(response.body.content, 'hello')
+  assert.equal((await request(handler, { method: 'POST', token: 'fixture-only', body: '{' })).status, 400)
+})
+test('HTTP can queue a validated model switch without changing the saved default', async t => {
+  const { store } = fixture(t)
+  const switched = []
+  const handler = createHandler(store, token => token === 'fixture-only', { switchModel: value => { switched.push(value); return true } })
+  const response = await request(handler, { method: 'POST', token: 'fixture-only', body: JSON.stringify({ kind: 'model-switch', model: 'claude-current' }) })
+  assert.equal(response.status, 200)
+  assert.deepEqual(switched, ['claude-current'])
+  assert.equal(store.readModel().model, '')
+  assert.equal((await request(handler, { method: 'POST', token: 'fixture-only', body: JSON.stringify({ kind: 'model-switch', model: 'bad model' }) })).status, 400)
 })

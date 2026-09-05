@@ -866,7 +866,7 @@
           <div class="bar-label"><span id="session-label">-</span><span id="session-pct">-</span></div>
           <div class="bar"><div class="bar-fill" id="session-bar" style="width:0%"></div></div>
         </div>
-        <div style="font-size:11px;color:var(--text-dim);margin-top:6px;">压缩后归零 · 约估，非精确值</div>
+        <div style="font-size:11px;color:var(--text-dim);margin-top:6px;">来自当前 Claude Code 状态栏 · 百分比不是压缩倒计时</div>
       </div>
       <div class="card" id="mem-card">
         <div class="card-title">内存</div>
@@ -1597,9 +1597,10 @@ function renderStatus(data) {
   }
   if (data.session) {
     const pct = data.session.pct
-    const label = data.session.tokens != null
-      ? `${Math.round(data.session.tokens / 1000)}K tokens`
-      : `${Math.round((data.session.bytes || 0) / 1024)} KB`
+    const used = data.session.tokens != null ? Math.round(data.session.tokens / 1000) : null
+    const windowSize = data.session.contextWindow != null ? Math.round(data.session.contextWindow / 1000) : null
+    const baseLabel = used != null && windowSize != null ? `${used}K / ${windowSize}K tokens` : '当前会话快照'
+    const label = baseLabel + (data.session.stale ? ' · 旧快照' : '')
     document.getElementById('session-label').textContent = label
     document.getElementById('session-pct').textContent = `${pct}%`
     const fill = document.getElementById('session-bar')
@@ -2371,9 +2372,9 @@ document.getElementById('perm-modal').addEventListener('click', e => {
 </style>
 <dialog id="cc-settings-dialog" aria-labelledby="cc-settings-title">
   <div class="cc-row"><h2 id="cc-settings-title">CC 设置</h2><button id="cc-settings-close" style="margin-left:auto" aria-label="关闭设置">关闭</button></div>
-  <h3>下次会话默认模型</h3>
-  <p class="cc-help">选择常用模型，或输入完整模型 ID。使用本项目启动的新会话生效；不会打断正在进行的对话。实际可用性取决于你的账号。</p>
-  <div class="cc-row"><input id="cc-model" list="cc-model-options" aria-label="默认模型" placeholder="留空跟随 CC 默认" maxlength="160"><datalist id="cc-model-options"><option value="sonnet"><option value="opus"><option value="haiku"></datalist><button id="cc-model-save">保存模型</button></div>
+  <h3>Claude Code 模型</h3>
+  <p class="cc-help">列表从 Claude Code 的当前状态、近期使用记录和本机模型缓存动态读取；也可输入完整模型 ID。当前模型：<span id="cc-current-model">未知</span>。</p>
+  <div class="cc-row"><input id="cc-model" list="cc-model-options" aria-label="Claude Code 模型" placeholder="留空跟随 CC 默认" maxlength="160"><datalist id="cc-model-options"></datalist><button id="cc-model-save">保存为默认</button><button id="cc-model-switch">切换当前会话</button></div>
   <h3>CLAUDE.md · 对话说明</h3>
   <div class="cc-row"><select id="cc-scope" aria-label="说明文件范围"><option value="project">归巢项目说明</option><option value="global">全局说明</option></select><button id="cc-reload">重新读取</button><button id="cc-preview-toggle">阅读预览</button></div>
   <p class="cc-help">全局说明适用于该服务器账号的 CC；项目说明适用于归巢项目。未保存的草稿留在此面板，刷新网页前请保存。</p>

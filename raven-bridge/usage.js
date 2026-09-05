@@ -91,7 +91,7 @@ function verdict(claude, codex) {
     const top = Math.max(claude.five_hour?.used_percent || 0, claude.seven_day?.used_percent || 0)
     if (top >= 90) worries.push('涟言额度快见底了')
     else if (top >= 75) worries.push('涟言额度过半偏多')
-    if ((claude.context_used_percent || 0) >= 85) worries.push('涟言这个窗口快满了，随时会压缩')
+    if ((claude.context_used_percent || 0) >= 85) worries.push('涟言当前上下文占用较高')
   }
   if (codex.available && !codex.stale) {
     if (codex.limit_reached) worries.push('小扣已经撞限额了')

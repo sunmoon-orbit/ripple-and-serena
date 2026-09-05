@@ -7,6 +7,8 @@ electron-app/node_modules/
 raven-bridge/.push-quote-last
 raven-bridge/.push-night-last
 raven-bridge/activity.json
+raven-bridge/proactive-msg-state.json
+raven-bridge/call-invite-state.json
 raven-bridge/.env
 raven-bridge/.valid-tokens.json
 raven/*.zip

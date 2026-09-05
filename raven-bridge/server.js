@@ -6,6 +6,7 @@ const fs = require('fs')
 const path = require('path')
 const crypto = require('crypto')
 const { getUsage } = require('./usage')
+const { contextSnapshot } = require('./claude-runtime')
 
 const PW_HASH = (() => {
   try {
@@ -350,39 +351,8 @@ function pm2Services() {
   } catch { return [] }
 }
 
-const SESSION_DIR = '/home/ripple/.claude/projects/-home-ripple-ripple-and-serena'
-const CONTEXT_MAX_TOKENS = 200000
-
 function sessionUsage() {
-  try {
-    const entries = fs.readdirSync(SESSION_DIR)
-      .filter(f => f.endsWith('.jsonl'))
-      .map(f => { try { return { f, mtime: fs.statSync(path.join(SESSION_DIR, f)).mtimeMs } } catch { return null } })
-      .filter(Boolean)
-      .sort((a, b) => b.mtime - a.mtime)
-    if (!entries.length) return null
-
-    const latest = path.join(SESSION_DIR, entries[0].f)
-    const size = fs.statSync(latest).size
-    const readSize = Math.min(size, 30 * 1024)
-    const buf = Buffer.alloc(readSize)
-    const fd = fs.openSync(latest, 'r')
-    fs.readSync(fd, buf, 0, readSize, size - readSize)
-    fs.closeSync(fd)
-
-    const lines = buf.toString('utf8').split('\n').reverse()
-    for (const line of lines) {
-      if (!line.trim()) continue
-      try {
-        const entry = JSON.parse(line)
-        const usage = entry.usage || entry.message?.usage
-        if (!usage) continue
-        const tokens = (usage.input_tokens || 0) + (usage.cache_read_input_tokens || 0) + (usage.cache_creation_input_tokens || 0)
-        if (tokens > 0) return { tokens, pct: Math.min(100, Math.round(tokens / CONTEXT_MAX_TOKENS * 100)) }
-      } catch {}
-    }
-    return null
-  } catch { return null }
+  return contextSnapshot(path.join(os.homedir(), '.claude', 'rate_limits_latest.json'))
 }
 
 // uptime-kuma runs outside pm2 (root instance on :3001) — probe it directly
@@ -650,7 +620,7 @@ const handleCcSettings = ccSettings.createHandler(ccSettings.createStore({
   project: path.resolve(__dirname, '..'),
   home: os.homedir(),
   backups: path.join(os.homedir(), '.raven-cc-backups'),
-}), tokenIsValid)
+}), tokenIsValid, { switchModel: model => tmuxSend(`/model ${model}`) })
 
 const server = http.createServer((req, res) => {
   res.setHeader('Access-Control-Allow-Origin', '*')
