@@ -730,6 +730,9 @@
       <span>Ripple</span>
     </div>
     <div id="conn-status">
+      <button id="cc-settings-open" title="CC 设置" aria-label="模型与 CLAUDE.md 设置" style="background:none;border:0;color:var(--text-dim);padding:5px;cursor:pointer">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M4 7h16M4 17h16"/><circle cx="9" cy="7" r="3" fill="var(--bg)"/><circle cx="15" cy="17" r="3" fill="var(--bg)"/></svg>
+      </button>
       <button id="cal-btn" title="消息日历" aria-label="消息日历">
         <svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
           <rect x="2" y="4" width="16" height="14" rx="2"/>
@@ -2352,5 +2355,32 @@ document.getElementById('perm-modal').addEventListener('click', e => {
   }
 })
 </script>
+<style>
+#cc-settings-dialog { width:min(680px,calc(100vw - 24px)); max-height:88dvh; box-sizing:border-box; overflow:auto; border:1px solid var(--border); border-radius:20px; padding:22px; background:var(--bg); color:var(--text); }
+#cc-settings-dialog::backdrop { background:rgba(0,0,0,.4); }
+#cc-settings-dialog h2 { font-size:20px; margin:0; }
+#cc-settings-dialog h3 { font-size:15px; }
+.cc-row { display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin:12px 0; }
+#cc-settings-dialog button,#cc-settings-dialog select,#cc-settings-dialog input { font:inherit; padding:9px 12px; border:1px solid var(--border); border-radius:10px; color:var(--text); background:var(--surface); }
+#cc-settings-dialog button { cursor:pointer; }
+#cc-settings-dialog button:disabled { opacity:.5; cursor:wait; }
+#cc-model { min-width:0; flex:1; }
+#cc-document { box-sizing:border-box; width:100%; min-height:240px; resize:vertical; padding:12px; font:14px/1.7 monospace; border:1px solid var(--border); border-radius:12px; color:var(--text); background:var(--surface); }
+#cc-preview { white-space:pre-wrap; overflow-wrap:anywhere; line-height:1.7; min-height:240px; }
+.cc-help,#cc-settings-status { font-size:13px; line-height:1.6; color:var(--text-dim); }
+</style>
+<dialog id="cc-settings-dialog" aria-labelledby="cc-settings-title">
+  <div class="cc-row"><h2 id="cc-settings-title">CC 设置</h2><button id="cc-settings-close" style="margin-left:auto" aria-label="关闭设置">关闭</button></div>
+  <h3>下次会话默认模型</h3>
+  <p class="cc-help">选择常用模型，或输入完整模型 ID。使用本项目启动的新会话生效；不会打断正在进行的对话。实际可用性取决于你的账号。</p>
+  <div class="cc-row"><input id="cc-model" list="cc-model-options" aria-label="默认模型" placeholder="留空跟随 CC 默认" maxlength="160"><datalist id="cc-model-options"><option value="sonnet"><option value="opus"><option value="haiku"></datalist><button id="cc-model-save">保存模型</button></div>
+  <h3>CLAUDE.md · 对话说明</h3>
+  <div class="cc-row"><select id="cc-scope" aria-label="说明文件范围"><option value="project">归巢项目说明</option><option value="global">全局说明</option></select><button id="cc-reload">重新读取</button><button id="cc-preview-toggle">阅读预览</button></div>
+  <p class="cc-help">全局说明适用于该服务器账号的 CC；项目说明适用于归巢项目。未保存的草稿留在此面板，刷新网页前请保存。</p>
+  <textarea id="cc-document" spellcheck="false" aria-label="CLAUDE.md 内容"></textarea><div id="cc-preview" hidden></div>
+  <div class="cc-row"><button id="cc-document-save">保存说明</button></div>
+  <p id="cc-settings-status" role="status" aria-live="polite"></p>
+</dialog>
+<script src="/raven/cc-settings.js"></script>
 </body>
 </html>

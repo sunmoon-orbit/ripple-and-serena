@@ -645,6 +645,13 @@ setInterval(() => {
 
 // --- HTTP + WS server ---
 
+const ccSettings = require('./cc-settings')
+const handleCcSettings = ccSettings.createHandler(ccSettings.createStore({
+  project: path.resolve(__dirname, '..'),
+  home: os.homedir(),
+  backups: path.join(os.homedir(), '.raven-cc-backups'),
+}), tokenIsValid)
+
 const server = http.createServer((req, res) => {
   res.setHeader('Access-Control-Allow-Origin', '*')
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
@@ -653,6 +660,11 @@ const server = http.createServer((req, res) => {
   if (req.method === 'OPTIONS') { res.writeHead(204); res.end(); return }
 
   const url = new URL(req.url, `http://localhost`)
+
+  if (url.pathname === '/raven/cc-settings') {
+    void handleCcSettings(req, res, url)
+    return
+  }
 
   // ── 接口分级鉴权（2026-07-03 安全加固）──────────────────────────
   // 内部接口只许本机：reply/thinking 是 CC 的回复与 hook 通道，mcp 是 CC 的 MCP 通道。
