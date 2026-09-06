@@ -737,6 +737,23 @@ function ugCache(cache) {
   return `<div class="ug-cache">涟言 · 缓存 ${state}${parts.length ? ' · ' + parts.join(' · ') : ''}${cause}</div>`
 }
 
+function ugCodexCache(cache) {
+  if (!cache?.available) return '<div class="ug-cache">曜 · Codex · 缓存暂未提供</div>'
+  const cached = Number(cache.cached_input_tokens).toLocaleString('zh-CN')
+  const state = cache.cached_input_tokens > 0
+    ? '<strong class="warm">本次命中</strong>'
+    : '<strong>本次未命中</strong>'
+  const parts = [`读取 ${cached} token`]
+  if (cache.cache_write_input_tokens != null) {
+    parts.push(`写入 ${Number(cache.cache_write_input_tokens).toLocaleString('zh-CN')} token`)
+  }
+  if (cache.input_tokens != null) {
+    parts.push(`输入 ${Number(cache.input_tokens).toLocaleString('zh-CN')} token`)
+  }
+  if (cache.stale) parts.push('数据已旧')
+  return `<div class="ug-cache">曜 · Codex · 缓存 ${state} · ${parts.join(' · ')}</div>`
+}
+
 async function loadUsage() {
   const btn = document.getElementById('usage-refresh')
   btn.classList.remove('spinning'); void btn.offsetWidth; btn.classList.add('spinning')
@@ -764,6 +781,7 @@ async function loadUsage() {
       if (x.primary) rows.push(ugBar('曜 · Codex · 5 小时', x.primary.used_percent, x.primary.reset_after_seconds))
       if (x.secondary) rows.push(ugBar('曜 · Codex · 7 天', x.secondary.used_percent, x.secondary.reset_after_seconds))
     }
+    rows.push(ugCodexCache(x.prompt_cache))
 
     const notes = []
     if (!c.available) notes.push('涟言那边还没数据（要等他下次启动后状态栏刷新一次）')

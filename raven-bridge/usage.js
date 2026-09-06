@@ -5,17 +5,20 @@
 // 另一个要巡检和备份的东西）。这台机器 1.9G 内存，能少一个常驻进程就少一个。
 // 真正有价值的是它那两个数据源怎么读，那部分不到一百行，搬进归巢就够了。
 //
-// 两个来源都是「别人写好的快照文件」，这里只读不取钥匙：
+// 额度来源是「别人写好的快照文件」，这里只读不取钥匙：
 //   涟言（Claude Code 订阅额度 + 上下文余量）
 //     ← ~/bin/cc-status-capture.py，挂在 CC 的 statusLine 钩子上，CC 每次重画状态栏就刷新
 //   曜 · Codex（共用 Codex 额度）
 //     ← /home/codex/bin/usage-snapshot.py，codex 自己的 cron 每 10 分钟跑一次
 //       故意绕这一圈：codex 的 OAuth token 一步都不进 ripple 的进程，共用文件里只有百分比
 //
-// 所以这个模块本身碰不到任何凭证，最坏情况是读到一份过期的百分比。
+// Codex 缓存读取量则来自本机 rollout 的 token_count 事件，只挑官方生成的
+// cached_input_tokens / cache_write_input_tokens 数字，不读取或返回对话正文。
+// 所以这个模块本身碰不到任何凭证，最坏情况是读到一份过期的数字。
 
 const fs = require('fs')
 const { normalizePromptCache } = require('./claude-cache')
+const { readCodexPromptCache } = require('./codex-cache')
 
 const CLAUDE_FILE = '/home/ripple/.claude/rate_limits_latest.json'
 const CODEX_FILE = '/var/lib/ai-usage/codex.json'
@@ -70,10 +73,11 @@ function claudePart() {
 }
 
 function codexPart() {
+  const promptCache = readCodexPromptCache()
   const d = readJson(CODEX_FILE)
-  if (!d) return { available: false, error: 'snapshot_missing' }
-  if (d._error) return { available: false, error: d._error }
-  if (!d.available) return { available: false, error: d.error || 'unknown' }
+  if (!d) return { available: false, error: 'snapshot_missing', prompt_cache: promptCache }
+  if (d._error) return { available: false, error: d._error, prompt_cache: promptCache }
+  if (!d.available) return { available: false, error: d.error || 'unknown', prompt_cache: promptCache }
   const age = ageOf(d)
   return {
     available: true,
@@ -83,6 +87,7 @@ function codexPart() {
     limit_reached: !!d.limit_reached,
     primary: withCountdown(d.primary),
     secondary: withCountdown(d.secondary),
+    prompt_cache: promptCache,
   }
 }
 
