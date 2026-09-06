@@ -2,9 +2,8 @@
 
 入口：聊天页顶部滑杆图标。
 
-- 模型列表：从 Claude Code 状态栏快照、`~/.claude.json` 的模型选项缓存和近期使用记录动态读取，不在前端写死。接口只返回模型标识与展示名，不返回会话内容、凭证或完整配置。
-- 默认模型：在项目 `.claude/settings.local.json` 中只更新 `model` 字段，保留 hooks、permissions 等其他配置；留空删除覆盖。对下次从项目目录启动的 CC 生效，CLI 启动参数及组织策略可能覆盖。
-- 当前模型：显式点击后，向当前可接收消息的 tmux Claude Code pane 发送经过严格字符校验的 `/model <模型>`。接口只表示指令已排队，最终结果以 Claude Code 终端反馈及随后状态栏快照为准；没有可用 pane 时返回 409，不会另起会话。
+- 当前模型：设置面板只显示 Claude Code 状态栏快照中的当前模型，不维护或猜测模型候选列表。
+- 切换模型：直接在归巢聊天输入框发送 `/model <别名或完整模型 ID>`，沿用现有 tmux 消息通道；单独发送 `/model` 可打开 Claude Code 自带的选择器。模型别名与具体版本均由 Claude Code 维护。
 - 上下文：读取当前 Claude Code statusLine 生成的 `rate_limits_latest.json`，同时使用真实 `context_used_percent` 与 `context_window_size`；不再固定按 20 万 token 推算。百分比表示当前占用，不作为压缩倒计时；实际压缩仍沿用独立的终端事件提示。
 - 说明：读取/编辑项目 `CLAUDE.md` 或当前服务账号 `~/.claude/CLAUDE.md`。阅读预览仅渲染文本与标题，不执行 Markdown 内的 HTML。新会话会加载说明；不保证当前会话立即重读。
 - 保存：版本摘要比较，冲突返回 409，浏览器保留草稿；旧文件备份到服务账号 `~/.raven-cc-backups`，原子替换。拒绝符号链接和任意文件路径，正文上限 256 KiB。
