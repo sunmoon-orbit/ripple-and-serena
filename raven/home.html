@@ -194,6 +194,13 @@ html, body { min-height: 100%; background: var(--bg); color: var(--text); font-f
 .ug-fill.mid { background: var(--accent); }
 .ug-fill.hot { background: #d17a52; }
 .ug-note { font-size: 10px; color: var(--text-faint); margin-top: 8px; }
+.ug-cache {
+  margin: 10px 0 2px; padding: 9px 10px; border-radius: 9px; background: var(--surface2);
+  font-size: 11px; color: var(--text-dim); line-height: 1.55;
+}
+.ug-cache strong { color: var(--text); font-weight: 600; }
+.ug-cache .warm { color: var(--green); }
+.ug-cache .cold { color: var(--yellow); }
 
 /* tools row */
 .tools-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
@@ -708,6 +715,28 @@ function ugBar(label, pct, resetSec, extra) {
   </div>`
 }
 
+function ugCache(cache) {
+  if (!cache) return '<div class="ug-cache">涟言 · 缓存统计待首次对话 <span class="ug-reset">需 CC 2.1.251+</span></div>'
+  const state = cache.warm
+    ? '<strong class="warm">温热</strong>'
+    : cache.caching_observed ? '<strong class="cold">已冷</strong>' : '<strong>未报告缓存</strong>'
+  const parts = []
+  if (cache.hit_percent != null) parts.push(`命中 ${cache.hit_percent}%`)
+  if (cache.requests != null) parts.push(`${cache.requests} 次请求`)
+  if (cache.misses != null) parts.push(`${cache.misses} 次未命中`)
+  if (cache.warm && cache.expires_after_seconds != null) parts.push(ugDuration(cache.expires_after_seconds).replace('重置', '变冷'))
+  const causeNames = {
+    tools_changed: '工具发生变化',
+    system_prompt_changed: '系统提示发生变化',
+    ttl_expired_5m: '5 分钟缓存到期',
+    ttl_expired_1h: '1 小时缓存到期',
+    likely_server_side: '可能是服务端原因',
+  }
+  const causes = (cache.last_miss_causes || []).map(cause => causeNames[cause]).filter(Boolean)
+  const cause = causes.length ? `<div class="ug-note">最近未命中：${causes.join('、')}</div>` : ''
+  return `<div class="ug-cache">涟言 · 缓存 ${state}${parts.length ? ' · ' + parts.join(' · ') : ''}${cause}</div>`
+}
+
 async function loadUsage() {
   const btn = document.getElementById('usage-refresh')
   btn.classList.remove('spinning'); void btn.offsetWidth; btn.classList.add('spinning')
@@ -728,6 +757,7 @@ async function loadUsage() {
         const windowLabel = c.context_window_size ? ` · ${Math.round(c.context_window_size / 1000)}K` : ''
         rows.push(ugBar('涟言 · 当前上下文', c.context_used_percent, null, windowLabel))
       }
+      rows.push(ugCache(c.prompt_cache))
     }
     const x = d.codex || {}
     if (x.available) {
