@@ -701,7 +701,7 @@ const server = http.createServer((req, res) => {
     return
   }
 
-  // 涟言和小扣还剩多少额度（详见 usage.js：只读快照文件，不碰任何凭证）
+  // 涟言和曜 · Codex 还剩多少额度（详见 usage.js：只读快照文件，不碰任何凭证）
   if (req.method === 'GET' && url.pathname === '/raven/usage') {
     res.writeHead(200, { 'Content-Type': 'application/json' })
     res.end(JSON.stringify(getUsage()))
