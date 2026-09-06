@@ -400,7 +400,7 @@ html, body { min-height: 100%; background: var(--bg); color: var(--text); font-f
       <div id="mem-tags"></div>
     </div>
 
-    <!-- 额度：涟言（Claude 订阅 + 上下文余量）和小扣（Codex）还剩多少 -->
+    <!-- 额度：涟言（Claude 订阅 + 上下文余量）和曜 · Codex 还剩多少 -->
     <div class="card wide" id="usage-card">
       <div class="mem-header">
         <div class="mem-label">还剩多少</div>
@@ -695,7 +695,7 @@ async function loadMemory() {
   }
 }
 
-// 额度卡片：涟言（Claude 订阅额度 + 上下文余量）和小扣（Codex）
+// 额度卡片：涟言（Claude 订阅额度 + 上下文余量）和曜 · Codex
 // 数据来自 /raven/usage —— 服务端只读两份快照文件，不碰任何凭证，详见 raven-bridge/usage.js
 function ugDuration(sec) {
   if (sec == null || sec <= 0) return ''
@@ -761,15 +761,15 @@ async function loadUsage() {
     }
     const x = d.codex || {}
     if (x.available) {
-      if (x.primary) rows.push(ugBar('小扣 · 5 小时', x.primary.used_percent, x.primary.reset_after_seconds))
-      if (x.secondary) rows.push(ugBar('小扣 · 7 天', x.secondary.used_percent, x.secondary.reset_after_seconds))
+      if (x.primary) rows.push(ugBar('曜 · Codex · 5 小时', x.primary.used_percent, x.primary.reset_after_seconds))
+      if (x.secondary) rows.push(ugBar('曜 · Codex · 7 天', x.secondary.used_percent, x.secondary.reset_after_seconds))
     }
 
     const notes = []
     if (!c.available) notes.push('涟言那边还没数据（要等他下次启动后状态栏刷新一次）')
     else if (c.stale) notes.push('涟言的数字是旧的，他这会儿多半没在跑')
-    if (!x.available) notes.push('小扣那边没数据：' + (x.error || '未知'))
-    else if (x.stale) notes.push('小扣的数字是旧的，快照任务可能停了')
+    if (!x.available) notes.push('曜 · Codex 那边没数据：' + (x.error || '未知'))
+    else if (x.stale) notes.push('曜 · Codex 的数字是旧的，快照任务可能停了')
 
     bEl.innerHTML = (rows.join('') || '<div class="ug-note">暂时没有可显示的额度</div>')
       + (notes.length ? `<div class="ug-note">${notes.join('；')}</div>` : '')
