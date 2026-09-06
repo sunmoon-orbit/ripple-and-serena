@@ -15,6 +15,7 @@
 // 所以这个模块本身碰不到任何凭证，最坏情况是读到一份过期的百分比。
 
 const fs = require('fs')
+const { normalizePromptCache } = require('./claude-cache')
 
 const CLAUDE_FILE = '/home/ripple/.claude/rate_limits_latest.json'
 const CODEX_FILE = '/var/lib/ai-usage/codex.json'
@@ -64,6 +65,7 @@ function claudePart() {
     context_used_percent: d.context_used_percent ?? null,
     context_window_size: d.context_window_size ?? null,
     session_cost_usd: d.session_cost_usd ?? null,
+    prompt_cache: normalizePromptCache(d.prompt_cache),
   }
 }
 
