@@ -2365,7 +2365,11 @@ document.getElementById('perm-modal').addEventListener('click', e => {
 #cc-settings-dialog button,#cc-settings-dialog select,#cc-settings-dialog input { font:inherit; padding:9px 12px; border:1px solid var(--border); border-radius:10px; color:var(--text); background:var(--surface); }
 #cc-settings-dialog button { cursor:pointer; }
 #cc-settings-dialog button:disabled { opacity:.5; cursor:wait; }
-#cc-model { min-width:0; flex:1; }
+#cc-model { min-width:0; flex:1 1 240px; }
+@media (max-width:560px) {
+  #cc-model { flex:1 0 100%; width:100%; min-width:100%; }
+  #cc-model-save,#cc-model-switch { flex:1 1 calc(50% - 5px); }
+}
 #cc-document { box-sizing:border-box; width:100%; min-height:240px; resize:vertical; padding:12px; font:14px/1.7 monospace; border:1px solid var(--border); border-radius:12px; color:var(--text); background:var(--surface); }
 #cc-preview { white-space:pre-wrap; overflow-wrap:anywhere; line-height:1.7; min-height:240px; }
 .cc-help,#cc-settings-status { font-size:13px; line-height:1.6; color:var(--text-dim); }
