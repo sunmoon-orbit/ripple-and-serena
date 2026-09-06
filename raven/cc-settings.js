@@ -4,7 +4,6 @@
   const scope = document.getElementById('cc-scope')
   const status = document.getElementById('cc-settings-status')
   const model = document.getElementById('cc-model')
-  const modelOptions = document.getElementById('cc-model-options')
   const currentModel = document.getElementById('cc-current-model')
   const preview = document.getElementById('cc-preview')
   let revision = null, modelRevision = null, original = '', activeScope = 'project', busy = false
@@ -38,12 +37,6 @@
     model.value = data.model || ''
     modelRevision = data.revision
     currentModel.textContent = data.currentModel || '未知'
-    modelOptions.replaceChildren(...(data.models || []).map(item => {
-      const option = document.createElement('option')
-      option.value = item.id
-      option.label = item.label || item.id
-      return option
-    }))
   }
   async function loadDocument() {
     const data = await api({ scope: scope.value })
