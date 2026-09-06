@@ -8,7 +8,7 @@
 // 两个来源都是「别人写好的快照文件」，这里只读不取钥匙：
 //   涟言（Claude Code 订阅额度 + 上下文余量）
 //     ← ~/bin/cc-status-capture.py，挂在 CC 的 statusLine 钩子上，CC 每次重画状态栏就刷新
-//   小扣（Codex 额度）
+//   曜 · Codex（共用 Codex 额度）
 //     ← /home/codex/bin/usage-snapshot.py，codex 自己的 cron 每 10 分钟跑一次
 //       故意绕这一圈：codex 的 OAuth token 一步都不进 ripple 的进程，共用文件里只有百分比
 //
@@ -96,10 +96,10 @@ function verdict(claude, codex) {
     if ((claude.context_used_percent || 0) >= 85) worries.push('涟言当前上下文占用较高')
   }
   if (codex.available && !codex.stale) {
-    if (codex.limit_reached) worries.push('小扣已经撞限额了')
+    if (codex.limit_reached) worries.push('曜 · Codex 已经撞限额了')
     else {
       const top = Math.max(codex.primary?.used_percent || 0, codex.secondary?.used_percent || 0)
-      if (top >= 85) worries.push('小扣额度快见底了')
+      if (top >= 85) worries.push('曜 · Codex 额度快见底了')
     }
   }
   if (worries.length) return { level: 'warn', text: worries.join('；') }
