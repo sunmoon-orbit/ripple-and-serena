@@ -5,6 +5,7 @@ import {
   fetchBooks, fetchBook, fetchBookChapter, createBook, appendBookChapters,
   deleteBook, createBookAnnotation, deleteBookAnnotation, saveBookBookmark,
   sendReadingHeartbeat, fetchBookChat, createBookChatMessage, stampBook, unstampBook,
+  fetchReadingActivity,
 } from '../../api/moonMemory'
 import { sendMessage } from '../../api/llm'
 import { useThemedConfirm } from '../ThemedConfirmDialog'
@@ -21,6 +22,31 @@ const SPINE_COLORS = ['#4a7c59', '#8b6f47', '#5b6e8c', '#9c5b5b', '#7a5c8a', '#4
 
 // 书架分层：书多了各归各位（2026-07-12 阿颖提的）；空串=未分层，排最后
 const SHELF_ORDER = ['闲书层', '正经层', '工具层']
+
+function beijingDateKey(date = new Date()) {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'Asia/Shanghai', year: 'numeric', month: '2-digit', day: '2-digit',
+  }).formatToParts(date)
+  const value = Object.fromEntries(parts.map((part) => [part.type, part.value]))
+  return `${value.year}-${value.month}-${value.day}`
+}
+
+function recentDateKeys(count = 7) {
+  const today = new Date(`${beijingDateKey()}T12:00:00+08:00`)
+  return Array.from({ length: count }, (_, idx) => {
+    const date = new Date(today)
+    date.setUTCDate(date.getUTCDate() - (count - 1 - idx))
+    return beijingDateKey(date)
+  })
+}
+
+function formatReadingTime(seconds) {
+  const minutes = Math.max(0, Math.round((Number(seconds) || 0) / 60))
+  if (minutes < 60) return `${minutes} 分钟`
+  const hours = Math.floor(minutes / 60)
+  const rest = minutes % 60
+  return rest ? `${hours} 小时 ${rest} 分钟` : `${hours} 小时`
+}
 
 // 读 txt 文件：先按 UTF-8 严格解码，失败退 GBK（国内 txt 大多是 GBK，直接 readAsText 会乱码）
 async function readTxtFile(file) {
@@ -143,6 +169,7 @@ export default function BookRead({ onClose }) {
   const [chatInput, setChatInput] = useState('')
   const [chatLoading, setChatLoading] = useState(false)
   const [chatSending, setChatSending] = useState(false)
+  const [readingSummary, setReadingSummary] = useState(null)
   const textRef = useRef(null)
   const annoRefs = useRef({})
   const fileRef = useRef(null)
@@ -156,17 +183,42 @@ export default function BookRead({ onClose }) {
     fetchBooks(cfg).then((list) => setBooks(Array.isArray(list) ? list : [])).catch(() => setBooks([]))
   }, [])
 
-  // 阅读心跳：书打开且页面可见时每60s上报一次，服务端按天累加——
-  // 涟言用 reading_activity 工具就能看到「她今天读了多久、划了什么」（2026-07-05）
+  // 阅读心跳 + 页内时长摘要：书打开且页面可见时每60s上报，并刷新今日/近7天统计。
+  // 服务端按北京时间分日；摘要只做回顾，不设置阅读目标，避免把读书变成任务。
   useEffect(() => {
-    if (!active || !cfg.apiToken) return
-    const t = setInterval(() => {
+    if (!active || !cfg.apiToken) { setReadingSummary(null); return }
+    let cancelled = false
+
+    async function refreshSummary() {
+      try {
+        const activity = await fetchReadingActivity(cfg, 168)
+        const keys = recentDateKeys(7)
+        const byDay = Object.fromEntries(keys.map((day) => [day, 0]))
+        for (const item of (activity?.reading || [])) {
+          if (item.reader === '阿颖' && Object.hasOwn(byDay, item.day)) {
+            byDay[item.day] += Number(item.seconds) || 0
+          }
+        }
+        if (!cancelled) {
+          const days = keys.map((day) => ({ day, seconds: byDay[day] }))
+          setReadingSummary({
+            todaySeconds: byDay[keys[keys.length - 1]],
+            weekSeconds: days.reduce((sum, item) => sum + item.seconds, 0),
+            days,
+          })
+        }
+      } catch { /* 阅读不应因统计接口异常被打断 */ }
+    }
+
+    refreshSummary()
+    const t = setInterval(async () => {
       if (document.visibilityState === 'visible') {
-        sendReadingHeartbeat(cfg, active.id, '阿颖', chapter?.idx ?? null).catch(() => {})
+        try { await sendReadingHeartbeat(cfg, active.id, '阿颖', chapter?.idx ?? null) } catch { /* ignore */ }
+        refreshSummary()
       }
     }, 60 * 1000)
-    return () => clearInterval(t)
-  }, [active, chapter?.idx])
+    return () => { cancelled = true; clearInterval(t) }
+  }, [active?.id, chapter?.idx, cfg.apiToken, cfg.baseUrl])
 
   const openChapter = useCallback(async (book, idx, restoreScroll = 0) => {
     setLoading(true)
@@ -582,6 +634,24 @@ export default function BookRead({ onClose }) {
           <span className="coread-reader-title">{active.title}</span>
           <button className="roost-modal-close" onClick={onClose}>✕</button>
         </div>
+        {readingSummary && (() => {
+          const maxSeconds = Math.max(60, ...readingSummary.days.map((item) => item.seconds))
+          return (
+            <div
+              className="bookread-reading-summary"
+              aria-label={`今日阅读 ${formatReadingTime(readingSummary.todaySeconds)}，近七天共 ${formatReadingTime(readingSummary.weekSeconds)}`}
+            >
+              <span className="bookread-reading-today">今日 <strong>{formatReadingTime(readingSummary.todaySeconds)}</strong></span>
+              <span className="bookread-reading-divider" aria-hidden="true" />
+              <span>近 7 天 {formatReadingTime(readingSummary.weekSeconds)}</span>
+              <span className="bookread-reading-spark" aria-hidden="true">
+                {readingSummary.days.map((item) => (
+                  <i key={item.day} style={{ height: `${Math.max(2, Math.round(item.seconds / maxSeconds * 18))}px` }} />
+                ))}
+              </span>
+            </div>
+          )
+        })()}
         <div className="roost-modal-body" ref={bodyRef} onScroll={onBodyScroll}>
           {loading && <div className="roost-empty">翻开书页……</div>}
           {!loading && chapter && (

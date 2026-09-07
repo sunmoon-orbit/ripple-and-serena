@@ -3825,6 +3825,33 @@ textarea.form-input { display: block; margin: 8px 16px 12px; }
 .bookread-append-link { color: var(--accent); cursor: pointer; user-select: none; }
 .bookread-append-link:active { opacity: 0.6; }
 
+/* 阅读页时长摘要：颜色完全跟随主题变量，烟水等半透明主题也自然继承 */
+.bookread-reading-summary {
+  flex-shrink: 0;
+  display: flex; align-items: center; gap: 8px;
+  min-height: 34px; padding: 7px 20px;
+  border-bottom: 1px solid var(--border);
+  background: color-mix(in srgb, var(--card) 72%, var(--accent) 6%);
+  color: var(--text-muted); font-size: 11px;
+}
+.bookread-reading-today { color: var(--text-mid); }
+.bookread-reading-today strong { color: var(--accent); font-size: 12px; font-weight: 600; }
+.bookread-reading-divider { width: 1px; height: 13px; background: var(--border-md); }
+.bookread-reading-spark {
+  height: 18px; margin-left: auto;
+  display: flex; align-items: flex-end; gap: 3px;
+}
+.bookread-reading-spark i {
+  display: block; width: 3px; min-height: 2px;
+  border-radius: 3px 3px 1px 1px;
+  background: var(--accent); opacity: 0.72;
+}
+
+@media (max-width: 390px) {
+  .bookread-reading-summary { padding-inline: 16px; gap: 6px; }
+  .bookread-reading-spark { gap: 2px; }
+}
+
 .bookread-chapter-bar {
   display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 12px;
 }
