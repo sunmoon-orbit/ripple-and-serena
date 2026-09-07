@@ -40,6 +40,26 @@
     --terminal-bg: #f5eae8;
     --terminal-text: #5a3838;
   }
+  [data-theme="lavender"] {
+    --bg:#f4f0f8; --surface:#ebe4f2; --border:#d8cbe4;
+    --text:#45404d; --text-dim:#82738f; --accent:#947daf;
+    --terminal-bg:#eee8f4; --terminal-text:#574466;
+  }
+  [data-theme="sage"] {
+    --bg:#f1f5ef; --surface:#e5ede1; --border:#cbd9c5;
+    --text:#3c493d; --text-dim:#71816e; --accent:#789273;
+    --terminal-bg:#e9f0e5; --terminal-text:#415b40;
+  }
+  [data-theme="mist"] {
+    --bg:#f0f5f8; --surface:#e3edf3; --border:#c7d8e3;
+    --text:#3d4852; --text-dim:#6e8393; --accent:#7295ad;
+    --terminal-bg:#e7eff5; --terminal-text:#3f6077;
+  }
+  [data-theme="apricot"] {
+    --bg:#fbf5ea; --surface:#f4e9d7; --border:#e5d3b8;
+    --text:#51463a; --text-dim:#917b63; --accent:#aa8356;
+    --terminal-bg:#f5ecdd; --terminal-text:#705330;
+  }
   @import url('https://fonts.bunny.net/css?family=inter:400,500,600|lora:400,400i,500,600,700,700i&display=swap');
   html, body { height: 100%; background: var(--bg); color: var(--text); font-family: 'Lora', 'Inter', -apple-system, 'PingFang SC', 'Noto Sans SC', serif; }
 
@@ -178,11 +198,11 @@
   .tab.active { color: var(--accent); border-bottom: 2px solid var(--accent); }
 
   /* --- panels --- */
-  .panel { display: none; flex: 1; overflow: hidden; flex-direction: column; position: relative; }
+  .panel { display: none; flex: 1; min-height: 0; min-width: 0; overflow: hidden; flex-direction: column; position: relative; }
   .panel.active { display: flex; }
 
   /* ========= CHAT PANEL ========= */
-  #chat-messages { flex: 1; overflow-y: auto; padding: 12px; display: flex; flex-direction: column; gap: 8px; }
+  #chat-messages { flex: 1; min-height: 0; width: 100%; overflow-y: auto; padding: 12px; display: flex; flex-direction: column; gap: 8px; }
   .msg-wrap { display: flex; align-items: flex-start; gap: 8px; }
   .msg-avatar {
     width: 32px; height: 32px; border-radius: 50%; object-fit: cover; flex-shrink: 0;
@@ -226,6 +246,15 @@
     border: 1px solid rgba(220,190,188,0.3);
     box-shadow: 0 2px 14px rgba(180,130,130,0.1), inset 0 1px 0 rgba(255,255,255,0.45);
   }
+  :is([data-theme="lavender"], [data-theme="sage"], [data-theme="mist"], [data-theme="apricot"]) .msg.user {
+    background: var(--surface); color: var(--text); border-color: var(--border);
+    box-shadow: 0 2px 10px rgba(0,0,0,.08);
+  }
+  :is([data-theme="lavender"], [data-theme="sage"], [data-theme="mist"], [data-theme="apricot"]) .msg.assistant {
+    background: var(--bg); border-color: var(--border);
+    box-shadow: 0 2px 10px rgba(0,0,0,.08);
+  }
+  :is([data-theme="lavender"], [data-theme="sage"], [data-theme="mist"], [data-theme="apricot"]) .msg-body pre code { color: #e1d8ef; }
   .msg.assistant.sticker-msg { background: none; border: none; padding: 2px 0; box-shadow: none; backdrop-filter: none; }
   .msg.system { align-self: center; font-size: 12px; color: var(--text-dim); background: none; padding: 2px 0; }
 
@@ -816,6 +845,7 @@
   <input type="file" id="bg-upload" accept="image/*" style="display:none">
   <div id="bg-menu">
     <button id="bg-upload-btn">选择图片</button>
+    <button id="bg-fit-btn">显示方式：完整图片</button>
     <button id="bg-clear-btn">恢复纯色</button>
   </div>
 
@@ -2075,18 +2105,22 @@ document.getElementById('notes-clear').addEventListener('click', () => {
 })
 
 // --- theme ---
-const THEMES = ['dark', 'pink']
-const THEME_COLORS = { dark: '#1a1a1f', pink: '#fdf0f3' }
+const THEMES = ['dark', 'pink', 'lavender', 'sage', 'mist', 'apricot']
+const THEME_COLORS = { dark: '#1a1a1f', pink: '#fbf5f0', lavender: '#f4f0f8', sage: '#f1f5ef', mist: '#f0f5f8', apricot: '#fbf5ea' }
+const THEME_NAMES = { dark: '深夜', pink: '柔粉', lavender: '香芋紫', sage: '鼠尾草绿', mist: '雾蓝', apricot: '奶杏' }
 
 let currentTheme = localStorage.getItem('raven-theme') || 'dark'
 
 function applyTheme(t) {
+  if (!THEMES.includes(t)) t = 'dark'
   currentTheme = t
   document.documentElement.setAttribute('data-theme', t === 'dark' ? '' : t)
   document.querySelector('meta[name="theme-color"]').setAttribute('content', THEME_COLORS[t])
   const btn = document.getElementById('theme-btn')
-  btn.style.background = t === 'dark' ? '#fdf0f3' : '#1a1a1f'
-  btn.title = t === 'dark' ? '切换粉色主题' : '切换深色主题'
+  const next = THEMES[(THEMES.indexOf(t) + 1) % THEMES.length]
+  btn.style.background = THEME_COLORS[next]
+  btn.title = `当前${THEME_NAMES[t]}，切换${THEME_NAMES[next]}`
+  btn.setAttribute('aria-label', btn.title)
   localStorage.setItem('raven-theme', t)
 }
 
@@ -2099,14 +2133,18 @@ applyTheme(currentTheme)
 
 // --- chat background image ---
 const BG_KEY = 'raven-bg-image'
+const BG_FIT_KEY = 'raven-bg-fit'
+let bgFit = localStorage.getItem(BG_FIT_KEY) === 'cover' ? 'cover' : 'contain'
 
 function applyBg(dataUrl) {
   const el = document.getElementById('chat-messages')
   if (dataUrl) {
-    el.style.backgroundImage = `url(${dataUrl})`
-    el.style.backgroundSize = 'cover'
+    el.style.backgroundImage = `url(${JSON.stringify(dataUrl)})`
+    el.style.backgroundSize = bgFit
     el.style.backgroundPosition = 'center'
-    el.style.backgroundAttachment = 'local'
+    // Size against the visible scroll container, never the full chat history.
+    el.style.backgroundAttachment = 'scroll'
+    el.style.backgroundRepeat = 'no-repeat'
   } else {
     el.style.backgroundImage = ''
   }
@@ -2116,6 +2154,17 @@ const savedBg = localStorage.getItem(BG_KEY)
 if (savedBg) applyBg(savedBg)
 
 const bgMenu = document.getElementById('bg-menu')
+const bgFitBtn = document.getElementById('bg-fit-btn')
+function updateBgFitLabel() {
+  bgFitBtn.textContent = bgFit === 'contain' ? '显示方式：完整图片（点此铺满）' : '显示方式：铺满背景（点此完整）'
+}
+bgFitBtn.addEventListener('click', () => {
+  bgFit = bgFit === 'contain' ? 'cover' : 'contain'
+  localStorage.setItem(BG_FIT_KEY, bgFit)
+  applyBg(localStorage.getItem(BG_KEY))
+  updateBgFitLabel()
+})
+updateBgFitLabel()
 document.getElementById('bg-btn').addEventListener('click', (e) => {
   e.stopPropagation()
   bgMenu.classList.toggle('open')
