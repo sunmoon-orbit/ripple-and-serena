@@ -12,6 +12,26 @@ const {
 const BODY_LIMIT = 128 * 1024
 const DEFAULT_PUBLIC_BASE = 'https://memory.ravenlove.cc/raven/yanji-mcp'
 const APP_ORIGIN = 'https://sunmoon-orbit.github.io'
+const CLIENT_METADATA_PATH = '/oauth/client-metadata-v2.json'
+
+function normalizePublicBase(raw) {
+  let url
+  try { url = new URL(String(raw || '')) } catch { throw new Error('YANJI_MCP_PUBLIC_BASE 必须是公网 HTTPS URL') }
+  const hostname = url.hostname.toLowerCase()
+  const ipv4 = hostname.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/)?.slice(1).map(Number)
+  const privateIpv4 = ipv4 && (ipv4.some((part) => part > 255) || ipv4[0] === 0 || ipv4[0] === 10 || ipv4[0] === 127 ||
+    (ipv4[0] === 169 && ipv4[1] === 254) || (ipv4[0] === 172 && ipv4[1] >= 16 && ipv4[1] <= 31) ||
+    (ipv4[0] === 192 && ipv4[1] === 168) || ipv4[0] >= 224)
+  const privateIpv6 = hostname === '[::]' || hostname === '[::1]' || /^\[(?:fc|fd|fe[89ab])/i.test(hostname)
+  if (url.protocol !== 'https:' || url.username || url.password || url.search || url.hash ||
+      !hostname.includes('.') || hostname === 'localhost' || hostname.endsWith('.localhost') ||
+      hostname.endsWith('.local') || privateIpv4 || privateIpv6) {
+    throw new Error('YANJI_MCP_PUBLIC_BASE 必须是公网 HTTPS URL')
+  }
+  const base = url.href.replace(/\/+$/, '')
+  if (new URL(base).pathname === '/') throw new Error('YANJI_MCP_PUBLIC_BASE 必须包含路径')
+  return base
+}
 
 function emptyState() {
   return { version: 1, servers: {}, oauthPending: {}, wake: {}, wakePending: [] }
@@ -118,7 +138,10 @@ function userError(error) {
 
 function createService(options = {}) {
   const stateFile = options.stateFile || path.join(__dirname, '.yanji-mcp-state.json')
-  const publicBase = String(options.publicBase || process.env.YANJI_MCP_PUBLIC_BASE || DEFAULT_PUBLIC_BASE).replace(/\/$/, '')
+  // OAuth 的公网身份只来自受信任的部署配置，绝不从 Host / X-Forwarded-* 推导。
+  const publicBase = normalizePublicBase(options.publicBase || process.env.YANJI_MCP_PUBLIC_BASE || DEFAULT_PUBLIC_BASE)
+  const clientMetadataUrl = `${publicBase}${CLIENT_METADATA_PATH}`
+  const redirectUri = `${publicBase}/oauth/callback`
   const userToken = String(options.userToken || '')
   const fetchImpl = options.fetchImpl || fetch
   const guardedFetch = async (requestUrl, init) => {
@@ -186,12 +209,13 @@ function createService(options = {}) {
     const prefix = '/raven/yanji-mcp'
     const subpath = url.pathname.slice(prefix.length) || '/'
     const callbackPath = '/oauth/callback'
-    const metadataPath = '/oauth/client-metadata.json'
 
-    if (req.method === 'GET' && subpath === metadataPath) {
+    if (req.method === 'GET' && (subpath === CLIENT_METADATA_PATH || subpath === '/oauth/client-metadata.json')) {
+      const requestedClientId = `${publicBase}${subpath}`
       return sendJson(res, 200, {
+        client_id: requestedClientId,
         client_name: '言叽', client_uri: `${APP_ORIGIN}/ripple-and-serena/yanji/`,
-        redirect_uris: [`${publicBase}${callbackPath}`],
+        redirect_uris: [redirectUri],
         grant_types: ['authorization_code', 'refresh_token'], response_types: ['code'],
         token_endpoint_auth_method: 'none',
       })
@@ -281,9 +305,8 @@ function createService(options = {}) {
         if (req.method === 'POST' && action === 'oauth/start') {
           if (server.authType !== 'oauth') return sendJson(res, 409, { error: '这个 MCP 没有选择 OAuth' })
           const discovery = await discoverOAuth({ resource: server.url, fetchImpl: guardedFetch })
-          const redirectUri = `${publicBase}${callbackPath}`
           const client = await registerClient({
-            discovery, clientMetadataUrl: `${publicBase}${metadataPath}`, redirectUri,
+            discovery, clientMetadataUrl, redirectUri,
             clientId: server.oauthClientId, fetchImpl: guardedFetch,
           })
           if (!discovery.authorizationMetadata.authorization_endpoint) {
@@ -359,4 +382,7 @@ function createService(options = {}) {
   return { handler, state, wake, publicServer, persist }
 }
 
-module.exports = { createService, loadState, publicServer, saveState, timingSafeEqual }
+module.exports = {
+  CLIENT_METADATA_PATH, createService, loadState, normalizePublicBase,
+  publicServer, saveState, timingSafeEqual,
+}

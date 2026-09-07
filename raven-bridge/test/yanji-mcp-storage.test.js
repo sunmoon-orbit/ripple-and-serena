@@ -4,12 +4,12 @@ const fs = require('fs')
 const os = require('os')
 const path = require('path')
 const { EventEmitter } = require('events')
-const { createService, publicServer } = require('../yanji-mcp')
+const { CLIENT_METADATA_PATH, createService, normalizePublicBase, publicServer } = require('../yanji-mcp')
 
-function invoke(handler, { method = 'GET', path: requestPath, token = 'user-token', body } = {}) {
+function invoke(handler, { method = 'GET', path: requestPath, token = 'user-token', body, headers = {} } = {}) {
   const req = new EventEmitter()
   req.method = method
-  req.headers = { authorization: token ? `Bearer ${token}` : '' }
+  req.headers = { authorization: token ? `Bearer ${token}` : '', ...headers }
   const result = { status: 0, headers: {}, body: '' }
   const res = {
     writeHead(status, headers = {}) { result.status = status; result.headers = headers },
@@ -70,4 +70,39 @@ test('cancelled reauthorization keeps the previously valid OAuth token', async (
   assert.equal(response.status, 400)
   assert.equal(service.state.servers.remote.oauth.tokens.accessToken, 'still-valid')
   assert.equal(response.body.includes('still-valid'), false)
+})
+
+test('versioned client metadata uses the configured public origin and exact client_id bytes', async () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'yanji-mcp-'))
+  const publicBase = 'https://oauth.example:8443/edge%2Ftenant/yanji-mcp///'
+  const service = createService({ stateFile: path.join(root, 'state.json'), userToken: 'right', publicBase })
+  const response = await invoke(service.handler, {
+    path: `/raven/yanji-mcp${CLIENT_METADATA_PATH}`,
+    token: '',
+    headers: {
+      host: '127.0.0.1:3400',
+      'x-forwarded-host': 'attacker.invalid',
+      'x-forwarded-proto': 'http',
+      'x-forwarded-port': '3400',
+    },
+  })
+  const metadata = JSON.parse(response.body)
+  const expectedClientId = 'https://oauth.example:8443/edge%2Ftenant/yanji-mcp/oauth/client-metadata-v2.json'
+  assert.equal(response.status, 200)
+  assert.match(response.headers['Content-Type'], /^application\/json/)
+  assert.equal(response.headers['Cache-Control'], 'no-store')
+  assert.equal(Buffer.compare(Buffer.from(metadata.client_id), Buffer.from(expectedClientId)), 0)
+  assert.deepEqual(metadata.redirect_uris, ['https://oauth.example:8443/edge%2Ftenant/yanji-mcp/oauth/callback'])
+  assert.equal(JSON.stringify(metadata).includes('127.0.0.1'), false)
+  assert.equal(JSON.stringify(metadata).includes('attacker.invalid'), false)
+})
+
+test('public OAuth base requires a path on a non-local HTTPS origin', () => {
+  assert.equal(normalizePublicBase('https://memory.ravenlove.cc/raven/yanji-mcp/'), 'https://memory.ravenlove.cc/raven/yanji-mcp')
+  for (const invalid of [
+    'http://memory.ravenlove.cc/raven/yanji-mcp',
+    'https://memory.ravenlove.cc/',
+    'https://127.0.0.1:3400/raven/yanji-mcp',
+    'https://service.local/raven/yanji-mcp',
+  ]) assert.throws(() => normalizePublicBase(invalid), /公网 HTTPS URL|必须包含路径/)
 })

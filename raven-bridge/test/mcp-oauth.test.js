@@ -2,8 +2,9 @@ const test = require('node:test')
 const assert = require('node:assert/strict')
 const crypto = require('crypto')
 const {
-  authorizationMetadataCandidates, createPkce, discoverOAuth, parseBearerChallenge,
+  authorizationMetadataCandidates, buildAuthorization, createPkce, discoverOAuth, parseBearerChallenge,
   protectedResourceCandidates, refreshAccessToken, startDeviceAuthorization, validateCallback,
+  registerClient,
 } = require('../mcp-oauth')
 
 function response(status, body, headers = {}) {
@@ -100,4 +101,22 @@ test('device authorization is accepted only when metadata explicitly declares it
   assert.equal(result.userCode, 'ABCD-EFGH')
   assert.equal(result.deviceCode, 'backend-only')
   assert.equal(result.intervalSeconds, 8)
+})
+
+test('metadata-document client_id survives authorization URL encoding byte-for-byte', async () => {
+  const clientMetadataUrl = 'https://oauth.example:8443/a%2Fb/client-metadata-v2.json'
+  const discovery = {
+    resource: 'https://andco.example/mcp', scope: '',
+    authorizationMetadata: {
+      client_id_metadata_document_supported: true,
+      authorization_endpoint: 'https://andco.example/oauth/authorize',
+    },
+  }
+  const client = await registerClient({ discovery, clientMetadataUrl, redirectUri: 'https://oauth.example/callback' })
+  const authorizationUrl = buildAuthorization({
+    discovery, client, redirectUri: 'https://oauth.example/callback', state: 'state',
+    pkce: { challenge: 'challenge' },
+  })
+  const actual = new URL(authorizationUrl).searchParams.get('client_id')
+  assert.equal(Buffer.compare(Buffer.from(actual), Buffer.from(clientMetadataUrl)), 0)
 })
