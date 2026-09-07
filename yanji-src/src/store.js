@@ -41,7 +41,7 @@ const DEFAULT_STATE = {
     apiToken: '',
     limit: 5,
   },
-  // 远程 Streamable HTTP MCP。令牌和 API Key 一样只保存在这台设备的本地设置中。
+  // 远程 Streamable HTTP MCP。这里只存非敏感展示配置；凭据与 OAuth token 在后端 600 文件。
   mcpServers: [],
   theme: 'claude',
   // 新安装默认实色，保证各主题文字都清楚；老用户已经保存的透明度原样沿用。
@@ -195,7 +195,11 @@ function saveSettings(payload) {
   // 读失败过就绝不写：那份读不出来的数据可能是完好的，覆盖了就真没了
   if (loadFailed) return
   try {
-    localStorage.setItem(LOCAL_KEY, JSON.stringify(payload))
+    const safe = { ...payload }
+    if (Array.isArray(safe.mcpServers)) {
+      safe.mcpServers = safe.mcpServers.map(({ bearerToken, credential, ...server }) => server)
+    }
+    localStorage.setItem(LOCAL_KEY, JSON.stringify(safe))
   } catch (err) {
     // 这里以前是 `catch {}`：配额满了也一声不吭，于是换了头像刷新变回去、
     // 发的消息刷新就没了，谁都不知道为什么。现在必须吼出来。
@@ -611,7 +615,7 @@ export const useStore = create((set, get) => ({
   },
   addMcpServer: (server) => {
     const item = {
-      id: uuid(), name: '', url: '', authType: 'none', bearerToken: '',
+      id: uuid(), name: '', url: '', authType: 'none', bearerToken: '', credentialMode: 'bearer', oauthClientId: '',
       enabled: true, allowWrites: false, tools: [], ...server,
     }
     set((s) => {
@@ -774,6 +778,7 @@ export function buildBackupJson() {
   if (!state.bigReady) return null
   const out = {}
   for (const k of persistedKeys) if (state[k] !== undefined) out[k] = state[k]
+  if (Array.isArray(out.mcpServers)) out.mcpServers = out.mcpServers.map(({ bearerToken, credential, ...server }) => server)
   return JSON.stringify(out)
 }
 
@@ -790,6 +795,16 @@ export async function restoreFromBackupJson(text) {
     if (parsed[k] !== undefined) settings[k] = parsed[k]
   }
   localStorage.setItem(LOCAL_KEY, JSON.stringify(settings))
+}
+
+// 旧版 Bearer 会在第一次成功上传后立即从内存和 localStorage 擦掉；
+// 事件里不带凭据，只带服务 id，避免调试器/错误日志复制时捎出秘密。
+if (typeof window !== 'undefined') {
+  window.addEventListener('yanji-mcp-credential-stored', (event) => {
+    const serverId = event?.detail?.serverId
+    if (!serverId) return
+    useStore.getState().updateMcpServer(serverId, { bearerToken: '', credential: '', credentialStored: true })
+  })
 }
 
 // 关页面/切后台时把还在防抖窗口里的那一版赶紧写下去

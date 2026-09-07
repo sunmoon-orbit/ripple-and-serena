@@ -110,6 +110,7 @@ const MOON_TOKEN = (() => {
   return m[1].trim()
 })()
 const MOON_BASE = 'http://127.0.0.1:3210'
+const yanjiMcp = require('./yanji-mcp').createService({ userToken: MOON_TOKEN })
 
 function moonGet(pathname) {
   return new Promise((resolve, reject) => {
@@ -630,6 +631,14 @@ const server = http.createServer((req, res) => {
   if (req.method === 'OPTIONS') { res.writeHead(204); res.end(); return }
 
   const url = new URL(req.url, `http://localhost`)
+
+  // 言叽远程 MCP：浏览器只持有言叽原本就需要的 moon-memory 会话凭据；
+  // MCP 的手动凭据、OAuth verifier/client secret/access/refresh token 全留在后端 600 文件。
+  // OAuth 回调与客户端元数据由模块自行做公开/私有分级，不能套外层 raven 登录。
+  if (url.pathname.startsWith('/raven/yanji-mcp')) {
+    void yanjiMcp.handler(req, res, url)
+    return
+  }
 
   if (url.pathname === '/raven/cc-settings') {
     void handleCcSettings(req, res, url)

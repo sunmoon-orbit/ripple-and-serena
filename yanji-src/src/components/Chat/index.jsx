@@ -17,6 +17,7 @@ import { syncChatsToL0 } from '../../utils/l0Sync'
 import { createStreamUpdateScheduler } from '../../utils/streamUpdateScheduler'
 import { pickAutoPostTrigger, markAutoPosted, postMoment, fetchAutopostSetting } from '../../api/moments'
 import { notifyReplyReady } from '../../api/push'
+import { acknowledgeAndcoWake, getAndcoWakePending, getAndcoWakeStatus } from '../../api/mcp'
 import { extractMood, stripMoodTag, stripInlineFx } from '../../utils/moodFx'
 import { showToast } from '../Toast'
 import ConversationList from './ConversationList'
@@ -957,6 +958,44 @@ export default function Chat() {
 
     await generateReply(chat, conn, { titleText: text, hidden: opts.hidden, voicemail: opts.voicemail })
   }, [isSending, activeChat, activeConn, connections, imageDescriptions, injectMode, injectPrompt, replyDelay, generateReply])
+
+  // AndCo 适配层只把明确 @/回复/定向事件交成普通 user turn；不造 system/developer。
+  // 这里使用可见页 60 秒保守取件，且每次先重新读取后端总闸。平台尚无正式事件入口时
+  // 队列永远为空，不会为了「看起来实时」去抓网页或猜私有 API。
+  const andcoWakePollRef = useRef(false)
+  useEffect(() => {
+    if (!moonMemory?.apiToken) return
+    const poll = async () => {
+      if (document.visibilityState !== 'visible' || andcoWakePollRef.current || isSending) return
+      andcoWakePollRef.current = true
+      try {
+        const wakeStatus = await getAndcoWakeStatus(moonMemory)
+        if (!wakeStatus?.active) return
+        const current = useStore.getState()
+        const cfg = wakeStatus.config || {}
+        const mcp = current.mcpServers.find((item) => item.id === cfg.serverId)
+        const wakeTool = mcp?.tools?.find((item) => item.name === cfg.wakeToolName)
+        if (mcp?.enabled === false || wakeTool?.enabled !== true) return
+        const { delivery } = await getAndcoWakePending(moonMemory)
+        if (!delivery?.deliveryId || !delivery?.event?.content) return
+        const latest = useStore.getState()
+        const latestMcp = latest.mcpServers.find((item) => item.id === cfg.serverId)
+        if (latestMcp?.enabled === false || latestMcp?.tools?.find((item) => item.name === cfg.wakeToolName)?.enabled !== true) return
+        const chat = latest.chats.find((item) => item.id === delivery.chatId)
+        const conn = chat && (latest.connections.find((item) => item.id === chat.connectionId) || latest.getActiveConnection())
+        if (!chat || !conn?.apiKey) return
+        addMessage(chat.id, { role: 'user', content: delivery.event.content, andcoWakeId: delivery.event.id, andcoSource: true })
+        await generateReply(chat, conn, { titleText: delivery.event.content })
+        await acknowledgeAndcoWake(delivery.deliveryId, moonMemory)
+      } catch { /* 唤醒通道失败即停在队列里，不自动调用模型重试 */ }
+      finally { andcoWakePollRef.current = false }
+    }
+    void poll()
+    const timer = setInterval(poll, 60000)
+    const onVisible = () => { if (document.visibilityState === 'visible') void poll() }
+    document.addEventListener('visibilitychange', onVisible)
+    return () => { clearInterval(timer); document.removeEventListener('visibilitychange', onVisible) }
+  }, [moonMemory, isSending, generateReply, addMessage])
 
   // ── 延迟回复到点检查：每 5s + 回前台时看一眼，到点就补上回复 ──────────────
   useEffect(() => {

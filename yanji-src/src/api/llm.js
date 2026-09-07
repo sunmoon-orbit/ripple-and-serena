@@ -160,7 +160,7 @@ async function executeTool(name, args, ctx) {
 async function executeToolRaw(name, args, { searchConfig, moonMemoryConfig, mcpServers, onStatus, onFile }) {
   if (name.startsWith('mcp_')) {
     onStatus?.('调用 MCP 工具…')
-    return await executeMcpTool(name, args, mcpServers)
+    return await executeMcpTool(name, args, mcpServers, moonMemoryConfig)
   }
   if (name === 'make_file') {
     onStatus?.('生成文件...')

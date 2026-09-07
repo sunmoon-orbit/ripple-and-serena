@@ -1,7 +1,5 @@
 export const MCP_EXTERNAL_TOOL_LIMIT = 8
 
-const clients = new Map()
-
 function shortHash(value) {
   let hash = 2166136261
   for (let i = 0; i < value.length; i++) {
@@ -97,8 +95,11 @@ function validatedUrl(raw) {
   return url
 }
 
-function signature(server) {
-  return JSON.stringify([server?.url || '', server?.authType || 'none', server?.bearerToken || ''])
+function backendBase(config) {
+  if (!config?.apiToken) throw new Error('远程 MCP 需要先在「拾羽」中配置 API Token，用它保护后端凭据')
+  let origin
+  try { origin = new URL(config.baseUrl || 'https://memory.ravenlove.cc').origin } catch { throw new Error('拾羽地址格式不正确') }
+  return `${origin}/raven/yanji-mcp`
 }
 
 function friendlyMcpError(error) {
@@ -106,67 +107,112 @@ function friendlyMcpError(error) {
   if (/Failed to fetch|NetworkError|Load failed|CORS/i.test(message)) {
     return new Error('连接不到 MCP 服务。请检查地址、代理，以及服务端是否允许浏览器跨域（CORS）访问。')
   }
-  if (/401|Unauthorized/i.test(message)) return new Error('MCP 身份验证失败，请检查 Bearer 令牌')
+  if (/401|Unauthorized/i.test(message)) return new Error('MCP 身份验证失败，请重新授权或更新凭据')
   return error instanceof Error ? error : new Error(message)
 }
 
-async function getClient(server, { refresh = false } = {}) {
-  const id = server?.id
-  if (!id) throw new Error('MCP 服务缺少 id')
-  const sig = signature(server)
-  const cached = clients.get(id)
-  if (!refresh && cached?.signature === sig) return cached.client
-  if (cached) {
-    clients.delete(id)
-    cached.client.close().catch(() => {})
-  }
-
-  const url = validatedUrl(server.url)
-  const token = String(server.bearerToken || '').trim()
-  if (server.authType === 'bearer' && !token) throw new Error('请填写 Bearer 令牌')
-  // SDK 不进聊天首屏包：只有用户真的测试/调用 MCP 时才下载，免得新功能拖慢原有聊天。
-  const { Client, StreamableHTTPClientTransport } = await import('@modelcontextprotocol/client')
-  const transport = new StreamableHTTPClientTransport(url, {
-    ...(server.authType === 'bearer' ? { authProvider: { token: async () => token } } : {}),
-    requestInit: { cache: 'no-store' },
+async function backendRequest(config, path, options = {}) {
+  const response = await fetch(`${backendBase(config)}${path}`, {
+    cache: 'no-store',
+    ...options,
+    headers: {
+      Authorization: `Bearer ${config.apiToken}`,
+      ...(options.body ? { 'Content-Type': 'application/json' } : {}),
+      ...(options.headers || {}),
+    },
   })
-  const client = new Client(
-    { name: 'yanji', version: '2.0.0' },
-    { versionNegotiation: { mode: 'auto', probe: { timeoutMs: 12000 } }, inputRequired: { autoFulfill: false } },
-  )
-  try {
-    await client.connect(transport, { timeout: 15000 })
-    clients.set(id, { signature: sig, client })
-    return client
-  } catch (error) {
-    await client.close().catch(() => {})
-    throw friendlyMcpError(error)
+  const data = await response.json().catch(() => ({}))
+  if (!response.ok) throw new Error(data.error || `MCP 后端暂时不可用 (${response.status})`)
+  return data
+}
+
+function serverPayload(server) {
+  validatedUrl(server.url)
+  return {
+    name: server.name || '', url: server.url, authType: server.authType || 'none',
+    credentialMode: server.credentialMode || 'bearer', enabled: server.enabled !== false,
+    allowWrites: !!server.allowWrites, oauthClientId: server.oauthClientId || '',
+    tools: server.tools || [],
+    ...(server.bearerToken ? { bearerToken: server.bearerToken } : {}),
+    ...(server.credential ? { credential: server.credential } : {}),
   }
 }
 
-export async function discoverMcpTools(server) {
+export async function syncMcpServer(server, backendConfig) {
+  if (!server?.id) throw new Error('MCP 服务缺少 id')
+  const data = await backendRequest(backendConfig, `/servers/${encodeURIComponent(server.id)}`, {
+    method: 'PUT', body: JSON.stringify(serverPayload(server)),
+  })
+  if ((server.bearerToken || server.credential) && data.server?.credentialStored) {
+    window.dispatchEvent(new CustomEvent('yanji-mcp-credential-stored', { detail: { serverId: server.id } }))
+  }
+  return data.server
+}
+
+export async function deleteMcpServerRemote(serverId, backendConfig) {
+  return backendRequest(backendConfig, `/servers/${encodeURIComponent(serverId)}`, { method: 'DELETE' })
+}
+
+export async function discoverMcpTools(server, backendConfig) {
   try {
-    const client = await getClient(server, { refresh: true })
-    const result = await client.listTools(undefined, { timeout: 15000, cacheMode: 'refresh' })
+    await syncMcpServer(server, backendConfig)
+    const data = await backendRequest(backendConfig, `/servers/${encodeURIComponent(server.id)}/discover`, { method: 'POST' })
     return {
-      tools: mergeDiscoveredMcpTools(server.tools, result.tools),
-      serverInfo: client.getServerVersion?.() || null,
+      tools: mergeDiscoveredMcpTools(server.tools, data.server?.tools || []),
+      serverInfo: data.server?.serverInfo || null,
+      server: data.server,
     }
   } catch (error) {
     throw friendlyMcpError(error)
   }
 }
 
-export async function executeMcpTool(wireName, args, servers) {
+export async function executeMcpTool(wireName, args, servers, backendConfig) {
   const resolved = resolveMcpTool(wireName, servers)
   if (!resolved) throw new Error('找不到对应的 MCP 工具，可能刚刚刷新过工具列表')
   const { server, tool } = resolved
   assertMcpToolAllowed(server, tool)
   try {
-    const client = await getClient(server)
-    const result = await client.callTool({ name: tool.name, arguments: args || {} }, { timeout: 60000 })
-    return normalizeMcpResult(result)
+    await syncMcpServer(server, backendConfig)
+    const data = await backendRequest(backendConfig, `/servers/${encodeURIComponent(server.id)}/call`, {
+      method: 'POST', body: JSON.stringify({ name: tool.name, arguments: args || {} }),
+    })
+    return normalizeMcpResult(data.result)
   } catch (error) {
     throw friendlyMcpError(error)
   }
+}
+
+export async function startMcpOAuth(server, backendConfig) {
+  await syncMcpServer(server, backendConfig)
+  return backendRequest(backendConfig, `/servers/${encodeURIComponent(server.id)}/oauth/start`, { method: 'POST' })
+}
+
+export async function revokeMcpOAuth(serverId, backendConfig) {
+  return backendRequest(backendConfig, `/servers/${encodeURIComponent(serverId)}/oauth/revoke`, { method: 'POST' })
+}
+
+export async function pollMcpDeviceOAuth(serverId, backendConfig) {
+  return backendRequest(backendConfig, `/servers/${encodeURIComponent(serverId)}/oauth/device/poll`, { method: 'POST' })
+}
+
+export async function getMcpServerStatus(serverId, backendConfig) {
+  const data = await backendRequest(backendConfig, `/servers/${encodeURIComponent(serverId)}`)
+  return data.server
+}
+
+export async function getAndcoWakeStatus(backendConfig) {
+  return backendRequest(backendConfig, '/wake/status')
+}
+
+export async function saveAndcoWakeConfig(config, backendConfig) {
+  return backendRequest(backendConfig, '/wake/config', { method: 'PUT', body: JSON.stringify(config) })
+}
+
+export async function getAndcoWakePending(backendConfig) {
+  return backendRequest(backendConfig, '/wake/pending')
+}
+
+export async function acknowledgeAndcoWake(deliveryId, backendConfig) {
+  return backendRequest(backendConfig, '/wake/ack', { method: 'POST', body: JSON.stringify({ deliveryId }) })
 }
