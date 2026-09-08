@@ -20,7 +20,8 @@ const TYPE_LABELS = {
   treasure: '宝藏', deep: '深层', anchor: '锚点',
 }
 const LEGEND = ['memory', 'tech', 'dream', 'diary', 'treasure', 'deep', 'anchor']
-const DUST_COUNT = 180
+const DUST_COUNT = 300
+const OPENING_TRAIL_COUNT = 52
 
 function colorOf(type) { return TYPE_COLORS[type] || OTHER_COLOR }
 
@@ -30,35 +31,42 @@ function smoothstep(from, to, n) {
   return p * p * (3 - 2 * p)
 }
 
-function colorWithAlpha(hex, alpha) {
-  const value = hex.replace('#', '')
-  const r = parseInt(value.slice(0, 2), 16)
-  const g = parseInt(value.slice(2, 4), 16)
-  const b = parseInt(value.slice(4, 6), 16)
-  return `rgba(${r},${g},${b},${alpha})`
-}
-
-// 星点从夜空中心旋展开：开头聚成一束短星轨，随后落回最终坐标。
-// 使用纯 Canvas 线段，不加逐星 shadowBlur，避免在手机上重新制造糊成一片的效果。
-function revealPosition(node, reveal, cx, cy, scale) {
-  const eased = 1 - Math.pow(1 - clamp01(reveal), 3)
-  const dx = node.x * scale
-  const dy = node.y * scale
-  const distance = Math.hypot(dx, dy) || 1
-  const direction = seeded(node.id, 73) > 0.5 ? 1 : -1
-  const arc = Math.sin(Math.PI * eased) * Math.min(88, distance * 0.16) * direction
-  return {
-    x: cx + dx * eased - (dy / distance) * arc,
-    y: cy + dy * eased + (dx / distance) * arc,
-  }
-}
-
 // 重要记忆先醒来，日常记忆随后铺满夜空；同一层内用稳定的小错峰避免机械齐亮。
 function revealDelay(node) {
   if (node.pinned) return seeded(node.id, 71) * 90
   const importance = Number(node.importance) || 0
   const wave = importance >= 9 ? 0 : importance >= 7 ? 260 : importance >= 5 ? 610 : importance >= 3 ? 960 : 1290
   return wave + seeded(node.id, 72) * 230
+}
+
+// 开场是一整片星轨从夜空掠过，而不是记忆节点从中心炸开。
+// 共用右上方的旋转中心能让轨迹方向一致，像长曝光星轨；随后整体淡出，让位给星图。
+function drawOpeningTrails(ctx, elapsed, W, H) {
+  if (elapsed < 0 || elapsed > 1350) return
+  const travel = clamp01(elapsed / 1050)
+  const opacity = smoothstep(0, 0.18, travel) * (1 - smoothstep(0.68, 1, travel))
+  if (opacity <= 0) return
+
+  const orbitX = W * 0.84
+  const orbitY = H * 0.08
+  const span = Math.max(W, H)
+  ctx.save()
+  ctx.globalCompositeOperation = 'lighter'
+  ctx.lineCap = 'round'
+  for (let i = 0; i < OPENING_TRAIL_COUNT; i++) {
+    const radius = 50 + seeded(i + 1, 101) * span * 1.34
+    const baseAngle = seeded(i + 1, 102) * Math.PI * 2
+    const speed = 0.42 + seeded(i + 1, 103) * 0.32
+    const head = baseAngle + travel * speed
+    const length = 0.025 + seeded(i + 1, 104) * 0.075
+    const brightness = 0.12 + seeded(i + 1, 105) * 0.34
+    ctx.strokeStyle = `rgba(216,228,248,${opacity * brightness})`
+    ctx.lineWidth = 0.35 + seeded(i + 1, 106) * 1.05
+    ctx.beginPath()
+    ctx.ellipse(orbitX, orbitY, radius, radius * 0.78, -0.12, head - length, head)
+    ctx.stroke()
+  }
+  ctx.restore()
 }
 
 // ── 背景星座（真实星座连线的简化版，视口坐标 0~1，配合视差绘制）──
@@ -246,6 +254,13 @@ export default function StarMapPanel() {
       const W = rect.width, H = rect.height
       const { tx, ty, k } = viewRef.current
       const cx = W / 2 + tx, cy = H / 2 + ty
+      const world = worldRef.current
+      const { nodes, edges } = world
+      const reducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
+      const elapsed = world.settled ? t - world.revealStart : -1
+      const skyReveal = reducedMotion
+        ? (world.settled ? 1 : 0)
+        : smoothstep(0.45, 1, clamp01(elapsed / 1450))
 
       // 深空底色：中心略亮，边缘压暗，星群会像悬在空间里而不是贴在平面上。
       const grad = ctx.createRadialGradient(W * 0.48, H * 0.45, 0, W * 0.48, H * 0.45, Math.max(W, H) * 0.85)
@@ -267,14 +282,17 @@ export default function StarMapPanel() {
       nebulaB.addColorStop(1, 'rgba(0,0,0,0)')
       ctx.fillStyle = nebulaB; ctx.fillRect(0, 0, W, H)
 
-      // 远景星尘使用稳定随机数，拖动时只有轻微视差，不会每帧闪跳。
+      // 星轨先从同一方向划过，随后远景繁星和记忆星图一起从夜色里显现。
+      if (!reducedMotion) drawOpeningTrails(ctx, elapsed, W, H)
+
+      // 远景星尘使用稳定随机数，数量略密但单颗更淡；拖动时只有轻微视差。
       for (let i = 0; i < DUST_COUNT; i++) {
         const depth = 0.12 + seeded(i + 7, 91) * 0.28
         const x = ((seeded(i + 19, 92) * W + tx * depth) % (W + 40) + W + 40) % (W + 40) - 20
         const y = ((seeded(i + 29, 93) * H + ty * depth) % (H + 40) + H + 40) % (H + 40) - 20
         const pulse = 0.35 + 0.35 * Math.sin(t / (1700 + i % 9 * 120) + i)
         const radius = 0.35 + seeded(i + 41, 94) * 0.75
-        ctx.globalAlpha = (0.12 + pulse * 0.20) * (0.65 + depth)
+        ctx.globalAlpha = (0.09 + pulse * 0.17) * (0.65 + depth) * skyReveal
         ctx.fillStyle = i % 13 === 0 ? '#bfd3f4' : '#eef1f8'
         ctx.beginPath(); ctx.arc(x, y, radius, 0, Math.PI * 2); ctx.fill()
       }
@@ -283,6 +301,7 @@ export default function StarMapPanel() {
 
       // ── 背景星座（视差 0.35，不随缩放，像远处的天幕）──
       const px = tx * 0.35, py = ty * 0.35
+      ctx.globalAlpha = skyReveal
       for (const ast of ASTERISMS) {
         const bx = ast.box.x * W + px, by = ast.box.y * H + py
         const bw = ast.box.w * W, bh = ast.box.h * H
@@ -303,12 +322,11 @@ export default function StarMapPanel() {
         ctx.font = '11px system-ui'
         ctx.fillText(ast.name, bx + bw * 0.42, by + bh + 14)
       }
+      ctx.globalAlpha = 1
 
-      const world = worldRef.current
-      const { nodes, edges } = world
-      const reducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
-      const elapsed = world.settled ? t - world.revealStart : -1
-      const revealOf = (node) => reducedMotion ? (world.settled ? 1 : 0) : clamp01((elapsed - node.revealDelay) / 900)
+      const revealOf = (node) => reducedMotion
+        ? (world.settled ? 1 : 0)
+        : clamp01((elapsed - 620 - node.revealDelay * 0.45) / 780)
       if (nodes.length) {
         // ── 连线 ──
         const hover = hoverRef.current
@@ -320,39 +338,28 @@ export default function StarMapPanel() {
           if ((ax < -50 && bx2 < -50) || (ax > W + 50 && bx2 > W + 50)) continue
           if ((ay < -50 && by2 < -50) || (ay > H + 50 && by2 > H + 50)) continue
           const isHoverEdge = hover != null && (e.a === hover || e.b === hover)
-          // 星轨收束后连线才浮现，避免开场同时出现太多图形。
+          // 记忆星点站稳后连线才浮现，避免开场同时出现太多图形。
           const edgeReveal = smoothstep(0.72, 1, Math.min(revealOf(a), revealOf(b)))
           const alpha = (isHoverEdge ? 0.42 : 0.018 + Math.max(0, e.s - 0.55) * 0.24) * edgeReveal
           ctx.strokeStyle = `rgba(125,158,215,${Math.min(0.42, alpha)})`
           ctx.beginPath(); ctx.moveTo(ax, ay); ctx.lineTo(bx2, by2); ctx.stroke()
         }
-        // ── 星星：短星轨从中心旋展开，再安静停在最终位置 ──
+        // ── 记忆星点：在最终位置依重要度渐亮，不再从中心向外发散 ──
         ctx.globalCompositeOperation = 'lighter'
         for (let i = 0; i < nodes.length; i++) {
           const p = nodes[i]
           const reveal = revealOf(p)
           if (reveal <= 0) continue
-          const pos = revealPosition(p, reveal, cx, cy, k)
-          const x = pos.x, y = pos.y
+          const x = cx + p.x * k, y = cy + p.y * k
           if (x < -20 || x > W + 20 || y < -20 || y > H + 20) continue
           const twinkle = 0.72 + 0.28 * Math.sin(t / (1050 + (i % 7) * 90) + p.phase)
           const hierarchy = Math.min(2.6, Math.log2(1 + (p.degree || 0)) * 0.28)
           const coreIn = smoothstep(0, 0.44, reveal)
           const r = Math.max(1.05, (1.15 + p.importance * 0.28 + hierarchy) * Math.sqrt(k)) * (i === hover ? 1.55 : 1)
           const c = colorOf(p.type)
-          if (!reducedMotion && reveal < 0.94) {
-            const tail = revealPosition(p, Math.max(0, reveal - 0.13), cx, cy, k)
-            const trail = ctx.createLinearGradient(tail.x, tail.y, x, y)
-            trail.addColorStop(0, colorWithAlpha(c, 0))
-            trail.addColorStop(1, colorWithAlpha(c, 0.42 * smoothstep(0.02, 0.28, reveal) * (1 - reveal)))
-            ctx.strokeStyle = trail
-            ctx.lineWidth = Math.max(0.55, Math.min(1.35, r * 0.34))
-            ctx.lineCap = 'round'
-            ctx.beginPath(); ctx.moveTo(tail.x, tail.y); ctx.lineTo(x, y); ctx.stroke()
-          }
           // 清晰的同色星点。手机 Canvas 的逐星 shadowBlur 很昂贵，也会把星群画糊，
           // 因此只用实体大小与透明度表达层级，不再添加十字星芒或逐星模糊。
-          const starR = r * (0.68 + coreIn * 0.32)
+          const starR = r * (0.58 + coreIn * 0.42)
           ctx.globalAlpha = (0.58 + twinkle * 0.22) * coreIn
           ctx.fillStyle = c
           ctx.beginPath(); ctx.arc(x, y, starR, 0, Math.PI * 2); ctx.fill()
