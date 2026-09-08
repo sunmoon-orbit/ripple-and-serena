@@ -17,6 +17,7 @@ const SHORT_TO_SLOT = {
   cf: 'confusion', gu: 'guilt', ch: 'melancholy', mr: 'daze',
   j: 'joy', w: 'warmth', sa: 'satisfaction', fo: 'fondness', d: 'desire', lo: 'longing',
 }
+const BARE_EMOTION_TAIL_RE = /(?:^|\n)(\s*\{[^{}\n]*\}\s*)$/
 
 const DECAY_PER_24H = {
   anger: 10, sadness: 5, grievance: 8, frustration: 8, fatigue: 12, anxiety: 8,
@@ -126,7 +127,28 @@ export function buildEmotionPrompt(state) {
 export function extractEmotionUpdate(text) {
   const match = (text || '').match(/<es>([\s\S]*?)<\/es>/i)
   const clean = (text || '').replace(/<es>[\s\S]*?<\/es>/gi, '').trimEnd()
-  if (!match) return { clean, delta: null }
+  if (!match) {
+    // 有些模型会照着情绪协议输出 JSON，却漏掉外层 <es> 标签。仅当回复末行是
+    // 一个独立对象、所有键都是合法情绪短名且值为有限小幅数字时才兜底提取，
+    // 避免把正文里的普通 JSON、代码块或未知业务数据吞掉。
+    const bare = clean.match(BARE_EMOTION_TAIL_RE)
+    if (!bare) return { clean, delta: null }
+    try {
+      const jsonStr = bare[1].trim().replace(/([:,]\s*)\+/g, '$1')
+      const delta = JSON.parse(jsonStr)
+      const entries = delta && !Array.isArray(delta) ? Object.entries(delta) : []
+      const valid = entries.length > 0 && entries.every(([key, value]) => (
+        Object.hasOwn(SHORT_TO_SLOT, key)
+        && typeof value === 'number'
+        && Number.isFinite(value)
+        && Math.abs(value) <= 100
+      ))
+      if (!valid) return { clean, delta: null }
+      return { clean: clean.slice(0, bare.index).trimEnd(), delta }
+    } catch {
+      return { clean, delta: null }
+    }
+  }
   try {
     // AI 按提示会写成 {"j":+8} —— JSON 不允许数字前导 +，先把 +N 清理成 N 再解析
     const jsonStr = match[1].replace(/([:,]\s*)\+/g, '$1')
@@ -138,8 +160,9 @@ export function extractEmotionUpdate(text) {
 
 // 流式过程中剥离 <es> 标签（可能不完整）
 export function stripEmotionTag(text) {
-  return (text || '')
+  const clean = (text || '')
     .replace(/<es>[\s\S]*?<\/es>/gi, '')
     .replace(/<es>[\s\S]*$/i, '')
     .trimEnd()
+  return extractEmotionUpdate(clean).clean
 }
