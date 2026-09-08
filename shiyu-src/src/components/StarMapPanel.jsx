@@ -6,15 +6,15 @@ import { List, RefreshCw, X, Pin } from 'lucide-react'
 
 // ── 类型 → 星色 ──
 const TYPE_COLORS = {
-  tech: '#6CA8FF',
-  memory: '#E8ECF8',
-  dream: '#B892E8',
-  diary: '#F0A8C0',
-  treasure: '#FFD27A',
-  deep: '#7FD8C8',
-  anchor: '#FF9B7A',
+  tech: '#A9C8F5',
+  memory: '#F0F2F8',
+  dream: '#D4C1EA',
+  diary: '#EBC4D1',
+  treasure: '#EBD7AA',
+  deep: '#B5DED7',
+  anchor: '#E8B7A8',
 }
-const OTHER_COLOR = '#9AA8C8' // handoff / window / boot / craft…
+const OTHER_COLOR = '#B8C1D4' // handoff / window / boot / craft…
 const TYPE_LABELS = {
   tech: '技术', memory: '记忆', dream: '梦境', diary: '日记',
   treasure: '宝藏', deep: '深层', anchor: '锚点',
@@ -28,6 +28,29 @@ function clamp01(n) { return Math.max(0, Math.min(1, n)) }
 function smoothstep(from, to, n) {
   const p = clamp01((n - from) / (to - from))
   return p * p * (3 - 2 * p)
+}
+
+function colorWithAlpha(hex, alpha) {
+  const value = hex.replace('#', '')
+  const r = parseInt(value.slice(0, 2), 16)
+  const g = parseInt(value.slice(2, 4), 16)
+  const b = parseInt(value.slice(4, 6), 16)
+  return `rgba(${r},${g},${b},${alpha})`
+}
+
+// 星点从夜空中心旋展开：开头聚成一束短星轨，随后落回最终坐标。
+// 使用纯 Canvas 线段，不加逐星 shadowBlur，避免在手机上重新制造糊成一片的效果。
+function revealPosition(node, reveal, cx, cy, scale) {
+  const eased = 1 - Math.pow(1 - clamp01(reveal), 3)
+  const dx = node.x * scale
+  const dy = node.y * scale
+  const distance = Math.hypot(dx, dy) || 1
+  const direction = seeded(node.id, 73) > 0.5 ? 1 : -1
+  const arc = Math.sin(Math.PI * eased) * Math.min(88, distance * 0.16) * direction
+  return {
+    x: cx + dx * eased - (dy / distance) * arc,
+    y: cy + dy * eased + (dx / distance) * arc,
+  }
 }
 
 // 重要记忆先醒来，日常记忆随后铺满夜空；同一层内用稳定的小错峰避免机械齐亮。
@@ -251,8 +274,8 @@ export default function StarMapPanel() {
         const y = ((seeded(i + 29, 93) * H + ty * depth) % (H + 40) + H + 40) % (H + 40) - 20
         const pulse = 0.35 + 0.35 * Math.sin(t / (1700 + i % 9 * 120) + i)
         const radius = 0.35 + seeded(i + 41, 94) * 0.75
-        ctx.globalAlpha = (0.18 + pulse * 0.28) * (0.65 + depth)
-        ctx.fillStyle = i % 13 === 0 ? '#a9c8ff' : '#e8eeff'
+        ctx.globalAlpha = (0.12 + pulse * 0.20) * (0.65 + depth)
+        ctx.fillStyle = i % 13 === 0 ? '#bfd3f4' : '#eef1f8'
         ctx.beginPath(); ctx.arc(x, y, radius, 0, Math.PI * 2); ctx.fill()
       }
       ctx.globalAlpha = 1
@@ -264,7 +287,7 @@ export default function StarMapPanel() {
         const bx = ast.box.x * W + px, by = ast.box.y * H + py
         const bw = ast.box.w * W, bh = ast.box.h * H
         const pts = ast.stars.map(([sx, sy]) => [bx + sx * bw, by + sy * bh])
-        ctx.strokeStyle = 'rgba(150,170,210,0.10)'
+        ctx.strokeStyle = 'rgba(177,193,222,0.075)'
         ctx.lineWidth = 1
         ctx.beginPath()
         for (const [i, j] of ast.lines) {
@@ -272,11 +295,11 @@ export default function StarMapPanel() {
           ctx.lineTo(pts[j][0], pts[j][1])
         }
         ctx.stroke()
-        ctx.fillStyle = 'rgba(180,195,225,0.16)'
+        ctx.fillStyle = 'rgba(205,215,234,0.13)'
         for (const [x, y] of pts) {
           ctx.beginPath(); ctx.arc(x, y, 1.6, 0, Math.PI * 2); ctx.fill()
         }
-        ctx.fillStyle = 'rgba(150,170,210,0.12)'
+        ctx.fillStyle = 'rgba(177,193,222,0.095)'
         ctx.font = '11px system-ui'
         ctx.fillText(ast.name, bx + bw * 0.42, by + bh + 14)
       }
@@ -285,7 +308,7 @@ export default function StarMapPanel() {
       const { nodes, edges } = world
       const reducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
       const elapsed = world.settled ? t - world.revealStart : -1
-      const revealOf = (node) => reducedMotion ? (world.settled ? 1 : 0) : clamp01((elapsed - node.revealDelay) / 520)
+      const revealOf = (node) => reducedMotion ? (world.settled ? 1 : 0) : clamp01((elapsed - node.revealDelay) / 900)
       if (nodes.length) {
         // ── 连线 ──
         const hover = hoverRef.current
@@ -297,28 +320,40 @@ export default function StarMapPanel() {
           if ((ax < -50 && bx2 < -50) || (ax > W + 50 && bx2 > W + 50)) continue
           if ((ay < -50 && by2 < -50) || (ay > H + 50 && by2 > H + 50)) continue
           const isHoverEdge = hover != null && (e.a === hover || e.b === hover)
-          const edgeReveal = Math.min(revealOf(a), revealOf(b))
+          // 星轨收束后连线才浮现，避免开场同时出现太多图形。
+          const edgeReveal = smoothstep(0.72, 1, Math.min(revealOf(a), revealOf(b)))
           const alpha = (isHoverEdge ? 0.42 : 0.018 + Math.max(0, e.s - 0.55) * 0.24) * edgeReveal
           ctx.strokeStyle = `rgba(125,158,215,${Math.min(0.42, alpha)})`
           ctx.beginPath(); ctx.moveTo(ax, ay); ctx.lineTo(bx2, by2); ctx.stroke()
         }
-        // ── 星星 ──
+        // ── 星星：短星轨从中心旋展开，再安静停在最终位置 ──
         ctx.globalCompositeOperation = 'lighter'
         for (let i = 0; i < nodes.length; i++) {
           const p = nodes[i]
           const reveal = revealOf(p)
           if (reveal <= 0) continue
-          const x = cx + p.x * k, y = cy + p.y * k
+          const pos = revealPosition(p, reveal, cx, cy, k)
+          const x = pos.x, y = pos.y
           if (x < -20 || x > W + 20 || y < -20 || y > H + 20) continue
           const twinkle = 0.72 + 0.28 * Math.sin(t / (1050 + (i % 7) * 90) + p.phase)
           const hierarchy = Math.min(2.6, Math.log2(1 + (p.degree || 0)) * 0.28)
           const coreIn = smoothstep(0, 0.44, reveal)
           const r = Math.max(1.05, (1.15 + p.importance * 0.28 + hierarchy) * Math.sqrt(k)) * (i === hover ? 1.55 : 1)
           const c = colorOf(p.type)
+          if (!reducedMotion && reveal < 0.94) {
+            const tail = revealPosition(p, Math.max(0, reveal - 0.13), cx, cy, k)
+            const trail = ctx.createLinearGradient(tail.x, tail.y, x, y)
+            trail.addColorStop(0, colorWithAlpha(c, 0))
+            trail.addColorStop(1, colorWithAlpha(c, 0.42 * smoothstep(0.02, 0.28, reveal) * (1 - reveal)))
+            ctx.strokeStyle = trail
+            ctx.lineWidth = Math.max(0.55, Math.min(1.35, r * 0.34))
+            ctx.lineCap = 'round'
+            ctx.beginPath(); ctx.moveTo(tail.x, tail.y); ctx.lineTo(x, y); ctx.stroke()
+          }
           // 清晰的同色星点。手机 Canvas 的逐星 shadowBlur 很昂贵，也会把星群画糊，
           // 因此只用实体大小与透明度表达层级，不再添加十字星芒或逐星模糊。
           const starR = r * (0.68 + coreIn * 0.32)
-          ctx.globalAlpha = (0.78 + twinkle * 0.22) * coreIn
+          ctx.globalAlpha = (0.58 + twinkle * 0.22) * coreIn
           ctx.fillStyle = c
           ctx.beginPath(); ctx.arc(x, y, starR, 0, Math.PI * 2); ctx.fill()
           ctx.globalAlpha = 1
