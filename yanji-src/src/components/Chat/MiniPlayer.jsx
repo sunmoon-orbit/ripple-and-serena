@@ -41,16 +41,51 @@ export default function MiniPlayer() {
 
   const pct = player.duration ? (player.currentTime / player.duration) * 100 : 0
 
-  function onSeekBar(e) {
-    const rect = e.currentTarget.getBoundingClientRect()
-    const ratio = (e.clientX - rect.left) / rect.width
-    seek(Math.max(0, Math.min(1, ratio)) * player.duration)
+  const seekMax = Number.isFinite(player.duration) && player.duration > 0 ? player.duration : 0
+  const seekValue = seekMax ? Math.min(Math.max(player.currentTime || 0, 0), seekMax) : 0
+
+  function seekTo(value) {
+    const target = Number(value)
+    if (!seekMax || !Number.isFinite(target)) return
+    seek(Math.min(Math.max(target, 0), seekMax))
+  }
+
+  function onSeekInput(e) {
+    seekTo(e.currentTarget.value)
+  }
+
+  function onLyricKeyDown(e, time) {
+    if (e.key !== 'Enter' && e.key !== ' ') return
+    e.preventDefault()
+    seekTo(time)
+  }
+
+  const seekInputStyle = {
+    position: 'absolute',
+    inset: '-14px 0',
+    width: '100%',
+    height: '32px',
+    margin: 0,
+    opacity: 0,
+    cursor: seekMax ? 'pointer' : 'default',
+    touchAction: 'none',
   }
 
   const mini = (
     <div className="mini-player">
-      <div className="mp-progress" onClick={onSeekBar}>
+      <div className="mp-progress" style={{ position: 'relative' }}>
         <div className="mp-progress-fill" style={{ width: `${pct}%` }} />
+        <input
+          type="range"
+          min="0"
+          max={seekMax}
+          step="0.1"
+          value={seekValue}
+          onChange={onSeekInput}
+          aria-label="播放进度"
+          disabled={!seekMax}
+          style={seekInputStyle}
+        />
       </div>
       <div className="mp-body">
         <div className="mp-info" onClick={() => setExpanded(true)}>
@@ -103,15 +138,30 @@ export default function MiniPlayer() {
             key={i}
             data-li={i}
             className={'mp-lyric-line' + (i === activeIdx ? ' active' : '')}
-            onClick={() => seek(l.t)}
+            role="button"
+            tabIndex={0}
+            aria-label={`跳转到 ${fmt(l.t)}：${l.text}`}
+            onClick={() => seekTo(l.t)}
+            onKeyDown={(e) => onLyricKeyDown(e, l.t)}
           >{l.text}</div>
         )) : <div className="mp-lyric-empty">纯音乐，或这首没有歌词</div>}
       </div>
 
       <div className="mp-full-ctrl">
         <span className="mp-time">{fmt(player.currentTime)}</span>
-        <div className="mp-full-bar" onClick={onSeekBar}>
+        <div className="mp-full-bar" style={{ position: 'relative' }}>
           <div className="mp-full-bar-fill" style={{ width: `${pct}%` }} />
+          <input
+            type="range"
+            min="0"
+            max={seekMax}
+            step="0.1"
+            value={seekValue}
+            onChange={onSeekInput}
+            aria-label="播放进度"
+            disabled={!seekMax}
+            style={seekInputStyle}
+          />
         </div>
         <span className="mp-time">{fmt(player.duration)}</span>
       </div>
