@@ -77,6 +77,31 @@ export async function deleteTarotDraw(config, id) {
   return request(config, `/tarot/draws/${id}`, { method: 'DELETE' })
 }
 
+// 少数 OpenAI 兼容模型会把本应走 function calling 的「保存解牌」调用写成正文：
+// [draw_tarot:reading|id=12|解读…]
+// 只接受回复末尾独立一行、reading 动作、正整数 id 和有限长度正文；其他工具名/
+// 动作一律不执行，避免普通聊天文字意外触发写操作。
+const TEXTUAL_READING_RE = /(?:^|\n)\[draw_tarot:reading\|id=(\d+)\|([\s\S]+)\]\s*$/i
+
+export function extractTextualTarotReading(text) {
+  const source = text || ''
+  const match = source.match(TEXTUAL_READING_RE)
+  if (!match) return { clean: source, reading: null }
+  const id = Number(match[1])
+  const reading = match[2].trim()
+  if (!Number.isSafeInteger(id) || id <= 0 || !reading || reading.length > 5000) {
+    return { clean: source, reading: null }
+  }
+  return {
+    clean: source.slice(0, match.index).trimEnd(),
+    reading: { id, text: reading },
+  }
+}
+
+export function stripTextualTarotReading(text) {
+  return extractTextualTarotReading(text).clean
+}
+
 // ─── 排版 ─────────────────────────────────────────────────────────────────
 
 function spreadName(n) {

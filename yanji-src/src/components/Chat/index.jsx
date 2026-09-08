@@ -19,6 +19,7 @@ import { pickAutoPostTrigger, markAutoPosted, postMoment, fetchAutopostSetting }
 import { notifyReplyReady } from '../../api/push'
 import { acknowledgeAndcoWake, getAndcoWakePending, getAndcoWakeStatus } from '../../api/mcp'
 import { extractMood, stripMoodTag, stripInlineFx } from '../../utils/moodFx'
+import { extractTextualTarotReading, saveTarotReading, stripTextualTarotReading } from '../../api/tarot'
 import { showToast } from '../Toast'
 import ConversationList from './ConversationList'
 import MessageList from './MessageList'
@@ -427,7 +428,7 @@ export default function Chat() {
     const streamUi = createStreamUpdateScheduler(() => {
       const patch = { streaming: true }
       if (fullText) {
-        patch.content = stripVoiceMsgTag(stripCallTag(stripNegTag(stripMoodTag(stripEmotionTag(fullText)))))
+        patch.content = stripVoiceMsgTag(stripCallTag(stripNegTag(stripMoodTag(stripEmotionTag(stripTextualTarotReading(fullText))))))
       }
       if (fullThinking) patch.thinking = fullThinking
       updateMessage(chat.id, assistantId, patch)
@@ -690,8 +691,18 @@ export default function Chat() {
       // streaming:true 覆盖回来，留下永不结束的光标。
       streamUi.cancel()
 
+      // 个别模型会把 draw_tarot 的 reading 调用写成正文伪标签；严格解析后照常保存，
+      // 同时从气泡里剥离。保存失败不牵连已经生成好的回复。
+      const { clean: afterTarotText, reading: textualTarotReading } = extractTextualTarotReading(result.text || fullText)
+      if (textualTarotReading) {
+        try {
+          await saveTarotReading(moonMemory, textualTarotReading.id, textualTarotReading.text)
+        } catch {
+          showToast('解牌说完了，但这次没能收进牌记', 'error')
+        }
+      }
       // 提取情绪更新标签，应用到情绪状态，从显示文本里剥离
-      const { clean: afterEs, delta: emotionDelta } = extractEmotionUpdate(result.text || fullText)
+      const { clean: afterEs, delta: emotionDelta } = extractEmotionUpdate(afterTarotText)
       if (emotionDelta) {
         const emoState = applyEmotionDelta(emotionDelta)
         maybeAutoPostMoment(emoState, conn, moonMemory)  // 某正向情绪越阈值时，涟言自动发条朋友圈
@@ -783,7 +794,7 @@ export default function Chat() {
       // 上游已经出了字（也已经计过费）却在收尾阶段抛错——流被掐断、工具连不上都算——
       // 以前一律把这条助手消息删掉，她只看到「[错误] Failed to fetch」：钱花了、话没了
       // （0726 阿颖遇到）。有正文就留下并标「没说完就断线了」，没正文才删。
-      const salvaged = stripVoiceMsgTag(stripCallTag(stripNegTag(stripMoodTag(stripEmotionTag(fullText)))))
+      const salvaged = stripVoiceMsgTag(stripCallTag(stripNegTag(stripMoodTag(stripEmotionTag(stripTextualTarotReading(fullText))))))
         .replace(/\s*\[MSG\]\s*/gi, '\n\n')
         .trim()
       // Provider 在断流前发来的 usage 仍然是真实账单，不能因为最后抛错就消失。
