@@ -11,6 +11,7 @@ import { synthesizeSpeech } from '../../api/moonMemory'
 import MusicCard from './MusicCard'
 import { shouldToggleMessageMeta } from './messageMetaToggle'
 import { applyInlineFx, stripInlineFx, stripEnglishTags, stripUnknownAssistantTags } from '../../utils/moodFx'
+import { stripEmotionTag } from '../../utils/emotion'
 import { downloadBlob, hasNativeDownloadBridge } from '../../utils/download'
 import { showToast } from '../Toast'
 
@@ -297,7 +298,7 @@ function renderAssistantContent(content, isStreaming, reveal = false) {
   }
   // 模型偶尔会自创 [love]/[sigh] 一类舞台标签；只清理助手显示内容，
   // 不动用户原文、代码、Markdown 链接和言叽正式支持的情绪特效。
-  const displayContent = stripUnknownAssistantTags(content)
+  const displayContent = stripUnknownAssistantTags(stripEmotionTag(content))
   // 双语通话的回复：[译:中文] 尾标签渲染成同气泡里的翻译块（英文正文 + 虚线 + 中文，仿参考截图）
   const { main: biMain, zh: biZh } = splitTranslation(displayContent)
   if (biZh) {
