@@ -22,6 +22,7 @@ const TYPE_LABELS = {
 const LEGEND = ['memory', 'tech', 'dream', 'diary', 'treasure', 'deep', 'anchor']
 const DUST_COUNT = 300
 const OPENING_TRAIL_COUNT = 52
+const OPENING_TRAIL_DURATION = 2400
 
 function colorOf(type) { return TYPE_COLORS[type] || OTHER_COLOR }
 
@@ -42,9 +43,9 @@ function revealDelay(node) {
 // 开场是一整片星轨从夜空掠过，而不是记忆节点从中心炸开。
 // 共用右上方的旋转中心能让轨迹方向一致，像长曝光星轨；随后整体淡出，让位给星图。
 function drawOpeningTrails(ctx, elapsed, W, H) {
-  if (elapsed < 0 || elapsed > 1350) return
-  const travel = clamp01(elapsed / 1050)
-  const opacity = smoothstep(0, 0.18, travel) * (1 - smoothstep(0.68, 1, travel))
+  if (elapsed < 0 || elapsed > OPENING_TRAIL_DURATION + 350) return
+  const travel = clamp01(elapsed / OPENING_TRAIL_DURATION)
+  const opacity = smoothstep(0, 0.15, travel) * (1 - smoothstep(0.72, 1, travel))
   if (opacity <= 0) return
 
   const orbitX = W * 0.84
@@ -260,7 +261,7 @@ export default function StarMapPanel() {
       const elapsed = world.settled ? t - world.revealStart : -1
       const skyReveal = reducedMotion
         ? (world.settled ? 1 : 0)
-        : smoothstep(0.45, 1, clamp01(elapsed / 1450))
+        : smoothstep(0.52, 1, clamp01(elapsed / 2700))
 
       // 深空底色：中心略亮，边缘压暗，星群会像悬在空间里而不是贴在平面上。
       const grad = ctx.createRadialGradient(W * 0.48, H * 0.45, 0, W * 0.48, H * 0.45, Math.max(W, H) * 0.85)
@@ -326,7 +327,7 @@ export default function StarMapPanel() {
 
       const revealOf = (node) => reducedMotion
         ? (world.settled ? 1 : 0)
-        : clamp01((elapsed - 620 - node.revealDelay * 0.45) / 780)
+        : clamp01((elapsed - 1450 - node.revealDelay * 0.45) / 900)
       if (nodes.length) {
         // ── 连线 ──
         const hover = hoverRef.current
