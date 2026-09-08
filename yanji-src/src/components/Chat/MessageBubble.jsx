@@ -10,7 +10,7 @@ import { useStore } from '../../store'
 import { synthesizeSpeech } from '../../api/moonMemory'
 import MusicCard from './MusicCard'
 import { shouldToggleMessageMeta } from './messageMetaToggle'
-import { applyInlineFx, stripInlineFx, stripEnglishTags } from '../../utils/moodFx'
+import { applyInlineFx, stripInlineFx, stripEnglishTags, stripUnknownAssistantTags } from '../../utils/moodFx'
 import { downloadBlob, hasNativeDownloadBridge } from '../../utils/download'
 import { showToast } from '../Toast'
 
@@ -295,8 +295,11 @@ function renderAssistantContent(content, isStreaming, reveal = false) {
   if (!content) {
     return <div className="bubble-markdown" dangerouslySetInnerHTML={{ __html: isStreaming ? '<span class="cursor-blink">▌</span>' : '' }} />
   }
+  // 模型偶尔会自创 [love]/[sigh] 一类舞台标签；只清理助手显示内容，
+  // 不动用户原文、代码、Markdown 链接和言叽正式支持的情绪特效。
+  const displayContent = stripUnknownAssistantTags(content)
   // 双语通话的回复：[译:中文] 尾标签渲染成同气泡里的翻译块（英文正文 + 虚线 + 中文，仿参考截图）
-  const { main: biMain, zh: biZh } = splitTranslation(content)
+  const { main: biMain, zh: biZh } = splitTranslation(displayContent)
   if (biZh) {
     return (
       <>
@@ -308,10 +311,10 @@ function renderAssistantContent(content, isStreaming, reveal = false) {
       </>
     )
   }
-  if (!MUSIC_TAG_RE.test(content)) {
-    return <MarkdownBlock html={parseMarkdown(content)} enhance={!isStreaming} reveal={reveal} />
+  if (!MUSIC_TAG_RE.test(displayContent)) {
+    return <MarkdownBlock html={parseMarkdown(displayContent)} enhance={!isStreaming} reveal={reveal} />
   }
-  const parts = content.split(/(\[music:[^\]]+\])/)
+  const parts = displayContent.split(/(\[music:[^\]]+\])/)
   return (
     <>
       {parts.map((part, i) => {

@@ -10,7 +10,10 @@ export const INLINE_FX = [
   { tag: 'wave', label: '飘动', hint: '缓缓浮动，适合梦呓、飘忽的心绪' },
 ]
 const FX_TAGS = INLINE_FX.map((f) => f.tag).join('|')
+const FX_TAG_SET = new Set(INLINE_FX.map((f) => f.tag))
 const FX_RE = new RegExp(`\\[(${FX_TAGS})\\]([\\s\\S]*?)\\[\\/\\1\\]`, 'g')
+const ENGLISH_BRACKET_TAG_RE = /\[\/?([A-Za-z][A-Za-z0-9 '’,.\-]{0,24})\]/g
+const MARKDOWN_CODE_RE = /(```[\s\S]*?```|~~~[\s\S]*?~~~|`[^`\n]*`)/g
 
 // 在 markdown 解析前调用：把行内特效标签换成 span（marked 会原样透传 inline HTML）
 export function applyInlineFx(text) {
@@ -38,6 +41,25 @@ export function stripInlineFx(text) {
 export function stripEnglishTags(text) {
   if (!text || text.indexOf('[') === -1) return text
   return text.replace(/\[[A-Za-z][A-Za-z0-9 '’,.\-]{0,24}\]/g, '')
+}
+
+// 普通助手气泡也会偶尔收到模型自创的舞台提示（[love]、[sigh]、
+// [laughs softly] 等）。这些不是言叽协议的一部分，不该原样露给阿颖。
+// 只在助手显示链路调用；保留真正支持的情绪特效、Markdown 链接/图片、
+// 代码里的字面量，以及常见的全大写缩写，避免误删正常内容。
+export function stripUnknownAssistantTags(text) {
+  if (!text || text.indexOf('[') === -1) return text
+  return text.split(MARKDOWN_CODE_RE).map((part, index) => {
+    if (index % 2 === 1) return part
+    return part.replace(ENGLISH_BRACKET_TAG_RE, (match, label, offset, source) => {
+      if (FX_TAG_SET.has(label.toLowerCase())) return match
+      const next = source[offset + match.length]
+      const previous = source[offset - 1]
+      if (next === '(' || next === '[' || previous === ']') return match
+      if (label === label.toUpperCase() && /[A-Z]/.test(label)) return match
+      return ''
+    })
+  }).join('')
 }
 
 // ── 情绪皮肤：隐藏 <mood> 标签，像 <es> 一样不显示，改变整屏氛围 ──────────────
