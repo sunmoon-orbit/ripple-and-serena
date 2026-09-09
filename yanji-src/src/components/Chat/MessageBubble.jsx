@@ -13,9 +13,11 @@ import { shouldToggleMessageMeta } from './messageMetaToggle'
 import { applyInlineFx, stripInlineFx, stripEnglishTags, stripUnknownAssistantTags } from '../../utils/moodFx'
 import { stripEmotionTag } from '../../utils/emotion'
 import { stripTextualTarotReading } from '../../api/tarot'
+import { underlineExtension } from '../../utils/markdownUnderline'
 import { downloadBlob, hasNativeDownloadBridge } from '../../utils/download'
 import { showToast } from '../Toast'
 
+marked.use({ extensions: [underlineExtension] })
 marked.setOptions({
   breaks: true,
   gfm: true,
@@ -39,7 +41,7 @@ const VOICE_TAG_RE = /\[(breath|laughter)\]/gi
 // 所以用白名单：留标签和样式，杀掉 on* 事件和 javascript: 协议。（2026-08-02）
 const PURIFY_OPTS = {
   ALLOWED_TAGS: [
-    'p', 'br', 'hr', 'span', 'div', 'img', 'a', 'em', 'strong', 'del', 'code', 'pre',
+    'p', 'br', 'hr', 'span', 'div', 'img', 'a', 'em', 'strong', 'u', 'del', 'code', 'pre',
     'blockquote', 'ul', 'ol', 'li', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
     'table', 'thead', 'tbody', 'tr', 'th', 'td', 'sup', 'sub',
   ],
@@ -334,30 +336,12 @@ function renderAssistantContent(content, isStreaming, reveal = false) {
   )
 }
 
-function renderStickered(text) {
-  if (!text || !/\[sticker:[^\]]+\]/.test(text)) {
-    return <span className="bubble-text">{text}</span>
-  }
-  const parts = text.split(/(\[sticker:[^\]]+\])/)
-  return (
-    <span>
-      {parts.map((part, i) => {
-        const m = part.match(/^\[sticker:([^\]]+)\]$/)
-        // 自定义表情包是完整 URL，内置的是 stickers/ 目录下的文件名
-        if (m) return <img key={i} src={/^https?:\/\//.test(m[1]) ? m[1] : STICKER_BASE + m[1]} alt="sticker" style={{ maxWidth: 140, borderRadius: 8, display: 'block', margin: '2px 0' }} />
-        return part ? <span key={i} className="bubble-text">{part}</span> : null
-      })}
-    </span>
-  )
-}
-
-// 她自己发的消息里若含代码，也渲染成代码块+运行/复制（普通聊天文字仍走纯文本，
-// 不误伤：只有带 ``` 围栏、或整段就是 HTML 的才当代码）——2026-07-04 她反馈粘贴代码看不到运行按钮
+// 她自己发的消息也走与助手一致的 Markdown 安全渲染链路；整段 HTML 仍按
+// 可运行代码展示，不把她粘贴的页面直接注入言叽。——2026-09-09
 function renderUserBody(text) {
   if (!text) return <span className="bubble-text">{text}</span>
-  if (/```/.test(text)) return <MarkdownBlock html={parseMarkdown(text)} />
   if (looksRunnableHtml('', text.trim())) return <MarkdownBlock html={parseMarkdown('```html\n' + text.trim() + '\n```')} />
-  return renderStickered(text)
+  return <MarkdownBlock html={parseMarkdown(text)} />
 }
 
 function AttachChip({ name, content }) {

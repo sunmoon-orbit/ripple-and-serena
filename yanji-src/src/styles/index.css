@@ -1516,6 +1516,7 @@ textarea.form-input { display: block; margin: 8px 16px 12px; }
   border: 1px solid var(--border); font-size: 12.5px;
 }
 .bubble-markdown code { font-family: "SF Mono","Fira Code",monospace; font-size: 0.87em; }
+.bubble-markdown :not(pre) > code { background: rgba(150,140,180,0.1); padding: 0.12em 0.36em; border-radius: 4px; }
 /* 代码块头部：语言标签 + 复制按钮 */
 .code-head {
   display: flex; align-items: center; justify-content: space-between;
@@ -1547,6 +1548,11 @@ textarea.form-input { display: block; margin: 8px 16px 12px; }
 .bubble-markdown h1,.bubble-markdown h2,.bubble-markdown h3 { margin: 10px 0 5px; font-weight: 600; }
 .bubble-markdown blockquote { border-left: 3px solid var(--accent); padding-left: 10px; margin: 8px 0; color: var(--text-mid); font-style: italic; }
 .bubble-markdown a { color: var(--accent); text-decoration: underline; }
+.bubble-markdown u { text-decoration-thickness: 1px; text-underline-offset: 0.16em; }
+.bubble-user .bubble-markdown blockquote { border-left-color: currentColor; color: inherit; opacity: 0.88; }
+.bubble-user .bubble-markdown a { color: inherit; }
+.bubble-user .bubble-markdown pre { background: rgba(255,255,255,0.14); border-color: rgba(255,255,255,0.22); }
+.bubble-user .bubble-markdown :not(pre) > code { background: rgba(255,255,255,0.16); }
 .bubble-markdown img { max-width: 160px; max-height: 160px; border-radius: 8px; display: block; margin: 4px 0; }
 .bubble-markdown table { border-collapse: collapse; width: 100%; margin: 8px 0; font-size: 13px; }
 .bubble-markdown th,.bubble-markdown td { border: 1px solid var(--border); padding: 6px 10px; text-align: left; }
