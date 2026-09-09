@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { useStore } from '../../store'
+import { useStore, DEFAULT_CUSTOM_THEME } from '../../store'
 import { normalizeProvider, BUILTIN_MODELS } from '../../api/llm'
 import { checkHealth, fetchPushSchedule, savePushSchedule } from '../../api/moonMemory'
 import { maybeSyncEmotion } from '../../utils/emotionSync'
@@ -11,6 +11,57 @@ import { DEFAULT_RINGTONE_ID, RINGTONES, playRingtone } from '../../utils/ringto
 import { squareDownscale } from '../../utils/squareDownscale'
 import McpSettings from './McpSettings'
 import { useThemedConfirm } from '../ThemedConfirmDialog'
+
+const CUSTOM_THEME_FIELDS = [
+  { key: 'background', label: '页面底色' },
+  { key: 'accent', label: '强调色' },
+  { key: 'userBubble', label: '我的气泡' },
+  { key: 'assistantBubble', label: 'AI 气泡' },
+  { key: 'text', label: '正文文字' },
+]
+
+function CustomColorField({ item, value, onChange }) {
+  const normalized = /^#[0-9a-f]{6}$/i.test(value || '') ? value : DEFAULT_CUSTOM_THEME[item.key]
+  const [draft, setDraft] = useState(normalized)
+
+  useEffect(() => setDraft(normalized), [normalized])
+
+  function commit(raw) {
+    const next = String(raw || '').trim()
+    if (/^#[0-9a-f]{6}$/i.test(next)) {
+      const clean = next.toLowerCase()
+      setDraft(clean)
+      onChange(clean)
+    } else {
+      setDraft(normalized)
+    }
+  }
+
+  return (
+    <label style={{ display: 'grid', gridTemplateColumns: '38px 1fr', alignItems: 'center', gap: 9 }}>
+      <input
+        type="color"
+        value={normalized}
+        aria-label={item.label}
+        onChange={(e) => commit(e.target.value)}
+        style={{ width: 38, height: 34, padding: 2, border: '1px solid var(--border-md)', borderRadius: 9, background: 'var(--card)' }}
+      />
+      <span style={{ minWidth: 0 }}>
+        <span style={{ display: 'block', fontSize: 12, color: 'var(--text-mid)', marginBottom: 3 }}>{item.label}</span>
+        <input
+          value={draft}
+          inputMode="text"
+          maxLength={7}
+          aria-label={item.label + '十六进制颜色'}
+          onChange={(e) => setDraft(e.target.value)}
+          onBlur={(e) => commit(e.target.value)}
+          onKeyDown={(e) => { if (e.key === 'Enter') { e.currentTarget.blur() } }}
+          style={{ width: '100%', minWidth: 0, border: 'none', borderBottom: '1px solid var(--border)', background: 'transparent', color: 'var(--text)', fontSize: 12, fontFamily: 'ui-monospace, monospace', outline: 'none', padding: '1px 0 3px' }}
+        />
+      </span>
+    </label>
+  )
+}
 
 function Section({ title, children }) {
   return (
@@ -444,12 +495,12 @@ function ConnectionCard({ conn, onSave, onDelete, onActivate, isActive }) {
 export default function Settings() {
   const store = useStore()
   const {
-    connections, activeConnectionId, tokenStats, moonMemory, theme, glassOpacity, avatarConfig, scrollAnchor,
+    connections, activeConnectionId, tokenStats, moonMemory, theme, customTheme, glassOpacity, avatarConfig, scrollAnchor,
     customKeyboardEnabled, setCustomKeyboardEnabled, widgetBackgroundStyle, setWidgetBackgroundStyle,
     globalInstruction, generationConfig, contextLimit, searchConfig, autoTools, imageDescriptions, injectMode, injectPrompt,
     addConnection, updateConnection, deleteConnection, setActiveConnection,
     setGlobalInstruction, setGenerationConfig, setContextLimit, setSearchConfig,
-    setAutoTools, setImageDescriptions, setMoonMemory, setTheme, setGlassOpacity, setAvatarConfig, setScrollAnchor,
+    setAutoTools, setImageDescriptions, setMoonMemory, setTheme, setCustomTheme, setGlassOpacity, setAvatarConfig, setScrollAnchor,
     setInjectMode, setInjectPrompt, replyDelay, setReplyDelay,
     textReveal, setTextReveal,
     voiceCallStyle, setVoiceCallStyle,
@@ -693,6 +744,7 @@ export default function Settings() {
     { id: 'claude', name: 'Claude', color: '#c8745a' },
     { id: 'glass', name: '烟水', color: '#7eb8c8' },
     { id: 'chensi', name: '沉思', color: 'linear-gradient(135deg, #fff 0 48%, #292929 52% 100%)' },
+    { id: 'custom', name: '自定义', color: 'conic-gradient(#b78daa, #faf7f4, #ffffff, #b78daa)' },
   ]
 
   async function checkMoonHealth() {
@@ -1276,6 +1328,35 @@ export default function Settings() {
                     </button>
                   ))}
                 </div>
+                {(theme || 'default') === 'custom' && (
+                  <div style={{ marginTop: 14, padding: 13, border: '1px solid var(--border)', borderRadius: 13, background: 'color-mix(in srgb, var(--card) 90%, var(--accent-dim))' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginBottom: 12 }}>
+                      <div>
+                        <div style={{ fontSize: 13, fontWeight: 650, color: 'var(--text)' }}>我的调色盘</div>
+                        <div style={{ marginTop: 2, fontSize: 11, color: 'var(--text-muted)' }}>改动会即时预览，只保存在这台设备</div>
+                      </div>
+                      <button
+                        type="button"
+                        className="btn-sm btn-ghost"
+                        onClick={() => setCustomTheme({ ...DEFAULT_CUSTOM_THEME })}
+                      >恢复默认</button>
+                    </div>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(126px, 1fr))', gap: '12px 14px' }}>
+                      {CUSTOM_THEME_FIELDS.map((item) => (
+                        <CustomColorField
+                          key={item.key}
+                          item={item}
+                          value={customTheme?.[item.key]}
+                          onChange={(value) => setCustomTheme({ [item.key]: value })}
+                        />
+                      ))}
+                    </div>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginTop: 14 }}>
+                      <div className="bubble-user" style={{ padding: '8px 11px', fontSize: 12, textAlign: 'center', borderRadius: 10 }}>这是我</div>
+                      <div className="bubble-assistant" style={{ padding: '8px 11px', fontSize: 12, textAlign: 'center', borderRadius: 10 }}>这是 AI</div>
+                    </div>
+                  </div>
+                )}
                 <div className="card-row" style={{ marginTop: 14, paddingTop: 12, borderTop: '1px solid var(--border)' }}>
                   <span className="card-row-label">气泡透明度</span>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>

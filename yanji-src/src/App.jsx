@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { useStore } from './store'
+import { useStore, DEFAULT_CUSTOM_THEME } from './store'
 import { pushNative } from './utils/nativeInbox'
 import { findConversationChat } from './utils/proactiveRouting'
 import { squareDownscale } from './utils/squareDownscale'
@@ -14,6 +14,71 @@ import Home from './components/Home'
 import Roost from './components/Roost'
 import Toast from './components/Toast'
 import MiniPlayer from './components/Chat/MiniPlayer'
+
+const CUSTOM_THEME_VARS = [
+  '--bg', '--bg-sidebar', '--card', '--accent', '--accent-soft', '--accent-dim', '--accent-grad',
+  '--text', '--text-mid', '--text-muted', '--text-faint', '--border', '--border-md',
+  '--shadow-sm', '--shadow-md', '--bubble-user-rgb', '--bubble-user-grad-rgb',
+  '--bubble-asst-rgb', '--bubble-asst-grad-rgb', '--bubble-user-text',
+]
+
+function hexToRgb(value, fallback) {
+  const match = /^#([0-9a-f]{6})$/i.exec(String(value || ''))
+  if (!match) return hexToRgb(fallback, '#000000')
+  const n = parseInt(match[1], 16)
+  return [(n >> 16) & 255, (n >> 8) & 255, n & 255]
+}
+
+function mix(a, b, weight) {
+  return a.map((v, i) => Math.round(v * (1 - weight) + b[i] * weight))
+}
+
+function rgbText(rgb) { return rgb.join(', ') }
+function rgbHex(rgb) { return '#' + rgb.map((v) => v.toString(16).padStart(2, '0')).join('') }
+
+function readableText(rgb) {
+  const linear = rgb.map((v) => {
+    const n = v / 255
+    return n <= 0.04045 ? n / 12.92 : ((n + 0.055) / 1.055) ** 2.4
+  })
+  return 0.2126 * linear[0] + 0.7152 * linear[1] + 0.0722 * linear[2] > 0.46 ? '#241f24' : '#ffffff'
+}
+
+function clearCustomTheme(root) {
+  CUSTOM_THEME_VARS.forEach((name) => root.style.removeProperty(name))
+}
+
+function applyCustomTheme(root, value) {
+  const cfg = { ...DEFAULT_CUSTOM_THEME, ...(value || {}) }
+  const bg = hexToRgb(cfg.background, DEFAULT_CUSTOM_THEME.background)
+  const accent = hexToRgb(cfg.accent, DEFAULT_CUSTOM_THEME.accent)
+  const user = hexToRgb(cfg.userBubble, DEFAULT_CUSTOM_THEME.userBubble)
+  const assistant = hexToRgb(cfg.assistantBubble, DEFAULT_CUSTOM_THEME.assistantBubble)
+  const text = hexToRgb(cfg.text, DEFAULT_CUSTOM_THEME.text)
+  const vars = {
+    '--bg': rgbHex(bg),
+    '--bg-sidebar': rgbHex(mix(bg, accent, 0.08)),
+    '--card': rgbHex(assistant),
+    '--accent': rgbHex(accent),
+    '--accent-soft': rgbHex(mix(accent, assistant, 0.48)),
+    '--accent-dim': `rgba(${rgbText(accent)}, 0.15)`,
+    '--accent-grad': rgbHex(mix(accent, assistant, 0.18)),
+    '--text': rgbHex(text),
+    '--text-mid': rgbHex(mix(text, bg, 0.28)),
+    '--text-muted': rgbHex(mix(text, bg, 0.48)),
+    '--text-faint': rgbHex(mix(text, bg, 0.66)),
+    '--border': `rgba(${rgbText(text)}, 0.12)`,
+    '--border-md': `rgba(${rgbText(text)}, 0.22)`,
+    '--shadow-sm': `0 1px 3px rgba(${rgbText(text)}, 0.07), 0 2px 8px rgba(${rgbText(text)}, 0.05)`,
+    '--shadow-md': `0 2px 12px rgba(${rgbText(text)}, 0.10), 0 8px 24px rgba(${rgbText(text)}, 0.08)`,
+    '--bubble-user-rgb': rgbText(user),
+    '--bubble-user-grad-rgb': rgbText(mix(user, accent, 0.22)),
+    '--bubble-asst-rgb': rgbText(assistant),
+    '--bubble-asst-grad-rgb': rgbText(mix(assistant, bg, 0.16)),
+    '--bubble-user-text': readableText(user),
+  }
+  Object.entries(vars).forEach(([name, val]) => root.style.setProperty(name, val))
+}
 
 function Splash({ onDone }) {
   const [fading, setFading] = useState(false)
@@ -41,6 +106,7 @@ export default function App() {
   const activePanel = useStore((s) => s.activePanel)
   const theme = useStore((s) => s.theme)
   const glassOpacity = useStore((s) => s.glassOpacity ?? 1)
+  const customTheme = useStore((s) => s.customTheme)
   const widgetBackgroundStyle = useStore((s) => s.widgetBackgroundStyle || 'solid')
   const avatarSize = useStore((s) => s.avatarConfig?.size || 28)
   const ringtone = useStore((s) => s.ringtone)
@@ -110,14 +176,17 @@ export default function App() {
     // 官端槽位已被沉思替换（0723）：老存档里残留 guanduan 的自动迁到 chensi
     const t0 = theme === 'guanduan' ? 'chensi' : theme
     const t = t0 && t0 !== 'default' ? t0 : ''
-    document.documentElement.setAttribute('data-theme', t)
+    const root = document.documentElement
+    root.setAttribute('data-theme', t)
+    clearCustomTheme(root)
+    if (t === 'custom') applyCustomTheme(root, customTheme)
     // 透明度以前只写进烟水主题的两只气泡，切到别的主题滑杆就失效。
     // 现在统一只下发 alpha；每套主题仍在 CSS 里保留自己的气泡 RGB，不会串色。
     // 夹在 0.1–1 之间也兼容旧存档和手改 localStorage 的异常值。
     const bubbleOpacity = Math.min(1, Math.max(0.1, Number(glassOpacity) || 1))
     document.documentElement.style.setProperty('--bubble-opacity', String(bubbleOpacity))
     try { window.YanjiNative?.updateTheme(theme || 'default') } catch {}
-  }, [theme, glassOpacity])
+  }, [theme, glassOpacity, customTheme])
 
   // 桌面小组件由原生 RemoteViews 绘制，读不到网页 localStorage。
   // 开机同步一次，覆盖安装新 APK 后也无需她重新拨动设置。

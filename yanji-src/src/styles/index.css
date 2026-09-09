@@ -46,6 +46,7 @@
   --shadow-md: 0 2px 12px rgba(150,140,180,0.10), 0 8px 24px rgba(150,140,180,0.08);
   /* 气泡颜色和透明度拆开：主题只换 RGB，设置滑杆统一控制 alpha。 */
   --bubble-opacity: 1;
+  --bubble-user-text: #fff;
   --bubble-user-rgb: 191, 181, 216;
   --bubble-user-grad-rgb: 200, 190, 221;
   --bubble-asst-rgb: 255, 255, 255;
@@ -1464,7 +1465,7 @@ textarea.form-input { display: block; margin: 8px 16px 12px; }
   background: linear-gradient(135deg,
     rgba(var(--bubble-user-rgb), var(--bubble-opacity)) 0%,
     rgba(var(--bubble-user-grad-rgb), var(--bubble-opacity)) 100%);
-  color: #fff; border-bottom-right-radius: 3px;
+  color: var(--bubble-user-text, #fff); border-bottom-right-radius: 3px;
   box-shadow: 0 2px 10px color-mix(in srgb, var(--accent) 28%, transparent);
 }
 .bubble-assistant {

@@ -6,6 +6,14 @@ import { normalizeGenerationConfig } from './utils/generationConfig'
 import { updateChatDraft, removeChatDraft } from './utils/chatDrafts'
 
 const LOCAL_KEY = 'llm_hub_state_v1'
+
+export const DEFAULT_CUSTOM_THEME = Object.freeze({
+  background: '#faf7f4',
+  accent: '#b78daa',
+  userBubble: '#b78daa',
+  assistantBubble: '#ffffff',
+  text: '#302830',
+})
 // 聊天记录和摘要不再进 localStorage（约 5MB 配额，撑满之后**所有**写入一起失败，
 // 连换个头像都存不下——2026-08-02 就是这么丢了两段对话），改存 IndexedDB。见 utils/bigStore.js
 const BIG_KEYS = ['messagesByChatId', 'summariesByChatId']
@@ -44,6 +52,8 @@ const DEFAULT_STATE = {
   // 远程 Streamable HTTP MCP。这里只存非敏感展示配置；凭据与 OAuth token 在后端 600 文件。
   mcpServers: [],
   theme: 'claude',
+  // 自定义主题只覆盖五个核心颜色，其余层级由 App 自动调和，避免设置项过载。
+  customTheme: { ...DEFAULT_CUSTOM_THEME },
   // 新安装默认实色，保证各主题文字都清楚；老用户已经保存的透明度原样沿用。
   glassOpacity: 1,
   // 言叽自己的 26 键拼音键盘：默认关闭，避免第一次更新就替换她已经习惯的系统输入法。
@@ -242,7 +252,7 @@ const persistedKeys = [
   'connections', 'activeConnectionId', 'chats', 'activeChatId',
   'messagesByChatId', 'globalInstruction', 'summariesByChatId', 'draftsByChatId',
   'generationConfig', 'memoryItems', 'tokenStats', 'contextLimit',
-  'searchConfig', 'avatarConfig', 'autoTools', 'imageDescriptions', 'moonMemory', 'mcpServers', 'theme', 'glassOpacity',
+  'searchConfig', 'avatarConfig', 'autoTools', 'imageDescriptions', 'moonMemory', 'mcpServers', 'theme', 'customTheme', 'glassOpacity',
   'customKeyboardEnabled', 'widgetBackgroundStyle',
   'injectMode', 'injectPrompt', 'scrollAnchor', 'textReveal', 'replyDelay', 'customStickers',
   'voiceCallStyle', 'vcBackground', 'homeStyle', 'rainSound', 'timeAwareness', 'longingPush', 'proactiveCall', 'randomTool', 'ringtone', 'lastBackupAt',
@@ -266,6 +276,9 @@ function mergeWithDefaults(persisted) {
     s.moonMemory = { ...DEFAULT_STATE.moonMemory }
   }
   if (!Array.isArray(s.mcpServers)) s.mcpServers = []
+  s.customTheme = s.customTheme && typeof s.customTheme === 'object'
+    ? { ...DEFAULT_CUSTOM_THEME, ...s.customTheme }
+    : { ...DEFAULT_CUSTOM_THEME }
   return s
 }
 
@@ -282,7 +295,12 @@ export const useStore = create((set, get) => ({
 
   // ─── panel navigation ─────────────────────────────────────────────
   setActivePanel: (panel) => set({ activePanel: panel }),
-  setTheme: (theme) => set((s) => { savePersistedState({ ...s, theme }); try { window.YanjiNative?.updateTheme(theme === 'default' ? 'default' : theme) } catch {}; return { theme } }),
+  setTheme: (theme) => set((s) => { savePersistedState({ ...s, theme }); try { window.YanjiNative?.updateTheme(theme === 'custom' ? 'default' : theme) } catch {}; return { theme } }),
+  setCustomTheme: (patch) => set((s) => {
+    const customTheme = { ...DEFAULT_CUSTOM_THEME, ...s.customTheme, ...(patch || {}) }
+    savePersistedState({ ...s, customTheme })
+    return { customTheme }
+  }),
   setGlassOpacity: (v) => set((s) => { savePersistedState({ ...s, glassOpacity: v }); return { glassOpacity: v } }),
   setCustomKeyboardEnabled: (v) => set((s) => {
     const customKeyboardEnabled = !!v
