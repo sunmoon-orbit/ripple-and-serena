@@ -42,12 +42,13 @@ vm.runInContext([
   grab('isPromptCacheKeyCompatibilityError'),
   grab('isPromptCacheHintCompatibilityError'),
   grab('isToolsCompatibilityError'),
+  grab('extractTextToolCall'),
   grab('parseProviderHttpMessage'),
   grab('providerRequestSummary'),
   grab('providerHttpError'),
   grab('streamGeminiParts'),
   grab('streamSSE'),
-  '__fns = { streamGeminiParts, streamSSE, assertStreamComplete, sanitizeResponseDiagnostic, isPromptCacheKeyCompatibilityError, isPromptCacheHintCompatibilityError, isToolsCompatibilityError, providerHttpError };',
+  '__fns = { streamGeminiParts, streamSSE, assertStreamComplete, sanitizeResponseDiagnostic, isPromptCacheKeyCompatibilityError, isPromptCacheHintCompatibilityError, isToolsCompatibilityError, providerHttpError, extractTextToolCall };',
 ].join('\n\n'), ctx)
 const {
   streamGeminiParts,
@@ -58,6 +59,7 @@ const {
   isPromptCacheHintCompatibilityError,
   isToolsCompatibilityError,
   providerHttpError,
+  extractTextToolCall,
 } = ctx.__fns
 
 // 把若干字符串块伪装成 resp.body.getReader()
@@ -227,6 +229,18 @@ const check = (name, cond, extra = '') => {
     error.responseDiagnostic.includes('tools: 1') &&
     !error.responseDiagnostic.includes('不应进入诊断') &&
     !error.responseDiagnostic.includes('secret-chat-id'))
+}
+
+// ── 13. 非标准 tool_name 文本工具调用也要被识别 ─────────────────────
+{
+  console.log('用例13 文本工具调用兼容：')
+  const standard = extractTextToolCall('先记一下\\n{"name":"write_memory","arguments":{"content":"标准"}}')
+  const kiro = extractTextToolCall('{"tool_name":"write_memory","arguments":{"content":"Kiro 变体\\\\n第二行"}}')
+  check('标准 name 保持可用', standard?.name === 'write_memory' && standard?.args?.content === '标准')
+  check('识别 Kiro 的 tool_name', kiro?.name === 'write_memory', JSON.stringify(kiro))
+  check('Kiro 参数没有丢失', kiro?.args?.content === 'Kiro 变体\\n第二行', JSON.stringify(kiro?.args))
+  check('工具调用前正文得到保留', standard?.remaining === '先记一下', standard?.remaining)
+  check('普通 JSON 不误判为工具', extractTextToolCall('{"content":"只是正文"}') === null)
 }
 
 console.log(`\n通过 ${pass}，失败 ${fail}`)
