@@ -10,8 +10,6 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Ripple">
 <link rel="apple-touch-icon" href="icon.png">
-<link rel="stylesheet" href="roost-splash.css">
-<script src="roost-splash.js" defer></script>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -785,23 +783,6 @@
 <link rel="preload" as="image" href="badge-96.png">
 </head>
 <body>
-<div id="roost-splash" aria-hidden="true">
-  <div class="roost-splash-world">
-    <div class="roost-splash-stars" aria-hidden="true"></div>
-    <div class="roost-splash-moon" aria-hidden="true"></div>
-    <div class="roost-splash-mark" aria-hidden="true">
-      <svg viewBox="0 0 72 72" role="img" aria-label="归巢">
-        <path d="M14 34 36 16l22 18v25H14Z"/>
-        <path d="M28 59V42h16v17M47 24c-2-6 3-11 9-10-3 2-4 5-2 8 2 2 4 3 7 2-2 6-9 8-14 4Z"/>
-      </svg>
-      <strong>归巢</strong>
-      <span>雾散以后，灯一直亮着</span>
-    </div>
-  </div>
-  <canvas id="roost-splash-fog"></canvas>
-  <div class="roost-splash-hint">用手指划开雾气</div>
-  <button id="roost-splash-skip" type="button">直接归巢</button>
-</div>
 <div id="auth-overlay">
   <div id="auth-box">
     <div id="auth-title">Ripple</div>
@@ -905,7 +886,6 @@
     <button id="bg-upload-btn">选择图片</button>
     <button id="bg-fit-btn">显示方式：完整图片</button>
     <button id="bg-clear-btn">恢复纯色</button>
-    <button id="splash-replay-btn">重播开场</button>
   </div>
 
   <!-- CHAT -->
@@ -2374,7 +2354,6 @@ async function tryAuth(password) {
     if (data.ok && data.token) {
       localStorage.setItem('raven-token', data.token)
       hideAuthOverlay()
-      window.roostSplashShow?.()
       document.getElementById('auth-error').textContent = ''
     } else {
       document.getElementById('auth-error').textContent = '密码不对'
