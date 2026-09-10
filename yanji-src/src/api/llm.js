@@ -640,7 +640,9 @@ async function callWithTools({
           // 下发的工具清单。否则模型写一段 JSON 就可能调用未启用的工具。
           const advertised = tools.some((tool) => tool.name === textTc.name)
           if (!advertised) {
-            finalText = stripFakeToolResult(textTc.remaining) || `模型尝试调用未启用的工具「${textTc.name}」，言叽已拦截。`
+            const cleanPrefix = stripFakeToolResult(textTc.remaining)
+            const unavailable = `我刚才想调用工具「${textTc.name}」，但它当前没有启用，所以没有执行，也没有写入或修改任何内容。`
+            finalText = cleanPrefix ? `${cleanPrefix}\n\n${unavailable}` : unavailable
             break
           }
           onToolCall?.([textTc.name])
