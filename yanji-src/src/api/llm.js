@@ -405,9 +405,10 @@ export async function sendMessage({
   })
 }
 
-// 从文本里提取代理混入的工具调用 JSON，格式：{"name":"xxx","arguments":{...}}
+// 从文本里提取代理混入的工具调用 JSON。标准兼容写法用 name；部分
+// 中转/模型（例如 Kiro 兼容线路）会改成 tool_name，却仍把整坨塞进正文。
 function extractTextToolCall(text) {
-  const re = /\{[^{}]*"name"\s*:\s*"([^"]+)"[^{}]*"arguments"\s*:\s*(\{(?:[^{}]|\{[^{}]*\})*\})[^{}]*\}/s
+  const re = /\{[^{}]*"(?:name|tool_name)"\s*:\s*"([^"]+)"[^{}]*"arguments"\s*:\s*(\{(?:[^{}]|\{[^{}]*\})*\})[^{}]*\}/s
   const m = text.match(re)
   if (!m) return null
   try {
@@ -635,6 +636,13 @@ async function callWithTools({
       if (msg.content) {
         const textTc = extractTextToolCall(msg.content)
         if (textTc) {
+          // 文本 JSON 不属于供应商保证过的 tool_calls 协议，必须再对照本轮实际
+          // 下发的工具清单。否则模型写一段 JSON 就可能调用未启用的工具。
+          const advertised = tools.some((tool) => tool.name === textTc.name)
+          if (!advertised) {
+            finalText = stripFakeToolResult(textTc.remaining) || `模型尝试调用未启用的工具「${textTc.name}」，言叽已拦截。`
+            break
+          }
           onToolCall?.([textTc.name])
           try {
             const result = compressToolResult(await executeTool(textTc.name, textTc.args, { searchConfig, moonMemoryConfig, mcpServers, onStatus, onFile }))
