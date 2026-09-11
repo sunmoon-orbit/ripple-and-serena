@@ -15,6 +15,7 @@ import { drainNative } from '../../utils/nativeInbox'
 import { findConversationChat, hasProactiveMessage, parseProactiveCreatedAt, pendingCallMatches } from '../../utils/proactiveRouting'
 import { syncChatsToL0 } from '../../utils/l0Sync'
 import { createStreamUpdateScheduler } from '../../utils/streamUpdateScheduler'
+import { formatShanghaiHm, hasRealSleepInterval } from '../../utils/healthSleep.js'
 import { pickAutoPostTrigger, markAutoPosted, postMoment, fetchAutopostSetting } from '../../api/moments'
 import { notifyReplyReady } from '../../api/push'
 import { acknowledgeAndcoWake, getAndcoWakePending, getAndcoWakeStatus } from '../../api/mcp'
@@ -617,6 +618,9 @@ export default function Chat() {
                 if (v.steps != null) parts.push(`今日步数${v.steps}`)
                 if (v.calories != null) parts.push(`卡路里${Math.round(v.calories)}千卡`)
                 if (v.sleep_ms != null) parts.push(`睡眠${(v.sleep_ms / 3600000).toFixed(1)}小时`)
+                if (hasRealSleepInterval(v)) {
+                  parts.push(`入睡${formatShanghaiHm(v.sleep_start_at)}，醒来${formatShanghaiHm(v.sleep_end_at)}（北京时间）`)
+                }
                 if (parts.length) {
                   dynParts.push(`【她的手环】${ageMin < 5 ? '刚刚' : `${ageMin}分钟前`}：${parts.join('，')}。这是背景感知，不必每次提；心率明显偏高、步数暴涨之类异常时可以自然关心一句。想看更多历史用 check_health 工具。`)
                 }

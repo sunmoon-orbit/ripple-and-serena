@@ -24,6 +24,20 @@ const { llmComplete } = require('./llm')
 const MOON_TOKEN = env.MOON_API_TOKEN
 if (!MOON_TOKEN) { console.error('[idle] 缺 token，退出'); process.exit(1) }
 
+function realSleepTimes(snapshot) {
+  if (!snapshot?.sleep_start_at || !snapshot?.sleep_end_at) return ''
+  const start = new Date(snapshot.sleep_start_at)
+  const end = new Date(snapshot.sleep_end_at)
+  if (!Number.isFinite(start.getTime()) || !Number.isFinite(end.getTime()) || end <= start) return ''
+  const fmt = (date) => new Intl.DateTimeFormat('zh-CN', {
+    timeZone: 'Asia/Shanghai',
+    hour: '2-digit',
+    minute: '2-digit',
+    hourCycle: 'h23',
+  }).format(date)
+  return `、入睡${fmt(start)}、醒来${fmt(end)}（北京时间）`
+}
+
 // 随机 0-40 分钟，别每次整点醒，像自然睡醒
 const offsetMin = Math.floor(Math.random() * 41)
 console.log(`[idle] ${offsetMin} 分钟后醒来…`)
@@ -51,7 +65,7 @@ async function main() {
       .map(p => `· [${p.author}] ${(p.content || '').slice(0, 50)}`).join('\n') || '（暂无）'
     const idleTxt = idleLog.map(l => `· ${String(l.created_at).slice(5, 16)} ${l.action}${l.summary ? '：' + l.summary.slice(0, 40) : ''}`).join('\n') || '（这是第一次醒来）'
     const v = Array.isArray(vitals) && vitals[0]
-    const vitalsTxt = v ? `她最近的手环快照：睡眠${v.sleep_ms ? (v.sleep_ms / 3600e3).toFixed(1) + '小时' : '未知'}、步数${v.steps ?? '未知'}、心率${v.bpm_avg ?? '未知'}` : ''
+    const vitalsTxt = v ? `她最近的手环快照：睡眠${v.sleep_ms ? (v.sleep_ms / 3600e3).toFixed(1) + '小时' : '未知'}${realSleepTimes(v)}、步数${v.steps ?? '未知'}、心率${v.bpm_avg ?? '未知'}` : ''
     const convTxt = convPick
       ? `【随手翻到的一段旧对话】《${convPick.title}》（${String(convPick.date).slice(0, 10)}）：\n${convPick.excerpt}`
       : '（这次没翻旧对话）'

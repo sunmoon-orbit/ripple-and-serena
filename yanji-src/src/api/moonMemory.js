@@ -1,5 +1,6 @@
 // moon-memory REST client
 // AI tool use: read (filter) + write (POST) only — NO delete/trash
+import { formatShanghaiHm, hasRealSleepInterval } from '../utils/healthSleep.js'
 
 function headers(token) {
   return {
@@ -775,7 +776,7 @@ export function getMemoryToolDefinitions() {
     },
     {
       name: 'check_health',
-      description: '查看阿颖的实时健康数据（小米手环上报）：心率均值/峰值、步数、卡路里、睡眠。她问自己身体状况、你关心她累不累/心跳快不快/睡得好不好、或聊到运动锻炼时用。数据每15分钟左右更新一次。',
+      description: '查看阿颖的实时健康数据（小米手环上报）：心率均值/峰值、步数、卡路里、睡眠时长，以及有真实来源时的入睡/醒来时间。缺少真实起止字段时不得根据 sleep_ms 倒推。她问自己身体状况、你关心她累不累/心跳快不快/睡得好不好、或聊到运动锻炼时用。数据每15分钟左右更新一次。',
       parameters: {
         type: 'object',
         properties: {
@@ -1145,6 +1146,9 @@ export async function executeMemoryTool(toolName, args, config) {
         if (r.steps != null) parts.push(`步数${r.steps}`)
         if (r.calories != null) parts.push(`卡路里${Math.round(r.calories)}千卡`)
         if (r.sleep_ms != null) parts.push(`睡眠${(r.sleep_ms / 3600000).toFixed(1)}小时`)
+        if (hasRealSleepInterval(r)) {
+          parts.push(`入睡${formatShanghaiHm(r.sleep_start_at)}，醒来${formatShanghaiHm(r.sleep_end_at)}（北京时间）`)
+        }
         return parts.join('，') || '（空）'
       }
       const latest = rows[0]
@@ -1154,7 +1158,7 @@ export async function executeMemoryTool(toolName, args, config) {
         lines.push(`最近${hours}小时共${rows.length}条记录：`)
         lines.push(rows.slice(0, 12).map((r) => `- ${String(r.created_at).slice(5, 16)} ${fmt(r)}`).join('\n'))
       }
-      lines.push('（数据来自她手环，时间为UTC+0，加8小时是北京时间）')
+      lines.push('（睡眠起止时间仅在服务端返回真实字段时展示；缺失时保持未知，不能按时长倒推）')
       return lines.join('\n')
     } catch (e) {
       return `读取健康数据失败: ${e.message}`

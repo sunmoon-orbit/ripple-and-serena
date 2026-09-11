@@ -2,6 +2,12 @@ import { useState, useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import { useStore } from '../../store'
 import { fetchVitals } from '../../api/moonMemory'
+import {
+  aggregateVitalsByShanghaiDay,
+  formatShanghaiHm,
+  parseUtcTimestamp,
+  shanghaiDayKey,
+} from '../../utils/healthSleep.js'
 
 // 身体气象站（阿颖的主意，2026-07-10）
 // 手环→Tasker 上报的健康快照，此前只有三个涟言能查（check_health），
@@ -9,37 +15,11 @@ import { fetchVitals } from '../../api/moonMemory'
 
 const WEEK_CN = ['日', '一', '二', '三', '四', '五', '六']
 
-// sqlite CURRENT_TIMESTAMP 是 UTC，解析成本地时间
-function parseUtc(s) {
-  return new Date(s.replace(' ', 'T') + 'Z')
-}
-
-function dayKey(d) {
-  return d.toLocaleDateString('sv')
-}
-
 function fmtSleep(ms) {
   if (!ms) return '—'
   const h = Math.floor(ms / 3600000)
   const m = Math.round((ms % 3600000) / 60000)
   return `${h}小时${String(m).padStart(2, '0')}分`
-}
-
-// 快照里步数/卡路里是当天累计值，睡眠是昨晚一整段——按天聚合时都取当天最大值
-function aggregateByDay(rows) {
-  const days = {}
-  for (const r of rows) {
-    const t = parseUtc(r.created_at)
-    const k = dayKey(t)
-    const d = days[k] || { steps: 0, calories: 0, sleep_ms: 0, bpmAvg: null, bpmMax: 0 }
-    d.steps = Math.max(d.steps, r.steps || 0)
-    d.calories = Math.max(d.calories, r.calories || 0)
-    d.sleep_ms = Math.max(d.sleep_ms, r.sleep_ms || 0)
-    if (r.bpm_avg) d.bpmAvg = r.bpm_avg // rows 按时间升序遍历后留最新一笔
-    d.bpmMax = Math.max(d.bpmMax, r.bpm_max || 0)
-    days[k] = d
-  }
-  return days
 }
 
 function Bars({ series, unit, color }) {
@@ -72,9 +52,9 @@ export default function HealthCard({ onClose }) {
       .catch((e) => setError(e.message || '拉取失败'))
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
-  const days = rows ? aggregateByDay(rows) : {}
+  const days = rows ? aggregateVitalsByShanghaiDay(rows) : {}
   const latest = rows?.length ? rows[rows.length - 1] : null
-  const todayK = dayKey(new Date())
+  const todayK = shanghaiDayKey(new Date())
   const today = days[todayK]
 
   // 近 7 天序列（含无数据的空天）
@@ -82,7 +62,7 @@ export default function HealthCard({ onClose }) {
   for (let i = 6; i >= 0; i--) {
     const d = new Date()
     d.setDate(d.getDate() - i)
-    const k = dayKey(d)
+    const k = shanghaiDayKey(d)
     series.push({ key: k, week: WEEK_CN[d.getDay()], data: days[k], isToday: i === 0 })
   }
   const sleepSeries = series.map((s) => ({
@@ -96,7 +76,7 @@ export default function HealthCard({ onClose }) {
     label: s.data?.steps >= 1000 ? `${(s.data.steps / 1000).toFixed(1)}k` : String(s.data?.steps || ''),
   }))
 
-  const lastReport = latest ? parseUtc(latest.created_at) : null
+  const lastReport = latest ? parseUtcTimestamp(latest.created_at) : null
 
   return createPortal(
     <div className="health-overlay" onClick={onClose}>
@@ -116,6 +96,11 @@ export default function HealthCard({ onClose }) {
             <div className="health-tile">
               <div className="health-tile-label">昨晚睡眠</div>
               <div className="health-tile-value">{fmtSleep(today.sleep_ms)}</div>
+              {today.sleep_start_at && today.sleep_end_at && (
+                <div className="health-tile-minor">
+                  入睡 {formatShanghaiHm(today.sleep_start_at)} · 醒来 {formatShanghaiHm(today.sleep_end_at)}
+                </div>
+              )}
             </div>
             <div className="health-tile">
               <div className="health-tile-label">今日步数</div>
