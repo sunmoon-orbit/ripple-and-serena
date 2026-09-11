@@ -234,7 +234,7 @@ const check = (name, cond, extra = '') => {
 // ── 13. 非标准 tool_name 文本工具调用也要被识别 ─────────────────────
 {
   console.log('用例13 文本工具调用兼容：')
-  const standard = extractTextToolCall('先记一下\\n{"name":"write_memory","arguments":{"content":"标准"}}')
+  const standard = extractTextToolCall('先记一下\n{"name":"write_memory","arguments":{"content":"标准"}}')
   const kiro = extractTextToolCall('{"tool_name":"write_memory","arguments":{"content":"Kiro 变体\\\\n第二行"}}')
   check('标准 name 保持可用', standard?.name === 'write_memory' && standard?.args?.content === '标准')
   check('识别 Kiro 的 tool_name', kiro?.name === 'write_memory', JSON.stringify(kiro))
