@@ -4,6 +4,7 @@ import { showToast } from '../Toast'
 import { transcribeAudio, removeArchiveConversation, restoreArchiveConversation } from '../../api/moonMemory'
 import { useThemedConfirm } from '../ThemedConfirmDialog'
 import PinyinKeyboard from './PinyinKeyboard'
+import { isRunnableHtmlMessage } from '../../utils/runnableCode'
 
 const STICKERS = [
   'kaixin.png','wuyu.png','qushi.png','shangban.png','xihuan.png',
@@ -267,7 +268,7 @@ export default function ChatInput({ onSend, disabled, onImageAdd, images, onImag
     const vopts = pendingVoiceRef.current ? { voice: true, voiceDuration: pendingVoiceRef.current.duration, voiceTone: pendingVoiceRef.current.tone || undefined } : {}
     if (quoted) vopts.quote = quoted
     // 分段发送：空行隔开的段落拆成多条气泡依次发出（语音/带附件时不拆）
-    if (!pendingVoiceRef.current && !attachedTexts.length) {
+    if (!pendingVoiceRef.current && !attachedTexts.length && !isRunnableHtmlMessage(finalText)) {
       const segs = finalText.split(/\n[ \t]*\n/).map((s) => s.trim()).filter(Boolean)
       if (segs.length > 1) vopts.segments = segs
     }
