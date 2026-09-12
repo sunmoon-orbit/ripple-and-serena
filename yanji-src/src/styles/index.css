@@ -1420,7 +1420,8 @@ textarea.form-input { display: block; margin: 8px 16px 12px; }
 /* Perspective flip: swap left/right to see the chat from the other side */
 .perspective-mode .message-row-user { flex-direction: row !important; }
 .perspective-mode .message-row-assistant { flex-direction: row-reverse !important; }
-.perspective-mode .message-row-user .message-content-wrap { align-items: flex-start; }
+.perspective-mode .message-row-user .message-content-wrap {
+  min-width: 0; align-items: flex-start; }
 .perspective-mode .message-row-assistant .message-content-wrap { align-items: flex-end; }
 .message-avatar {
   width: var(--avatar-size, 28px); height: var(--avatar-size, 28px); border-radius: 50%;
@@ -1525,6 +1526,7 @@ textarea.form-input { display: block; margin: 8px 16px 12px; }
 .bubble-markdown p { margin: 0 0 8px; }
 .bubble-markdown p:last-child { margin-bottom: 0; }
 .bubble-markdown pre {
+  max-width: 100%;
   background: rgba(150,140,180,0.08); padding: 10px 12px;
   border-radius: var(--r-sm); overflow-x: auto; margin: 8px 0;
   border: 1px solid var(--border); font-size: 12.5px;
@@ -1547,6 +1549,11 @@ textarea.form-input { display: block; margin: 8px 16px 12px; }
 .bubble-markdown pre.has-head { margin-top: 0; border-top-left-radius: 0; border-top-right-radius: 0; }
 /* 代码就地运行：html 代码块下的运行按钮 + 沙箱渲染框 */
 .code-run-bar { margin: -4px 0 8px; }
+.message-bubble { min-width: 0; max-width: 100%; }
+.bubble-markdown { min-width: 0; max-width: 100%; }
+.runnable-user-html .code-run-bar { margin: 0; padding: 8px 0; }
+.runnable-user-html pre { max-height: 320px; overflow: auto; }
+.bubble-user .code-run-btn { color: inherit; border-color: currentColor; }
 .code-run-btn {
   background: var(--accent-dim); color: var(--accent); border: 1px solid var(--border-md);
   border-radius: 100px; padding: 3px 12px; font-size: 12px; cursor: pointer;

@@ -200,10 +200,10 @@ function RunnableUserHtml({ source }) {
         <span className="code-lang">html</span>
         <button type="button" className="code-copy" onClick={copy}>{copied ? '已复制' : '复制'}</button>
       </div>
-      <pre className="has-head"><code className="language-html">{source}</code></pre>
       <div className="code-run-bar">
-        <button type="button" className="code-run-btn" onClick={() => setOpen((value) => !value)}>{open ? '■ 收起' : '▶ 运行'}</button>
+        <button type="button" className="code-run-btn" onClick={(event) => { event.stopPropagation(); setOpen((value) => !value) }}>{open ? '■ 收起效果' : '▶ 运行 HTML'}</button>
       </div>
+      <pre className="has-head"><code className="language-html">{source}</code></pre>
       {open && <iframe className="code-run-frame" sandbox="allow-scripts allow-modals" loading="lazy" srcDoc={source} title="运行效果" />}
     </div>
   )
