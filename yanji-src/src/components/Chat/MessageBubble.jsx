@@ -16,6 +16,7 @@ import { stripTextualTarotReading } from '../../api/tarot'
 import { underlineExtension } from '../../utils/markdownUnderline'
 import { downloadBlob, hasNativeDownloadBridge } from '../../utils/download'
 import { showToast } from '../Toast'
+import { looksRunnableHtml } from '../../utils/runnableCode'
 
 marked.use({ extensions: [underlineExtension] })
 marked.setOptions({
@@ -68,10 +69,6 @@ function parseMarkdown(text) {
 // 发一段 html 代码块（```html），下面出现「运行」按钮，点了在沙箱 iframe 里渲染成
 // 会动的小东西——表白页、爱心动画之类。用来搞点浪漫（阿颖的主意，2026-07-04）。
 // 安全：sandbox 只给 allow-scripts，不给 allow-same-origin，代码碰不到我们的页面/存储。
-function looksRunnableHtml(cls, raw) {
-  if (/language-(html|xml|svg)/i.test(cls || '')) return true
-  return /^\s*<(!doctype|html|svg|body|div|style|canvas|section|main)[\s>]/i.test(raw || '')
-}
 function langOf(cls) {
   const m = /language-([a-z0-9]+)/i.exec(cls || '')
   return m ? m[1].toLowerCase() : ''
