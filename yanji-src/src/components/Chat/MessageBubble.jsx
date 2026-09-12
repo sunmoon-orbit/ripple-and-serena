@@ -382,6 +382,22 @@ function renderUserContent(content) {
   )
 }
 
+
+function LinkPreviewCard({ preview }) {
+  if (!preview?.url) return null
+  const labels = { loading: '正在读取…', read: '已读取正文', preview: '仅链接预览', failed: '读取失败' }
+  return (
+    <a className="link-preview-card" href={preview.url} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()}>
+      <div className="link-preview-copy">
+        <strong>{preview.title || preview.site || '分享的链接'}</strong>
+        {preview.description && <span>{preview.description}</span>}
+        <small><b>{preview.site || '网页'}</b><i>{labels[preview.status] || '链接预览'}</i></small>
+      </div>
+      {preview.image && <img src={preview.image} alt="" loading="lazy" onError={(e) => { e.currentTarget.style.display = 'none' }} />}
+    </a>
+  )
+}
+
 const AssistantIcon = () => (
   <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
     <path d="M4 8 C4 8 7 4 12 5 C16 6 18 9 17 13 C16 17 12 19 8 17" />
@@ -657,6 +673,7 @@ function MessageBubble({ msg, onEdit, onQuote, onDelete, isLast }) {
                     </div>
                   )
                 ) : renderUserContent(msg.content)}
+                {msg.linkPreview && <LinkPreviewCard preview={msg.linkPreview} />}
               </>
             )
           ) : msg.callInvite ? (

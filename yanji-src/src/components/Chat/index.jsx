@@ -16,6 +16,7 @@ import { findConversationChat, hasProactiveMessage, parseProactiveCreatedAt, pen
 import { syncChatsToL0 } from '../../utils/l0Sync'
 import { createStreamUpdateScheduler } from '../../utils/streamUpdateScheduler'
 import { formatShanghaiHm, hasRealSleepInterval } from '../../utils/healthSleep.js'
+import { extractFirstUrl, fetchLinkPreview, buildLinkPreviewContext } from '../../utils/linkPreview.js'
 import { pickAutoPostTrigger, markAutoPosted, postMoment, fetchAutopostSetting } from '../../api/moments'
 import { notifyReplyReady } from '../../api/push'
 import { acknowledgeAndcoWake, getAndcoWakePending, getAndcoWakeStatus } from '../../api/mcp'
@@ -459,6 +460,8 @@ export default function Chat() {
         }
         // 语音消息带上机器听出的语气线索（SenseVoice），只给模型看，气泡里不显示
         if (m.voice && m.voiceTone) c = `${c}\n（这条是语音，语气听起来：${m.voiceTone}）`
+        const linkContext = buildLinkPreviewContext(m.linkPreview)
+        if (linkContext) c = `${c}\n\n${linkContext}`
         return {
           role: m.role,
           content: m.injected ? `${c}\n\n${m.injected}` : c,
@@ -954,6 +957,18 @@ export default function Chat() {
     }
     if (imageDescriptions !== false && images.length && imageMessage) {
       void describeImages(chat.id, imageMessage.id, images, conn, updateMessage, recordTokenUsage)
+    }
+    const sharedUrl = extractFirstUrl(text)
+    if (sharedUrl && imageMessage && moonMemory?.enabled && moonMemory?.apiToken) {
+      let site = ''
+      try { site = new URL(sharedUrl).hostname.replace(/^www\./, '') } catch {}
+      updateMessage(chat.id, imageMessage.id, { linkPreview: { url: sharedUrl, site, status: 'loading' } })
+      try {
+        const preview = await fetchLinkPreview(moonMemory, sharedUrl)
+        updateMessage(chat.id, imageMessage.id, { linkPreview: preview })
+      } catch {
+        updateMessage(chat.id, imageMessage.id, { linkPreview: { url: sharedUrl, site, status: 'failed' } })
+      }
     }
     setPendingImages([])
 

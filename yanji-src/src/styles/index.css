@@ -625,6 +625,20 @@ a { text-decoration: none; color: inherit; }
 .message-bubble a { color: var(--accent); text-decoration: underline; }
 .message.user .message-bubble a { color: rgba(255,255,255,0.85); }
 
+.message.user .link-preview-card {
+  display: flex; min-width: min(280px, 68vw); max-width: 420px; margin-top: 9px;
+  overflow: hidden; border: 1px solid color-mix(in srgb, var(--border) 72%, transparent);
+  border-radius: 10px; background: color-mix(in srgb, var(--card) 94%, transparent);
+  color: var(--text); text-decoration: none; box-shadow: 0 2px 10px rgba(20,16,32,.08);
+}
+.link-preview-copy { min-width: 0; flex: 1; padding: 10px 11px; display: flex; flex-direction: column; gap: 4px; }
+.link-preview-copy strong { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-size: 13px; line-height: 1.35; }
+.link-preview-copy > span { color: var(--text-muted); font-size: 11px; line-height: 1.45; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.link-preview-copy small { display: flex; align-items: center; gap: 7px; color: var(--text-faint); font-size: 10px; }
+.link-preview-copy small b { max-width: 150px; overflow: hidden; text-overflow: ellipsis; font-weight: 500; }
+.link-preview-copy small i { font-style: normal; color: var(--accent); }
+.link-preview-card > img { width: 78px; min-height: 78px; object-fit: cover; background: var(--bg-sidebar); }
+
 /* 思考块 */
 .thinking-block {
   margin-bottom: 8px;

@@ -7,6 +7,7 @@ const path = require('path')
 const crypto = require('crypto')
 const { getUsage } = require('./usage')
 const { contextSnapshot } = require('./claude-runtime')
+const { getLinkPreview } = require('./link-preview')
 
 const PW_HASH = (() => {
   try {
@@ -100,6 +101,12 @@ function externalAuthed(req, url) {
   const h = req.headers.authorization || ''
   const t = h.startsWith('Bearer ') ? h.slice(7) : (url.searchParams.get('token') || '')
   return tokenIsValid(t)
+}
+
+function moonAuthed(req) {
+  const h = req.headers.authorization || ''
+  const token = h.startsWith('Bearer ') ? h.slice(7) : ''
+  return token.length === MOON_TOKEN.length && crypto.timingSafeEqual(Buffer.from(token), Buffer.from(MOON_TOKEN))
 }
 
 // token 从 moon-memory/.env 读取，不准硬编码（2026.6.11 公开仓库泄漏教训）
@@ -642,6 +649,28 @@ const server = http.createServer((req, res) => {
 
   if (url.pathname === '/raven/cc-settings') {
     void handleCcSettings(req, res, url)
+    return
+  }
+
+  if (req.method === 'POST' && url.pathname === '/raven/link-preview') {
+    if (!moonAuthed(req)) { res.writeHead(401, { 'Content-Type': 'application/json' }); res.end('{"error":"unauthorized"}'); return }
+    let body = ''
+    req.on('data', chunk => {
+      body += chunk
+      if (body.length > 4096) req.destroy()
+    })
+    req.on('end', async () => {
+      try {
+        const target = JSON.parse(body || '{}').url
+        if (typeof target !== 'string' || target.length > 2048) throw new Error('invalid url')
+        const preview = await getLinkPreview(target)
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'private, max-age=600' })
+        res.end(JSON.stringify(preview))
+      } catch (error) {
+        res.writeHead(422, { 'Content-Type': 'application/json; charset=utf-8' })
+        res.end(JSON.stringify({ error: error.message }))
+      }
+    })
     return
   }
 
