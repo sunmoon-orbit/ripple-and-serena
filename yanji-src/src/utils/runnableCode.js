@@ -4,6 +4,12 @@ export function looksRunnableHtml(className = '', source = '') {
 }
 
 export function isRunnableHtmlMessage(text = '') {
+  return Boolean(extractRunnableHtmlMessage(text))
+}
+
+export function extractRunnableHtmlMessage(text = '') {
   const source = String(text).trim()
-  return looksRunnableHtml('', source) || /^```(?:html|xml|svg)(?:\s|$)/i.test(source)
+  if (looksRunnableHtml('', source)) return source
+  const fenced = source.match(/^```(?:html|xml|svg)[^\n]*\n([\s\S]*?)\n?```\s*$/i)
+  return fenced?.[1]?.trim() || ''
 }
