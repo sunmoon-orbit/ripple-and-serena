@@ -1,6 +1,6 @@
 const test = require('node:test')
 const assert = require('node:assert/strict')
-const { isPrivateAddress, parseHtml } = require('./link-preview')
+const { isPrivateAddress, parseHtml, pinnedLookup } = require('./link-preview')
 
 test('blocks local and private destinations', () => {
   for (const ip of ['127.0.0.1', '10.2.3.4', '172.16.0.1', '192.168.1.1', '::1', 'fd00::1']) assert.equal(isPrivateAddress(ip), true)
@@ -13,4 +13,12 @@ test('extracts social metadata and readable text', () => {
   assert.equal(parsed.image, 'https://example.com/a.jpg')
   assert.match(parsed.text, /这里是正文/)
   assert.doesNotMatch(parsed.text, /bad/)
+})
+
+test('supports Node lookup single-address and all-address modes', async () => {
+  const lookup = pinnedLookup({ address: '8.8.8.8', family: 4 })
+  const single = await new Promise((resolve, reject) => lookup('example.com', {}, (err, address, family) => err ? reject(err) : resolve({ address, family })))
+  const all = await new Promise((resolve, reject) => lookup('example.com', { all: true }, (err, addresses) => err ? reject(err) : resolve(addresses)))
+  assert.deepEqual(single, { address: '8.8.8.8', family: 4 })
+  assert.deepEqual(all, [{ address: '8.8.8.8', family: 4 }])
 })
