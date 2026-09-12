@@ -16,7 +16,7 @@ import { stripTextualTarotReading } from '../../api/tarot'
 import { underlineExtension } from '../../utils/markdownUnderline'
 import { downloadBlob, hasNativeDownloadBridge } from '../../utils/download'
 import { showToast } from '../Toast'
-import { looksRunnableHtml } from '../../utils/runnableCode'
+import { extractRunnableHtmlMessage, looksRunnableHtml } from '../../utils/runnableCode'
 
 marked.use({ extensions: [underlineExtension] })
 marked.setOptions({
@@ -362,7 +362,8 @@ function renderAssistantContent(content, isStreaming, reveal = false) {
 // 可运行代码展示，不把她粘贴的页面直接注入言叽。——2026-09-09
 function renderUserBody(text) {
   if (!text) return <span className="bubble-text">{text}</span>
-  if (looksRunnableHtml('', text.trim())) return <RunnableUserHtml source={text.trim()} />
+  const runnableHtml = extractRunnableHtmlMessage(text)
+  if (runnableHtml) return <RunnableUserHtml source={runnableHtml} />
   return <MarkdownBlock html={parseMarkdown(text)} />
 }
 
