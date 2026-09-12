@@ -28,6 +28,12 @@ async function publicAddresses(hostname) {
   return rows
 }
 
+function pinnedLookup(chosen) {
+  return (_host, opts, cb) => opts?.all
+    ? cb(null, [chosen])
+    : cb(null, chosen.address, chosen.family)
+}
+
 function decodeEntities(s = '') {
   return s.replace(/&nbsp;/gi, ' ').replace(/&amp;/gi, '&').replace(/&quot;/gi, '"')
     .replace(/&#39;|&apos;/gi, "'").replace(/&lt;/gi, '<').replace(/&gt;/gi, '>')
@@ -67,7 +73,7 @@ async function download(rawUrl, redirects = 0) {
     const req = transport.request(url, {
       method: 'GET', timeout: 6500,
       headers: { 'User-Agent': 'Yanji-LinkPreview/1.0', Accept: 'text/html,application/xhtml+xml;q=0.9' },
-      lookup: (_host, _opts, cb) => cb(null, chosen.address, chosen.family),
+      lookup: pinnedLookup(chosen),
     }, res => {
       if ([301, 302, 303, 307, 308].includes(res.statusCode) && res.headers.location) {
         res.resume()
@@ -107,4 +113,4 @@ async function getLinkPreview(rawUrl) {
   return value
 }
 
-module.exports = { getLinkPreview, isPrivateAddress, parseHtml }
+module.exports = { getLinkPreview, isPrivateAddress, parseHtml, pinnedLookup }
