@@ -184,6 +184,31 @@ function MarkdownBlock({ html, enhance = true, reveal = false, className = 'bubb
   return <div ref={ref} className={className} dangerouslySetInnerHTML={{ __html: html }} />
 }
 
+function RunnableUserHtml({ source }) {
+  const [open, setOpen] = useState(false)
+  const [copied, setCopied] = useState(false)
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(source)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 1500)
+    } catch { setCopied(false) }
+  }
+  return (
+    <div className="bubble-markdown runnable-user-html">
+      <div className="code-head">
+        <span className="code-lang">html</span>
+        <button type="button" className="code-copy" onClick={copy}>{copied ? '已复制' : '复制'}</button>
+      </div>
+      <pre className="has-head"><code className="language-html">{source}</code></pre>
+      <div className="code-run-bar">
+        <button type="button" className="code-run-btn" onClick={() => setOpen((value) => !value)}>{open ? '■ 收起' : '▶ 运行'}</button>
+      </div>
+      {open && <iframe className="code-run-frame" sandbox="allow-scripts allow-modals" loading="lazy" srcDoc={source} title="运行效果" />}
+    </div>
+  )
+}
+
 const STICKER_BASE = 'https://memory.ravenlove.cc/raven/stickers/'
 const MUSIC_TAG_RE = /\[music:[^\]]+\]/
 
@@ -337,7 +362,7 @@ function renderAssistantContent(content, isStreaming, reveal = false) {
 // 可运行代码展示，不把她粘贴的页面直接注入言叽。——2026-09-09
 function renderUserBody(text) {
   if (!text) return <span className="bubble-text">{text}</span>
-  if (looksRunnableHtml('', text.trim())) return <MarkdownBlock html={parseMarkdown('```html\n' + text.trim() + '\n```')} />
+  if (looksRunnableHtml('', text.trim())) return <RunnableUserHtml source={text.trim()} />
   return <MarkdownBlock html={parseMarkdown(text)} />
 }
 
