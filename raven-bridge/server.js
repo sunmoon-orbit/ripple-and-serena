@@ -1348,7 +1348,7 @@ wss.on('connection', (ws) => {
           ws.crossingClientId = `crossing-${crypto.randomUUID()}`
           crossingClients.set(ws.crossingClientId, ws)
         }
-        ws.send(JSON.stringify({ type: 'crossing/status', agent: 'codex', state: crossing.adapter.online ? 'online' : 'idle' }))
+        ws.send(JSON.stringify({ type: 'crossing/authenticated', agent: 'codex' }))
         return
       }
       if (typeof msg.type === 'string' && msg.type.startsWith('crossing/')) {
@@ -1357,7 +1357,7 @@ wss.on('connection', (ws) => {
           return
         }
         void crossing.handle(ws.crossingClientId, msg)
-          .catch(error => sendCrossing(ws.crossingClientId, { type: 'crossing/error', error: String(error?.message || '渡口操作失败').slice(0, 500) }))
+          .catch(error => sendCrossing(ws.crossingClientId, { type: 'crossing/error', requestId: msg.requestId, operation: msg.type, error: require('./codex-app-server').clip(error?.message || '渡口操作失败', 500) }))
         return
       }
       // 前端连上后第一件事发 {type:'auth', token}，通过才开始收广播

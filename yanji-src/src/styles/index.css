@@ -5505,7 +5505,10 @@ body.mp-active .scroll-bottom-btn { bottom: 139px; }
 .crossing-session-head button { color: var(--accent); background: none; border: 0; padding: 3px; cursor: pointer; font: inherit; }
 .crossing-session { display: block; width: 100%; border: 0; border-radius: 9px; background: transparent; color: var(--text); text-align: left; padding: 9px 8px; cursor: pointer; min-width: 0; }
 .crossing-session.active { background: var(--accent-dim); }
-.crossing-session b,.crossing-session small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.crossing-session b,.crossing-session small { display: block; overflow: hidden; text-overflow: ellipsis; overflow-wrap: anywhere; }
+.crossing-session b { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+.crossing-sessions[hidden] { display: none; }
+.crossing-panel button:disabled { opacity: .45; cursor: not-allowed; }
 .crossing-session b { font-weight: 500; font-size: 12px; }
 .crossing-session small { margin-top: 3px; color: var(--text-muted); font-size: 10px; }
 .crossing-chat { flex: 1; min-width: 0; display: flex; flex-direction: column; }
@@ -5521,9 +5524,10 @@ body.mp-active .scroll-bottom-btn { bottom: 139px; }
 .crossing-path { padding: 0 10px 8px; color: var(--text-muted); font: 10px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace; overflow-wrap: anywhere; white-space: pre-wrap; }
 .crossing-working,.crossing-empty { color: var(--text-muted); text-align: center; font-size: 12px; padding: 22px 12px; }
 .crossing-input { flex: 0 0 auto; display: flex; align-items: flex-end; gap: 8px; padding: 10px max(12px, env(safe-area-inset-right)) calc(10px + env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left)); border-top: 1px solid var(--border); background: var(--bg); }
-.crossing-input textarea { flex: 1; min-width: 0; resize: none; max-height: 120px; padding: 10px; border: 1px solid var(--border-md); border-radius: 12px; outline: none; color: var(--text); background: var(--card); font: inherit; line-height: 1.4; }
+.crossing-input textarea { flex: 1; min-width: 0; min-height: 44px; box-sizing: border-box; resize: none; max-height: 120px; padding: 10px; border: 1px solid var(--border-md); border-radius: 12px; outline: none; color: var(--text); background: var(--card); font-family: inherit; font-size: 16px; line-height: 1.4; }
 .crossing-input textarea:focus { border-color: var(--accent); }
-.crossing-input button { flex: 0 0 auto; min-height: 38px; padding: 0 12px; border: 0; border-radius: 10px; cursor: pointer; background: var(--accent); color: var(--bubble-user-text); font: 12px inherit; }
+.crossing-input button { flex: 0 0 64px; min-width: 64px; min-height: 44px; padding: 0 8px; border: 0; border-radius: 10px; cursor: pointer; background: var(--accent); color: var(--bubble-user-text); font-size: 14px; }
+.crossing-error { flex: 0 0 auto; max-height: 64px; overflow-y: auto; }
 .crossing-input .crossing-stop { background: rgba(190,80,80,.14); color: #b14d4d; }
 .crossing-approval-backdrop { position: fixed; z-index: 80; inset: 0; display: grid; place-items: end center; padding: 14px; background: rgba(20,15,25,.32); }
 .crossing-approval { width: min(500px, 100%); max-height: min(78dvh, 620px); overflow: auto; padding: 16px; border: 1px solid var(--border-md); border-radius: 17px; background: var(--bg); box-shadow: var(--shadow-md); }
@@ -5541,9 +5545,10 @@ body.mp-active .scroll-bottom-btn { bottom: 139px; }
   .crossing-bubble { max-width: 96%; }
 }
 @media (max-width: 430px) {
-  .crossing-layout { display: block; overflow-y: auto; }
-  .crossing-sessions { display: flex; gap: 6px; flex-basis: auto; overflow-x: auto; overflow-y: hidden; border-right: 0; border-bottom: 1px solid var(--border); }
-  .crossing-session-head { display: none; }
-  .crossing-session { flex: 0 0 132px; border: 1px solid var(--border); }
-  .crossing-chat { min-height: min(58dvh, 520px); }
+  .crossing-layout { display: flex; flex-direction: column; overflow: hidden; min-width: 0; }
+  .crossing-sessions { display: block; flex: 0 1 auto; max-height: 32dvh; min-width: 0; overflow-x: hidden; overflow-y: auto; border-right: 0; border-bottom: 1px solid var(--border); }
+  .crossing-session-head { display: flex; }
+  .crossing-session { min-height: 48px; border-bottom: 1px solid var(--border); }
+  .crossing-session small { display: block; }
+  .crossing-chat { min-height: 0; }
 }

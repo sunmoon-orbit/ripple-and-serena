@@ -67,6 +67,8 @@ function createCrossingService(options = {}) {
   let startingTurn = null
   const disconnectedClients = new Set()
   const approvals = new Map()
+  const sessions = new Map()
+  const selecting = new Set()
 
   function status(state, extra = {}) { broadcast({ type: 'crossing/status', agent: 'codex', state, ...extra }) }
   function emit(event) { broadcast({ agent: 'codex', ...event }) }
@@ -122,6 +124,7 @@ function createCrossingService(options = {}) {
 
   adapter.on('online', () => status('online'))
   adapter.on('offline', ({ error, pendingRequestIds }) => {
+    sessions.clear()
     for (const requestId of pendingRequestIds || []) clearApproval(requestId)
     activeTurn = null
     startingTurn = null
@@ -160,28 +163,36 @@ function createCrossingService(options = {}) {
     send(activeTurn.clientId, { type: 'crossing/approval/request', agent: 'codex', ...view, expiresAt: Date.now() + APPROVAL_TIMEOUT_MS })
   })
 
-  async function handle(clientId, message) {
+  async function perform(clientId, message) {
     disconnectedClients.delete(clientId)
     const type = message?.type
     await ensureOnline()
     if (type === 'crossing/thread/list') {
-      const result = await adapter.request('thread/list', { cwd, limit: 80 })
+      const result = await adapter.request('thread/list', { cwd, limit: 80, sourceKinds: ['appServer', 'cli', 'vscode'], cursor: message.cursor || null })
       send(clientId, { type: 'crossing/threads', threads: (result.data || []).map(publicThread).filter(Boolean), nextCursor: result.nextCursor || null })
       return
     }
     if (type === 'crossing/thread/start') {
+      sessions.delete(clientId)
       const result = await adapter.request('thread/start', { cwd, sandbox: 'workspace-write', approvalPolicy: 'untrusted', approvalsReviewer: 'user' })
-      send(clientId, { type: 'crossing/thread', action: 'started', thread: publicThread(result.thread) })
+      if (!result.thread?.id) throw new Error('Codex 未返回会话编号')
+      if (disconnectedClients.has(clientId)) return
+      sessions.set(clientId, result.thread.id)
+      send(clientId, { type: 'crossing/thread', requestId: message.requestId, action: 'started', ready: true, thread: publicThread(result.thread) })
       return
     }
     if (type === 'crossing/thread/read') {
       const result = await adapter.request('thread/read', { threadId: String(message.threadId || ''), includeTurns: true })
-      send(clientId, { type: 'crossing/thread', action: 'read', thread: result.thread })
+      send(clientId, { type: 'crossing/thread', requestId: message.requestId, action: 'read', ready: false, thread: result.thread })
       return
     }
     if (type === 'crossing/thread/resume') {
+      sessions.delete(clientId)
       const result = await adapter.request('thread/resume', { threadId: String(message.threadId || ''), cwd, sandbox: 'workspace-write', approvalPolicy: 'untrusted', approvalsReviewer: 'user', excludeTurns: false })
-      send(clientId, { type: 'crossing/thread', action: 'resumed', thread: result.thread })
+      if (!result.thread?.id || result.thread.id !== message.threadId) throw new Error('Codex 返回的会话编号不匹配')
+      if (disconnectedClients.has(clientId)) return
+      sessions.set(clientId, result.thread.id)
+      send(clientId, { type: 'crossing/thread', requestId: message.requestId, action: 'resumed', ready: true, thread: result.thread })
       return
     }
     if (type === 'crossing/usage/read') { await publishRateLimits(); return }
@@ -190,6 +201,7 @@ function createCrossingService(options = {}) {
       const threadId = String(message.threadId || '')
       const text = String(message.text || '').trim()
       if (!threadId || !text) throw new Error('缺少会话或消息内容')
+      if (selecting.has(clientId) || sessions.get(clientId) !== threadId) throw new Error('会话尚未恢复，请重新选择会话')
       startingTurn = { clientId, threadId }
       try {
         const result = await adapter.request('turn/start', {
@@ -232,7 +244,18 @@ function createCrossingService(options = {}) {
     throw new Error('未知渡口操作')
   }
 
+  async function handle(clientId, message) {
+    const changesSession = ['crossing/thread/start', 'crossing/thread/read', 'crossing/thread/resume'].includes(message?.type)
+    if (!changesSession) return perform(clientId, message)
+    if (selecting.has(clientId)) throw new Error('会话正在加载，请稍候')
+    if (activeTurn || startingTurn) throw new Error('请先停止当前任务再切换会话')
+    selecting.add(clientId)
+    try { return await perform(clientId, message) }
+    finally { selecting.delete(clientId) }
+  }
+
   function disconnect(clientId) {
+    sessions.delete(clientId)
     disconnectedClients.add(clientId)
     for (const [requestId, approval] of approvals) {
       if (approval.clientId !== clientId) continue

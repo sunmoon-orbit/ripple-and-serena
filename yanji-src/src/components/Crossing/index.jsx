@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useStore } from '../../store'
+import { createSessionFlow } from './session-flow.mjs'
 
 function wsUrl(baseUrl) {
   const base = new URL(baseUrl || 'https://memory.ravenlove.cc')
@@ -52,6 +53,11 @@ export default function Crossing() {
   const [approval, setApproval] = useState(null)
   const [usage, setUsage] = useState(null)
   const [compacting, setCompacting] = useState(false)
+  const [sessionState, setSessionState] = useState({ phase: 'disconnected' })
+  const [sessionsOpen, setSessionsOpen] = useState(true)
+  const [starting, setStarting] = useState(false)
+  const inputRef = useRef(null)
+  const flowRef = useRef(null)
 
   useEffect(() => { activeThreadRef.current = activeThread?.id || activeThread?.threadId || '' }, [activeThread])
   useEffect(() => { scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' }) }, [messages, items, approval])
@@ -60,11 +66,25 @@ export default function Crossing() {
     if (wsRef.current?.readyState !== WebSocket.OPEN) throw new Error('渡口尚未连接')
     wsRef.current.send(JSON.stringify(payload))
   }, [])
+  if (!flowRef.current) flowRef.current = createSessionFlow(send, (state) => {
+    setSessionState(state)
+    if (state.error) setError(state.error)
+    if (state.phase === 'ready') {
+      activeThreadRef.current = state.thread.id
+      setActiveThread(state.thread)
+      setMessages(threadsFromRead(state.thread))
+      setItems([]); setTurn(null); setStarting(false); setApproval(null); setError(''); setSessionsOpen(false)
+    }
+  })
+  useEffect(() => {
+    const node = inputRef.current
+    if (node) { node.style.height = 'auto'; node.style.height = `${Math.min(node.scrollHeight, 120)}px` }
+  }, [draft])
 
-  const readThread = useCallback((threadId, resume = true) => {
+  const readThread = useCallback((threadId) => {
     if (!threadId) return
-    send({ type: resume ? 'crossing/thread/resume' : 'crossing/thread/read', threadId })
-  }, [send])
+    if (!turn && !starting) flowRef.current.select(threadId)
+  }, [turn, starting])
 
   useEffect(() => {
     if (!moonMemory?.apiToken) { setConnection('needs-setup'); return undefined }
@@ -78,30 +98,29 @@ export default function Crossing() {
       wsRef.current = ws
       ws.onopen = () => {
         ws.send(JSON.stringify({ type: 'crossing/auth', token: moonMemory.apiToken }))
-        ws.send(JSON.stringify({ type: 'crossing/thread/list' }))
-        ws.send(JSON.stringify({ type: 'crossing/usage/read' }))
       }
       ws.onmessage = (raw) => {
+        if (disposed || wsRef.current !== ws) return
         let msg
         try { msg = JSON.parse(raw.data) } catch { return }
         if (!String(msg.type || '').startsWith('crossing/')) return
+        flowRef.current.receive(msg)
         if (msg.type === 'crossing/auth_failed') { setConnection('error'); setError('渡口身份验证失败'); ws.close(); return }
-        if (msg.type === 'crossing/status') { setConnection(msg.state || 'online'); if (msg.error) setError(msg.error); return }
-        if (msg.type === 'crossing/error') { setError(msg.error || '渡口操作失败'); return }
+        if (msg.type === 'crossing/status') {
+          setConnection(msg.state || 'online')
+          if (['offline', 'error'].includes(msg.state)) { setTurn(null); setStarting(false); setApproval(null) }
+          if (msg.error) setError(msg.error)
+          return
+        }
+        if (msg.type === 'crossing/error') { setStarting(false); setError(msg.error || '渡口操作失败'); return }
         if (msg.type === 'crossing/threads') { setThreads(msg.threads || []); return }
         if (msg.type === 'crossing/usage') { setUsage(msg.usage || null); return }
         if (msg.type === 'crossing/thread') {
-          const thread = msg.thread
-          if (!thread) return
-          const id = thread.id || thread.threadId
-          setActiveThread(thread)
-          if (msg.action === 'read' || msg.action === 'resumed') setMessages(threadsFromRead(thread))
-          setItems([]); setTurn(null); setApproval(null)
-          if (id) send({ type: 'crossing/thread/list' })
           return
         }
-        if (msg.type === 'crossing/turn/started') { setTurn(msg.turn); return }
-        if (msg.type === 'crossing/turn/completed') { setTurn(null); setApproval(null); return }
+        if (msg.threadId && msg.threadId !== activeThreadRef.current) return
+        if (msg.type === 'crossing/turn/started') { setStarting(false); setTurn(msg.turn); return }
+        if (msg.type === 'crossing/turn/completed') { setStarting(false); setTurn(null); setApproval(null); return }
         if (msg.type === 'crossing/turn/interrupted') { setTurn(null); return }
         if (msg.type === 'crossing/message/delta') {
           if (msg.threadId !== activeThreadRef.current) return
@@ -132,6 +151,7 @@ export default function Crossing() {
       }
       ws.onclose = () => {
         if (disposed) return
+        flowRef.current.disconnect(); setTurn(null); setStarting(false); setApproval(null)
         setConnection('reconnecting')
         reconnectRef.current = setTimeout(connect, 2500)
       }
@@ -141,19 +161,18 @@ export default function Crossing() {
     return () => { disposed = true; clearTimeout(reconnectRef.current); try { wsRef.current?.close() } catch {} }
   }, [moonMemory?.apiToken, moonMemory?.baseUrl, send])
 
-  const createThread = () => { try { send({ type: 'crossing/thread/start' }) } catch (e) { setError(e.message) } }
+  const createThread = () => { if (turn || starting) return; try { flowRef.current.create() } catch (e) { setError(e.message) } }
   const startTurn = () => {
     const text = draft.trim()
-    if (!text || turn) return
+    if (!text || turn || starting || !sessionState.authenticated || sessionState.phase === 'loading') return
     if (text === '/new') { setDraft(''); createThread(); return }
-    if (text === '/sessions') { setDraft(''); send({ type: 'crossing/thread/list' }); return }
+    if (text === '/sessions') { setDraft(''); setSessionsOpen(true); send({ type: 'crossing/thread/list' }); return }
     if (text.startsWith('/resume')) { setDraft(''); const id = text.slice(7).trim(); if (id) readThread(id); else setError('用法：/resume 会话编号'); return }
-    const threadId = activeThread?.id || activeThread?.threadId
-    if (!threadId) { setError('请先新建或选择一个会话'); return }
     const clientMessageId = crypto.randomUUID()
+    try { if (!flowRef.current.start(text, clientMessageId)) return } catch (e) { setError(e.message); return }
+    setStarting(true)
     setMessages((previous) => [...previous, { id: clientMessageId, role: 'user', text }])
     setDraft('')
-    try { send({ type: 'crossing/turn/start', threadId, text, clientMessageId }) } catch (e) { setError(e.message) }
   }
   const interrupt = () => { if (turn && activeThread) send({ type: 'crossing/turn/interrupt', threadId: activeThread.id || activeThread.threadId, turnId: turn.id }) }
   const respond = (choice) => {
@@ -162,7 +181,8 @@ export default function Crossing() {
     setApproval(null)
   }
 
-  const activeId = activeThread?.id || activeThread?.threadId
+  const activeId = sessionState.phase === 'ready' ? activeThread?.id : ''
+  const shortcut = /^\/(new|sessions|resume)(\s|$)/.test(draft.trim())
   const toolItems = useMemo(() => items.filter((item) => item.type !== 'reasoning'), [items])
   if (!moonMemory?.apiToken) return <div className="panel-shell crossing-panel"><div className="panel-empty">渡口需要先在「拾羽」中配置记忆库连接。</div></div>
 
@@ -170,15 +190,16 @@ export default function Crossing() {
     <div className="panel-shell crossing-panel">
       <div className="panel-topbar crossing-topbar">
         <button className="topbar-btn" onClick={() => setActivePanel('chat')} title="回到 Murmur">←</button>
-        <div className="crossing-title"><h2 className="panel-title">渡口</h2><span>Codex · {connection === 'online' ? '已连接' : connection === 'idle' ? '待唤醒' : connection === 'reconnecting' ? '重连中' : connection === 'connecting' ? '连接中' : '离线'}</span></div>
-        <button className="topbar-btn" onClick={createThread} title="新建 Codex 会话">＋</button>
+        <div className="crossing-title"><h2 className="panel-title">渡口</h2><span>Codex · {sessionState.phase === 'ready' ? '会话就绪' : sessionState.phase === 'loading' ? '正在加载会话…' : sessionState.authenticated ? '请选择或新建会话' : connection === 'reconnecting' ? '重连中' : '连接中'}</span></div>
+        <button className="topbar-btn" onClick={() => setSessionsOpen(!sessionsOpen)} aria-expanded={sessionsOpen}>会话</button>
+        <button className="topbar-btn" disabled={!sessionState.authenticated || sessionState.phase === 'loading' || !!turn || starting} onClick={createThread} title="新建 Codex 会话">＋</button>
       </div>
       <div className="crossing-meta"><span>{usageText(usage)}</span>{compacting && <span className="crossing-compacting">正在压缩上下文…</span>}</div>
       {error && <div className="crossing-error">{error}<button onClick={() => setError('')}>×</button></div>}
       <div className="crossing-layout">
-        <aside className="crossing-sessions">
+        <aside className="crossing-sessions" hidden={!sessionsOpen}>
           <div className="crossing-session-head"><span>会话</span><button onClick={() => send({ type: 'crossing/thread/list' })}>刷新</button></div>
-          {threads.map((thread) => <button key={thread.id} className={'crossing-session' + (thread.id === activeId ? ' active' : '')} onClick={() => readThread(thread.id)}><b>{thread.name || '未命名会话'}</b><small>{thread.preview || compactTime(thread.updatedAt)}</small></button>)}
+          {threads.map((thread) => <button disabled={sessionState.phase === 'loading' || !!turn || starting} key={thread.id} className={'crossing-session' + (thread.id === activeId ? ' active' : '')} onClick={() => readThread(thread.id)}><b>{thread.name === '未命名会话' ? thread.preview || thread.name : thread.name}</b><small>{compactTime(thread.updatedAt)} · {thread.id.slice(0, 8)}</small></button>)}
           {!threads.length && <div className="crossing-empty">还没有 Codex 会话</div>}
         </aside>
         <main className="crossing-chat">
@@ -188,7 +209,7 @@ export default function Crossing() {
             {toolItems.map((item) => <details key={item.id} className={'crossing-tool ' + (item.status === 'failed' ? 'failed' : '')}><summary>{item.lifecycle === 'started' ? '正在' : '已完成'} · {item.title || '工具调用'}{item.exitCode != null ? `（${item.exitCode}）` : ''}</summary>{item.cwd && <div className="crossing-path">{item.cwd}</div>}{item.output && <pre>{item.output}</pre>}{item.error && <pre>{item.error}</pre>}{item.paths?.length ? <div className="crossing-path">{item.paths.join('\n')}</div> : null}</details>)}
             {turn && <div className="crossing-working">Codex 正在工作…</div>}
           </div>
-          <div className="crossing-input"><textarea value={draft} onChange={(e) => setDraft(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); startTurn() } }} placeholder={activeThread ? '输入消息；/new、/sessions、/resume 会映射为渡口操作' : '先新建或选择会话'} disabled={connection !== 'online' && connection !== 'idle'} rows="2" />{turn ? <button className="crossing-stop" onClick={interrupt}>停止</button> : <button className="send-btn" onClick={startTurn}>发送</button>}</div>
+          <div className="crossing-input"><textarea ref={inputRef} value={draft} onChange={(e) => setDraft(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); startTurn() } }} placeholder={sessionState.phase === 'ready' ? '输入消息' : sessionState.phase === 'loading' ? '正在加载会话…' : '先点击＋新建，或选择历史会话'} disabled={!sessionState.authenticated} rows="1" />{turn ? <button className="crossing-stop" onClick={interrupt}>停止</button> : <button disabled={(!shortcut && sessionState.phase !== 'ready') || !sessionState.authenticated || sessionState.phase === 'loading' || !draft.trim() || starting} onClick={startTurn}>{starting ? '提交中' : shortcut ? '执行' : '发送'}</button>}</div>
         </main>
       </div>
       {approval && <div className="crossing-approval-backdrop"><div className="crossing-approval"><b>Codex 需要本次授权</b><p>{approval.kind === 'file-change' ? '准备修改文件' : '准备执行命令'}</p>{approval.command && <pre>{approval.command}</pre>}{approval.reason && <p>{approval.reason}</p>}<small>{approval.cwd}</small><div><button className="crossing-deny" onClick={() => respond('deny')}>拒绝</button><button onClick={() => respond('allow')}>允许本次</button></div></div></div>}

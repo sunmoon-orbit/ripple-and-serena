@@ -185,7 +185,11 @@ class CodexAppServer extends EventEmitter {
       if (!entry) return
       clearTimeout(entry.timer)
       this.pending.delete(message.id)
-      if (message.error) entry.reject(toError(message.error, `${entry.method} 失败`))
+      if (message.error) {
+        const error = toError(message.error, `${entry.method} 失败`)
+        error.message = `${entry.method}: ${clip(error.message, 400)}`
+        entry.reject(error)
+      }
       else entry.resolve(message.result)
       return
     }
