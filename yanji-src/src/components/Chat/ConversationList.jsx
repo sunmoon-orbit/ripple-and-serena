@@ -4,7 +4,7 @@ import { formatTime } from '../../utils'
 import { applyDecayAndGet, getEmotionState, POSITIVE_SLOTS, NEGATIVE_SLOTS, SLOT_LABELS } from '../../utils/emotion'
 import { useThemedConfirm } from '../ThemedConfirmDialog'
 
-export default function ConversationList({ onClose, onStartCall, onOpenGames, onOpenMusic, onOpenWheel, onOpenFate, onOpenTarot, onOpenFortune, onOpenChecklist, onOpenHealth, onOpenPeriod, onOpenAlbum, onOpenIdleJournal, onOpenBoard, onOpenWallet, onOpenCalls }) {
+export default function ConversationList({ onClose, onOpenCrossing, onStartCall, onOpenGames, onOpenMusic, onOpenWheel, onOpenFate, onOpenTarot, onOpenFortune, onOpenChecklist, onOpenHealth, onOpenPeriod, onOpenAlbum, onOpenIdleJournal, onOpenBoard, onOpenWallet, onOpenCalls }) {
   const confirmAction = useThemedConfirm()
   const chats = useStore((s) => s.chats)
   const connections = useStore((s) => s.connections)
@@ -150,6 +150,12 @@ export default function ConversationList({ onClose, onStartCall, onOpenGames, on
 
   return (
     <div className="conv-list-panel">
+
+      <button className="sb-crossing-entry" onClick={() => { onClose?.(); onOpenCrossing?.() }}>
+        <span className="sb-crossing-mark">⌁</span>
+        <span><b>渡口</b><small>Codex Agent</small></span>
+        <span className="sb-crossing-arrow">›</span>
+      </button>
 
       {/* ── 对话 section ─────────────────────────────── */}
       <div className="sb-section">

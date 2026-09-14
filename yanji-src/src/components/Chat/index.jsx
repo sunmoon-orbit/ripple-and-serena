@@ -1633,7 +1633,7 @@ export default function Chat() {
     <div className="chat-panel">
       {/* Sidebar */}
       <div className={'chat-sidebar' + (sidebarOpen ? ' open' : '')}>
-        <ConversationList onClose={() => setSidebarOpen(false)} onStartCall={dialCall} onOpenGames={() => setGamesOpen(true)} onOpenMusic={() => setMusicOpen(true)} onOpenWheel={() => setWheelOpen(true)} onOpenFate={() => setFateOpen(true)} onOpenTarot={() => setTarotOpen(true)} onOpenFortune={() => setFortuneOpen(true)} onOpenChecklist={() => setChecklistOpen(true)} onOpenHealth={() => setHealthOpen(true)} onOpenWallet={() => setWalletOpen(true)} onOpenPeriod={() => setPeriodOpen(true)} onOpenAlbum={() => setAlbumOpen(true)} onOpenIdleJournal={() => setIdleJournalOpen(true)} onOpenBoard={() => setBoardOpen(true)} onOpenCalls={() => setCallsOpen(true)} />
+        <ConversationList onClose={() => setSidebarOpen(false)} onOpenCrossing={() => setActivePanel('crossing')} onStartCall={dialCall} onOpenGames={() => setGamesOpen(true)} onOpenMusic={() => setMusicOpen(true)} onOpenWheel={() => setWheelOpen(true)} onOpenFate={() => setFateOpen(true)} onOpenTarot={() => setTarotOpen(true)} onOpenFortune={() => setFortuneOpen(true)} onOpenChecklist={() => setChecklistOpen(true)} onOpenHealth={() => setHealthOpen(true)} onOpenWallet={() => setWalletOpen(true)} onOpenPeriod={() => setPeriodOpen(true)} onOpenAlbum={() => setAlbumOpen(true)} onOpenIdleJournal={() => setIdleJournalOpen(true)} onOpenBoard={() => setBoardOpen(true)} onOpenCalls={() => setCallsOpen(true)} />
       </div>
       {sidebarOpen && <div className="sidebar-backdrop" onClick={() => setSidebarOpen(false)} />}
 

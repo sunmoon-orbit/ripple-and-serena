@@ -8,6 +8,7 @@ const crypto = require('crypto')
 const { getUsage } = require('./usage')
 const { contextSnapshot } = require('./claude-runtime')
 const { getLinkPreview } = require('./link-preview')
+const { createCrossingService } = require('./yanji-crossing')
 
 const PW_HASH = (() => {
   try {
@@ -106,7 +107,14 @@ function externalAuthed(req, url) {
 function moonAuthed(req) {
   const h = req.headers.authorization || ''
   const token = h.startsWith('Bearer ') ? h.slice(7) : ''
-  return token.length === MOON_TOKEN.length && crypto.timingSafeEqual(Buffer.from(token), Buffer.from(MOON_TOKEN))
+  return moonTokenIsValid(token)
+}
+
+// 言叽已有的记忆库会话凭据只用于它自己的 crossing WebSocket namespace。
+// 它绝不能被加入归巢 clients，否则言叽会收到归巢的私有广播。
+function moonTokenIsValid(token) {
+  const value = String(token || '')
+  return value.length === MOON_TOKEN.length && crypto.timingSafeEqual(Buffer.from(value), Buffer.from(MOON_TOKEN))
 }
 
 // token 从 moon-memory/.env 读取，不准硬编码（2026.6.11 公开仓库泄漏教训）
@@ -392,6 +400,7 @@ function getStatus() {
 // --- WebSocket broadcast ---
 
 const clients = new Set()
+const crossingClients = new Map() // crossingClientId → authenticated Yanji WebSocket
 const mcpSseClients = new Map() // clientId → SSE res
 const recentCids = new Set()    // 最近处理过的前端消息 id，用于重发去重
 let appLatestCache = { at: 0, data: null }  // 归巢 APK 最新版本信息，缓存 30 分钟
@@ -405,6 +414,24 @@ function broadcast(msg) {
     } else if (ws.readyState === 1) ws.send(data)
   }
 }
+
+function sendCrossing(clientId, msg) {
+  const ws = crossingClients.get(clientId)
+  if (ws?.readyState === 1) ws.send(JSON.stringify(msg))
+}
+
+function broadcastCrossing(msg) {
+  const data = JSON.stringify(msg)
+  for (const [clientId, ws] of crossingClients) {
+    if (ws.readyState === 1) ws.send(data)
+    else crossingClients.delete(clientId)
+  }
+}
+
+const crossing = createCrossingService({
+  broadcast: broadcastCrossing,
+  send: sendCrossing,
+})
 
 // 没有 WS 客户端在线时发推送提醒，避免阿颖错过回复
 function pushReplyNotif(text) {
@@ -1304,12 +1331,35 @@ wss.on('connection', (ws) => {
       ws.send(JSON.stringify(lastPermData))
     }
   }
-  const authTimer = setTimeout(() => { if (!ws.authed) ws.close() }, 15000)
+  const authTimer = setTimeout(() => { if (!ws.authed && !ws.crossingClientId) ws.close() }, 15000)
   ws.once('close', () => clearTimeout(authTimer))
 
   ws.on('message', (raw) => {
     try {
       const msg = JSON.parse(raw)
+      // 言叽·渡口使用和归巢分离的 WebSocket namespace。凭据沿用言叽已经
+      // 配置的记忆库会话凭据；通过后仅加入 crossingClients，绝不复用归巢广播。
+      if (msg.type === 'crossing/auth') {
+        if (!moonTokenIsValid(msg.token)) {
+          ws.send(JSON.stringify({ type: 'crossing/auth_failed' }))
+          return
+        }
+        if (!ws.crossingClientId) {
+          ws.crossingClientId = `crossing-${crypto.randomUUID()}`
+          crossingClients.set(ws.crossingClientId, ws)
+        }
+        ws.send(JSON.stringify({ type: 'crossing/status', agent: 'codex', state: crossing.adapter.online ? 'online' : 'idle' }))
+        return
+      }
+      if (typeof msg.type === 'string' && msg.type.startsWith('crossing/')) {
+        if (!ws.crossingClientId || !crossingClients.has(ws.crossingClientId)) {
+          ws.send(JSON.stringify({ type: 'crossing/auth_failed' }))
+          return
+        }
+        void crossing.handle(ws.crossingClientId, msg)
+          .catch(error => sendCrossing(ws.crossingClientId, { type: 'crossing/error', error: String(error?.message || '渡口操作失败').slice(0, 500) }))
+        return
+      }
       // 前端连上后第一件事发 {type:'auth', token}，通过才开始收广播
       if (msg.type === 'auth') {
         if (tokenIsValid(msg.token)) {
@@ -1359,8 +1409,22 @@ wss.on('connection', (ws) => {
     } catch {}
   })
 
-  ws.on('close', () => { clients.delete(ws); console.log('[ws] client disconnected, total:', clients.size) })
-  ws.on('error', () => { clients.delete(ws); console.log('[ws] client error, total:', clients.size) })
+  ws.on('close', () => {
+    clients.delete(ws)
+    if (ws.crossingClientId) {
+      crossing.disconnect(ws.crossingClientId)
+      crossingClients.delete(ws.crossingClientId)
+    }
+    console.log('[ws] client disconnected, total:', clients.size)
+  })
+  ws.on('error', () => {
+    clients.delete(ws)
+    if (ws.crossingClientId) {
+      crossing.disconnect(ws.crossingClientId)
+      crossingClients.delete(ws.crossingClientId)
+    }
+    console.log('[ws] client error, total:', clients.size)
+  })
 })
 
 server.listen(PORT, '127.0.0.1', () => {

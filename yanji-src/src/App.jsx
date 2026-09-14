@@ -12,6 +12,7 @@ import Moments from './components/Moments'
 import Settings from './components/Settings'
 import Home from './components/Home'
 import Roost from './components/Roost'
+import Crossing from './components/Crossing'
 import Toast from './components/Toast'
 import MiniPlayer from './components/Chat/MiniPlayer'
 
@@ -250,6 +251,7 @@ export default function App() {
         <div className="main-area">
           {activePanel === 'roost' && <Roost />}
           {activePanel === 'chat' && <Chat />}
+          {activePanel === 'crossing' && <Crossing />}
           {activePanel === 'memory' && <Memory />}
           {activePanel === 'dream' && <Dream />}
           {activePanel === 'moments' && <Moments />}

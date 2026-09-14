@@ -1,0 +1,24 @@
+# 言叽·渡口（第一阶段）
+
+渡口是 Murmur 侧栏里的独立 Codex Agent 页面，不会替换言叽原来的 API 聊天。先在「拾羽」配置原有的记忆库连接，再从 Murmur 左侧栏点「渡口」。
+
+## 能做什么
+
+- 新建、列出、切换和恢复 Codex 持久会话。
+- 流式显示 Codex 回复、工作项和上下文压缩提示。
+- 显示 Codex 的 5 小时与 7 天用量；优先走 App Server，旧版本才标为「快照」。
+- 在手机上对命令执行或文件修改选择「允许本次」或「拒绝」。授权严格绑定当前浏览器、会话、turn、工作项和请求编号；离开页面会自动拒绝待授权并中断该页面发起的任务。
+- 用停止按钮中断当前 Codex turn。
+
+`/new`、`/sessions`、`/resume <会话编号>` 是渡口本地快捷操作，不会作为普通消息发送给模型。
+
+## 安全与范围
+
+- 渡口通过既有言叽连接鉴权进入独立的 `crossing/*` WebSocket namespace，不能读取归巢聊天广播。
+- Codex 登录状态、cookie、OAuth token 和其他认证文件都只由服务器本机的 Codex App Server 使用，浏览器和构建产物不接收它们。
+- 第一阶段只允许 Codex 成为活动 Agent。未来若支持 Claude Code，必须在服务端显式互斥切换，绝不能同时运行两个 Agent。
+- 每个 bridge 实例同时最多一个活动 Codex turn；浏览器断线不会让旧授权作用到新任务。
+
+## 上线前提
+
+部署 bridge 后，App Server 使用服务器已有的 `codex app-server --stdio`。本机已验证的 CLI 版本为 `0.153.4`；上线前应确认目标主机的该命令可完成 `initialize`、`initialized` 和 `account/rateLimits/read` 握手。无需增加前端 API key 或 Codex 凭据。

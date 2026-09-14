@@ -1,0 +1,251 @@
+// 言叽·渡口的传输无关服务层。
+// Codex 是唯一活动 Agent；未来若接入 Claude Code，应实现同一接口并在
+// activateAgent 中互斥切换，不能并行运行两个 agent runtime。
+const { CodexAppServer, clip } = require('./codex-app-server')
+
+const APPROVAL_TIMEOUT_MS = 2 * 60 * 1000
+const DEFAULT_CWD = pathSafe(process.env.YANJI_CROSSING_CWD || pathJoinParent())
+
+function pathJoinParent() {
+  return require('path').resolve(__dirname, '..')
+}
+
+function pathSafe(value) { return String(value || pathJoinParent()) }
+
+function fallbackRateLimits(file = '/var/lib/ai-usage/codex.json') {
+  try {
+    const data = JSON.parse(require('fs').readFileSync(file, 'utf8'))
+    if (!data?.available) return null
+    const window = (entry) => entry ? {
+      usedPercent: Number(entry.used_percent) || 0,
+      resetsAt: Number(entry.reset_at) ? Number(entry.reset_at) * 1000 : null,
+      windowDurationMins: null,
+    } : null
+    return { source: 'snapshot', planType: data.plan || '', limitReached: data.limit_reached ? 'limit_reached' : null, primary: window(data.primary), secondary: window(data.secondary) }
+  } catch { return null }
+}
+
+function publicThread(thread) {
+  if (!thread || typeof thread !== 'object') return null
+  return {
+    id: thread.id || thread.threadId || '',
+    name: thread.name || thread.title || '未命名会话',
+    preview: clip(thread.preview || thread.summary || '', 240),
+    createdAt: thread.createdAt || thread.created_at || null,
+    updatedAt: thread.updatedAt || thread.updated_at || null,
+    cwd: thread.cwd || '',
+  }
+}
+
+function input(text) { return [{ type: 'text', text: String(text || '') }] }
+
+function approvalResult(method, choice) {
+  if (method === 'item/commandExecution/requestApproval' || method === 'item/fileChange/requestApproval') {
+    return { decision: choice === 'allow' ? 'accept' : 'decline' }
+  }
+  return null
+}
+
+function approvalView(request) {
+  const p = request.params || {}
+  const kind = request.method === 'item/fileChange/requestApproval' ? 'file-change' : 'command'
+  return {
+    requestId: String(request.id),
+    threadId: p.threadId || '', turnId: p.turnId || '', itemId: p.itemId || '',
+    kind,
+    command: clip(p.command, 1000), cwd: p.cwd || '', reason: clip(p.reason, 600),
+  }
+}
+
+function createCrossingService(options = {}) {
+  const cwd = options.cwd || DEFAULT_CWD
+  const adapter = options.adapter || new CodexAppServer({ cwd, spawn: options.spawn, command: options.command, args: options.args })
+  const broadcast = options.broadcast || (() => {})
+  const send = options.send || (() => {})
+  const rateLimitFallback = options.rateLimitFallback || fallbackRateLimits
+  let activeTurn = null
+  let startingTurn = null
+  const disconnectedClients = new Set()
+  const approvals = new Map()
+
+  function status(state, extra = {}) { broadcast({ type: 'crossing/status', agent: 'codex', state, ...extra }) }
+  function emit(event) { broadcast({ agent: 'codex', ...event }) }
+
+  async function ensureOnline() {
+    if (adapter.online) return
+    status('connecting')
+    try {
+      await adapter.start()
+      status('online')
+      await publishRateLimits()
+    } catch (error) {
+      status('error', { error: clip(error.message, 300) })
+      throw error
+    }
+  }
+
+  async function publishRateLimits() {
+    try {
+      const usage = await adapter.rateLimits()
+      emit({ type: 'crossing/usage', usage })
+      return usage
+    } catch (error) {
+      const usage = rateLimitFallback()
+      emit({ type: 'crossing/usage', usage: usage || { source: 'unavailable', primary: null, secondary: null }, error: usage ? '' : clip(error.message, 240) })
+      return usage
+    }
+  }
+
+  function clearApproval(requestId, reject = false) {
+    const entry = approvals.get(String(requestId))
+    if (!entry) return false
+    clearTimeout(entry.timer)
+    approvals.delete(String(requestId))
+    if (reject) adapter.rejectServerRequest(requestId)
+    return true
+  }
+
+  function clearTurn(turnId) {
+    if (activeTurn?.turnId !== turnId) return
+    activeTurn = null
+    for (const [requestId, approval] of approvals) {
+      if (approval.turnId === turnId) clearApproval(requestId, true)
+    }
+  }
+
+  function assertClientTurn(clientId, data) {
+    if (!activeTurn) throw new Error('当前没有活动任务')
+    if (activeTurn.clientId !== clientId || activeTurn.threadId !== data.threadId || activeTurn.turnId !== data.turnId) {
+      throw new Error('此操作不属于当前任务')
+    }
+  }
+
+  adapter.on('online', () => status('online'))
+  adapter.on('offline', ({ error, pendingRequestIds }) => {
+    for (const requestId of pendingRequestIds || []) clearApproval(requestId)
+    activeTurn = null
+    startingTurn = null
+    status('offline', { error: clip(error, 300) })
+  })
+  adapter.on('protocolError', (error) => status('error', { error: clip(error.message, 300) }))
+  adapter.on('agentDelta', (params) => emit({ type: 'crossing/message/delta', ...params }))
+  adapter.on('item', (event) => {
+    emit({ type: 'crossing/item', ...event })
+    if (event.summary?.type === 'contextCompaction') emit({ type: 'crossing/context-compaction', threadId: event.threadId, turnId: event.turnId, lifecycle: event.lifecycle })
+  })
+  adapter.on('turnCompleted', (params) => {
+    emit({ type: 'crossing/turn/completed', ...params })
+    clearTurn(params.turn?.id || params.turnId)
+  })
+  adapter.on('rateLimits', (usage) => emit({ type: 'crossing/usage', usage }))
+  adapter.on('notification', (message) => {
+    if (message.method === 'serverRequest/resolved') {
+      clearApproval(message.params?.requestId)
+      emit({ type: 'crossing/approval/resolved', ...message.params })
+    }
+  })
+  adapter.on('serverRequest', (request) => {
+    const result = approvalResult(request.method, 'deny')
+    const view = approvalView(request)
+    if (!result || !activeTurn || activeTurn.threadId !== view.threadId || activeTurn.turnId !== view.turnId) {
+      adapter.rejectServerRequest(request.id, '渡口不接受此类授权请求')
+      return
+    }
+    const timer = setTimeout(() => {
+      if (!clearApproval(view.requestId)) return
+      adapter.resolveServerRequest(view.requestId, approvalResult(request.method, 'deny'))
+      emit({ type: 'crossing/approval/resolved', requestId: view.requestId, threadId: view.threadId, turnId: view.turnId, itemId: view.itemId, outcome: 'timed_out' })
+    }, APPROVAL_TIMEOUT_MS)
+    approvals.set(view.requestId, { ...view, clientId: activeTurn.clientId, method: request.method, timer })
+    send(activeTurn.clientId, { type: 'crossing/approval/request', agent: 'codex', ...view, expiresAt: Date.now() + APPROVAL_TIMEOUT_MS })
+  })
+
+  async function handle(clientId, message) {
+    disconnectedClients.delete(clientId)
+    const type = message?.type
+    await ensureOnline()
+    if (type === 'crossing/thread/list') {
+      const result = await adapter.request('thread/list', { cwd, limit: 80 })
+      send(clientId, { type: 'crossing/threads', threads: (result.data || []).map(publicThread).filter(Boolean), nextCursor: result.nextCursor || null })
+      return
+    }
+    if (type === 'crossing/thread/start') {
+      const result = await adapter.request('thread/start', { cwd, sandbox: 'workspace-write', approvalPolicy: 'untrusted', approvalsReviewer: 'user' })
+      send(clientId, { type: 'crossing/thread', action: 'started', thread: publicThread(result.thread) })
+      return
+    }
+    if (type === 'crossing/thread/read') {
+      const result = await adapter.request('thread/read', { threadId: String(message.threadId || ''), includeTurns: true })
+      send(clientId, { type: 'crossing/thread', action: 'read', thread: result.thread })
+      return
+    }
+    if (type === 'crossing/thread/resume') {
+      const result = await adapter.request('thread/resume', { threadId: String(message.threadId || ''), cwd, sandbox: 'workspace-write', approvalPolicy: 'untrusted', approvalsReviewer: 'user', excludeTurns: false })
+      send(clientId, { type: 'crossing/thread', action: 'resumed', thread: result.thread })
+      return
+    }
+    if (type === 'crossing/usage/read') { await publishRateLimits(); return }
+    if (type === 'crossing/turn/start') {
+      if (activeTurn || startingTurn) throw new Error('已有 Codex 任务正在运行；请先停止或等待完成')
+      const threadId = String(message.threadId || '')
+      const text = String(message.text || '').trim()
+      if (!threadId || !text) throw new Error('缺少会话或消息内容')
+      startingTurn = { clientId, threadId }
+      try {
+        const result = await adapter.request('turn/start', {
+          threadId, input: input(text), clientUserMessageId: String(message.clientMessageId || ''),
+          approvalPolicy: 'untrusted', approvalsReviewer: 'user',
+          sandboxPolicy: { type: 'workspaceWrite', writableRoots: [cwd], networkAccess: false },
+        })
+        const turnId = result.turn?.id
+        if (!turnId) throw new Error('Codex 未返回任务编号')
+        activeTurn = { clientId, threadId, turnId }
+        if (disconnectedClients.has(clientId)) {
+          await adapter.request('turn/interrupt', { threadId, turnId }).catch(() => {})
+          activeTurn = null
+          throw new Error('浏览器已断开，已停止该任务')
+        }
+        emit({ type: 'crossing/turn/started', threadId, turn: result.turn })
+      } finally {
+        startingTurn = null
+      }
+      return
+    }
+    if (type === 'crossing/turn/interrupt') {
+      assertClientTurn(clientId, message)
+      await adapter.request('turn/interrupt', { threadId: activeTurn.threadId, turnId: activeTurn.turnId })
+      emit({ type: 'crossing/turn/interrupted', threadId: activeTurn.threadId, turnId: activeTurn.turnId })
+      return
+    }
+    if (type === 'crossing/approval/respond') {
+      const requestId = String(message.requestId || '')
+      const approval = approvals.get(requestId)
+      if (!approval || approval.clientId !== clientId || approval.threadId !== message.threadId || approval.turnId !== message.turnId || approval.itemId !== message.itemId) {
+        throw new Error('授权请求已过期或不属于当前任务')
+      }
+      const choice = message.choice === 'allow' ? 'allow' : 'deny'
+      clearApproval(requestId)
+      adapter.resolveServerRequest(requestId, approvalResult(approval.method, choice))
+      emit({ type: 'crossing/approval/resolved', requestId, threadId: approval.threadId, turnId: approval.turnId, itemId: approval.itemId, outcome: choice })
+      return
+    }
+    throw new Error('未知渡口操作')
+  }
+
+  function disconnect(clientId) {
+    disconnectedClients.add(clientId)
+    for (const [requestId, approval] of approvals) {
+      if (approval.clientId !== clientId) continue
+      clearApproval(requestId)
+      adapter.resolveServerRequest(requestId, approvalResult(approval.method, 'deny'))
+    }
+    if (activeTurn?.clientId === clientId) {
+      // 不杀掉 app-server；只中断属于已断开浏览器的实际 turn，避免迟到授权误用。
+      adapter.request('turn/interrupt', { threadId: activeTurn.threadId, turnId: activeTurn.turnId }).catch(() => {})
+    }
+  }
+
+  return { handle, disconnect, adapter, getActiveTurn: () => activeTurn, publishRateLimits }
+}
+
+module.exports = { createCrossingService, fallbackRateLimits, publicThread, approvalResult }
