@@ -2,6 +2,8 @@
 // Codex 是唯一活动 Agent；未来若接入 Claude Code，应实现同一接口并在
 // activateAgent 中互斥切换，不能并行运行两个 agent runtime。
 const { CodexAppServer, clip } = require('./codex-app-server')
+const { createModelControls, threadOverrides, confirmedModel } = require('./crossing-models')
+const { createUploadStore } = require('./crossing-uploads')
 
 const APPROVAL_TIMEOUT_MS = 2 * 60 * 1000
 const DEFAULT_CWD = pathSafe(process.env.YANJI_CROSSING_CWD || pathJoinParent())
@@ -34,6 +36,7 @@ function publicThread(thread) {
     createdAt: thread.createdAt || thread.created_at || null,
     updatedAt: thread.updatedAt || thread.updated_at || null,
     cwd: thread.cwd || '',
+    model: thread.model || null, reasoningEffort: thread.reasoningEffort ?? null,
   }
 }
 
@@ -69,6 +72,23 @@ function createCrossingService(options = {}) {
   const approvals = new Map()
   const sessions = new Map()
   const selecting = new Set()
+  const modelControls = createModelControls(adapter, options.modelStateFile)
+  const uploads = options.uploads || createUploadStore({ cwd })
+  const metadata = new Map()
+  const warnings = new Set()
+  const cleanup = setInterval(() => { try { uploads.sweep() } catch {} }, 60000)
+  cleanup.unref()
+  function rememberChoice(threadId, choice) {
+    try { modelControls.remember(threadId, choice) }
+    catch { emit({ type: 'crossing/warning', threadId, message: '模型选择未能保存到磁盘，服务重启后请重新选择。' }) }
+  }
+  function threadView(result, history = false) {
+    const meta = confirmedModel(result)
+    metadata.set(result.thread.id, meta)
+    const view = { ...publicThread(result.thread), ...meta }
+    if (history) view.turns = (result.thread.turns || []).map(t => ({ id: t.id, items: (t.items || []).filter(i => ['userMessage', 'agentMessage'].includes(i.type)).map(i => i.type === 'userMessage' ? { id: i.id, type: i.type, content: (i.content || []).map(c => c.type === 'text' ? { type: 'text', text: c.text } : { type: 'text', text: '[图片附件]' }) } : { id: i.id, type: i.type, text: i.text }) }))
+    return view
+  }
 
   function status(state, extra = {}) { broadcast({ type: 'crossing/status', agent: 'codex', state, ...extra }) }
   function emit(event) { broadcast({ agent: 'codex', ...event }) }
@@ -109,6 +129,7 @@ function createCrossingService(options = {}) {
 
   function clearTurn(turnId) {
     if (activeTurn?.turnId !== turnId) return
+    uploads.pin(activeTurn.attachments, false)
     activeTurn = null
     for (const [requestId, approval] of approvals) {
       if (approval.turnId === turnId) clearApproval(requestId, true)
@@ -124,6 +145,8 @@ function createCrossingService(options = {}) {
 
   adapter.on('online', () => status('online'))
   adapter.on('offline', ({ error, pendingRequestIds }) => {
+    uploads.pin(activeTurn?.attachments, false)
+    metadata.clear()
     sessions.clear()
     for (const requestId of pendingRequestIds || []) clearApproval(requestId)
     activeTurn = null
@@ -133,7 +156,9 @@ function createCrossingService(options = {}) {
   adapter.on('protocolError', (error) => status('error', { error: clip(error.message, 300) }))
   adapter.on('agentDelta', (params) => emit({ type: 'crossing/message/delta', ...params }))
   adapter.on('item', (event) => {
-    emit({ type: 'crossing/item', ...event })
+    // Raw userMessage items may contain localImage filesystem paths.
+    const { item, ...publicEvent } = event
+    emit({ type: 'crossing/item', ...publicEvent })
     if (event.summary?.type === 'contextCompaction') emit({ type: 'crossing/context-compaction', threadId: event.threadId, turnId: event.turnId, lifecycle: event.lifecycle })
   })
   adapter.on('turnCompleted', (params) => {
@@ -142,6 +167,20 @@ function createCrossingService(options = {}) {
   })
   adapter.on('rateLimits', (usage) => emit({ type: 'crossing/usage', usage }))
   adapter.on('notification', (message) => {
+    if (message.method === 'warning') {
+      const key = `${message.params?.threadId}:${message.params?.message}`
+      if (!warnings.has(key)) {
+        if (warnings.size > 100) warnings.clear()
+        warnings.add(key)
+        emit({ type: 'crossing/warning', threadId: message.params?.threadId, message: clip(message.params?.message, 500) })
+      }
+    }
+    if (message.method === 'thread/settings/updated') {
+      const p = message.params
+      const meta = { model: p.threadSettings?.model || null, reasoningEffort: p.threadSettings?.effort ?? null }
+      metadata.set(p.threadId, meta)
+      emit({ type: 'crossing/model/confirmed', threadId: p.threadId, ...meta })
+    }
     if (message.method === 'serverRequest/resolved') {
       clearApproval(message.params?.requestId)
       emit({ type: 'crossing/approval/resolved', ...message.params })
@@ -167,6 +206,10 @@ function createCrossingService(options = {}) {
     disconnectedClients.delete(clientId)
     const type = message?.type
     await ensureOnline()
+    if (type === 'crossing/model/list') {
+      send(clientId, { type: 'crossing/models', requestId: message.requestId, models: await modelControls.list(true) })
+      return
+    }
     if (type === 'crossing/thread/list') {
       const result = await adapter.request('thread/list', { cwd, limit: 80, sourceKinds: ['appServer', 'cli', 'vscode'], cursor: message.cursor || null })
       send(clientId, { type: 'crossing/threads', threads: (result.data || []).map(publicThread).filter(Boolean), nextCursor: result.nextCursor || null })
@@ -174,25 +217,30 @@ function createCrossingService(options = {}) {
     }
     if (type === 'crossing/thread/start') {
       sessions.delete(clientId)
-      const result = await adapter.request('thread/start', { cwd, sandbox: 'workspace-write', approvalPolicy: 'untrusted', approvalsReviewer: 'user' })
+      const choice = message.model ? await modelControls.validate(message) : null
+      const result = await adapter.request('thread/start', { cwd, sandbox: 'workspace-write', approvalPolicy: 'untrusted', approvalsReviewer: 'user', ...threadOverrides(choice) })
       if (!result.thread?.id) throw new Error('Codex 未返回会话编号')
       if (disconnectedClients.has(clientId)) return
       sessions.set(clientId, result.thread.id)
-      send(clientId, { type: 'crossing/thread', requestId: message.requestId, action: 'started', ready: true, thread: publicThread(result.thread) })
+      if (choice) rememberChoice(result.thread.id, choice)
+      send(clientId, { type: 'crossing/thread', requestId: message.requestId, action: 'started', ready: true, thread: threadView(result), pendingModel: choice && (confirmedModel(result).model !== choice.model || confirmedModel(result).reasoningEffort !== choice.effort) ? choice : null })
       return
     }
     if (type === 'crossing/thread/read') {
       const result = await adapter.request('thread/read', { threadId: String(message.threadId || ''), includeTurns: true })
-      send(clientId, { type: 'crossing/thread', requestId: message.requestId, action: 'read', ready: false, thread: result.thread })
+      send(clientId, { type: 'crossing/thread', requestId: message.requestId, action: 'read', ready: false, thread: threadView(result, true) })
       return
     }
     if (type === 'crossing/thread/resume') {
       sessions.delete(clientId)
-      const result = await adapter.request('thread/resume', { threadId: String(message.threadId || ''), cwd, sandbox: 'workspace-write', approvalPolicy: 'untrusted', approvalsReviewer: 'user', excludeTurns: false })
+      const requested = message.model ? message : modelControls.remembered(message.threadId)
+      const choice = requested ? await modelControls.validate(requested) : null
+      const result = await adapter.request('thread/resume', { threadId: String(message.threadId || ''), cwd, sandbox: 'workspace-write', approvalPolicy: 'untrusted', approvalsReviewer: 'user', excludeTurns: false, ...threadOverrides(choice) })
       if (!result.thread?.id || result.thread.id !== message.threadId) throw new Error('Codex 返回的会话编号不匹配')
       if (disconnectedClients.has(clientId)) return
       sessions.set(clientId, result.thread.id)
-      send(clientId, { type: 'crossing/thread', requestId: message.requestId, action: 'resumed', ready: true, thread: result.thread })
+      if (choice) rememberChoice(result.thread.id, choice)
+      send(clientId, { type: 'crossing/thread', requestId: message.requestId, action: 'resumed', ready: true, thread: threadView(result, true), pendingModel: choice && (confirmedModel(result).model !== choice.model || confirmedModel(result).reasoningEffort !== choice.effort) ? choice : null })
       return
     }
     if (type === 'crossing/usage/read') { await publishRateLimits(); return }
@@ -200,25 +248,42 @@ function createCrossingService(options = {}) {
       if (activeTurn || startingTurn) throw new Error('已有 Codex 任务正在运行；请先停止或等待完成')
       const threadId = String(message.threadId || '')
       const text = String(message.text || '').trim()
-      if (!threadId || !text) throw new Error('缺少会话或消息内容')
+      if (!threadId || (!text && !message.attachments?.length)) throw new Error('缺少会话或消息内容')
       if (selecting.has(clientId) || sessions.get(clientId) !== threadId) throw new Error('会话尚未恢复，请重新选择会话')
       startingTurn = { clientId, threadId }
       try {
+        const saved = modelControls.remembered(threadId)
+        const current = metadata.get(threadId)
+        const desired = message.model ? message : saved || (current?.model ? { model: current.model, effort: current.reasoningEffort } : null)
+        const choice = desired ? await modelControls.validate(desired) : null
+        const attachmentInputs = uploads.inputs(message.attachments, !!choice?.inputModalities.includes('image'))
+        uploads.pin(message.attachments, true)
         const result = await adapter.request('turn/start', {
-          threadId, input: input(text), clientUserMessageId: String(message.clientMessageId || ''),
+          threadId, input: [...(text ? input(text) : []), ...attachmentInputs], clientUserMessageId: String(message.clientMessageId || ''),
+          ...(choice ? { model: choice.model, effort: choice.effort } : {}),
           approvalPolicy: 'untrusted', approvalsReviewer: 'user',
           sandboxPolicy: { type: 'workspaceWrite', writableRoots: [cwd], networkAccess: false },
         })
         const turnId = result.turn?.id
         if (!turnId) throw new Error('Codex 未返回任务编号')
-        activeTurn = { clientId, threadId, turnId }
+        activeTurn = { clientId, threadId, turnId, ...(message.attachments?.length ? { attachments: message.attachments } : {}) }
+        if (choice) rememberChoice(threadId, choice)
         if (disconnectedClients.has(clientId)) {
           await adapter.request('turn/interrupt', { threadId, turnId }).catch(() => {})
           activeTurn = null
           throw new Error('浏览器已断开，已停止该任务')
         }
         emit({ type: 'crossing/turn/started', threadId, turn: result.turn })
+        // A turn response has no model field. Read configured metadata instead of
+        // trusting the requested override or interpreting assistant prose.
+        void adapter.request('thread/read', { threadId, includeTurns: false }).then(result => {
+          if (result.thread?.id !== threadId) return
+          const meta = confirmedModel(result)
+          metadata.set(threadId, meta)
+          emit({ type: 'crossing/model/confirmed', threadId, ...meta })
+        }).catch(() => {})
       } finally {
+        if (!activeTurn) uploads.pin(message.attachments, false)
         startingTurn = null
       }
       return
@@ -268,7 +333,7 @@ function createCrossingService(options = {}) {
     }
   }
 
-  return { handle, disconnect, adapter, getActiveTurn: () => activeTurn, publishRateLimits }
+  return { handle, disconnect, adapter, uploads, getActiveTurn: () => activeTurn, publishRateLimits }
 }
 
 module.exports = { createCrossingService, fallbackRateLimits, publicThread, approvalResult }

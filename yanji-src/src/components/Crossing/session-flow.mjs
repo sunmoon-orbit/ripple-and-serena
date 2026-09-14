@@ -1,18 +1,20 @@
 // Transport-independent session state, shared by the React view and wire tests.
+import { localCommand } from './controls.mjs'
 export function createSessionFlow(send, changed = () => {}) {
   let state = { authenticated: false, phase: 'disconnected', thread: null, error: '' }
   let sequence = 0
   let pending = null
   let remembered = ''
   const update = (patch) => { state = { ...state, ...patch }; changed(state) }
-  const request = (type, threadId) => {
-    pending = { requestId: `session-${++sequence}`, type, threadId }
+  const request = (type, threadId, choice = {}) => {
+    pending = { requestId: `session-${++sequence}`, type, threadId, ...choice }
     update({ phase: 'loading', error: '' })
     send({ ...pending })
   }
   const flow = {
     get state() { return state },
-    create() { if (state.authenticated && state.phase !== 'loading') request('crossing/thread/start') },
+    create(choice) { if (state.authenticated && state.phase !== 'loading') request('crossing/thread/start', undefined, choice) },
+    switchModel(choice) { if (state.authenticated && state.phase !== 'loading' && state.thread?.id) request('crossing/thread/resume', state.thread.id, choice) },
     select(id) { if (id && state.authenticated && state.phase !== 'loading') request('crossing/thread/read', id) },
     disconnect() { pending = null; update({ authenticated: false, phase: 'disconnected' }) },
     receive(msg) {
@@ -20,6 +22,7 @@ export function createSessionFlow(send, changed = () => {}) {
         update({ authenticated: true, phase: 'empty', error: '' })
         send({ type: 'crossing/thread/list' })
         send({ type: 'crossing/usage/read' })
+        send({ type: 'crossing/model/list' })
         if (remembered) request('crossing/thread/resume', remembered)
       }
       if (msg.type === 'crossing/status' && ['offline', 'error'].includes(msg.state)) {
@@ -36,18 +39,19 @@ export function createSessionFlow(send, changed = () => {}) {
       }
       if (msg.action === 'read') {
         // Reading history alone does not load the model runtime for this thread.
+        update({ thread: msg.thread })
         request('crossing/thread/resume', msg.thread.id)
         return
       }
       if (!msg.ready || !['started', 'resumed'].includes(msg.action)) return
       remembered = msg.thread.id
       pending = null
-      update({ phase: 'ready', thread: msg.thread, error: '' })
+      update({ phase: 'ready', thread: msg.thread, pendingModel: msg.pendingModel || null, error: '' })
       send({ type: 'crossing/thread/list' })
     },
-    start(text, clientMessageId) {
-      if (!state.authenticated || state.phase !== 'ready' || !state.thread?.id || !text.trim()) return false
-      send({ type: 'crossing/turn/start', threadId: state.thread.id, text, clientMessageId })
+    start(text, clientMessageId, options = {}) {
+      if (!state.authenticated || state.phase !== 'ready' || !state.thread?.id || (!text.trim() && !options.attachments?.length) || localCommand(text)) return false
+      send({ type: 'crossing/turn/start', threadId: state.thread.id, text, clientMessageId, ...options })
       return true
     },
   }

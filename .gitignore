@@ -1,4 +1,6 @@
 node_modules/
+.crossing-uploads/
+raven-bridge/.crossing-models.json*
 yanji-src/node_modules/
 electron-app/node_modules/
 .DS_Store

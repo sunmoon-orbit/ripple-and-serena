@@ -16,6 +16,7 @@ function toError(value, fallback = 'Codex App Server 请求失败') {
 
 function redactSensitive(value) {
   return String(value || '')
+    .replace(/(?:\/[^\s"']+)*\/\.crossing-uploads\/[a-f0-9]{32}\.[a-z]+/g, '[临时附件]')
     .replace(/(authorization\s*[:=]\s*(?:bearer\s+)?)\S+/ig, '$1[已隐藏]')
     .replace(/\b(sk-[A-Za-z0-9_-]{12,}|(?:api[_-]?key|token|secret|password)\s*[:=]\s*)\S+/ig, '[已隐藏]')
 }

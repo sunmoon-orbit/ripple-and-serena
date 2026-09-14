@@ -6,38 +6,8 @@ import { useThemedConfirm } from '../ThemedConfirmDialog'
 import PinyinKeyboard from './PinyinKeyboard'
 import { isRunnableHtmlMessage } from '../../utils/runnableCode'
 
-const STICKERS = [
-  'kaixin.png','wuyu.png','qushi.png','shangban.png','xihuan.png',
-  'shinshi.png','ding.png','love.png','liangjingjing.png',
-  'crow_close.jpg','crow_sunset.jpg','meiyou.jpg','shishikan.jpg',
-  'queren.jpg','fenkaida.jpg','chishenme.jpg','tuizhan.jpg',
-  'beipan-siligu.png','ni-you-claude-cong.png','beiandezhe.png',
-  'xiaogou-dezhi.png','wo-yao-gaozhuan.png','qishi-pengpeng.png',
-  'brewing-puzzling.png','nishuo-duile.png',
-  'zhongsuan-laile.png','atao-weiqiu.png',
-  // 猫猫系列
-  's-tieti.jpg','s-tieti2.jpg','s-aixin.jpg','s-aixin2.jpg','s-love.jpg',
-  's-haixiu.jpg','s-shufu.jpg','s-xihuan.jpg','s-wozai.jpg','s-yiqipa.jpg',
-  's-motou.jpg','s-motou2.jpg','s-naoxiaba.jpg','s-nilian.jpg','s-dapugu.jpg',
-  's-yaer.jpg','s-baituo.jpg','s-hi.jpg',
-  's-kaixin-changge.jpg','s-kaixin2.jpg','s-jiaoa.jpg','s-xixi.jpg',
-  's-en.jpg','s-sheme.jpg','s-wenhao.jpg','s-wenhao2.jpg',
-  's-jinzhang.jpg','s-zhongji.jpg','s-haipa.jpg','s-emo.jpg','s-zhamao.jpg',
-  's-shengqi.jpg','s-no.jpg',
-  's-weiquku.jpg','s-weiqui.jpg','s-ku.jpg','s-ku2.jpg','s-suoyi-ku.jpg','s-zaidi-ku.jpg',
-  's-buyaozou.jpg','s-bupei.jpg','s-xinsui.jpg','s-jusang.jpg',
-  's-yundao.jpg','s-yundao2.jpg','s-shuijiao.jpg','s-shuizhao.jpg','s-gangxingwu.jpg',
-  's-ele.jpg','s-xiangjichi.jpg','s-xiang-chi.jpg','s-maidanglao.jpg','s-fengkuang.jpg',
-  's-zuofan.jpg','s-tinyinyue.jpg','s-pang.jpg','s-modudu.jpg',
-  's-tianshi.jpg','s-jiaojiao.jpg','s-ding2.jpg',
-  's-qianfei.jpg','s-quanshi.jpg','s-haiyaoyao.jpg','s-meiyoule.jpg',
-  's-zaixiele.jpg','s-zhidaole.jpg','s-zaiyebugandele.jpg',
-  's-wanan.jpg',
-  // 简笔猫系列（0710 阿颖投喂）
-  'm-yizhixiang.jpg','m-exin.jpg','m-eihei.jpg','m-o.jpg',
-  'm-cuole.jpg','m-budangai.jpg','m-a.jpg','m-wuen.jpg','m-jianlaji.jpg',
-]
-const STICKER_BASE = 'https://memory.ravenlove.cc/raven/stickers/'
+import { StickerPicker } from './StickerPicker'
+import { AttachmentPicker } from './AttachmentPicker'
 
 export default function ChatInput({ onSend, disabled, onImageAdd, images, onImageRemove, moonMemory, quoted, onClearQuote }) {
   const customStickers = useStore((s) => s.customStickers) || []
@@ -351,46 +321,7 @@ export default function ChatInput({ onSend, disabled, onImageAdd, images, onImag
 
   // 压缩到 1280px JPEG：手机原图几 MB 的 base64 会撑爆 localStorage（~5MB 配额），
   // 也会让 API 请求体积和 token 成本暴涨
-  function compressImage(file, maxDim = 1280, quality = 0.8) {
-    return new Promise((resolve) => {
-      const fallback = () => {
-        const reader = new FileReader()
-        reader.onload = (ev) => resolve(ev.target.result)
-        reader.readAsDataURL(file)
-      }
-      const img = new Image()
-      const url = URL.createObjectURL(file)
-      img.onload = () => {
-        URL.revokeObjectURL(url)
-        try {
-          const scale = Math.min(1, maxDim / Math.max(img.width, img.height))
-          const w = Math.round(img.width * scale)
-          const h = Math.round(img.height * scale)
-          const canvas = document.createElement('canvas')
-          canvas.width = w; canvas.height = h
-          canvas.getContext('2d').drawImage(img, 0, 0, w, h)
-          resolve(canvas.toDataURL('image/jpeg', quality))
-        } catch { fallback() }
-      }
-      img.onerror = () => { URL.revokeObjectURL(url); fallback() }
-      img.src = url
-    })
-  }
 
-  function handleFileChange(e) {
-    const files = Array.from(e.target.files || [])
-    files.forEach((file) => {
-      if (file.type.startsWith('image/')) {
-        compressImage(file).then((dataUrl) => onImageAdd?.(dataUrl))
-      } else if (file.type === 'text/plain' || file.name.match(/\.(txt|md|csv|json|js|py|html|css)$/i)) {
-        if (file.size > 200 * 1024) { alert(`${file.name} 太大了（最大 200KB）`); return }
-        const reader = new FileReader()
-        reader.onload = (ev) => setAttachedTexts((prev) => [...prev, { name: file.name, content: ev.target.result }])
-        reader.readAsText(file, 'utf-8')
-      }
-    })
-    e.target.value = ''
-  }
 
   const canSearchHistory = moonMemory?.enabled && moonMemory?.apiToken
   const sortedHistoryResults = [...historyResults].sort((a, b) => {
@@ -404,21 +335,7 @@ export default function ChatInput({ onSend, disabled, onImageAdd, images, onImag
 
   return (
     <div className="chat-input-area">
-      {stickerOpen && (
-        <div className="sticker-picker" ref={pickerRef}>
-          {/* 自定义表情包排最前（设置→外观→表情包管理里增删），插入完整 URL */}
-          {customStickers.map((t) => (
-            <div key={t.id} className="sticker-opt" onClick={() => sendSticker(t.url)} title={t.label}>
-              <img src={t.url} alt={t.label || 'sticker'} loading="lazy" />
-            </div>
-          ))}
-          {STICKERS.map((name) => (
-            <div key={name} className="sticker-opt" onClick={() => sendSticker(name)}>
-              <img src={STICKER_BASE + name} alt={name} loading="lazy" />
-            </div>
-          ))}
-        </div>
-      )}
+      {stickerOpen && <StickerPicker customStickers={customStickers} onSelect={sendSticker} pickerRef={pickerRef} />}
       {historyOpen && canSearchHistory && (
         <div className="history-panel" ref={historyRef}>
           <div className="history-search-row">
@@ -630,7 +547,7 @@ export default function ChatInput({ onSend, disabled, onImageAdd, images, onImag
           onClose={() => setCustomKeyboardOpen(false)}
         />
       )}
-      <input ref={fileRef} type="file" accept="image/*,.txt,.md,.csv,.json,.js,.py,.html,.css" multiple style={{ display: 'none' }} onChange={handleFileChange} />
+      <AttachmentPicker ref={fileRef} onAttachment={file => file.kind === 'image' ? onImageAdd?.(file.dataUrl) : setAttachedTexts(prev => [...prev, { name: file.name, content: file.content }])} onError={message => showToast(message, 'error')} />
     </div>
   )
 }

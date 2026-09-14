@@ -429,6 +429,7 @@ function broadcastCrossing(msg) {
 }
 
 const crossing = createCrossingService({
+  modelStateFile: require('path').join(__dirname, '.crossing-models.json'),
   broadcast: broadcastCrossing,
   send: sendCrossing,
 })
@@ -721,6 +722,10 @@ const server = http.createServer((req, res) => {
   }
   // 敏感读写接口外网必须带 token：记忆内容、CC 状态、思考内容、热力图写入、
   // 上传、push 订阅（不拦的话外人能把自己的推送端点订阅进来偷收通知）
+  if (req.method === 'POST' && url.pathname === '/raven/upload' && url.searchParams.get('channel') === 'crossing') {
+    require('./crossing-upload-http').handleUpload(req, res, crossing.uploads, moonAuthed)
+    return
+  }
   const TOKEN_REQUIRED = ['/raven/status', '/raven/last-thinking', '/raven/memory-random', '/raven/on-this-day', '/raven/memory-count', '/raven/activity', '/raven/upload', '/raven/push/subscribe', '/raven/push/unsubscribe', '/raven/usage']
   if (TOKEN_REQUIRED.includes(url.pathname) && !externalAuthed(req, url)) {
     res.writeHead(401, { 'Content-Type': 'application/json' })

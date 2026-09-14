@@ -5508,6 +5508,24 @@ body.mp-active .scroll-bottom-btn { bottom: 139px; }
 .crossing-session b,.crossing-session small { display: block; overflow: hidden; text-overflow: ellipsis; overflow-wrap: anywhere; }
 .crossing-session b { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
 .crossing-sessions[hidden] { display: none; }
+.crossing-controls { flex: 0 1 auto; min-height: 0; max-height: 30dvh; overflow: auto; padding: 10px 14px; border-bottom: 1px solid var(--border); font-size: 12px; overflow-wrap: anywhere; }
+.crossing-controls label { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+.crossing-controls select { flex: 1; min-width: 0; max-width: 100%; height: 40px; color: var(--text); background: var(--bg); border: 1px solid var(--border); border-radius: 8px; }
+.crossing-controls button,.crossing-meta button,.crossing-attachment-actions button { min-height: 40px; padding: 6px 10px; color: var(--text); background: var(--card); border: 1px solid var(--border); border-radius: 8px; overflow-wrap: anywhere; }
+.crossing-meta button { min-width: 0; }
+.crossing-controls small { display: block; color: var(--text-muted); margin-top: 6px; }
+.crossing-tool-links { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
+.crossing-tool-links .sb-tool-item { flex-wrap: wrap; min-width: 0; }
+.crossing-attachments { flex: 0 0 auto; display: flex; gap: 8px; padding: 6px 12px; max-height: 100px; overflow: auto; }
+.crossing-attachments > div { flex: 0 0 100px; min-width: 0; font-size: 11px; overflow-wrap: anywhere; }
+.crossing-attachments img { height: 40px; width: 60px; object-fit: contain; }
+.crossing-attachments span { display: block; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.crossing-preview { display: block; max-width: 100%; max-height: 180px; object-fit: contain; }
+.crossing-attachment-actions { flex: 0 0 auto; display: flex; align-items: center; gap: 6px; padding: 4px 12px; font-size: 11px; }
+.crossing-attachment-actions small { min-width: 0; color: var(--text-muted); }
+.crossing-stickers { flex: 0 1 auto; min-height: 0; max-height: 26dvh; overflow: auto; }
+.crossing-stickers .sticker-picker { position: static; width: auto; max-height: none; margin: 6px 12px; }
+.sticker-opt { border: 0; background: transparent; }
 .crossing-panel button:disabled { opacity: .45; cursor: not-allowed; }
 .crossing-session b { font-weight: 500; font-size: 12px; }
 .crossing-session small { margin-top: 3px; color: var(--text-muted); font-size: 10px; }
