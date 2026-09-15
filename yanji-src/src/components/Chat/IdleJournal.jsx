@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { createPortal } from 'react-dom'
-import { useStore } from '../../store'
+import { useToolMemory } from './ToolMemory'
 import { fetchIdleLog } from '../../api/moonMemory'
 
 // 独处手账（阿颖的主意，2026-07-12）
@@ -35,7 +35,7 @@ function fmtDayHeader(k) {
 }
 
 export default function IdleJournal({ onClose }) {
-  const moonMemory = useStore((s) => s.moonMemory)
+  const moonMemory = useToolMemory()
   const cfg = { baseUrl: moonMemory?.baseUrl, apiToken: moonMemory?.apiToken }
   const [log, setLog] = useState(null)
   const [error, setError] = useState('')

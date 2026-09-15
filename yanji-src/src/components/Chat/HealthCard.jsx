@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { createPortal } from 'react-dom'
-import { useStore } from '../../store'
+import { useToolMemory } from './ToolMemory'
 import { fetchVitals } from '../../api/moonMemory'
 import {
   aggregateVitalsByShanghaiDay,
@@ -41,7 +41,7 @@ function Bars({ series, unit, color }) {
 }
 
 export default function HealthCard({ onClose }) {
-  const moonMemory = useStore((s) => s.moonMemory)
+  const moonMemory = useToolMemory()
   const cfg = { baseUrl: moonMemory?.baseUrl, apiToken: moonMemory?.apiToken }
   const [rows, setRows] = useState(null)
   const [error, setError] = useState('')

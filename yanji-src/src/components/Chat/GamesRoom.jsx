@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { createPortal } from 'react-dom'
-import { useStore } from '../../store'
+import { useToolMemory } from './ToolMemory'
+import { toolFetch as fetch } from '../../api/toolFetch.mjs'
 import { showToast } from '../Toast'
 import { useThemedConfirm } from '../ThemedConfirmDialog'
 
@@ -20,8 +21,8 @@ const emptyForm = { name: '', icon: '🎮', player: 'chat', status: 'playing', s
 
 export default function GamesRoom({ onClose }) {
   const confirmAction = useThemedConfirm()
-  const moonMemory = useStore((s) => s.moonMemory)
-  const base = (moonMemory?.apiUrl || 'https://memory.ravenlove.cc').replace(/\/$/, '')
+  const moonMemory = useToolMemory()
+  const base = (moonMemory?.baseUrl || moonMemory?.apiUrl || 'https://memory.ravenlove.cc').replace(/\/$/, '')
   const token = moonMemory?.apiToken
 
   const [view, setView] = useState('list')   // list | detail | form

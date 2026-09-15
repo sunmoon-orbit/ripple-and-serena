@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { ToolMemoryContext } from '../Chat/ToolMemory'
 import { useStore } from '../../store'
 import { createSessionFlow } from './session-flow.mjs'
 import { localCommand, imageSupported, modelLabel, uploadAttachment } from './controls.mjs'
@@ -8,6 +9,7 @@ import CrossingTools from './Tools'
 import { sizeComposer } from './layout.mjs'
 import CrossingMessage from './Message'
 import { threadsFromRead, completeTurn } from './messages.mjs'
+import { bindAgentSession, canAuthenticate } from './authorization.mjs'
 
 function wsUrl(baseUrl) {
   const base = new URL(baseUrl || 'https://memory.ravenlove.cc')
@@ -33,6 +35,8 @@ function usageText(usage) {
 
 export default function Crossing() {
   const moonMemory = useStore((s) => s.moonMemory)
+  const agentBlocked = useStore(s => s.agentBlocked)
+  const [capability, setCapability] = useState('')
   const customStickers = useStore((s) => s.customStickers) || []
   const setActivePanel = useStore((s) => s.setActivePanel)
   const wsRef = useRef(null)
@@ -78,7 +82,7 @@ export default function Crossing() {
     viewport?.addEventListener('resize', resize)
     window.addEventListener('resize', resize)
     return () => { viewport?.removeEventListener('resize', resize); window.removeEventListener('resize', resize) }
-  }, [])
+  }, [capability])
 
   const send = useCallback((payload) => {
     if (wsRef.current?.readyState !== WebSocket.OPEN) throw new Error('渡口尚未连接')
@@ -107,7 +111,7 @@ export default function Crossing() {
     observer.observe(node.parentElement)
     window.visualViewport?.addEventListener('resize', resize)
     return () => { observer.disconnect(); window.visualViewport?.removeEventListener('resize', resize) }
-  }, [draft])
+  }, [draft, capability])
 
   const readThread = useCallback((threadId) => {
     if (!threadId) return
@@ -115,8 +119,16 @@ export default function Crossing() {
   }, [turn, starting])
 
   useEffect(() => {
-    if (!moonMemory?.apiToken) { setConnection('needs-setup'); return undefined }
+    if (!canAuthenticate(moonMemory) || agentBlocked) { flowRef.current.disconnect(); setCapability(''); setConnection('locked'); return undefined }
     let disposed = false
+    let denied = false
+    const lock = () => {
+      denied = true; setCapability(''); flowRef.current.disconnect(); setMessages([]); setThreads([]); setModels([]); setUsage(null); setApproval(null); setTurn(null); setAttachments([]); setStopEpoch(n => n + 1)
+      setConnection('locked'); clearTimeout(reconnectRef.current); clearTimeout(expiryTimer)
+      try { wsRef.current?.close() } catch {}
+    }
+    const unbind = bindAgentSession(lock)
+    let expiryTimer
     const connect = () => {
       if (disposed) return
       setConnection('connecting'); setError('')
@@ -125,13 +137,20 @@ export default function Crossing() {
       catch { setConnection('error'); setError('渡口地址无效'); return }
       wsRef.current = ws
       ws.onopen = () => {
-        ws.send(JSON.stringify({ type: 'crossing/auth', token: moonMemory.apiToken }))
+        ws.send(JSON.stringify({ type: 'crossing/auth', token: moonMemory.apiToken, enabled: true }))
       }
       ws.onmessage = (raw) => {
         if (disposed || wsRef.current !== ws) return
         let msg
         try { msg = JSON.parse(raw.data) } catch { return }
         if (!String(msg.type || '').startsWith('crossing/')) return
+        if (msg.type === 'crossing/auth_failed') { lock(); return }
+        if (msg.type === 'crossing/authenticated') {
+          if (!msg.capability || !Number.isFinite(msg.expiresAt) || msg.expiresAt <= Date.now()) { lock(); return }
+          clearTimeout(expiryTimer)
+          expiryTimer = setTimeout(lock, Math.min(msg.expiresAt - Date.now(), 15 * 60000))
+          setCapability(msg.capability)
+        }
         flowRef.current.receive(msg)
         if (msg.type === 'crossing/models') {
           setModels(msg.models || []); setModelsError('')
@@ -146,7 +165,6 @@ export default function Crossing() {
           }
           return
         }
-        if (msg.type === 'crossing/auth_failed') { setConnection('error'); setError('渡口身份验证失败'); ws.close(); return }
         if (msg.type === 'crossing/status') {
           setConnection(msg.state || 'online')
           if (['offline', 'error'].includes(msg.state)) { setStopEpoch(n => n + 1); setTurn(null); setStarting(false); setApproval(null) }
@@ -191,7 +209,8 @@ export default function Crossing() {
         if (msg.type === 'crossing/approval/resolved') { setApproval((current) => current?.requestId === msg.requestId ? null : current); return }
       }
       ws.onclose = () => {
-        if (disposed) return
+        if (disposed || denied) return
+        clearTimeout(expiryTimer); setCapability('')
         flowRef.current.disconnect(); setStopEpoch(n => n + 1); setTurn(null); setStarting(false); setApproval(null)
         setConnection('reconnecting')
         reconnectRef.current = setTimeout(connect, 2500)
@@ -199,8 +218,8 @@ export default function Crossing() {
       ws.onerror = () => ws.close()
     }
     connect()
-    return () => { disposed = true; clearTimeout(reconnectRef.current); try { wsRef.current?.close() } catch {} }
-  }, [moonMemory?.apiToken, moonMemory?.baseUrl, send])
+    return () => { disposed = true; unbind(); clearTimeout(expiryTimer); clearTimeout(reconnectRef.current); try { wsRef.current?.close() } catch {} }
+  }, [moonMemory?.apiToken, moonMemory?.baseUrl, moonMemory?.enabled, agentBlocked, send])
 
   const createThread = () => { if (turn || starting) return; setStopEpoch(n => n + 1); try { flowRef.current.create(selection.model ? selection : undefined) } catch (e) { setError(e.message) } }
   const startTurn = () => {
@@ -231,7 +250,7 @@ export default function Crossing() {
   const imagesAllowed = sessionState.phase === 'ready' && imageSupported(models, sessionState.pendingModel?.model || activeThread?.model)
   const addFile = async file => {
     if (file.kind === 'image' && !imagesAllowed) throw new Error('当前模型不支持图片，或模型尚未确认')
-    const attachment = await uploadAttachment(moonMemory, file)
+    const attachment = await uploadAttachment({ ...moonMemory, apiToken: capability }, file)
     setAttachments(prev => [...prev, attachment].slice(0, 4))
   }
   const addSticker = name => {
@@ -241,7 +260,7 @@ export default function Crossing() {
     setAttachments(prev => [...prev, { url, name: '表情包', kind: 'image' }].slice(0, 4)); setStickerOpen(false)
   }
   const toolItems = useMemo(() => items.filter((item) => item.type !== 'reasoning'), [items])
-  if (!moonMemory?.apiToken) return <div className="panel-shell crossing-panel"><div className="panel-empty">渡口需要先在「拾羽」中配置记忆库连接。</div></div>
+  if (!canAuthenticate(moonMemory) || agentBlocked || !sessionState.authenticated || !capability) return <div className="panel-shell crossing-panel"><div className="panel-empty"><p>渡口已锁定</p><p>{connection === 'reconnecting' ? '连接已断开，重连中；正在重新验证身份…' : connection === 'connecting' ? '正在验证拾羽记忆库连接…' : '请启用拾羽记忆库，并验证 API Token。'}</p><button className="btn-sm" onClick={() => setActivePanel('settings', 'moon-settings')}>前往设置</button></div></div>
 
   return (
     <div ref={panelRef} className="panel-shell crossing-panel">
@@ -264,7 +283,7 @@ export default function Crossing() {
         {selection.model && models.length > 0 && !selectedEntry && <p role="alert">当前会话模型不在可用列表中，请重新选择。</p>}
         <small>顶部只显示服务端确认值；选择仅作用于渡口会话。{sessionState.pendingModel && '所选模型将在下一次发送时覆盖，当前仍显示已确认模型。'}</small>
       </div>}
-      {toolsOpen && <div className="crossing-controls"><CrossingTools /></div>}
+      {toolsOpen && <div className="crossing-controls"><ToolMemoryContext.Provider value={{ ...moonMemory, baseUrl: `crossing+${moonMemory.baseUrl}`, apiToken: capability }}><CrossingTools /></ToolMemoryContext.Provider></div>}
       {warning && <div className="crossing-error" role="status">{warning}<button onClick={() => setWarning('')}>×</button></div>}
       {error && <div className="crossing-error">{error}<button onClick={() => setError('')}>×</button></div>}
       <div className="crossing-layout">
@@ -276,7 +295,7 @@ export default function Crossing() {
         <main className="crossing-chat">
           <div className="crossing-messages" ref={scrollRef}>
             {!activeThread && <div className="crossing-empty">新建会话后，即可在这里和 Codex 协作。</div>}
-            {messages.map(message => <CrossingMessage key={`${activeId}:${message.id}`} message={message} config={moonMemory} stopEpoch={stopEpoch} />)}
+            {messages.map(message => <CrossingMessage key={`${activeId}:${message.id}`} message={message} config={{ ...moonMemory, apiToken: capability, crossing: true }} stopEpoch={stopEpoch} />)}
             {toolItems.map((item) => <details key={item.id} className={'crossing-tool ' + (item.status === 'failed' ? 'failed' : '')}><summary>{item.lifecycle === 'started' ? '正在' : '已完成'} · {item.title || '工具调用'}{item.exitCode != null ? `（${item.exitCode}）` : ''}</summary>{item.cwd && <div className="crossing-path">{item.cwd}</div>}{item.output && <pre>{item.output}</pre>}{item.error && <pre>{item.error}</pre>}{item.paths?.length ? <div className="crossing-path">{item.paths.join('\n')}</div> : null}</details>)}
             {turn && <div className="crossing-working">Codex 正在工作…</div>}
           </div>

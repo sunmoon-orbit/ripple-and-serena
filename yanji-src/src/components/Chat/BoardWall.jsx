@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { createPortal } from 'react-dom'
-import { useStore } from '../../store'
+import { useToolMemory } from './ToolMemory'
 import { fetchBoardMessages, postBoardMessage, deleteBoardMessage } from '../../api/moonMemory'
 import { useThemedConfirm } from '../ThemedConfirmDialog'
 
@@ -24,7 +24,7 @@ const TILTS = [-2.4, 1.8, -1.2, 2.6, -3, 1.2, -1.8, 2.2]
 
 export default function BoardWall({ onClose }) {
   const confirmAction = useThemedConfirm()
-  const moonMemory = useStore((s) => s.moonMemory)
+  const moonMemory = useToolMemory()
   const cfg = { baseUrl: moonMemory?.baseUrl, apiToken: moonMemory?.apiToken }
   const [notes, setNotes] = useState(null)
   const [error, setError] = useState('')

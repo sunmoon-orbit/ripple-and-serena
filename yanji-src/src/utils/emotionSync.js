@@ -3,9 +3,12 @@
 // fire-and-forget + 节流，失败静默——同步挂了不该打扰聊天。
 import { getEmotionState } from './emotion'
 import { syncEmotion } from '../api/moonMemory'
+import { syncContactFields, createSettingsWriter } from './proactiveGates.mjs'
+import { showToast } from '../components/Toast'
 
 let lastSyncAt = 0
 const THROTTLE_MS = 5 * 60 * 1000
+const write = createSettingsWriter(({ config, body }) => syncEmotion(config, body))
 
 export function maybeSyncEmotion(moonMemory, { timeAwareness, longingPush, proactiveCall }, force = false) {
   if (!moonMemory?.apiToken) return
@@ -25,11 +28,9 @@ export function maybeSyncEmotion(moonMemory, { timeAwareness, longingPush, proac
     baseUrl,
     apiToken: moonMemory.apiToken,
   }
-  syncEmotion(cfg, {
+  return write({ config: cfg, body: {
     slots: state.slots || {},
     lastSeen: state.lastSeen || Date.now(),
-    timeAwareness: timeAwareness !== false,
-    longingPush: longingPush !== false,
-    proactiveCall: proactiveCall !== false,
-  }).catch(() => {})
+    ...syncContactFields({ timeAwareness, longingPush, proactiveCall }),
+  } }).catch(() => { lastSyncAt = 0; if (force) showToast('主动联系设置未能保存到服务器，请恢复连接后重试', 'error') })
 }

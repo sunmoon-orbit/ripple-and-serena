@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { createPortal } from 'react-dom'
-import { useStore } from '../../store'
+import { useToolMemory } from './ToolMemory'
 import { fetchHeartCards } from '../../api/moonMemory'
 
 // 卡册：收下的心意卡都存在这里，随时翻（阿颖的主意，2026-07-11）
@@ -16,7 +16,7 @@ function bjTime(utcStr) {
 }
 
 export default function HeartCardAlbum({ onClose }) {
-  const moonMemory = useStore((s) => s.moonMemory)
+  const moonMemory = useToolMemory()
   const hasKey = !!(moonMemory?.enabled && moonMemory?.apiToken)
   const [cards, setCards] = useState(null)
   const [error, setError] = useState('')

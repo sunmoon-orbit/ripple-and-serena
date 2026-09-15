@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { createPortal } from 'react-dom'
-import { useStore } from '../../store'
+import { useToolMemory } from './ToolMemory'
 import { fetchChecklist, addChecklistItem, toggleChecklistItem, deleteChecklistItem, fetchHabits, createHabit, toggleHabitDay, archiveHabit } from '../../api/moonMemory'
 import { showToast } from '../Toast'
 
@@ -25,7 +25,7 @@ function HabitGlyph({ id, title }) {
 const dayKey = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 
 export default function DailyChecklist({ onClose, initialView = 'receipt' }) {
-  const moonMemory = useStore((s) => s.moonMemory)
+  const moonMemory = useToolMemory()
   const cfg = { baseUrl: moonMemory?.baseUrl, apiToken: moonMemory?.apiToken, enabled: moonMemory?.enabled }
   const [items, setItems] = useState(null)
   const [input, setInput] = useState('')

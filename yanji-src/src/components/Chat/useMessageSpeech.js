@@ -10,13 +10,13 @@ export function useMessageSpeech(content, config, enabled = true, resetKey = '')
   useEffect(() => {
     let mounted = true
     const instance = createSpeechPlayer({
-      synthesize: signal => synthesizeSpeech({ baseUrl: config?.baseUrl, apiToken: config?.apiToken }, speechText(content), undefined, signal),
+      synthesize: signal => synthesizeSpeech({ baseUrl: config?.baseUrl, apiToken: config?.apiToken, crossing: config?.crossing }, speechText(content), undefined, signal),
       changed: next => { if (mounted) setState(next) },
     })
     player.current = instance
     setState(instance.state)
     return () => { mounted = false; instance.stop(); player.current = null }
-  }, [content, config?.baseUrl, config?.apiToken, available, resetKey])
+  }, [content, config?.baseUrl, config?.apiToken, config?.crossing, available, resetKey])
   const toggle = useCallback(() => { if (available) return player.current?.toggle() }, [available])
   const stop = useCallback(() => player.current?.stop(), [])
   return { ...state, available, toggle, stop }

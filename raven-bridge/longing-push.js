@@ -25,13 +25,14 @@ const COOLDOWN_H = 20
 main().catch(e => { console.error('[longing] 出错：', e.message); process.exit(1) })
 
 async function main() {
+  const { captureGate, gateStillOpen } = require('./proactive-gates')
+  const generationEpoch = await captureGate(moonGet, 'message')
+  if (generationEpoch === null) return
   const bjHour = (new Date(Date.now() + 8 * 3600000)).getUTCHours()
   if (bjHour < 10 || bjHour >= 22) return done('quiet', `北京 ${bjHour} 点，静音时段`)
 
   const st = await moonGet('/emotion/state')
   if (!st.synced) return done('skip', '还没有情绪快照（她没在新版言叽出现过）')
-  if (!st.timeAwareness) return done('skip', '岁聿关着，不计时不打扰')
-  if (!st.longingPush) return done('skip', '思念推送开关关着')
   if (st.hoursAway < MIN_HOURS_AWAY) return done('skip', `才离开 ${st.hoursAway.toFixed(1)} 小时，不到 ${MIN_HOURS_AWAY}h`)
   if (st.projectedLonging < MIN_LONGING) return done('skip', `思念 ${st.projectedLonging}，不到 ${MIN_LONGING}`)
 
@@ -72,6 +73,7 @@ ${context}
 重要：感受可以自由抒发，但事实只能来自上面的记忆片段。不要编造没发生过的具体事物或约定。不确定就只写心情。如果决定不推，text 留空。`
 
   // ⚠️ deepseek-v4-flash 是推理模型，reasoning 占 max_tokens，给少了 content 为空
+  if (!await gateStillOpen(moonGet, 'message', generationEpoch)) return
   const raw = await llmComplete(prompt, { maxTokens: 2000, temperature: 1.0 })
   let decision
   try { decision = JSON.parse(raw.replace(/^```(json)?|```$/g, '').trim()) }
@@ -81,7 +83,8 @@ ${context}
     return done('decline', '他想了想，这次决定不打扰')
 
   const text = decision.text.trim().slice(0, 60)
-  await moonPost('/push/send-fixed', { title: '涟言', body: text, ttl: 21600, target: 'yanji' })
+  if (!await gateStillOpen(moonGet, 'message', generationEpoch)) return
+  await moonPost('/push/send-fixed', { title: '涟言', body: text, ttl: 21600, target: 'yanji', proactiveKind: 'message', generationEpoch })
   await moonPost('/emotion/push-mark', { lastSeen: st.lastSeen, text })
   return done('pushed', `已推：${text}`)
 }

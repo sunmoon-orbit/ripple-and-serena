@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { createPortal } from 'react-dom'
-import { useStore } from '../../store'
+import { useToolMemory } from './ToolMemory'
 import { fetchPeriod, logPeriodStart, logPeriodEnd, deletePeriodLog } from '../../api/moonMemory'
 import { showToast } from '../Toast'
 import { useThemedConfirm } from '../ThemedConfirmDialog'
@@ -17,7 +17,7 @@ function fmtDate(s) {
 
 export default function PeriodCard({ onClose }) {
   const confirmAction = useThemedConfirm()
-  const moonMemory = useStore((s) => s.moonMemory)
+  const moonMemory = useToolMemory()
   const cfg = { baseUrl: moonMemory?.baseUrl, apiToken: moonMemory?.apiToken }
   const [data, setData] = useState(null)
   const [error, setError] = useState('')

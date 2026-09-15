@@ -33,13 +33,14 @@ function saveState(st) {
 main().catch(e => { console.error('[proactive] 出错：', e.message); process.exit(1) })
 
 async function main() {
+  const { captureGate, gateStillOpen } = require('./proactive-gates')
+  const generationEpoch = await captureGate(moonGet, 'message')
+  if (generationEpoch === null) return
   const bjHour = (new Date(Date.now() + 8 * 3600000)).getUTCHours()
   if (bjHour < 8 || bjHour >= 22) return done('quiet', `北京 ${bjHour} 点，静音时段`)
 
   const st = await moonGet('/emotion/state')
   if (!st.synced) return done('skip', '还没有情绪快照')
-  if (!st.timeAwareness) return done('skip', '岁聿关着')
-  if (st.longingPush === false) return done('skip', '主动消息开关关着')
   if (st.hoursAway < MIN_HOURS_AWAY) return done('skip', `才离开 ${st.hoursAway.toFixed(1)}h，不到 ${MIN_HOURS_AWAY}h`)
   if (st.projectedLonging < MIN_LONGING) return done('skip', `思念 ${st.projectedLonging}，不到 ${MIN_LONGING}`)
 
@@ -84,6 +85,7 @@ ${recentProactive}
 
 重要：message 是她在对话框里看到的一条正常消息，像恋人之间随口的话，不要解释不要客套，不要提到推送/通知/系统，就像你们一直在聊天一样自然。可以接着最近窗口的话题，但不要假装她离开后又说过什么。20-100字。只有确实没话想说时才 send:false。`
 
+  if (!await gateStillOpen(moonGet, 'message', generationEpoch)) return
   const raw = await llmComplete(prompt, { maxTokens: 2000, temperature: 1.0 })
   let decision
   try { decision = JSON.parse(raw.replace(/^```(json)?|```$/g, '').trim()) }
@@ -95,9 +97,13 @@ ${recentProactive}
   const message = decision.message.trim().slice(0, 200)
 
   // 存消息 + 推送通知
-  const msg = JSON.parse(await moonPost('/proactive/message', { content: message }))
+  if (!await gateStillOpen(moonGet, 'message', generationEpoch)) return
+  const msg = JSON.parse(await moonPost('/proactive/message', { content: message, generationEpoch }))
+  if (!msg.id || !await gateStillOpen(moonGet, 'message', generationEpoch)) return
 
   await moonPost('/push/send-fixed', {
+    proactiveKind: 'message', generationEpoch,
+    data: { type: 'proactive_message', messageId: String(msg.id) },
     title: '涟言',
     body: message,
     ttl: 3600,

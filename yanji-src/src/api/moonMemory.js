@@ -1,6 +1,7 @@
 // moon-memory REST client
 // AI tool use: read (filter) + write (POST) only — NO delete/trash
 import { formatShanghaiHm, hasRealSleepInterval } from '../utils/healthSleep.js'
+import { toolFetch } from './toolFetch.mjs'
 
 function headers(token) {
   return {
@@ -11,7 +12,7 @@ function headers(token) {
 
 async function request(baseUrl, path, options = {}) {
   const url = baseUrl.replace(/\/$/, '') + path
-  const resp = await fetch(url, options)
+  const resp = await toolFetch(url, options)
   if (!resp.ok) {
     const text = await resp.text().catch(() => '')
     throw new Error(`moon-memory ${resp.status}: ${text.slice(0, 200)}`)
@@ -84,8 +85,9 @@ export async function fetchHeatmap(config) {
 }
 
 export async function checkHealth(config) {
+  if (config.enabled !== true || !config.apiToken) throw new Error('unauthorized')
   const baseUrl = (config.baseUrl || 'https://memory.ravenlove.cc').replace(/\/$/, '')
-  return request(baseUrl, '/health')
+  return request(baseUrl, '/emotion/contact', { headers: headers(config.apiToken) })
 }
 
 // 情绪快照同步（思念推送数据源）：fire-and-forget，失败不打扰
@@ -129,6 +131,7 @@ export async function transcribeAudio(config, blob) {
 
 export async function synthesizeSpeech(config, text, voiceId, signal) {
   const { baseUrl, apiToken } = config
+  if (config.crossing) return request(baseUrl, '/raven/upload?channel=crossing', { method: 'POST', headers: headers(apiToken), body: JSON.stringify({ action: 'tts', text }), signal })
   return request(baseUrl, '/tts', {
     method: 'POST',
     headers: headers(apiToken),

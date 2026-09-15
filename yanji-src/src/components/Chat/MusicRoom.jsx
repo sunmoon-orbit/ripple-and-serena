@@ -1,13 +1,14 @@
 import { useState, useEffect, useCallback } from 'react'
 import { createPortal } from 'react-dom'
-import { useStore } from '../../store'
+import { useToolMemory } from './ToolMemory'
+import { toolFetch as fetch } from '../../api/toolFetch.mjs'
 import { showToast } from '../Toast'
 import { useThemedConfirm } from '../ThemedConfirmDialog'
 import { playTrack, setQueue } from '../../utils/player'
 
 export default function MusicRoom({ onClose }) {
   const confirmAction = useThemedConfirm()
-  const moonMemory = useStore((s) => s.moonMemory)
+  const moonMemory = useToolMemory()
   const base = (moonMemory?.baseUrl || 'https://memory.ravenlove.cc').replace(/\/$/, '')
   const token = moonMemory?.apiToken
   const auth = { Authorization: `Bearer ${token}` }

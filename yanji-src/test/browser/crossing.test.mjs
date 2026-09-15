@@ -22,7 +22,7 @@ test('real components: remount/reconnect/refresh, themes/IME geometry, speech an
   await context.route('**/*', route => {
     const url = new URL(route.request().url())
     if (url.origin === origin) return route.continue()
-    if (url.pathname === '/tts') {
+    if (url.pathname === '/tts' || (url.pathname === '/raven/upload' && route.request().postDataJSON()?.action === 'tts')) {
       ttsRequests++
       if (delayTts) { heldTts = route; return }
       return route.fulfill({ status: failTts ? 500 : 200, json: failTts ? { error: 'fixture failure' } : { audio: 'fixture-audio' } })
@@ -49,7 +49,9 @@ test('real components: remount/reconnect/refresh, themes/IME geometry, speech an
         const m = JSON.parse(raw); window.__wire.push(m)
         setTimeout(() => {
           if (this.readyState !== 1) return
-          if (m.type === 'crossing/auth') this.emit({ type: 'crossing/authenticated' })
+          if (m.type === 'crossing/auth') this.emit(m.enabled === true && m.token === 'test-only'
+            ? { type: 'crossing/authenticated', capability: 'fixture-capability', expiresAt: Date.now() + 60000 }
+            : { type: 'crossing/auth_failed' })
           if (m.type === 'crossing/thread/list') this.emit({ type: 'crossing/threads', threads: [window.__thread('thread-luna'), window.__thread('thread-two')] })
           if (m.type === 'crossing/model/list') this.emit({ type: 'crossing/models', models: [{ id: 'luna', model: 'gpt-5.6-luna', displayName: 'Luna fixture', supportedReasoningEfforts: [{ reasoningEffort: 'low' }], defaultReasoningEffort: 'low', inputModalities: ['text', 'image'], isDefault: true }] })
           if (['crossing/thread/read', 'crossing/thread/resume', 'crossing/thread/start'].includes(m.type)) this.emit({ type: 'crossing/thread', requestId: m.requestId, action: m.type.endsWith('read') ? 'read' : m.type.endsWith('start') ? 'started' : 'resumed', ready: !m.type.endsWith('read'), thread: window.__thread(m.threadId || 'new-thread') })

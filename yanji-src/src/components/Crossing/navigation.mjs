@@ -6,6 +6,7 @@ export function normalizeNavigation(value = {}) {
     murmur: value.murmur === 'crossing' ? 'crossing' : 'chat',
     threadId: typeof value.threadId === 'string' ? value.threadId.slice(0, 200) : '',
     callFromCrossing: value.callFromCrossing === true,
+    settingsSection: value.settingsSection === 'moon' ? 'moon' : '',
   }
 }
 export function readNavigation(storage = globalThis.localStorage) {
@@ -22,5 +23,6 @@ export function navigate(value, panel, intent) {
   if (next.panel === 'crossing') next.murmur = 'crossing'
   if (intent === 'api-back') next.murmur = 'chat'
   next.callFromCrossing = intent === 'api-call'
+  next.settingsSection = intent === 'moon-settings' ? 'moon' : ''
   return normalizeNavigation(next)
 }

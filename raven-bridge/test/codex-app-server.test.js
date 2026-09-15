@@ -67,7 +67,7 @@ class FakeAdapter extends EventEmitter {
   async request(method, params) {
     this.calls.push({ method, params })
     if (method === 'turn/start') return { turn: { id: 'turn-1', status: 'inProgress' } }
-    if (method === 'thread/list') return { data: [] }
+    if (method === 'thread/list') return { data: [{ id: 'thread-1' }] }
     if (method === 'thread/resume') return { thread: { id: params.threadId, turns: [] } }
     return {}
   }
@@ -78,7 +78,8 @@ class FakeAdapter extends EventEmitter {
 test('Crossing binds approvals to exact client/thread/turn/item and declines on disconnect', async () => {
   const adapter = new FakeAdapter()
   const sent = []
-  const service = createCrossingService({ adapter, send: (client, event) => sent.push({ client, event }), broadcast: () => {}, rateLimitFallback: () => null })
+  const service = createCrossingService({ authorize: () => true, adapter, send: (client, event) => sent.push({ client, event }), broadcast: () => {}, rateLimitFallback: () => null })
+  await service.handle('phone-a', { type: 'crossing/thread/list' })
   await service.handle('phone-a', { type: 'crossing/thread/resume', threadId: 'thread-1' })
   await service.handle('phone-a', { type: 'crossing/turn/start', threadId: 'thread-1', text: '检查一下', clientMessageId: 'm1' })
   adapter.emit('serverRequest', {
@@ -103,13 +104,15 @@ test('Crossing reserves the only active turn before turn/start resolves', async 
     constructor() { super(); this.online = true; this.resolveTurn = null }
     async request(method, params) {
       this.calls.push({ method, params })
+      if (method === 'thread/list') return { data: [{ id: 'thread-a' }] }
       if (method === 'turn/start') return new Promise((resolve) => { this.resolveTurn = resolve })
       if (method === 'thread/resume') return { thread: { id: params.threadId } }
       return {}
     }
   }
   const adapter = new DelayedAdapter()
-  const service = createCrossingService({ adapter, send: () => {}, broadcast: () => {}, rateLimitFallback: () => null })
+  const service = createCrossingService({ authorize: () => true, adapter, send: () => {}, broadcast: () => {}, rateLimitFallback: () => null })
+  await service.handle('phone-a', { type: 'crossing/thread/list' })
   await service.handle('phone-a', { type: 'crossing/thread/resume', threadId: 'thread-a' })
   const first = service.handle('phone-a', { type: 'crossing/turn/start', threadId: 'thread-a', text: '第一条' })
   await new Promise((resolve) => setImmediate(resolve))

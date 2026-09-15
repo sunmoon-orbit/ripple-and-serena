@@ -138,11 +138,11 @@ function moonGet(pathname) {
   })
 }
 
-function moonPost(pathname, body) {
+function moonPost(pathname, body, method = 'POST') {
   return new Promise((resolve, reject) => {
-    const bodyStr = JSON.stringify(body)
+    const bodyStr = body === undefined ? '' : JSON.stringify(body)
     const opts = {
-      hostname: '127.0.0.1', port: 3210, path: pathname, method: 'POST',
+      hostname: '127.0.0.1', port: 3210, path: pathname, method,
       headers: { Authorization: `Bearer ${MOON_TOKEN}`, 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(bodyStr) }
     }
     const req = http.request(opts, res => {
@@ -417,18 +417,29 @@ function broadcast(msg) {
 
 function sendCrossing(clientId, msg) {
   const ws = crossingClients.get(clientId)
-  if (ws?.readyState === 1) ws.send(JSON.stringify(msg))
+  if (agentSessions.get(clientId) && ws?.readyState === 1) ws.send(JSON.stringify(msg))
 }
 
 function broadcastCrossing(msg) {
   const data = JSON.stringify(msg)
   for (const [clientId, ws] of crossingClients) {
-    if (ws.readyState === 1) ws.send(data)
-    else crossingClients.delete(clientId)
+    if (!agentSessions.get(clientId) || ws.readyState !== 1) crossingClients.delete(clientId)
+    else if (crossing.canReceive(clientId, msg)) ws.send(data)
   }
 }
 
+const { createAgentSessions } = require('./crossing-auth')
+const agentSessions = createAgentSessions({
+  getToken: () => fs.readFileSync('/home/ripple/moon-memory/.env', 'utf8').match(/^MOON_API_TOKEN=(.+)$/m)?.[1]?.trim(),
+  onRevoke: ({ id, ws }) => {
+    crossingClients.delete(id)
+    crossing.disconnect(id)
+    if (ws.readyState === 1) { ws.send(JSON.stringify({ type: 'crossing/auth_failed' })); ws.close(1008, 'unauthorized') }
+  },
+})
+setInterval(() => agentSessions.sweep(), 1000).unref()
 const crossing = createCrossingService({
+  authorize: id => !!agentSessions.get(id),
   modelStateFile: require('path').join(__dirname, '.crossing-models.json'),
   broadcast: broadcastCrossing,
   send: sendCrossing,
@@ -723,7 +734,15 @@ const server = http.createServer((req, res) => {
   // 敏感读写接口外网必须带 token：记忆内容、CC 状态、思考内容、热力图写入、
   // 上传、push 订阅（不拦的话外人能把自己的推送端点订阅进来偷收通知）
   if (req.method === 'POST' && url.pathname === '/raven/upload' && url.searchParams.get('channel') === 'crossing') {
-    require('./crossing-upload-http').handleUpload(req, res, crossing.uploads, moonAuthed)
+    require('./crossing-upload-http').handleUpload(req, res, crossing.uploads, request => agentSessions.fromRequest(request), {
+      tts: async body => {
+        const result = await moonPost('/tts', body)
+        if (result.status < 200 || result.status >= 300) throw new Error('request failed')
+        return result.data
+      },
+      tool: ({ path, body, method }) => moonPost(path, body, method),
+      revoke: id => agentSessions.revoke(id),
+    })
     return
   }
   const TOKEN_REQUIRED = ['/raven/status', '/raven/last-thinking', '/raven/memory-random', '/raven/on-this-day', '/raven/memory-count', '/raven/activity', '/raven/upload', '/raven/push/subscribe', '/raven/push/unsubscribe', '/raven/usage']
@@ -1339,33 +1358,42 @@ wss.on('connection', (ws) => {
   const authTimer = setTimeout(() => { if (!ws.authed && !ws.crossingClientId) ws.close() }, 15000)
   ws.once('close', () => clearTimeout(authTimer))
 
-  ws.on('message', (raw) => {
+  ws.on('message', async (raw) => {
     try {
       const msg = JSON.parse(raw)
       // 言叽·渡口使用和归巢分离的 WebSocket namespace。凭据沿用言叽已经
       // 配置的记忆库会话凭据；通过后仅加入 crossingClients，绝不复用归巢广播。
       if (msg.type === 'crossing/auth') {
-        if (!moonTokenIsValid(msg.token)) {
+        if (ws.authed || ws.crossingClientId || ws.crossingAuthenticating) { ws.close(1008, 'unauthorized'); return }
+        ws.crossingAuthenticating = true
+        const session = agentSessions.open(ws, msg.token, msg.enabled)
+        if (!session) {
           ws.send(JSON.stringify({ type: 'crossing/auth_failed' }))
+          ws.close(1008, 'unauthorized')
           return
         }
-        if (!ws.crossingClientId) {
-          ws.crossingClientId = `crossing-${crypto.randomUUID()}`
-          crossingClients.set(ws.crossingClientId, ws)
+        if (!await require('./crossing-memory-auth').verifyMemoryToken(msg.token) || !agentSessions.get(session.id)) {
+          agentSessions.revoke(session.id)
+          return
         }
-        ws.send(JSON.stringify({ type: 'crossing/authenticated', agent: 'codex' }))
+        ws.crossingAuthenticating = false
+        ws.crossingClientId = session.id
+        crossingClients.set(session.id, ws)
+        ws.send(JSON.stringify({ type: 'crossing/authenticated', agent: 'codex', capability: session.capability, expiresAt: session.expiresAt }))
         return
       }
       if (typeof msg.type === 'string' && msg.type.startsWith('crossing/')) {
-        if (!ws.crossingClientId || !crossingClients.has(ws.crossingClientId)) {
+        if (!agentSessions.get(ws.crossingClientId)) {
           ws.send(JSON.stringify({ type: 'crossing/auth_failed' }))
           return
         }
-        void crossing.handle(ws.crossingClientId, msg)
-          .catch(error => sendCrossing(ws.crossingClientId, { type: 'crossing/error', requestId: msg.requestId, operation: msg.type, error: require('./codex-app-server').clip(error?.message || '渡口操作失败', 500) }))
+        if (msg.type === 'crossing/logout') { agentSessions.revoke(ws.crossingClientId); return }
+        ws.crossingQueue = (ws.crossingQueue || Promise.resolve()).then(() => crossing.handle(ws.crossingClientId, msg))
+          .catch(() => sendCrossing(ws.crossingClientId, { type: 'crossing/error', requestId: msg.requestId, operation: msg.type, error: '渡口操作未获允许或未能完成，请重新连接后重试' }))
         return
       }
       // 前端连上后第一件事发 {type:'auth', token}，通过才开始收广播
+      if (ws.crossingClientId || ws.crossingAuthenticating) { ws.close(1008, 'unauthorized'); return }
       if (msg.type === 'auth') {
         if (tokenIsValid(msg.token)) {
           ws.authToken = msg.token
@@ -1417,6 +1445,7 @@ wss.on('connection', (ws) => {
   ws.on('close', () => {
     clients.delete(ws)
     if (ws.crossingClientId) {
+      agentSessions.revoke(ws.crossingClientId)
       crossing.disconnect(ws.crossingClientId)
       crossingClients.delete(ws.crossingClientId)
     }
@@ -1425,6 +1454,7 @@ wss.on('connection', (ws) => {
   ws.on('error', () => {
     clients.delete(ws)
     if (ws.crossingClientId) {
+      agentSessions.revoke(ws.crossingClientId)
       crossing.disconnect(ws.crossingClientId)
       crossingClients.delete(ws.crossingClientId)
     }

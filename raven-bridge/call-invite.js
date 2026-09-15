@@ -7,6 +7,7 @@
 
 const http = require('http')
 const fs = require('fs')
+const { captureGate, gateStillOpen } = require('./proactive-gates')
 
 const env = {}
 fs.readFileSync('/home/ripple/moon-memory/.env', 'utf8').split('\n').forEach(line => {
@@ -35,13 +36,13 @@ function saveState(st) {
 main().catch(e => { console.error('[call] 出错：', e.message); process.exit(1) })
 
 async function main() {
+  const generationEpoch = await captureGate(moonGet, 'call')
+  if (generationEpoch === null) return
   const bjHour = (new Date(Date.now() + 8 * 3600000)).getUTCHours()
   if (bjHour < 7 || bjHour >= 22) return done('quiet', `北京 ${bjHour} 点，静音时段`)
 
   const st = await moonGet('/emotion/state')
   if (!st.synced) return done('skip', '还没有情绪快照')
-  if (!st.timeAwareness) return done('skip', '岁聿关着')
-  if (st.proactiveCall === false) return done('skip', '主动来电开关关着')
 
   const ps = loadState()
   const bjDate = new Date(Date.now() + 8 * 3600000).toISOString().slice(0, 10)
@@ -102,6 +103,7 @@ ${reasonTexts}
 
 重要：reason 是她在来电通知上看到的第一句话，要像恋人之间的一句话，不要解释不要客套，不要提到推送/通知/系统。可以接着最近窗口的话题，但不要假装她离开后又说过什么。如果不想打就 call:false。`
 
+  if (!await gateStillOpen(moonGet, 'call', generationEpoch)) return
   const raw = await llmComplete(prompt, { maxTokens: 2000, temperature: 1.0 })
   let decision
   try { decision = JSON.parse(raw.replace(/^```(json)?|```$/g, '').trim()) }
@@ -116,10 +118,13 @@ ${reasonTexts}
   if (DRY_RUN) return done('dry-run', `会拨号：${reason}`)
 
   // 创建来电邀请
-  const inv = JSON.parse(await moonPost('/call/invite', { reason }))
+  if (!await gateStillOpen(moonGet, 'call', generationEpoch)) return
+  const inv = JSON.parse(await moonPost('/call/invite', { reason, generationEpoch }))
+  if (!inv.id || !await gateStillOpen(moonGet, 'call', generationEpoch)) return
 
   // 推送通知
   await moonPost('/push/send-fixed', {
+    proactiveKind: 'call', generationEpoch,
     title: '涟言来电话了',
     body: reason,
     ttl: 90,

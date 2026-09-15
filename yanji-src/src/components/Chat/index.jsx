@@ -3,6 +3,14 @@ import { createPortal } from 'react-dom'
 import { useShallow } from 'zustand/react/shallow'
 import { useStore, buildBackupJson, restoreFromBackupJson } from '../../store'
 import CrossingCallEntry from './CrossingCallEntry'
+import { contactAllowed, createContactGuard } from '../../utils/proactiveGates.mjs'
+async function readContactConfig() {
+  const config = useStore.getState().moonMemory
+  if (!config?.enabled || !config.apiToken) throw new Error('unavailable')
+  const response = await fetch(`${config.baseUrl.replace(/\/$/, '')}/proactive/config`, { headers: { Authorization: `Bearer ${config.apiToken}` } })
+  if (!response.ok) throw new Error('unavailable')
+  return response.json()
+}
 import { sendMessage, summarizeThinking, normalizeProvider, BUILTIN_MODELS, buildSystemPrompt, compactMessages, buildSummaryInjection } from '../../api/llm'
 import { uuid } from '../../utils'
 import { downloadBlob } from '../../utils/download'
@@ -316,6 +324,9 @@ export default function Chat() {
   const [idleJournalOpen, setIdleJournalOpen] = useState(false) // 独处手账：独处时间醒来日志
   const [boardOpen, setBoardOpen] = useState(false) // 便利贴墙：留言板 UI 回归（0719 阿颖的主意）
   const [incomingCall, setIncomingCall] = useState(null) // 来电响铃中：{ chatId, msgId, reason }
+  useEffect(() => useStore.subscribe(state => {
+    if (!contactAllowed(state, 'call')) setIncomingCall(null)
+  }), [])
   const [dialing, setDialing] = useState(null) // 拨号中：{ status, text }
   const callFromCrossing = useStore(s => s.navigation.callFromCrossing)
   const [egg, setEgg] = useState(null) // 完成彩蛋：回复结束后小概率冒出的像素小家伙
@@ -417,7 +428,8 @@ export default function Chat() {
   // 的 exhaustive-deps 追着跑，也容易在依赖变化时抓到旧闭包）
   const generateReplyRef = useRef(null)
 
-  const generateReply = useCallback(async (chat, conn, { titleText, hidden, voicemail, retried } = {}) => {
+  const generateReply = useCallback(async (chat, conn, { titleText, hidden, voicemail, retried, proactive, contactGuard } = {}) => {
+    if (proactive && !contactAllowed(useStore.getState(), 'message')) return
     // Add placeholder assistant message（voicemail=未接来电转的语音留言，气泡默认以语音条形态出现）
     const assistantId = uuid()
     addMessage(chat.id, { id: assistantId, role: 'assistant', content: '', streaming: true, voicemail: voicemail || undefined })
@@ -430,6 +442,7 @@ export default function Chat() {
     // 中转站可能一秒推来几十上百个碎 chunk。逐 chunk setState 会把主线程耗在
     // React + Markdown 清洗上。合并成约 20fps 的界面刷新，文字仍实时增长但不会抖卡。
     const streamUi = createStreamUpdateScheduler(() => {
+      if (proactive) return // Unsolicited output is buffered until final server permission.
       const patch = { streaming: true }
       if (fullText) {
         patch.content = stripVoiceMsgTag(stripCallTag(stripNegTag(stripMoodTag(stripEmotionTag(stripTextualTarotReading(fullText))))))
@@ -664,8 +677,10 @@ export default function Chat() {
 
       const genFiles = [] // make_file 工具生成的文件，挂到助手消息上渲染成卡片
 
+      if (proactive && !await contactGuard?.check()) { removeLastEmptyAssistant(chat.id); return }
       const result = await sendMessage({
         connection: conn,
+        permissionCheck: proactive ? () => contactGuard.check() : undefined,
         messages: merged,
         systemPrompt,
         dynamicContext,
@@ -724,7 +739,7 @@ export default function Chat() {
       if (negM) window.dispatchEvent(new CustomEvent('neg-view-result', { detail: { allow: negM[1].toLowerCase() === 'allow' } }))
       // 来电邀请：[call:理由] → 响铃卡片。每对话限三次；语音留言里再喊也不接力
       const callM = afterMood.match(CALL_TAG_RE)
-      const callReason = (!voicemail && callM && getMessages(chat.id).filter((m) => m.callInvite).length < 3)
+      const callReason = (contactAllowed(useStore.getState(), 'call') && !voicemail && callM && getMessages(chat.id).filter((m) => m.callInvite).length < 3)
         ? (callM[1] || '').trim().slice(0, 40)
         : null
       // 语音条：涟言自己决定这条用说的。留言本来就是语音条，不重复标
@@ -734,6 +749,7 @@ export default function Chat() {
       const parts = voicemail
         ? [finalText.replace(/\[MSG\]/gi, ' ').trim()]
         : finalText.split(/\[MSG\]/).map((p) => p.trim()).filter(Boolean)
+      if (proactive && !await contactGuard?.check()) { removeLastEmptyAssistant(chat.id); return }
       updateMessage(chat.id, assistantId, {
         content: parts[0] || finalText,
         thinking: fullThinking || undefined,
@@ -744,7 +760,7 @@ export default function Chat() {
         files: genFiles.length ? genFiles : undefined,
         voiceMsg: asVoice || undefined,
       })
-      if (fullThinking) {
+      if (fullThinking && !proactive) {
         // 思考总结是一次性小任务，优先走轻连接省钱。
         // ⚠️ model 这三层回退必须原样保留：改成传 undefined 让 summarizeThinking 自己
         // 从 connection.defaultModel 取，会**丢掉 chat.model 那一层**——她给单个对话
@@ -755,23 +771,39 @@ export default function Chat() {
       }
       for (let i = 1; i < parts.length; i++) {
         await new Promise((r) => setTimeout(r, 700))
+        if (proactive && !await contactGuard?.check()) return
         addMessage(chat.id, { role: 'assistant', content: parts[i], voiceMsg: asVoice || undefined })
       }
       // 来电：正文落完再响铃（先看到她想说什么，再看到电话打过来）
-      if (callReason) {
+      if (callReason && contactAllowed(useStore.getState(), 'call')) {
+        // The server must approve and persist the invite before a browser rings.
+        const config = useStore.getState().moonMemory
+        let approved = null
+        try {
+          if (config?.enabled && config.apiToken) {
+            const response = await fetch(`${config.baseUrl.replace(/\/$/, '')}/call/invite`, {
+              method: 'POST', headers: { Authorization: `Bearer ${config.apiToken}`, 'Content-Type': 'application/json' },
+              body: JSON.stringify({ reason: callReason }),
+            })
+            if (response.ok) approved = await response.json()
+          }
+        } catch { /* No verified invitation means no ringing. */ }
+        if (approved?.id && contactAllowed(useStore.getState(), 'call')) {
+        localStorage.setItem('yanji_call_invite_seen', String(approved.id))
         const inv = addMessage(chat.id, {
           role: 'assistant',
           content: `[涟言发起了语音通话邀请：${callReason}]`,
-          callInvite: { status: 'ringing', reason: callReason },
+          callInvite: { status: 'ringing', reason: callReason, serverId: approved.id },
         })
-        setIncomingCall({ chatId: chat.id, msgId: inv.id, reason: callReason })
+        setIncomingCall({ chatId: chat.id, msgId: inv.id, reason: callReason, serverId: approved.id })
         if (document.hidden && moonMemory?.apiToken) {
           const base = (moonMemory.baseUrl || 'https://memory.ravenlove.cc').replace(/\/$/, '')
           fetch(`${base}/push/send-fixed`, {
             method: 'POST',
             headers: { Authorization: `Bearer ${moonMemory.apiToken}`, 'Content-Type': 'application/json' },
-            body: JSON.stringify({ title: '涟言来电话了', body: callReason, ttl: 90, target: 'yanji' }),
+            body: JSON.stringify({ title: '涟言来电话了', body: callReason, ttl: 90, target: 'yanji', proactiveKind: 'call', data: { type: 'call', inviteId: approved.id } }),
           }).catch(() => {})
+        }
         }
       }
       touchChat(chat.id)
@@ -800,6 +832,7 @@ export default function Chat() {
       }
     } catch (e) {
       streamUi.cancel()
+      if (proactive && !await contactGuard?.check()) { removeLastEmptyAssistant(chat.id); return }
       // 上游已经出了字（也已经计过费）却在收尾阶段抛错——流被掐断、工具连不上都算——
       // 以前一律把这条助手消息删掉，她只看到「[错误] Failed to fetch」：钱花了、话没了
       // （0726 阿颖遇到）。有正文就留下并标「没说完就断线了」，没正文才删。
@@ -831,7 +864,7 @@ export default function Chat() {
           removeLastEmptyAssistant(chat.id)
           setStatus('按你的选择重试中…')
           await new Promise((r) => setTimeout(r, 800))
-          return generateReplyRef.current?.(chat, conn, { titleText, hidden, voicemail, retried: true })
+          return generateReplyRef.current?.(chat, conn, { titleText, hidden, voicemail, proactive, contactGuard, retried: true })
         }
         if (fullThinking) {
           updateMessage(chat.id, assistantId, {
@@ -904,6 +937,11 @@ export default function Chat() {
 
   // ── Send ─────────────────────────────────────────────────────────────────
   const handleSend = useCallback(async (text, images, opts = {}) => {
+    if (opts.proactive && !contactAllowed(useStore.getState(), 'message')) return
+    if (opts.proactive) {
+      opts = { ...opts, contactGuard: createContactGuard(readContactConfig, useStore.getState) }
+      if (!await opts.contactGuard.check()) return
+    }
     if (isSending || (!text && !images.length)) return
 
     let chat = activeChat
@@ -988,7 +1026,7 @@ export default function Chat() {
       }
     }
 
-    await generateReply(chat, conn, { titleText: text, hidden: opts.hidden, voicemail: opts.voicemail })
+    await generateReply(chat, conn, { titleText: text, hidden: opts.hidden, voicemail: opts.voicemail, proactive: opts.proactive, contactGuard: opts.contactGuard })
   }, [isSending, activeChat, activeConn, connections, imageDescriptions, injectMode, injectPrompt, replyDelay, generateReply])
 
   // AndCo 适配层只把明确 @/回复/定向事件交成普通 user turn；不造 system/developer。
@@ -1173,7 +1211,7 @@ export default function Chat() {
     const tryNudge = () => {
       if (document.visibilityState !== 'visible') return
       const awareness = useStore.getState()
-      if (awareness.timeAwareness === false || awareness.longingPush === false) return
+      if (!contactAllowed(awareness, 'message')) return
       if (nudgeGuardRef.current) return // 一次可见期内只判一次，防 visibilitychange 抖动
       nudgeGuardRef.current = true
       setTimeout(() => { nudgeGuardRef.current = false }, 60_000)
@@ -1186,7 +1224,7 @@ export default function Chat() {
       const hit = shouldNudge(last.createdAt)
       if (!hit) return
       recordNudge()
-      handleSend(buildNudgeText(hit.gapHours), [], { hidden: true })
+      handleSend(buildNudgeText(hit.gapHours), [], { hidden: true, proactive: true })
     }
     tryNudge()
     document.addEventListener('visibilitychange', tryNudge)
@@ -1203,11 +1241,15 @@ export default function Chat() {
     const auth = { headers: { Authorization: `Bearer ${moonMemory.apiToken}` } }
     const seenKey = 'yanji_call_invite_seen'
     const checkCall = async () => {
+      if (!contactAllowed(useStore.getState(), 'call')) return
       if (callPollRef.current || incomingCall) return
+      const guard = createContactGuard(readContactConfig, useStore.getState, 'call')
+      if (!await guard.check()) return
       try {
         const res = await fetch(`${base}/call/invite`, auth)
         if (!res.ok) return
         const inv = await res.json()
+        if (!await guard.check()) return
         if (inv.status !== 'pending') return
         const seen = localStorage.getItem(seenKey)
         if (seen === String(inv.id)) return
@@ -1238,11 +1280,15 @@ export default function Chat() {
     // 未接来电补留言：她没开着言叽时那通电话响完就过期了，留言从来没生成过（0728 亲历）。
     // ⚠️ 只补最近一通、只补 6 小时内的——隔夜再冒出一条「刚才没接到你电话」很怪。
     const checkMissed = async () => {
+      if (!contactAllowed(useStore.getState(), 'message')) return
       if (incomingCall) return
+      const guard = createContactGuard(readContactConfig, useStore.getState)
+      if (!await guard.check()) return
       try {
         const res = await fetch(`${base}/call/history?limit=5`, auth)
         if (!res.ok) return
         const rows = await res.json()
+        if (!await guard.check()) return
         if (!Array.isArray(rows) || !rows.length) return
         const maxId = Math.max(...rows.map((r) => r.id))
         // 第一次跑（没有存档）不补历史，只记下水位线，免得装完 app 被三年前的旧电话轰炸
@@ -1269,22 +1315,27 @@ export default function Chat() {
         handleSend(
           `[系统：你之前想给阿颖打语音电话（理由：${m.reason || '想你了'}），但她当时没开着言叽，电话响完没人接。现在她打开了。请留一条语音留言：像对着电话答录机说话那样，把当时想说的用一小段自然的话说完，30-80字，一条说完。不要用 [MSG] 分段，不要再带 [call:] 标签，不要发贴图和点歌。]`,
           [],
-          { hidden: true, voicemail: true }
+          { hidden: true, voicemail: true, proactive: true }
         )
       } catch { /* 静默 */ }
     }
     const checkProactive = async () => {
+      if (!contactAllowed(useStore.getState(), 'message')) return
       if (proactivePollRef.current) return
       proactivePollRef.current = true
+      const guard = createContactGuard(readContactConfig, useStore.getState)
       try {
+        if (!await guard.check()) return
         const res = await fetch(`${base}/proactive/pending`, auth)
         if (!res.ok) return
         const msgs = await res.json()
+        if (!await guard.check()) return
         if (!Array.isArray(msgs) || !msgs.length) return
         let fallbackChat = null
         const deliveredIds = []
         for (const pm of msgs) {
           const state = useStore.getState()
+          if (!await guard.check()) break
           let chat = findConversationChat(state.chats, pm.conversationExternalId)
           if (!chat) {
             fallbackChat = fallbackChat || state.getActiveChat()
@@ -1598,10 +1649,11 @@ export default function Chat() {
       }).catch(() => {})
     }
     // 转语音留言：注入隐藏触发，让涟言像对答录机一样把想说的话留下来，回复以语音条形态出现
+    if (!contactAllowed(useStore.getState(), 'message')) return
     handleSend(
       `[系统：你刚才想给阿颖打语音电话（理由：${ic.reason}），但${how === 'declined' ? '她按了挂断——可能不方便接' : '响了90秒没人接'}。请留一条语音留言：像对着电话答录机说话那样，把你想说的用一小段自然的话说完，30-80字，一条说完。不要用 [MSG] 分段，不要再带 [call:] 标签，不要发贴图和点歌。]`,
       [],
-      { hidden: true, voicemail: true }
+      { hidden: true, voicemail: true, proactive: true }
     )
   }
 

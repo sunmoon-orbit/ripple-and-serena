@@ -149,6 +149,7 @@ function compressToolResult(result) {
 // 而绝大多数工具（记忆库/书架/朋友圈…）都要走网络到 moon-memory，服务器重启一下、
 // 手机网抖一下就会走到这里。所以一律翻译成一句工具结果交回给模型，让它把话说完。
 async function executeTool(name, args, ctx) {
+  if (ctx.permissionCheck && !await ctx.permissionCheck()) throw new Error('主动联系已关闭')
   try {
     return await executeToolRaw(name, args, ctx)
   } catch (e) {
@@ -365,6 +366,7 @@ const TOOL_BATCH_PROMPT = `【查东西的时候一次查完】
 - 拿不准要不要查的，宁可顺手一起查了，也别为它单开一轮`
 
 export async function sendMessage({
+  permissionCheck,
   connection,
   messages,
   systemPrompt,
@@ -397,7 +399,7 @@ export async function sendMessage({
     return await callWithTools({
       connection, messages, systemPrompt: systemPrompt ? systemPrompt + '\n\n' + TOOL_BATCH_PROMPT : TOOL_BATCH_PROMPT,
       dynamicContext, model: usedModel, generationConfig: safeGenerationConfig,
-      tools, provider, searchConfig, moonMemoryConfig, mcpServers, onChunk, onThinking, onStatus, onToolCall, onFile, cacheKey,
+      tools, provider, searchConfig, moonMemoryConfig, mcpServers, onChunk, onThinking, onStatus, onToolCall, onFile, cacheKey, permissionCheck,
     })
   }
   return await callStream({
@@ -514,6 +516,7 @@ function providerHttpError(provider, status, raw, body, details) {
 // ─── Tool-use loop (non-streaming, supports multi-turn) ─────────────────────
 
 async function callWithTools({
+  permissionCheck,
   connection, messages, systemPrompt, dynamicContext, model, generationConfig,
   tools, provider, searchConfig, moonMemoryConfig, mcpServers, onChunk, onThinking, onStatus, onToolCall, onFile, cacheKey,
 }) {
@@ -531,6 +534,7 @@ async function callWithTools({
   let responseDiagnostic = ''
 
   for (let iter = 0; iter < 6; iter++) {
+    if (permissionCheck && !await permissionCheck()) throw new Error('主动联系已关闭')
     onStatus?.(iter === 0 ? '思考中...' : '继续思考...')
 
     // ── OpenAI ──────────────────────────────────────────────────────
@@ -626,7 +630,7 @@ async function callWithTools({
             })
             continue
           }
-          const result = compressToolResult(await executeTool(tc.function.name, args, { searchConfig, moonMemoryConfig, mcpServers, onStatus, onFile }))
+          const result = compressToolResult(await executeTool(tc.function.name, args, { searchConfig, moonMemoryConfig, mcpServers, onStatus, onFile, permissionCheck }))
           convo.push({ role: 'tool', tool_call_id: tc.id, content: result })
         }
         continue
@@ -647,7 +651,7 @@ async function callWithTools({
           }
           onToolCall?.([textTc.name])
           try {
-            const result = compressToolResult(await executeTool(textTc.name, textTc.args, { searchConfig, moonMemoryConfig, mcpServers, onStatus, onFile }))
+            const result = compressToolResult(await executeTool(textTc.name, textTc.args, { searchConfig, moonMemoryConfig, mcpServers, onStatus, onFile, permissionCheck }))
             const cleanPrefix = stripFakeToolResult(textTc.remaining)
             finalText = cleanPrefix ? `${cleanPrefix}\n\n${result}` : result
           } catch (e) {
@@ -716,7 +720,7 @@ async function callWithTools({
         convo.push({ role: 'assistant', content: data.content })
         const results = []
         for (const tb of toolBlocks) {
-          const result = compressToolResult(await executeTool(tb.name, tb.input || {}, { searchConfig, moonMemoryConfig, mcpServers, onStatus, onFile }))
+          const result = compressToolResult(await executeTool(tb.name, tb.input || {}, { searchConfig, moonMemoryConfig, mcpServers, onStatus, onFile, permissionCheck }))
           results.push({ type: 'tool_result', tool_use_id: tb.id, content: result })
         }
         convo.push({ role: 'user', content: results })
@@ -761,7 +765,7 @@ async function callWithTools({
         const fc = fcPart.functionCall
         onToolCall?.([fc.name])
         convo.push({ role: 'assistant', content: '', functionCall: fc })
-        const result = compressToolResult(await executeTool(fc.name, fc.args || {}, { searchConfig, moonMemoryConfig, mcpServers, onStatus, onFile }))
+        const result = compressToolResult(await executeTool(fc.name, fc.args || {}, { searchConfig, moonMemoryConfig, mcpServers, onStatus, onFile, permissionCheck }))
         convo.push({ role: 'function', content: result, functionResponse: { name: fc.name, response: { result } } })
         continue
       }

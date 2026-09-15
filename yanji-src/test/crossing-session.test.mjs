@@ -32,7 +32,7 @@ function fixture() {
   })
   const events = []
   const deliver = msg => { events.push(msg); flow.receive(JSON.parse(JSON.stringify(msg))) }
-  const service = serviceModule.createCrossingService({ adapter, send: (_, msg) => deliver(msg), broadcast: deliver })
+  const service = serviceModule.createCrossingService({ authorize: () => true, adapter, send: (_, msg) => deliver(msg), broadcast: deliver })
   return { calls, wire, events, flow, adapter, service,
     notify(method, params) { child.stdout.write(JSON.stringify({ method, params }) + '\n') },
     reconnect() { service.disconnect(client); flow.disconnect(); client = 'phone-2'; flow.receive({ type: 'crossing/authenticated' }) },

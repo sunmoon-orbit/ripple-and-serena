@@ -19,7 +19,7 @@ class Fixture extends EventEmitter {
   async request(method, params) {
     this.calls.push({ method, params })
     if (method === 'model/list') return params.cursor ? { data: [catalog[1]], nextCursor: null } : { data: [catalog[0], { ...catalog[1], id: 'hidden', hidden: true }], nextCursor: 'page2' }
-    if (method === 'thread/list') return { data: [] }
+    if (method === 'thread/list') return { data: this.thread ? [this.thread] : [] }
     if (method === 'thread/start' || method === 'thread/resume') {
       const model = params.model || this.thread?.model || 'vision-fixture'
       const reasoningEffort = params.config?.model_reasoning_effort || this.thread?.reasoningEffort || 'low'
@@ -48,7 +48,7 @@ test('model/list exhausts pages, filters hidden and preserves all picker fields'
 test('real model config for thread/start, resume switch, turn override, persistent reconnect and warning', async t => {
   const cwd = temp(t), adapter = new Fixture(), events = []
   const stateFile = path.join(cwd, 'models.json')
-  const service = createCrossingService({ adapter, cwd, modelStateFile: stateFile, send: (_, x) => events.push(x), broadcast: x => events.push(x) })
+  const service = createCrossingService({ authorize: () => true, adapter, cwd, modelStateFile: stateFile, send: (_, x) => events.push(x), broadcast: x => events.push(x) })
   await service.handle('phone', { type: 'crossing/thread/start', model: 'vision-id', effort: 'high', requestId: 'new' })
   const start = adapter.calls.find(x => x.method === 'thread/start')
   assert.equal(start.params.model, 'vision-fixture')
@@ -56,7 +56,8 @@ test('real model config for thread/start, resume switch, turn override, persiste
   assert.equal(events.find(x => x.type === 'crossing/thread').thread.model, 'vision-fixture')
   await service.handle('phone', { type: 'crossing/thread/resume', threadId: 'thread-fixture', model: 'text-fixture', effort: 'medium' })
   service.disconnect('phone')
-  const restarted = createCrossingService({ adapter, cwd, modelStateFile: stateFile, send: (_, x) => events.push(x) })
+  const restarted = createCrossingService({ authorize: () => true, adapter, cwd, modelStateFile: stateFile, send: (_, x) => events.push(x) })
+  await restarted.handle('new-phone', { type: 'crossing/thread/list' })
   await restarted.handle('new-phone', { type: 'crossing/thread/resume', threadId: 'thread-fixture' })
   const resume = adapter.calls.filter(x => x.method === 'thread/resume').at(-1)
   assert.equal(resume.params.model, 'text-fixture')
@@ -79,6 +80,10 @@ const png = { name: 'photo.png', mime: 'image/png', data: Buffer.from([137,80,78
 test('uploads validate MIME, extension, traversal, byte limits and UTF-8; cleanup and inputs are real', t => {
   const cwd = temp(t); let now = Date.now()
   const store = createUploadStore({ cwd, now: () => now, ttl: 100 })
+  // This fixture represents a verified socket, never a production default.
+  const put = store.put.bind(store), inputs = store.inputs.bind(store)
+  store.put = file => put(file, 'fixture-owner')
+  store.inputs = (files, image) => inputs(files, image, 'fixture-owner')
   for (const name of ['../x.png', '/tmp/x.png', '..\\x.png']) assert.throws(() => store.put({ ...png, name }), /文件名/)
   assert.throws(() => store.put({ ...png, mime: 'text/plain' }), /MIME/)
   assert.throws(() => store.put({ ...png, data: Buffer.from('not a PNG').toString('base64') }), /MIME/)
@@ -99,9 +104,9 @@ test('uploads validate MIME, extension, traversal, byte limits and UTF-8; cleanu
   assert.equal(store.inputs([text], false)[0].type, 'text')
   assert.equal(fs.readFileSync(path.join(cwd, '.crossing-uploads', text.id), 'utf8'), 'fixture text')
   assert.throws(() => store.inputs([{ id: '../photo.png' }], true), /过期/)
-  store.pin([image], true); now += 1000; store.sweep()
+  store.pin([image], true, 'fixture-owner'); now += 1000; store.sweep()
   assert.ok(fs.existsSync(local.path)); assert.equal(fs.existsSync(path.join(cwd, '.crossing-uploads', text.id)), false)
-  store.pin([image], false); store.sweep(); assert.equal(fs.existsSync(local.path), false)
+  store.pin([image], false, 'fixture-owner'); store.sweep(); assert.equal(fs.existsSync(local.path), false)
 })
 
 test('HTTP upload rejects oversized body and returns only opaque attachment metadata', t => {
@@ -109,7 +114,7 @@ test('HTTP upload rejects oversized body and returns only opaque attachment meta
   function run(chunks, authed = true) {
     const req = new EventEmitter(); req.headers = { 'content-type': 'application/json' }; req.resume = () => {}
     const res = { writeHead(code) { this.code = code }, end(data) { this.body = JSON.parse(data) } }
-    handleUpload(req, res, store, () => authed)
+    handleUpload(req, res, store, () => authed ? { id: 'fixture-owner' } : null)
     for (const chunk of chunks) req.emit('data', chunk)
     req.emit('end'); return res
   }

@@ -4,6 +4,7 @@
 const { CodexAppServer, clip } = require('./codex-app-server')
 const { createModelControls, threadOverrides, confirmedModel } = require('./crossing-models')
 const { createUploadStore } = require('./crossing-uploads')
+const { OPERATIONS } = require('./crossing-auth')
 
 const APPROVAL_TIMEOUT_MS = 2 * 60 * 1000
 const DEFAULT_CWD = pathSafe(process.env.YANJI_CROSSING_CWD || pathJoinParent())
@@ -71,6 +72,9 @@ function createCrossingService(options = {}) {
   const disconnectedClients = new Set()
   const approvals = new Map()
   const sessions = new Map()
+  const allowedThreads = new Map()
+  const authorize = options.authorize || (() => false)
+  const check = id => { if (!authorize(id) || disconnectedClients.has(id)) throw new Error('unauthorized') }
   const selecting = new Set()
   const modelControls = createModelControls(adapter, options.modelStateFile)
   const uploads = options.uploads || createUploadStore({ cwd })
@@ -129,7 +133,7 @@ function createCrossingService(options = {}) {
 
   function clearTurn(turnId) {
     if (activeTurn?.turnId !== turnId) return
-    uploads.pin(activeTurn.attachments, false)
+    uploads.pin(activeTurn.attachments, false, activeTurn.clientId)
     activeTurn = null
     for (const [requestId, approval] of approvals) {
       if (approval.turnId === turnId) clearApproval(requestId, true)
@@ -145,7 +149,7 @@ function createCrossingService(options = {}) {
 
   adapter.on('online', () => status('online'))
   adapter.on('offline', ({ error, pendingRequestIds }) => {
-    uploads.pin(activeTurn?.attachments, false)
+    uploads.pin(activeTurn?.attachments, false, activeTurn?.clientId)
     metadata.clear()
     sessions.clear()
     for (const requestId of pendingRequestIds || []) clearApproval(requestId)
@@ -203,31 +207,40 @@ function createCrossingService(options = {}) {
   })
 
   async function perform(clientId, message) {
-    disconnectedClients.delete(clientId)
+    check(clientId)
     const type = message?.type
+    if (!OPERATIONS.has(type)) throw new Error('unauthorized')
+    const request = (method, params) => { check(clientId); return adapter.request(method, params) }
+    if (['crossing/thread/read', 'crossing/thread/resume'].includes(type) && !allowedThreads.get(clientId)?.has(message.threadId)) throw new Error('unauthorized')
     await ensureOnline()
+    check(clientId)
     if (type === 'crossing/model/list') {
       send(clientId, { type: 'crossing/models', requestId: message.requestId, models: await modelControls.list(true) })
       return
     }
     if (type === 'crossing/thread/list') {
-      const result = await adapter.request('thread/list', { cwd, limit: 80, sourceKinds: ['appServer', 'cli', 'vscode'], cursor: message.cursor || null })
+      const result = await request('thread/list', { cwd, limit: 80, sourceKinds: ['appServer', 'cli', 'vscode'], cursor: message.cursor || null })
+      check(clientId)
+      const permitted = allowedThreads.get(clientId) || new Set()
+      for (const thread of result.data || []) permitted.add(thread.id)
+      allowedThreads.set(clientId, permitted)
       send(clientId, { type: 'crossing/threads', threads: (result.data || []).map(publicThread).filter(Boolean), nextCursor: result.nextCursor || null })
       return
     }
     if (type === 'crossing/thread/start') {
       sessions.delete(clientId)
       const choice = message.model ? await modelControls.validate(message) : null
-      const result = await adapter.request('thread/start', { cwd, sandbox: 'workspace-write', approvalPolicy: 'untrusted', approvalsReviewer: 'user', ...threadOverrides(choice) })
+      const result = await request('thread/start', { cwd, sandbox: 'workspace-write', approvalPolicy: 'untrusted', approvalsReviewer: 'user', ...threadOverrides(choice) })
       if (!result.thread?.id) throw new Error('Codex 未返回会话编号')
       if (disconnectedClients.has(clientId)) return
       sessions.set(clientId, result.thread.id)
+      allowedThreads.set(clientId, new Set([...(allowedThreads.get(clientId) || []), result.thread.id]))
       if (choice) rememberChoice(result.thread.id, choice)
       send(clientId, { type: 'crossing/thread', requestId: message.requestId, action: 'started', ready: true, thread: threadView(result), pendingModel: choice && (confirmedModel(result).model !== choice.model || confirmedModel(result).reasoningEffort !== choice.effort) ? choice : null })
       return
     }
     if (type === 'crossing/thread/read') {
-      const result = await adapter.request('thread/read', { threadId: String(message.threadId || ''), includeTurns: true })
+      const result = await request('thread/read', { threadId: String(message.threadId || ''), includeTurns: true })
       send(clientId, { type: 'crossing/thread', requestId: message.requestId, action: 'read', ready: false, thread: threadView(result, true) })
       return
     }
@@ -235,7 +248,7 @@ function createCrossingService(options = {}) {
       sessions.delete(clientId)
       const requested = message.model ? message : modelControls.remembered(message.threadId)
       const choice = requested ? await modelControls.validate(requested) : null
-      const result = await adapter.request('thread/resume', { threadId: String(message.threadId || ''), cwd, sandbox: 'workspace-write', approvalPolicy: 'untrusted', approvalsReviewer: 'user', excludeTurns: false, ...threadOverrides(choice) })
+      const result = await request('thread/resume', { threadId: String(message.threadId || ''), cwd, sandbox: 'workspace-write', approvalPolicy: 'untrusted', approvalsReviewer: 'user', excludeTurns: false, ...threadOverrides(choice) })
       if (!result.thread?.id || result.thread.id !== message.threadId) throw new Error('Codex 返回的会话编号不匹配')
       if (disconnectedClients.has(clientId)) return
       sessions.set(clientId, result.thread.id)
@@ -256,9 +269,9 @@ function createCrossingService(options = {}) {
         const current = metadata.get(threadId)
         const desired = message.model ? message : saved || (current?.model ? { model: current.model, effort: current.reasoningEffort } : null)
         const choice = desired ? await modelControls.validate(desired) : null
-        const attachmentInputs = uploads.inputs(message.attachments, !!choice?.inputModalities.includes('image'))
-        uploads.pin(message.attachments, true)
-        const result = await adapter.request('turn/start', {
+        const attachmentInputs = uploads.inputs(message.attachments, !!choice?.inputModalities.includes('image'), clientId)
+        uploads.pin(message.attachments, true, clientId)
+        const result = await request('turn/start', {
           threadId, input: [...(text ? input(text) : []), ...attachmentInputs], clientUserMessageId: String(message.clientMessageId || ''),
           ...(choice ? { model: choice.model, effort: choice.effort } : {}),
           approvalPolicy: 'untrusted', approvalsReviewer: 'user',
@@ -276,21 +289,21 @@ function createCrossingService(options = {}) {
         emit({ type: 'crossing/turn/started', threadId, turn: result.turn })
         // A turn response has no model field. Read configured metadata instead of
         // trusting the requested override or interpreting assistant prose.
-        void adapter.request('thread/read', { threadId, includeTurns: false }).then(result => {
+        void request('thread/read', { threadId, includeTurns: false }).then(result => {
           if (result.thread?.id !== threadId) return
           const meta = confirmedModel(result)
           metadata.set(threadId, meta)
           emit({ type: 'crossing/model/confirmed', threadId, ...meta })
         }).catch(() => {})
       } finally {
-        if (!activeTurn) uploads.pin(message.attachments, false)
+        if (!activeTurn) uploads.pin(message.attachments, false, clientId)
         startingTurn = null
       }
       return
     }
     if (type === 'crossing/turn/interrupt') {
       assertClientTurn(clientId, message)
-      await adapter.request('turn/interrupt', { threadId: activeTurn.threadId, turnId: activeTurn.turnId })
+      await request('turn/interrupt', { threadId: activeTurn.threadId, turnId: activeTurn.turnId })
       emit({ type: 'crossing/turn/interrupted', threadId: activeTurn.threadId, turnId: activeTurn.turnId })
       return
     }
@@ -321,6 +334,8 @@ function createCrossingService(options = {}) {
 
   function disconnect(clientId) {
     sessions.delete(clientId)
+    allowedThreads.delete(clientId)
+    uploads.revoke?.(clientId)
     disconnectedClients.add(clientId)
     for (const [requestId, approval] of approvals) {
       if (approval.clientId !== clientId) continue
@@ -333,7 +348,8 @@ function createCrossingService(options = {}) {
     }
   }
 
-  return { handle, disconnect, adapter, uploads, getActiveTurn: () => activeTurn, publishRateLimits }
+  const canReceive = (id, message) => !message.threadId || (sessions.get(id) === message.threadId && (!activeTurn || activeTurn.clientId === id))
+  return { handle, disconnect, adapter, uploads, canReceive, getActiveTurn: () => activeTurn, publishRateLimits }
 }
 
 module.exports = { createCrossingService, fallbackRateLimits, publicThread, approvalResult }

@@ -5,6 +5,8 @@ import { showToast } from './components/Toast'
 import { normalizeGenerationConfig } from './utils/generationConfig'
 import { updateChatDraft, removeChatDraft } from './utils/chatDrafts'
 import { readNavigation, writeNavigation, navigate } from './components/Crossing/navigation.mjs'
+import { invalidateAgent } from './components/Crossing/authorization.mjs'
+import { contactEnabled, invalidateContacts } from './utils/proactiveGates.mjs'
 
 const LOCAL_KEY = 'llm_hub_state_v1'
 
@@ -84,9 +86,9 @@ const DEFAULT_STATE = {
   // 岁聿（时间感知）：开启时离开久了思念涨+回来时提醒涟言表达想念
   timeAwareness: true,
   // 主动消息：离开一阵子后服务端让 API 涟言结合近期对话决定是否先发消息（依赖岁聿开启）
-  longingPush: true,
+  longingPush: false,
   // 主动来电：门槛比主动消息高，服务端结合近期对话决定是否拨来（依赖岁聿开启）
-  proactiveCall: true,
+  proactiveCall: false,
   // 来电铃声：soft-chime 是原有的 E5 → C5 两音轻响，老用户默认听感不变
   ringtone: 'soft-chime',
   lastBackupAt: 0,
@@ -277,6 +279,8 @@ function mergeWithDefaults(persisted) {
     s.moonMemory = { ...DEFAULT_STATE.moonMemory }
   }
   if (!Array.isArray(s.mcpServers)) s.mcpServers = []
+  s.longingPush = contactEnabled(s.longingPush)
+  s.proactiveCall = contactEnabled(s.proactiveCall)
   s.customTheme = s.customTheme && typeof s.customTheme === 'object'
     ? { ...DEFAULT_CUSTOM_THEME, ...s.customTheme }
     : { ...DEFAULT_CUSTOM_THEME }
@@ -298,6 +302,8 @@ export const useStore = create((set, get) => ({
 
   // ─── panel navigation ─────────────────────────────────────────────
   navigation,
+  agentBlocked: false,
+  setAgentBlocked: value => { invalidateAgent(); set({ agentBlocked: value }) },
   setActivePanel: (panel, intent) => set((s) => {
     const navigation = writeNavigation(navigate(s.navigation, panel, intent))
     return { activePanel: navigation.panel, navigation }
@@ -334,8 +340,8 @@ export const useStore = create((set, get) => ({
   }),
   setRandomTool: (v) => set((s) => { savePersistedState({ ...s, randomTool: v }); return { randomTool: v } }),
   setTimeAwareness: (v) => set((s) => { savePersistedState({ ...s, timeAwareness: v }); return { timeAwareness: v } }),
-  setLongingPush: (v) => set((s) => { savePersistedState({ ...s, longingPush: v }); return { longingPush: v } }),
-  setProactiveCall: (v) => set((s) => { savePersistedState({ ...s, proactiveCall: v }); return { proactiveCall: v } }),
+  setLongingPush: (value) => set((s) => { const v = contactEnabled(value); if (v !== s.longingPush) invalidateContacts(); savePersistedState({ ...s, longingPush: v }); return { longingPush: v } }),
+  setProactiveCall: (value) => set((s) => { const v = contactEnabled(value); if (v !== s.proactiveCall) invalidateContacts(); savePersistedState({ ...s, proactiveCall: v }); return { proactiveCall: v } }),
   setLastBackupAt: (ts) => set((s) => { savePersistedState({ ...s, lastBackupAt: ts }); return { lastBackupAt: ts } }),
   // 锁屏来电是原生 CallActivity 放的铃，它读不到 localStorage——
   // 每次改铃声都往原生 SharedPreferences 抄一份，否则她选的铃声只在开着言叽时听得到。
@@ -633,10 +639,11 @@ export const useStore = create((set, get) => ({
     set((s) => { savePersistedState({ ...s, imageDescriptions: v }); return { imageDescriptions: v } })
   },
   setMoonMemory: (patch) => {
+    if (['apiToken', 'baseUrl', 'enabled'].some(key => key in patch)) invalidateAgent()
     set((s) => {
       const moonMemory = { ...s.moonMemory, ...patch }
       savePersistedState({ ...s, moonMemory })
-      return { moonMemory }
+      return { moonMemory, agentBlocked: false }
     })
   },
   addMcpServer: (server) => {

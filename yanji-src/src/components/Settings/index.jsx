@@ -11,6 +11,7 @@ import { DEFAULT_RINGTONE_ID, RINGTONES, playRingtone } from '../../utils/ringto
 import { squareDownscale } from '../../utils/squareDownscale'
 import McpSettings from './McpSettings'
 import { useThemedConfirm } from '../ThemedConfirmDialog'
+import { agentRevision } from '../Crossing/authorization.mjs'
 
 const CUSTOM_THEME_FIELDS = [
   { key: 'background', label: '页面底色' },
@@ -521,7 +522,7 @@ export default function Settings() {
   const [newMemContent, setNewMemContent] = useState('')
   const [newSticker, setNewSticker] = useState({ url: '', label: '' })
   const [expandedMemIds, setExpandedMemIds] = useState(new Set())
-  const [tab, setTab] = useState('connections')
+  const [tab, setTab] = useState(() => store.navigation.settingsSection || 'connections')
   const [pushEnabled, setPushEnabled] = useState(false)
   const [pushLoading, setPushLoading] = useState(false)
   const [idleCfg, setIdleCfg] = useState(null) // 独处时间：{enabled, last_wake}，null=没拉到
@@ -748,12 +749,17 @@ export default function Settings() {
   ]
 
   async function checkMoonHealth() {
+    const revision = agentRevision()
     try {
       setMoonHealthStatus('检查中...')
       await checkHealth(moonMemory)
+      if (agentRevision() !== revision) return
+      useStore.getState().setAgentBlocked(false)
       setMoonHealthStatus('连接正常')
     } catch (e) {
-      setMoonHealthStatus('连接失败: ' + e.message)
+      if (agentRevision() !== revision) return
+      useStore.getState().setAgentBlocked(true)
+      setMoonHealthStatus('连接验证失败，请检查启用状态与连接配置')
     }
   }
 
@@ -1114,22 +1120,22 @@ export default function Settings() {
                 </label>
               </div>
               <div className="card-row" style={{ fontSize: 12, color: 'var(--text-muted)' }}>
-                开启时，离开越久思念越浓，回来时他会自然地表达想你。关掉后不计时、不涨思念，什么时候来都像刚聊完。
+                只为你发起的正常对话提供时间上下文。是否允许主动消息和来电，由下面两个独立开关决定。
               </div>
               <div className="card-row">
                 <span className="card-row-label">主动消息</span>
                 <label className="toggle">
-                  <input type="checkbox" checked={timeAwareness !== false && longingPush !== false} disabled={timeAwareness === false} onChange={(e) => { setLongingPush(e.target.checked); maybeSyncEmotion(moonMemory, { timeAwareness, longingPush: e.target.checked, proactiveCall }, true) }} />
+                  <input type="checkbox" checked={longingPush === true} onChange={(e) => { setLongingPush(e.target.checked); maybeSyncEmotion(moonMemory, { timeAwareness, longingPush: e.target.checked, proactiveCall }, true) }} />
                   <span className="toggle-track" />
                 </label>
               </div>
               <div className="card-row" style={{ fontSize: 12, color: 'var(--text-muted)' }}>
-                你离开一阵子后，由 API 的他结合最近窗口聊过的内容，自己决定要不要先发消息。每天最多 3 条、至少间隔 3 小时，只在白天；关闭时间感知会一起停用。
+                允许根据最近对话主动发消息。关闭后停止主动文字、语音及未接来电跟进；时间感知不会代替这个开关。
               </div>
               <div className="card-row">
                 <span className="card-row-label">主动来电</span>
                 <label className="toggle">
-                  <input type="checkbox" checked={timeAwareness !== false && proactiveCall !== false} disabled={timeAwareness === false} onChange={(e) => { setProactiveCall(e.target.checked); maybeSyncEmotion(moonMemory, { timeAwareness, longingPush, proactiveCall: e.target.checked }, true) }} />
+                  <input type="checkbox" checked={proactiveCall === true} onChange={(e) => { setProactiveCall(e.target.checked); maybeSyncEmotion(moonMemory, { timeAwareness, longingPush, proactiveCall: e.target.checked }, true) }} />
                   <span className="toggle-track" />
                 </label>
               </div>
