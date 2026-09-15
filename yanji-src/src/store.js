@@ -4,6 +4,7 @@ import { bigGet, bigSet } from './utils/bigStore'
 import { showToast } from './components/Toast'
 import { normalizeGenerationConfig } from './utils/generationConfig'
 import { updateChatDraft, removeChatDraft } from './utils/chatDrafts'
+import { readNavigation, writeNavigation, navigate } from './components/Crossing/navigation.mjs'
 
 const LOCAL_KEY = 'llm_hub_state_v1'
 
@@ -284,6 +285,8 @@ function mergeWithDefaults(persisted) {
 
 const persisted = loadPersistedState()
 const initialState = mergeWithDefaults(persisted)
+const navigation = readNavigation()
+initialState.activePanel = navigation.panel
 
 // 同步应用主题——在 React 首帧之前，避免开屏动画闪默认紫色
 if (initialState.theme && initialState.theme !== 'default') {
@@ -294,7 +297,12 @@ export const useStore = create((set, get) => ({
   ...initialState,
 
   // ─── panel navigation ─────────────────────────────────────────────
-  setActivePanel: (panel) => set({ activePanel: panel }),
+  navigation,
+  setActivePanel: (panel, intent) => set((s) => {
+    const navigation = writeNavigation(navigate(s.navigation, panel, intent))
+    return { activePanel: navigation.panel, navigation }
+  }),
+  rememberCrossingThread: (threadId) => set((s) => ({ navigation: writeNavigation({ ...s.navigation, threadId }) })),
   setTheme: (theme) => set((s) => { savePersistedState({ ...s, theme }); try { window.YanjiNative?.updateTheme(theme === 'custom' ? 'default' : theme) } catch {}; return { theme } }),
   setCustomTheme: (patch) => set((s) => {
     const customTheme = { ...DEFAULT_CUSTOM_THEME, ...s.customTheme, ...(patch || {}) }

@@ -127,12 +127,13 @@ export async function transcribeAudio(config, blob) {
   return { text: (data.text || '').trim(), tone: data.tone || null }
 }
 
-export async function synthesizeSpeech(config, text, voiceId) {
+export async function synthesizeSpeech(config, text, voiceId, signal) {
   const { baseUrl, apiToken } = config
   return request(baseUrl, '/tts', {
     method: 'POST',
     headers: headers(apiToken),
     body: JSON.stringify({ text, ...(voiceId ? { voice_id: voiceId } : {}) }),
+    signal,
   })
 }
 

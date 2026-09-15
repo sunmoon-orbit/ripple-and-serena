@@ -2,6 +2,7 @@ import { useState, useCallback, useRef, useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import { useShallow } from 'zustand/react/shallow'
 import { useStore, buildBackupJson, restoreFromBackupJson } from '../../store'
+import CrossingCallEntry from './CrossingCallEntry'
 import { sendMessage, summarizeThinking, normalizeProvider, BUILTIN_MODELS, buildSystemPrompt, compactMessages, buildSummaryInjection } from '../../api/llm'
 import { uuid } from '../../utils'
 import { downloadBlob } from '../../utils/download'
@@ -316,6 +317,7 @@ export default function Chat() {
   const [boardOpen, setBoardOpen] = useState(false) // 便利贴墙：留言板 UI 回归（0719 阿颖的主意）
   const [incomingCall, setIncomingCall] = useState(null) // 来电响铃中：{ chatId, msgId, reason }
   const [dialing, setDialing] = useState(null) // 拨号中：{ status, text }
+  const callFromCrossing = useStore(s => s.navigation.callFromCrossing)
   const [egg, setEgg] = useState(null) // 完成彩蛋：回复结束后小概率冒出的像素小家伙
   const [retryPromptOpen, setRetryPromptOpen] = useState(false)
   const retryDecisionRef = useRef(null)
@@ -1538,6 +1540,7 @@ export default function Chat() {
 
   function closeCall() {
     setCallOpen(false)
+    if (useStore.getState().navigation.callFromCrossing) setActivePanel('crossing')
     const mk = callMarkerRef.current
     callMarkerRef.current = null
     if (!mk) return
@@ -1639,6 +1642,7 @@ export default function Chat() {
 
       {/* Main */}
       <div className="chat-main" data-mood={mood || undefined}>
+        {callFromCrossing && !callOpen && !dialing && <CrossingCallEntry onDial={dialCall} onReturn={() => setActivePanel('crossing')} disabled={!activeConn?.apiKey} />}
         {/* Top bar */}
         <div className="chat-topbar">
           <button className="topbar-btn" onClick={() => setSidebarOpen(true)} title="对话列表">

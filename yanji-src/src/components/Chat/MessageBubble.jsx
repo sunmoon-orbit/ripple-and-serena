@@ -7,10 +7,11 @@ import DOMPurify from 'dompurify'
 import hljs from 'highlight.js/lib/common'
 import { formatTime, splitTranslation } from '../../utils'
 import { useStore } from '../../store'
-import { synthesizeSpeech } from '../../api/moonMemory'
+import { useMessageSpeech } from './useMessageSpeech'
+import SpeechButton from './SpeechButton'
 import MusicCard from './MusicCard'
 import { shouldToggleMessageMeta } from './messageMetaToggle'
-import { applyInlineFx, stripInlineFx, stripEnglishTags, stripUnknownAssistantTags } from '../../utils/moodFx'
+import { applyInlineFx, stripUnknownAssistantTags } from '../../utils/moodFx'
 import { stripEmotionTag } from '../../utils/emotion'
 import { stripTextualTarotReading } from '../../api/tarot'
 import { underlineExtension } from '../../utils/markdownUnderline'
@@ -480,75 +481,19 @@ function MessageBubble({ msg, onEdit, onQuote, onDelete, isLast }) {
   // 每条消息独立控制；重新打开窗口时按清清要的默认重新显示。
   const [metaVisible, setMetaVisible] = useState(true)
   const [replyDlUrl, setReplyDlUrl] = useState(null)
-  const [ttsState, setTtsState] = useState('idle') // idle | loading | playing
-  // 语音条模式：正文隐藏，显示音浪。语音留言、以及涟言自己决定「用说的」那条（[voice] 标签），
-  // 一落地就是语音条。
+  // Keep Murmur's voice-bar presentation; transport and playback are shared.
   const isVoiceMsg = !!msg.voicemail || !!msg.voiceMsg
   const [voiceMode, setVoiceMode] = useState(isVoiceMsg)
-  // 转文字（微信那种：点一下音浪，文字在语音条**下面**展开，而不是把语音条换掉）。
-  // ⚠️ 这里不需要真的做语音识别——正文本来就在 msg.content 里，"转"只是把它显出来。
-  // 那 350ms 的「转文字中」纯粹是手感：瞬间蹦出来反而不像转出来的。
-  const [transcript, setTranscript] = useState('idle') // idle | loading | done
-  const [ttsDuration, setTtsDuration] = useState(0)
-  const audioRef = useRef(null) // 缓存的 Audio，重播不再重新合成
-
-  // 卸载时停掉还在播的音频（切会话等场景）
-  useEffect(() => () => { audioRef.current?.pause() }, [])
-
-  const stopTts = useCallback(() => {
-    const a = audioRef.current
-    if (a) { a.pause(); a.currentTime = 0 }
-    setTtsState('idle')
-  }, [])
-
-  const playTts = useCallback(async () => {
-    if (!moonMemory?.enabled || !moonMemory?.baseUrl || !moonMemory?.apiToken) return
-    if (ttsState === 'loading') return
-    if (ttsState === 'playing') { stopTts(); return }
-    setVoiceMode(true) // 跟归巢一致：点朗读先切成语音条
-    let audioEl = audioRef.current
-    if (!audioEl) {
-      setTtsState('loading')
-      try {
-        // 语音标签直接转成 MiniMax 认的圆括号形式（圆括号不在下面的符号清理名单里）。
-        // ⚠️别再用 __VTAG__ 哨兵保护——下面的清理会剥掉下划线，哨兵残骸 VTAGbreath 会被逐字朗读
-        const plainText = stripEnglishTags(stripInlineFx(msg.content) // 情绪特效标签只留正文（否则 glow/shake 被念成英文）
-          .replace(/\[music:[^\]]+\]/g, '')          // 点歌标签不朗读
-          .replace(/\[sticker:[^\]]+\]/g, '')        // 贴图标签不朗读（否则被念成 sticker:文件名）
-          .replace(/\[call:[^\]]+\]/gi, '')          // 来电标签不朗读（0709 教训：新方括号标签同步进清洗）
-          .replace(/\[voice\]/gi, '')                // 语音条标签不朗读（0729，同上条规矩）
-          .replace(/\[译[:：][\s\S]*?\]/g, '')       // 双语翻译标签不朗读（嘴上只念英文，翻译是给眼睛的）
-          .replace(/\[MSG\]/gi, ' ')                 // 漏拆的分段符不朗读（否则被念成英文 MSG）
-          .replace(VOICE_TAG_RE, (m, t) => (t.toLowerCase() === 'laughter' ? '(laughs)' : '(breath)'))
-          .replace(/!\[[^\]]*\]\([^)]*\)/g, '')   // 图片（贴图）整体去掉
-          .replace(/\[([^\]]*)\]\([^)]*\)/g, '$1')) // 链接只读文字
-          // ↑ 到这里收口：上面全是逐个点名的标签，模型在 RP 里自己发明的
-          //   [sigh]/[laughs softly] 之类没人管，会被下面这行剥成裸英文念出来
-          .replace(/[#*`>_~\[\]]/g, '')
-          .slice(0, 500)
-        const config = { baseUrl: moonMemory.baseUrl, apiToken: moonMemory.apiToken }
-        const { audio } = await synthesizeSpeech(config, plainText)
-        audioEl = new Audio(audio)
-        await new Promise((resolve, reject) => {
-          audioEl.onloadedmetadata = resolve
-          audioEl.onerror = reject
-        })
-        audioEl.onended = () => setTtsState('idle')
-        audioRef.current = audioEl
-        setTtsDuration(audioEl.duration || 0)
-      } catch {
-        setTtsState('idle')
-        return
-      }
-    }
-    try {
-      audioEl.currentTime = 0
-      await audioEl.play()
-      setTtsState('playing')
-    } catch {
-      setTtsState('idle')
-    }
-  }, [msg.content, moonMemory, ttsState, stopTts])
+  const [transcript, setTranscript] = useState('idle')
+  const speech = useMessageSpeech(msg.content, moonMemory, !isStreaming)
+  const ttsState = speech.status
+  const ttsDuration = speech.duration
+  const stopTts = speech.stop
+  const playTts = useCallback(() => {
+    if (!speech.available) return
+    setVoiceMode(true)
+    return speech.toggle()
+  }, [speech.available, speech.toggle])
 
   // 点音浪区。两种消息两种行为，是有意的：
   // - 本来就是语音的（留言 / 涟言用说的）→ 没有「原文视图」可回，就在下面展开转文字
@@ -837,21 +782,7 @@ function MessageBubble({ msg, onEdit, onQuote, onDelete, isLast }) {
                 </button>
           )}
           {!isUser && !isStreaming && moonMemory?.enabled && (
-            <button className={`msg-tts-btn${ttsState !== 'idle' ? ' active' : ''}`} onClick={playTts} title={ttsState === 'playing' ? '停止' : '朗读'}>
-              {ttsState === 'loading' ? (
-                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/>
-                </svg>
-              ) : ttsState === 'playing' ? (
-                <svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor">
-                  <rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/>
-                </svg>
-              ) : (
-                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/>
-                </svg>
-              )}
-            </button>
+            <SpeechButton status={ttsState} onClick={playTts} error={speech.error} />
           )}
         </div>}
       </div>

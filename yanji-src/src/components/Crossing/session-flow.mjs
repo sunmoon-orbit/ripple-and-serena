@@ -1,10 +1,10 @@
 // Transport-independent session state, shared by the React view and wire tests.
 import { localCommand } from './controls.mjs'
-export function createSessionFlow(send, changed = () => {}) {
+export function createSessionFlow(send, changed = () => {}, options = {}) {
   let state = { authenticated: false, phase: 'disconnected', thread: null, error: '' }
   let sequence = 0
   let pending = null
-  let remembered = ''
+  let remembered = options.threadId || ''
   const update = (patch) => { state = { ...state, ...patch }; changed(state) }
   const request = (type, threadId, choice = {}) => {
     pending = { requestId: `session-${++sequence}`, type, threadId, ...choice }
@@ -45,6 +45,7 @@ export function createSessionFlow(send, changed = () => {}) {
       }
       if (!msg.ready || !['started', 'resumed'].includes(msg.action)) return
       remembered = msg.thread.id
+      options.rememberThread?.(remembered)
       pending = null
       update({ phase: 'ready', thread: msg.thread, pendingModel: msg.pendingModel || null, error: '' })
       send({ type: 'crossing/thread/list' })

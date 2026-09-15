@@ -5542,11 +5542,18 @@ body.mp-active .scroll-bottom-btn { bottom: 139px; }
 .crossing-path { padding: 0 10px 8px; color: var(--text-muted); font: 10px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace; overflow-wrap: anywhere; white-space: pre-wrap; }
 .crossing-working,.crossing-empty { color: var(--text-muted); text-align: center; font-size: 12px; padding: 22px 12px; }
 .crossing-input { flex: 0 0 auto; display: flex; align-items: flex-end; gap: 8px; padding: 10px max(12px, env(safe-area-inset-right)) calc(10px + env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left)); border-top: 1px solid var(--border); background: var(--bg); }
-.crossing-input textarea { flex: 1; min-width: 0; min-height: 44px; box-sizing: border-box; resize: none; max-height: 120px; padding: 10px; border: 1px solid var(--border-md); border-radius: 12px; outline: none; color: var(--text); background: var(--card); font-family: inherit; font-size: 16px; line-height: 1.4; }
+.crossing-input textarea { flex: 1; min-width: 0; min-height: 44px; box-sizing: border-box; resize: none; overflow-y: hidden; max-height: 120px; padding: 10px; border: 1px solid var(--border-md); border-radius: 12px; outline: none; color: var(--text); background: var(--card); font-family: inherit; font-size: 16px; line-height: 1.4; }
 .crossing-input textarea:focus { border-color: var(--accent); }
 .crossing-input button { flex: 0 0 64px; min-width: 64px; min-height: 44px; padding: 0 8px; border: 0; border-radius: 10px; cursor: pointer; background: var(--accent); color: var(--bubble-user-text); font-size: 14px; }
 .crossing-error { flex: 0 0 auto; max-height: 64px; overflow-y: auto; }
 .crossing-input .crossing-stop { background: rgba(190,80,80,.14); color: #b14d4d; }
+.crossing-speech { display: flex; align-items: center; flex-wrap: wrap; gap: 4px; }
+.crossing-speech .msg-tts-btn { min-width: 44px; min-height: 44px; }
+.crossing-speech svg { width: 16px; height: 16px; }
+.msg-tts-error { color: var(--text-muted); font-size: 11px; overflow-wrap: anywhere; }
+.crossing-call-entry { flex: 0 0 auto; padding: 10px 12px; border-bottom: 1px solid var(--border); color: var(--text-mid); background: var(--card); font-size: 12px; overflow-wrap: anywhere; }
+.crossing-call-entry > div { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 6px; }
+.crossing-call-entry button { min-height: 44px; }
 .crossing-approval-backdrop { position: fixed; z-index: 80; inset: 0; display: grid; place-items: end center; padding: 14px; background: rgba(20,15,25,.32); }
 .crossing-approval { width: min(500px, 100%); max-height: min(78dvh, 620px); overflow: auto; padding: 16px; border: 1px solid var(--border-md); border-radius: 17px; background: var(--bg); box-shadow: var(--shadow-md); }
 .crossing-approval b { font-size: 15px; }
@@ -5556,6 +5563,9 @@ body.mp-active .scroll-bottom-btn { bottom: 139px; }
 .crossing-approval button { min-height: 38px; padding: 0 13px; border: 0; border-radius: 10px; background: var(--accent); color: var(--bubble-user-text); cursor: pointer; }
 .crossing-approval .crossing-deny { background: rgba(190,80,80,.13); color: #a34848; }
 @keyframes crossing-blink { 50% { opacity: 0; } }
+@media (max-width: 900px) {
+  .crossing-panel { flex: 0 0 auto; height: calc(var(--crossing-viewport-height, 100dvh) - 52px - env(safe-area-inset-bottom, 0px)); }
+}
 @media (max-width: 700px) {
   .crossing-sessions { flex-basis: 118px; }
   .crossing-session { padding: 8px 6px; }

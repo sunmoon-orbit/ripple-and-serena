@@ -53,8 +53,8 @@ export default function IconNav() {
         {NAV_ITEMS.map((item) => (
           <button
             key={item.id}
-            className={'icon-nav-btn' + (activePanel === item.id ? ' active' : '')}
-            onClick={() => setActivePanel(item.id)}
+            className={'icon-nav-btn' + (activePanel === item.id || (activePanel === 'crossing' && item.id === 'chat') ? ' active' : '')}
+            onClick={() => setActivePanel(item.id, 'bottom')}
             title={item.label}
           >
             {item.icon}

@@ -86,7 +86,7 @@ function createCrossingService(options = {}) {
     const meta = confirmedModel(result)
     metadata.set(result.thread.id, meta)
     const view = { ...publicThread(result.thread), ...meta }
-    if (history) view.turns = (result.thread.turns || []).map(t => ({ id: t.id, items: (t.items || []).filter(i => ['userMessage', 'agentMessage'].includes(i.type)).map(i => i.type === 'userMessage' ? { id: i.id, type: i.type, content: (i.content || []).map(c => c.type === 'text' ? { type: 'text', text: c.text } : { type: 'text', text: '[图片附件]' }) } : { id: i.id, type: i.type, text: i.text }) }))
+    if (history) view.turns = (result.thread.turns || []).map(t => ({ id: t.id, status: t.status || null, items: (t.items || []).filter(i => ['userMessage', 'agentMessage'].includes(i.type)).map(i => i.type === 'userMessage' ? { id: i.id, type: i.type, content: (i.content || []).map(c => c.type === 'text' ? { type: 'text', text: c.text } : { type: 'text', text: '[图片附件]' }) } : { id: i.id, type: i.type, text: i.text }) }))
     return view
   }
 
@@ -162,7 +162,7 @@ function createCrossingService(options = {}) {
     if (event.summary?.type === 'contextCompaction') emit({ type: 'crossing/context-compaction', threadId: event.threadId, turnId: event.turnId, lifecycle: event.lifecycle })
   })
   adapter.on('turnCompleted', (params) => {
-    emit({ type: 'crossing/turn/completed', ...params })
+    emit({ type: 'crossing/turn/completed', threadId: params.threadId, turn: { id: params.turn?.id || params.turnId, status: params.turn?.status || null } })
     clearTurn(params.turn?.id || params.turnId)
   })
   adapter.on('rateLimits', (usage) => emit({ type: 'crossing/usage', usage }))

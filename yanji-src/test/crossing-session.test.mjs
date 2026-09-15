@@ -11,7 +11,7 @@ function fixture() {
   const child = new EventEmitter()
   child.stdin = new PassThrough(); child.stdout = new PassThrough(); child.stderr = new PassThrough()
   child.kill = () => { child.killed = true; child.emit('exit', 0) }
-  const thread = (id) => ({ id, turns: [{ items: [{ id: 'old', type: 'agentMessage', text: '历史回复' }] }] })
+  const thread = (id) => ({ id, turns: [{ id: 'old-turn', status: 'completed', items: [{ id: 'old', type: 'agentMessage', text: '历史回复' }] }] })
   child.stdin.on('data', chunk => {
     for (const line of String(chunk).trim().split('\n')) {
       const msg = JSON.parse(line); calls.push(msg)
@@ -61,6 +61,7 @@ test('history click reads then resumes, reconnect confirms again; streaming and 
   f.flow.select('history'); await f.drain()
   assert.deepEqual(f.calls.filter(x => ['thread/read', 'thread/resume'].includes(x.method)).map(x => x.method), ['thread/read', 'thread/resume'])
   assert.equal(f.flow.state.thread.turns[0].items[0].text, '历史回复')
+  assert.equal(f.flow.state.thread.turns[0].status, 'completed', 'history exposes confirmed completion for TTS')
   f.reconnect()
   assert.equal(f.flow.start('not yet', 'm0'), false)
   await f.drain()
@@ -72,7 +73,10 @@ test('history click reads then resumes, reconnect confirms again; streaming and 
   assert.equal(f.events.find(x => x.type === 'crossing/message/delta').delta, 'fixture reply')
   await f.service.handle('phone-2', { type: 'crossing/turn/interrupt', threadId: 'history', turnId: 'turn-1' })
   assert.deepEqual(f.calls.at(-1).params, { threadId: 'history', turnId: 'turn-1' })
-  f.notify('turn/completed', { threadId: 'history', turn: { id: 'turn-1', status: 'interrupted' } })
+  f.notify('turn/completed', { threadId: 'history', turn: { id: 'turn-1', status: 'interrupted', items: [{ type: 'userMessage', content: [{ type: 'localImage', path: '/private/fixture.png' }] }] } })
+  const completed = f.events.find(x => x.type === 'crossing/turn/completed')
+  assert.deepEqual(completed.turn, { id: 'turn-1', status: 'interrupted' })
+  assert.equal(JSON.stringify(completed).includes('/private/'), false)
   assert.equal(f.service.getActiveTurn(), null)
   f.adapter.stop()
 })
