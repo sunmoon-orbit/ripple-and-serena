@@ -119,6 +119,29 @@ export default function VoiceCall({ onClose, onSend }) {
   const rafRef = useRef(0)
   const barsRef = useRef([])
   const stageRef = useRef(null)
+  const overlayRef = useRef(null)
+
+  // Android Chrome/PWA 打开软键盘时通常只缩小 visual viewport，fixed 元素仍按
+  // layout viewport 排版。把实时可见高度交给 CSS，底部控制区才不会落到键盘后面。
+  useEffect(() => {
+    const viewport = window.visualViewport
+    const resize = () => {
+      const node = overlayRef.current
+      if (!node) return
+      const visibleHeight = Math.min(viewport?.height || window.innerHeight, window.innerHeight)
+      node.style.setProperty('--vc-viewport-height', `${visibleHeight}px`)
+      node.style.setProperty('--vc-viewport-top', `${viewport?.offsetTop || 0}px`)
+    }
+    resize()
+    viewport?.addEventListener('resize', resize)
+    viewport?.addEventListener('scroll', resize)
+    window.addEventListener('resize', resize)
+    return () => {
+      viewport?.removeEventListener('resize', resize)
+      viewport?.removeEventListener('scroll', resize)
+      window.removeEventListener('resize', resize)
+    }
+  }, [])
 
   // Unlock AudioContext in the call-open gesture
   useEffect(() => {
@@ -385,14 +408,14 @@ export default function VoiceCall({ onClose, onSend }) {
   )
 
   return createPortal(
-    <div className={'vc-overlay' + (soft ? ' vc-soft' : '') + (duo ? ' vc-duo' : '') + (vcBackground && !vcBgImage ? ` vc-bg-${vcBackground}` : '') + (vcBgImage ? ' vc-bg-custom' : '')}>
+    <div ref={overlayRef} className={'vc-overlay' + (soft ? ' vc-soft' : '') + (duo ? ' vc-duo' : '') + (vcBackground && !vcBgImage ? ` vc-bg-${vcBackground}` : '') + (vcBgImage ? ' vc-bg-custom' : '')}>
       {vcBgImage && <div className="vc-bg-img" style={{ backgroundImage: `url(${vcBgImage})` }} />}
       <span className="vc-blob b1" />
       <span className="vc-blob b2" />
       <div className="vc-container">
 
         {duo ? (
-          <>
+          <div className="vc-content vc-content-duo">
             {/* ── 双语泡泡样式（参考阿颖 0714 发来的截图：双头像 + 滚动字幕气泡 + 泡内英中对照）── */}
             <div className="vcd-pill">{statusLabel}</div>
             <div className="vc-timer">{fmtDur(duration)}</div>
@@ -445,9 +468,9 @@ export default function VoiceCall({ onClose, onSend }) {
                 </div>
               ))}
             </div>
-          </>
+          </div>
         ) : soft ? (
-          <>
+          <div className="vc-content vc-content-soft">
             {/* ── 浅色头像样式 ── */}
             <div className={`vcs-head ${mode}`} ref={stageRef}>
               <div className="vcs-strip">
@@ -485,9 +508,9 @@ export default function VoiceCall({ onClose, onSend }) {
               实时字幕 · live transcript
             </div>
             <div className="vcs-pill">{userText || '你说的话会出现在这里'}</div>
-          </>
+          </div>
         ) : (
-          <>
+          <div className="vc-content vc-content-crow">
             {/* ── 像素乌鸦样式 ── */}
             <div className="vc-name">涟言</div>
             <div className="vc-timer">{fmtDur(duration)}</div>
@@ -513,12 +536,13 @@ export default function VoiceCall({ onClose, onSend }) {
               ) : null}
               {aiZh ? <p className="vc-ai-zh">{aiZh}</p> : null}
             </div>
-          </>
+          </div>
         )}
 
-        {/* 打字输入行：识别不准时直接敲字，回复照常念出来 */}
-        {typeOpen && (
-          <div className="vc-type-row">
+        <div className="vc-bottom">
+          {/* 打字输入行：识别不准时直接敲字，回复照常念出来 */}
+          {typeOpen && (
+            <div className="vc-type-row">
             <input
               ref={typeInputRef}
               className="vc-type-input"
@@ -533,11 +557,11 @@ export default function VoiceCall({ onClose, onSend }) {
                 <line x1="22" y1="2" x2="11" y2="13" /><polygon points="22 2 15 22 11 13 2 9 22 2" />
               </svg>
             </button>
-          </div>
-        )}
+            </div>
+          )}
 
-        {/* Push-to-talk + hang up */}
-        <div className="vc-controls">
+          {/* Push-to-talk + hang up */}
+          <div className="vc-controls">
           <button
             className={'vc-kbd vc-lang' + (bilingual ? ' open' : '')}
             onClick={toggleBilingual}
@@ -580,6 +604,7 @@ export default function VoiceCall({ onClose, onSend }) {
               <path d="M6.6 10.8c1.4 2.8 3.8 5.1 6.6 6.6l2.2-2.2c.27-.27.67-.36 1-.25 1.12.37 2.33.57 3.57.57.55 0 1 .45 1 1V20c0 .55-.45 1-1 1-9.39 0-17-7.61-17-17 0-.55.45-1 1-1h3.5c.55 0 1 .45 1 1 0 1.25.2 2.45.57 3.57.11.35.03.74-.25 1.01L6.6 10.8z"/>
             </svg>
           </button>
+          </div>
         </div>
       </div>
     </div>,

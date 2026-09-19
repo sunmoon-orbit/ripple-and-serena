@@ -2007,9 +2007,10 @@ textarea.form-input { display: block; margin: 8px 16px 12px; }
 
 /* ===== Voice Call Overlay ===== */
 .vc-overlay {
-  position: fixed; inset: 0; z-index: 9999;
+  position: fixed; top: var(--vc-viewport-top, 0); right: 0; left: 0; z-index: 9999;
+  height: min(var(--vc-viewport-height, 100dvh), 100dvh); min-height: 0;
   background: radial-gradient(130% 100% at 50% 0%, rgba(36, 27, 56, 0.97), rgba(10, 6, 18, 0.98));
-  display: flex; align-items: center; justify-content: center;
+  display: flex; align-items: stretch; justify-content: center;
   backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
   overflow: hidden;
 }
@@ -2026,15 +2027,34 @@ textarea.form-input { display: block; margin: 8px 16px 12px; }
 .vc-container {
   position: relative;
   display: flex; flex-direction: column; align-items: center;
-  gap: 12px; padding: 36px 24px; max-width: 340px; width: 100%;
+  gap: clamp(7px, 1.5dvh, 12px);
+  padding:
+    calc(clamp(12px, 3dvh, 28px) + env(safe-area-inset-top, 0px))
+    calc(16px + env(safe-area-inset-right, 0px))
+    calc(clamp(10px, 2dvh, 22px) + env(safe-area-inset-bottom, 0px))
+    calc(16px + env(safe-area-inset-left, 0px));
+  max-width: 420px; width: 100%; height: 100%; min-height: 0;
 }
+.vc-content {
+  flex: 1 1 auto; min-height: 0; width: 100%;
+  display: flex; flex-direction: column; align-items: center;
+  gap: clamp(5px, 1.25dvh, 12px); overflow: hidden;
+}
+.vc-bottom { flex: 0 0 auto; width: 100%; display: flex; flex-direction: column; align-items: center; gap: 8px; }
+.vc-content-soft { overflow-y: auto; overscroll-behavior: contain; scrollbar-width: none; }
+.vc-content-soft::-webkit-scrollbar { display: none; }
+.vc-content-duo { gap: clamp(4px, 1dvh, 9px); }
+.vc-content-crow .vc-text-area { flex: 1 1 auto; min-height: 0; }
 .vc-name { font-size: 20px; color: rgba(255,255,255,0.92); letter-spacing: 0.16em; font-weight: 500; }
 .vc-timer { font-size: 12px; color: rgba(255,255,255,0.4); letter-spacing: 0.08em; font-variant-numeric: tabular-nums; }
 .vc-status { font-size: 14px; color: rgba(255,255,255,0.65); min-height: 20px; transition: color 0.3s; }
 
 /* ── 舞台：呼吸光圈 + 像素乌鸦 ── */
 .vc-stage {
-  position: relative; width: 168px; height: 168px;
+  position: relative;
+  width: clamp(104px, min(46vw, 24dvh), 168px);
+  height: clamp(104px, min(46vw, 24dvh), 168px);
+  flex: 0 1 auto; aspect-ratio: 1;
   display: flex; align-items: center; justify-content: center;
   margin: 4px 0 0;
 }
@@ -2095,9 +2115,10 @@ textarea.form-input { display: block; margin: 8px 16px 12px; }
 
 /* ── 字幕区 ── */
 .vc-text-area {
-  min-height: 56px; max-height: 26vh; width: 100%;
+  min-height: 0; max-height: none; width: 100%;
   text-align: center; overflow-y: auto;
   display: flex; flex-direction: column; gap: 6px;
+  overscroll-behavior: contain; -webkit-overflow-scrolling: touch;
 }
 .vc-user-text { font-size: 13px; color: rgba(255,255,255,0.42); line-height: 1.55; margin: 0; }
 .vc-ai-text { font-size: 15px; color: rgba(255,255,255,0.92); line-height: 1.6; margin: 0; transition: opacity 0.5s; }
@@ -2113,7 +2134,7 @@ textarea.form-input { display: block; margin: 8px 16px 12px; }
 .vc-soft .vc-timer { color: rgba(90, 100, 122, 0.5); }
 
 /* 头像 + 两侧频谱 */
-.vcs-head { display: flex; align-items: center; gap: 12px; margin: 12px 0 2px; }
+.vcs-head { display: flex; align-items: center; gap: clamp(7px, 3vw, 12px); margin: clamp(0px, 1.5dvh, 12px) 0 2px; flex: 0 0 auto; }
 .vcs-strip { display: flex; align-items: center; gap: 3px; height: 34px; flex-shrink: 0; }
 .vc-soft .vc-bar { width: 2.5px; background: rgba(120, 130, 155, 0.4); max-height: 30px; }
 .vc-soft .vcs-head.listening .vc-bar { background: color-mix(in srgb, var(--accent) 75%, #6a7490); }
@@ -2122,7 +2143,10 @@ textarea.form-input { display: block; margin: 8px 16px 12px; }
 .vc-soft .vcs-head.thinking .vc-bar { animation: vc-bar-think 0.9s ease-in-out infinite alternate; }
 
 .vcs-avatar-wrap {
-  position: relative; width: 136px; height: 136px; flex-shrink: 0;
+  position: relative;
+  width: clamp(72px, min(34vw, 19dvh), 136px);
+  height: clamp(72px, min(34vw, 19dvh), 136px);
+  flex-shrink: 0;
   display: flex; align-items: center; justify-content: center;
 }
 .vcs-ring {
@@ -2136,7 +2160,7 @@ textarea.form-input { display: block; margin: 8px 16px 12px; }
   transform: scale(calc(1 + var(--vc-level, 0) * 0.3));
 }
 .vcs-avatar {
-  position: relative; width: 136px; height: 136px; border-radius: 50%;
+  position: relative; width: 100%; height: 100%; border-radius: 50%;
   overflow: hidden; background: #fff;
   box-shadow: 0 10px 32px rgba(120, 130, 160, 0.28), 0 0 0 4px rgba(255,255,255,0.85);
   display: flex; align-items: center; justify-content: center;
@@ -2153,7 +2177,7 @@ textarea.form-input { display: block; margin: 8px 16px 12px; }
 .vcs-head.speaking .vcw-wr { animation: vcw-flap-r 0.7s infinite alternate ease-in-out; }
 .vcs-head.listening .vcs-avatar .vc-crow { transform: rotate(-7deg); }
 
-.vcs-name { font-size: 25px; color: #3c4557; letter-spacing: 0.28em; padding-left: 0.28em; font-weight: 500; margin-top: 6px; }
+.vcs-name { font-size: clamp(20px, 6vw, 25px); color: #3c4557; letter-spacing: 0.28em; padding-left: 0.28em; font-weight: 500; margin-top: clamp(0px, 1dvh, 6px); flex: 0 0 auto; }
 .vcs-status { font-size: 13px; color: #8a93a8; letter-spacing: 0.1em; min-height: 18px; }
 .vcs-status::before { content: '· '; color: #b4bdcf; }
 .vcs-status::after { content: ' ·'; color: #b4bdcf; }
@@ -2161,9 +2185,10 @@ textarea.form-input { display: block; margin: 8px 16px 12px; }
 /* 大字幕：涟言说的话，带装饰引号 */
 .vcs-quote {
   position: relative; width: 100%;
-  font-size: 18px; color: #4a5468; line-height: 1.75; text-align: center;
-  padding: 20px 28px 22px; margin-top: 4px;
-  min-height: 46px; max-height: 24vh; overflow-y: auto;
+  font-size: clamp(15px, 4.5vw, 18px); color: #4a5468; line-height: 1.65; text-align: center;
+  padding: clamp(10px, 2dvh, 20px) 28px clamp(10px, 2dvh, 22px); margin-top: 2px;
+  flex: 1 1 auto; min-height: 34px; max-height: none; overflow-y: auto;
+  overscroll-behavior: contain; -webkit-overflow-scrolling: touch;
   transition: opacity 0.5s;
 }
 .vcs-quote::before {
@@ -2188,7 +2213,8 @@ textarea.form-input { display: block; margin: 8px 16px 12px; }
   font-size: 14px; color: #4a5468; text-align: center; line-height: 1.6;
   box-shadow: 0 4px 16px rgba(130, 140, 165, 0.14);
   backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
-  max-height: 16vh; overflow-y: auto;
+  max-height: min(16dvh, 96px); overflow-y: auto; flex: 0 1 auto; min-height: 0;
+  overscroll-behavior: contain; -webkit-overflow-scrolling: touch;
 }
 .vcs-pill:empty { display: none; }
 
@@ -2204,7 +2230,7 @@ textarea.form-input { display: block; margin: 8px 16px 12px; }
 .vc-soft .vc-hangup:hover { background: #c07e82; }
 
 .vc-hangup {
-  width: 64px; height: 64px; border-radius: 50%; border: none;
+  width: clamp(54px, 17vw, 64px); height: clamp(54px, 17vw, 64px); border-radius: 50%; border: none;
   background: #e05050; color: #fff;
   display: flex; align-items: center; justify-content: center;
   cursor: pointer; margin-top: 8px;
@@ -2217,7 +2243,7 @@ textarea.form-input { display: block; margin: 8px 16px 12px; }
 /* 通话中打字输入行 */
 .vc-type-row {
   display: flex; align-items: center; gap: 8px;
-  width: 100%; max-width: 380px; margin-top: 10px;
+  width: 100%; max-width: 380px; margin-top: 0;
 }
 .vc-type-input {
   flex: 1; min-width: 0; border: none; outline: none;
@@ -2239,7 +2265,7 @@ textarea.form-input { display: block; margin: 8px 16px 12px; }
 
 /* 键盘切换按钮 */
 .vc-kbd {
-  width: 48px; height: 48px; border-radius: 50%; border: none;
+  width: clamp(44px, 13vw, 48px); height: clamp(44px, 13vw, 48px); border-radius: 50%; border: none;
   background: rgba(255,255,255,0.14); color: rgba(240,237,245,0.85);
   display: flex; align-items: center; justify-content: center;
   cursor: pointer; transition: all 0.15s;
@@ -2253,9 +2279,9 @@ textarea.form-input { display: block; margin: 8px 16px 12px; }
 .vc-soft .vc-kbd.open { background: #8fa3c8; color: #fff; }
 
 /* push-to-talk 控制区 */
-.vc-controls { display: flex; align-items: center; justify-content: center; gap: 28px; margin-top: 8px; }
+.vc-controls { display: flex; align-items: center; justify-content: center; gap: clamp(10px, 5vw, 28px); margin-top: 0; width: 100%; }
 .vc-mic {
-  width: 72px; height: 72px; border-radius: 50%; border: none;
+  width: clamp(60px, 20vw, 72px); height: clamp(60px, 20vw, 72px); border-radius: 50%; border: none;
   background: var(--accent); color: #fff;
   display: flex; align-items: center; justify-content: center;
   cursor: pointer; transition: all 0.15s;
@@ -2291,7 +2317,7 @@ textarea.form-input { display: block; margin: 8px 16px 12px; }
 .vc-duo .vc-blob { opacity: 0.5; }
 .vc-duo .vc-blob.b1 { background: #f3d9c8; }
 .vc-duo .vc-blob.b2 { background: #e8d3e2; }
-.vc-duo .vc-container { max-width: 420px; height: 100%; padding: 24px 18px 28px; gap: 9px; }
+.vc-duo .vc-container { max-width: 420px; }
 .vc-duo .vc-timer { color: rgba(140, 110, 100, 0.55); }
 
 .vcd-pill {
@@ -2304,7 +2330,7 @@ textarea.form-input { display: block; margin: 8px 16px 12px; }
 .vcd-person { display: flex; flex-direction: column; align-items: center; gap: 6px; }
 .vcd-heart { color: #d9a8a0; font-size: 15px; align-self: center; margin-top: -16px; }
 .vcd-avatar {
-  width: 76px; height: 76px; border-radius: 50%; overflow: hidden;
+  width: clamp(58px, min(21vw, 12dvh), 76px); height: clamp(58px, min(21vw, 12dvh), 76px); border-radius: 50%; overflow: hidden;
   background: #fff; display: flex; align-items: center; justify-content: center;
   box-shadow: 0 6px 18px rgba(180, 140, 125, 0.22), 0 0 0 3px rgba(255,255,255,0.9);
   transition: transform 0.12s ease-out, box-shadow 0.2s;
