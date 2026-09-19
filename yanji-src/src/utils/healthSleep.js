@@ -52,12 +52,26 @@ function emptyDay() {
 
 export function aggregateVitalsByShanghaiDay(rows) {
   const days = {}
+  const calorieTimes = {}
   for (const row of rows) {
     const snapshotKey = shanghaiDayKey(row.created_at)
     if (!snapshotKey) continue
     const snapshotDay = days[snapshotKey] || emptyDay()
     snapshotDay.steps = Math.max(snapshotDay.steps, row.steps || 0)
-    snapshotDay.calories = Math.max(snapshotDay.calories, row.calories || 0)
+    const calorieValue = row.active_calories_kcal ?? row.calories
+    const calorieAt = parseUtcTimestamp(row.observed_at || row.created_at)
+    const calorieKey = calorieAt ? shanghaiDayKey(calorieAt) : snapshotKey
+    if (calorieKey && calorieValue != null && Number.isFinite(Number(calorieValue))) {
+      const previousAt = calorieTimes[calorieKey]
+      if (!previousAt || calorieAt.getTime() >= previousAt.getTime()) {
+        const calorieDay = calorieKey === snapshotKey
+          ? snapshotDay
+          : days[calorieKey] || emptyDay()
+        calorieDay.calories = Number(calorieValue)
+        days[calorieKey] = calorieDay
+        calorieTimes[calorieKey] = calorieAt
+      }
+    }
     if (row.bpm_avg) snapshotDay.bpmAvg = row.bpm_avg
     snapshotDay.bpmMax = Math.max(snapshotDay.bpmMax, row.bpm_max || 0)
     days[snapshotKey] = snapshotDay
