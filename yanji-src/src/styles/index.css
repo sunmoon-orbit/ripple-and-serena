@@ -5531,6 +5531,8 @@ body.mp-active .scroll-bottom-btn { bottom: 139px; }
 .crossing-session small { margin-top: 3px; color: var(--text-muted); font-size: 10px; }
 .crossing-chat { flex: 1; min-width: 0; display: flex; flex-direction: column; }
 .crossing-messages { flex: 1; min-height: 0; overflow-y: auto; padding: 17px clamp(12px, 3vw, 28px); display: flex; flex-direction: column; gap: 9px; }
+.crossing-messages .message-row { width: 100%; }
+.crossing-messages .message-content-wrap { max-width: min(78%, 600px); }
 .crossing-bubble { max-width: min(760px, 92%); padding: 10px 13px; overflow-wrap: anywhere; word-break: break-word; }
 .crossing-bubble.bubble-user { align-self: flex-end; }
 .crossing-bubble.bubble-assistant { align-self: flex-start; }

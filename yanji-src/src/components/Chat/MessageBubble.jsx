@@ -462,7 +462,7 @@ function isBareMedia(msg) {
   return false
 }
 
-function MessageBubble({ msg, onEdit, onQuote, onDelete, isLast }) {
+function MessageBubble({ msg, onEdit, onQuote, onDelete, isLast, presentationConfig, speechReady, speechResetKey }) {
   const isUser = msg.role === 'user'
   const isStreaming = msg.streaming
   const bare = isBareMedia(msg)
@@ -485,7 +485,8 @@ function MessageBubble({ msg, onEdit, onQuote, onDelete, isLast }) {
   const isVoiceMsg = !!msg.voicemail || !!msg.voiceMsg
   const [voiceMode, setVoiceMode] = useState(isVoiceMsg)
   const [transcript, setTranscript] = useState('idle')
-  const speech = useMessageSpeech(msg.content, moonMemory, !isStreaming)
+  const speechConfig = presentationConfig || moonMemory
+  const speech = useMessageSpeech(msg.content, speechConfig, !isStreaming && (speechReady ?? true), speechResetKey)
   const ttsState = speech.status
   const ttsDuration = speech.duration
   const stopTts = speech.stop
@@ -658,7 +659,7 @@ function MessageBubble({ msg, onEdit, onQuote, onDelete, isLast }) {
               </span>
             </div>
           ) : voiceMode ? (
-            <div className="vb-wrap">
+            <div className={'vb-wrap' + (presentationConfig?.crossing ? ' crossing-voice' : '')}>
               <div className={`voice-bar${ttsState === 'playing' ? ' playing' : ''}${msg.voicemail ? ' vb-voicemail' : ''}`}>
                 <button className="vb-play" onClick={playTts} aria-label={ttsState === 'playing' ? '暂停' : '播放'}>
                   {ttsState === 'loading' ? (
@@ -781,8 +782,10 @@ function MessageBubble({ msg, onEdit, onQuote, onDelete, isLast }) {
                   </svg>
                 </button>
           )}
-          {!isUser && !isStreaming && moonMemory?.enabled && (
-            <SpeechButton status={ttsState} onClick={playTts} error={speech.error} />
+          {!isUser && (!isStreaming || presentationConfig?.crossing) && (presentationConfig?.enabled ?? moonMemory?.enabled) && (
+            <div className={presentationConfig?.crossing ? 'crossing-speech' : undefined}>
+              <SpeechButton status={ttsState} onClick={playTts} disabled={presentationConfig?.crossing ? !speech.available : false} error={speech.error} />
+            </div>
           )}
         </div>}
       </div>
