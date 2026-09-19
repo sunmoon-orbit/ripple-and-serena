@@ -5542,6 +5542,13 @@ body.mp-active .scroll-bottom-btn { bottom: 139px; }
 .crossing-path { padding: 0 10px 8px; color: var(--text-muted); font: 10px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace; overflow-wrap: anywhere; white-space: pre-wrap; }
 .crossing-working,.crossing-empty { color: var(--text-muted); text-align: center; font-size: 12px; padding: 22px 12px; }
 .crossing-input { flex: 0 0 auto; display: flex; align-items: flex-end; gap: 8px; padding: 10px max(12px, env(safe-area-inset-right)) calc(10px + env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left)); border-top: 1px solid var(--border); background: var(--bg); }
+.crossing-composer { position: relative; flex: 0 0 auto; }
+.crossing-tool-card { position: absolute; z-index: 5; left: 10px; right: 10px; bottom: calc(100% + 6px); max-height: min(58dvh, 520px); overflow: auto; border: 1px solid var(--border-md); border-radius: 14px; background: var(--bg); box-shadow: var(--shadow-md); }
+.crossing-tool-card .crossing-controls { max-height: none; border-bottom: 0; }
+.crossing-plus { display: grid; place-items: center; flex: 0 0 44px !important; min-width: 44px !important; padding: 0 !important; color: var(--text) !important; background: var(--card) !important; border: 1px solid var(--border-md) !important; }
+.crossing-plus[aria-expanded="true"] { color: var(--accent) !important; }
+.crossing-voice { min-width: min(260px, 78vw); }
+.crossing-voice .voice-bar { min-width: 0; }
 .crossing-input textarea { flex: 1; min-width: 0; min-height: 44px; box-sizing: border-box; resize: none; overflow-y: hidden; max-height: 120px; padding: 10px; border: 1px solid var(--border-md); border-radius: 12px; outline: none; color: var(--text); background: var(--card); font-family: inherit; font-size: 16px; line-height: 1.4; }
 .crossing-input textarea:focus { border-color: var(--accent); }
 .crossing-input button { flex: 0 0 64px; min-width: 64px; min-height: 44px; padding: 0 8px; border: 0; border-radius: 10px; cursor: pointer; background: var(--accent); color: var(--bubble-user-text); font-size: 14px; }

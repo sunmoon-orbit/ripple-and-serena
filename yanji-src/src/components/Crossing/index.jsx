@@ -69,6 +69,7 @@ export default function Crossing() {
   const [uploading, setUploading] = useState(false)
   const [stickerOpen, setStickerOpen] = useState(false)
   const [toolsOpen, setToolsOpen] = useState(false)
+  const toolsRef = useRef(null)
   const [warning, setWarning] = useState('')
   const [stopEpoch, setStopEpoch] = useState(0)
 
@@ -112,6 +113,14 @@ export default function Crossing() {
     window.visualViewport?.addEventListener('resize', resize)
     return () => { observer.disconnect(); window.visualViewport?.removeEventListener('resize', resize) }
   }, [draft, capability])
+  useEffect(() => {
+    if (!toolsOpen) return undefined
+    const closeOnOutside = event => {
+      if (!event.target.closest?.('.crossing-tool-card, .crossing-plus')) setToolsOpen(false)
+    }
+    document.addEventListener('pointerdown', closeOnOutside)
+    return () => document.removeEventListener('pointerdown', closeOnOutside)
+  }, [toolsOpen])
 
   const readThread = useCallback((threadId) => {
     if (!threadId) return
@@ -271,7 +280,7 @@ export default function Crossing() {
         <button className="topbar-btn" disabled={!sessionState.authenticated || sessionState.phase === 'loading' || !!turn || starting} onClick={createThread} title="新建 Codex 会话">＋</button>
       </div>
       <div className="crossing-meta"><span>{usageText(usage)}</span>{compacting && <span className="crossing-compacting">正在压缩上下文…</span>}</div>
-      <div className="crossing-meta"><button onClick={() => { setModelOpen(!modelOpen); if (!models.length) send({ type: 'crossing/model/list' }) }} disabled={!sessionState.authenticated}>{modelLabel(sessionState.phase === 'ready' ? activeThread : null)}</button><button onClick={() => setToolsOpen(!toolsOpen)}>工具</button></div>
+      <div className="crossing-meta"><button onClick={() => { setModelOpen(!modelOpen); if (!models.length) send({ type: 'crossing/model/list' }) }} disabled={!sessionState.authenticated}>{modelLabel(sessionState.phase === 'ready' ? activeThread : null)}</button></div>
       {sessionState.pendingModel && <div className="crossing-meta" role="status">待下一轮应用：{sessionState.pendingModel.model} · {sessionState.pendingModel.effort}（未确认执行）</div>}
       {modelsError && <div className="crossing-error" role="alert">{modelsError}<button onClick={() => send({ type: 'crossing/model/list' })}>重试</button></div>}
       {modelOpen && <div className="crossing-controls">
@@ -283,7 +292,6 @@ export default function Crossing() {
         {selection.model && models.length > 0 && !selectedEntry && <p role="alert">当前会话模型不在可用列表中，请重新选择。</p>}
         <small>顶部只显示服务端确认值；选择仅作用于渡口会话。{sessionState.pendingModel && '所选模型将在下一次发送时覆盖，当前仍显示已确认模型。'}</small>
       </div>}
-      {toolsOpen && <div className="crossing-controls"><ToolMemoryContext.Provider value={{ ...moonMemory, baseUrl: `crossing+${moonMemory.baseUrl}`, apiToken: capability }}><CrossingTools /></ToolMemoryContext.Provider></div>}
       {warning && <div className="crossing-error" role="status">{warning}<button onClick={() => setWarning('')}>×</button></div>}
       {error && <div className="crossing-error">{error}<button onClick={() => setError('')}>×</button></div>}
       <div className="crossing-layout">
@@ -299,11 +307,12 @@ export default function Crossing() {
             {toolItems.map((item) => <details key={item.id} className={'crossing-tool ' + (item.status === 'failed' ? 'failed' : '')}><summary>{item.lifecycle === 'started' ? '正在' : '已完成'} · {item.title || '工具调用'}{item.exitCode != null ? `（${item.exitCode}）` : ''}</summary>{item.cwd && <div className="crossing-path">{item.cwd}</div>}{item.output && <pre>{item.output}</pre>}{item.error && <pre>{item.error}</pre>}{item.paths?.length ? <div className="crossing-path">{item.paths.join('\n')}</div> : null}</details>)}
             {turn && <div className="crossing-working">Codex 正在工作…</div>}
           </div>
-          {stickerOpen && <div className="crossing-stickers"><StickerPicker customStickers={customStickers} onSelect={addSticker} /></div>}
           {!!attachments.length && <div className="crossing-attachments">{attachments.map((a, i) => <div key={a.id || i}>{a.kind === 'image' && <img src={a.preview || a.url} alt="待发图片" />}<span>{a.name}</span><button onClick={() => setAttachments(prev => prev.filter((_, j) => j !== i))}>移除</button></div>)}</div>}
-          <div className="crossing-attachment-actions"><button disabled={!sessionState.authenticated || uploading || attachments.length >= 4} onClick={() => fileRef.current?.click()}>{uploading ? '上传中…' : imagesAllowed ? '图片／文件' : '文本文件'}</button><button disabled={!imagesAllowed || attachments.length >= 4} onClick={() => setStickerOpen(!stickerOpen)}>表情包</button>{!imagesAllowed && <small>模型未知或不支持图片</small>}</div>
-          <AttachmentPicker strict ref={fileRef} imagesAllowed={imagesAllowed} onAttachment={addFile} onError={setError} onBusy={setUploading} />
-          <div className="crossing-input"><textarea ref={inputRef} value={draft} onChange={(e) => setDraft(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); startTurn() } }} placeholder={sessionState.phase === 'ready' ? '输入消息；/model 选择模型' : sessionState.phase === 'loading' ? '正在加载会话…' : '先点击＋新建，或选择历史会话'} disabled={!sessionState.authenticated} rows="1" />{turn ? <button className="crossing-stop" onClick={interrupt}>停止</button> : <button disabled={(!shortcut && sessionState.phase !== 'ready') || !sessionState.authenticated || sessionState.phase === 'loading' || (!draft.trim() && !attachments.length) || starting || uploading} onClick={startTurn}>{starting ? '提交中' : shortcut ? '执行' : '发送'}</button>}</div>
+          <div ref={toolsRef} className="crossing-composer">
+            {toolsOpen && <div className="crossing-tool-card" role="dialog" aria-label="工具卡片"><div className="crossing-controls"><ToolMemoryContext.Provider value={{ ...moonMemory, baseUrl: `crossing+${moonMemory.baseUrl}`, apiToken: capability }}><CrossingTools /></ToolMemoryContext.Provider><div className="crossing-attachment-actions"><button disabled={!sessionState.authenticated || uploading || attachments.length >= 4} onClick={() => fileRef.current?.click()}>{uploading ? '上传中…' : imagesAllowed ? '图片／文件' : '文本文件'}</button><button disabled={!imagesAllowed || attachments.length >= 4} onClick={() => setStickerOpen(!stickerOpen)}>表情包</button>{!imagesAllowed && <small>模型未知或不支持图片</small>}</div>{stickerOpen && <div className="crossing-stickers"><StickerPicker customStickers={customStickers} onSelect={addSticker} /></div>}</div></div>}
+            <AttachmentPicker strict ref={fileRef} imagesAllowed={imagesAllowed} onAttachment={addFile} onError={setError} onBusy={setUploading} />
+            <div className="crossing-input"><button className="crossing-plus" onClick={() => setToolsOpen(open => !open)} aria-label="工具" aria-expanded={toolsOpen} title="工具"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M12 5v14M5 12h14" /></svg></button><textarea ref={inputRef} value={draft} onChange={(e) => setDraft(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); startTurn() } }} placeholder={sessionState.phase === 'ready' ? '输入消息；/model 选择模型' : sessionState.phase === 'loading' ? '正在加载会话…' : '先点击＋新建，或选择历史会话'} disabled={!sessionState.authenticated} rows="1" />{turn ? <button className="crossing-stop" onClick={interrupt}>停止</button> : <button disabled={(!shortcut && sessionState.phase !== 'ready') || !sessionState.authenticated || sessionState.phase === 'loading' || (!draft.trim() && !attachments.length) || starting || uploading} onClick={startTurn}>{starting ? '提交中' : shortcut ? '执行' : '发送'}</button>}</div>
+          </div>
         </main>
       </div>
       {approval && <div className="crossing-approval-backdrop"><div className="crossing-approval"><b>Codex 需要本次授权</b><p>{approval.kind === 'file-change' ? '准备修改文件' : '准备执行命令'}</p>{approval.command && <pre>{approval.command}</pre>}{approval.reason && <p>{approval.reason}</p>}<small>{approval.cwd}</small><div><button className="crossing-deny" onClick={() => respond('deny')}>拒绝</button><button onClick={() => respond('allow')}>允许本次</button></div></div></div>}
