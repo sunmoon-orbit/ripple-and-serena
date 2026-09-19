@@ -44,7 +44,7 @@ test('pending model is never promoted to confirmed by persistence or resume', ()
   const flow = createSessionFlow(m => wire.push(m), () => {}, { threadId: 't' })
   flow.receive({ type: 'crossing/authenticated' })
   flow.receive({ type: 'crossing/thread', requestId: wire.at(-1).requestId, action: 'resumed', ready: true, thread: { id: 't', model: null }, pendingModel: { model: 'gpt-5.6-luna', effort: 'low' } })
-  assert.equal(modelLabel(flow.state.thread), '模型未知')
+  assert.equal(modelLabel(flow.state.thread), '尚未确认模型')
   assert.equal(flow.state.pendingModel.model, 'gpt-5.6-luna')
 })
 

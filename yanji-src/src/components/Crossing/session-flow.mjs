@@ -14,7 +14,6 @@ export function createSessionFlow(send, changed = () => {}, options = {}) {
   const flow = {
     get state() { return state },
     create(choice) { if (state.authenticated && state.phase !== 'loading') request('crossing/thread/start', undefined, choice) },
-    switchModel(choice) { if (state.authenticated && state.phase !== 'loading' && state.thread?.id) request('crossing/thread/resume', state.thread.id, choice) },
     select(id) { if (id && state.authenticated && state.phase !== 'loading') request('crossing/thread/read', id) },
     disconnect() { pending = null; update({ authenticated: false, phase: 'disconnected' }) },
     receive(msg) {

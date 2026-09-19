@@ -130,7 +130,7 @@ export function cardTitle(c) {
 export function readingRequest(draw) {
   const labels = labelsFor(draw)
   const lines = [
-    `🔮 我抽了一手牌 · ${spreadName(draw.spread)}`,
+    `我抽了一手牌 · ${spreadName(draw.spread)}`,
     ...draw.cards.map((c, i) => `【${labels[i] || `第${i + 1}张`}】${cardTitle(c)}　${c.keywords || ''}`.trimEnd()),
   ]
   if (draw.question) lines.push('', `想问的是：${draw.question}`)

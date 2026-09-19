@@ -8,7 +8,7 @@ const crypto = require('crypto')
 const { getUsage } = require('./usage')
 const { contextSnapshot } = require('./claude-runtime')
 const { getLinkPreview } = require('./link-preview')
-const { createCrossingService } = require('./yanji-crossing')
+const { createCrossingService, diagnoseCrossingError } = require('./yanji-crossing')
 
 const PW_HASH = (() => {
   try {
@@ -1389,7 +1389,20 @@ wss.on('connection', (ws) => {
         }
         if (msg.type === 'crossing/logout') { agentSessions.revoke(ws.crossingClientId); return }
         ws.crossingQueue = (ws.crossingQueue || Promise.resolve()).then(() => crossing.handle(ws.crossingClientId, msg))
-          .catch(() => sendCrossing(ws.crossingClientId, { type: 'crossing/error', requestId: msg.requestId, operation: msg.type, error: '渡口操作未获允许或未能完成，请重新连接后重试' }))
+          .catch((error) => {
+            const diagnostic = diagnoseCrossingError(error, msg.type)
+            console.error(`[crossing] ${msg.type} failed [${diagnostic.code}]: ${diagnostic.detail}`)
+            sendCrossing(ws.crossingClientId, {
+              type: 'crossing/error', requestId: msg.requestId, operation: msg.type, code: diagnostic.code,
+              error: diagnostic.code === 'permission_or_auth'
+                ? '渡口授权已失效，请等待重新连接后再试'
+                : diagnostic.code === 'invalid_thread'
+                  ? '当前会话已失效，请重新选择会话'
+                  : diagnostic.code === 'invalid_model' || diagnostic.code === 'invalid_reasoning_effort'
+                    ? '所选模型或推理强度不可用，请刷新列表重选'
+                    : '渡口操作未能完成，请稍后重试',
+            })
+          })
         return
       }
       // 前端连上后第一件事发 {type:'auth', token}，通过才开始收广播

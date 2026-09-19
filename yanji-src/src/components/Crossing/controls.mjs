@@ -6,7 +6,7 @@ export function imageSupported(models, model) {
   return !!models.find(m => m.model === model || m.id === model)?.inputModalities?.includes('image')
 }
 export function modelLabel(thread) {
-  return thread?.model ? `${thread.model} · ${thread.reasoningEffort || '默认强度（未指定）'}` : '模型未知'
+  return thread?.model ? `${thread.model} · ${thread.reasoningEffort || '默认强度（未指定）'}` : '尚未确认模型'
 }
 export async function uploadAttachment(config, file) {
   const url = new URL('/raven/upload?channel=crossing', config.baseUrl || 'https://memory.ravenlove.cc')

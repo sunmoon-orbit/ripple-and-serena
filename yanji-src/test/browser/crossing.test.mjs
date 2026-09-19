@@ -5,7 +5,7 @@ import { chromium } from 'playwright'
 import { fileURLToPath } from 'node:url'
 
 // This test boots the real app but cannot reach any external HTTP or WS server.
-test('real components: remount/reconnect/refresh, themes/IME geometry, speech and API-call return', { timeout: 120000 }, async t => {
+test('real Crossing components preserve thread state across tools and model apply', { timeout: 120000 }, async t => {
   const root = fileURLToPath(new URL('../../', import.meta.url))
   const server = await createServer({ root, base: '/', server: { host: '127.0.0.1', port: 0, hmr: false } })
   t.after(() => server.close())
@@ -40,7 +40,10 @@ test('real components: remount/reconnect/refresh, themes/IME geometry, speech an
       localStorage.setItem('llm_hub_state_v1', JSON.stringify({ moonMemory: { enabled: true, baseUrl: 'https://fixture.invalid', apiToken: 'test-only' }, timeAwareness: false, longingPush: false, proactiveCall: false }))
     }
     window.__wire = []; window.__sockets = []; window.__audios = []
-    window.__thread = id => ({ id, name: `Fixture ${id}`, model: 'gpt-5.6-luna', reasoningEffort: 'low', turns: [{ id: 'old-turn', status: 'completed', items: [{ id: 'old', type: 'agentMessage', text: '完整的历史回复' }] }] })
+    window.__thread = id => {
+      const confirmed = JSON.parse(localStorage.getItem(`fixture-model-${id}`) || 'null') || { model: 'gpt-5.6-luna', effort: 'low' }
+      return { id, name: `Fixture ${id}`, model: confirmed.model, reasoningEffort: confirmed.effort, turns: [{ id: 'old-turn', status: 'completed', items: [{ id: 'old', type: 'agentMessage', text: '完整的历史回复' }] }] }
+    }
     class FakeSocket {
       static OPEN = 1
       constructor() { this.readyState = 0; window.__sockets.push(this); setTimeout(() => { if (this.readyState === 3) return; this.readyState = 1; this.onopen?.() }, 0) }
@@ -53,7 +56,17 @@ test('real components: remount/reconnect/refresh, themes/IME geometry, speech an
             ? { type: 'crossing/authenticated', capability: 'fixture-capability', expiresAt: Date.now() + 60000 }
             : { type: 'crossing/auth_failed' })
           if (m.type === 'crossing/thread/list') this.emit({ type: 'crossing/threads', threads: [window.__thread('thread-luna'), window.__thread('thread-two')] })
-          if (m.type === 'crossing/model/list') this.emit({ type: 'crossing/models', models: [{ id: 'luna', model: 'gpt-5.6-luna', displayName: 'Luna fixture', supportedReasoningEfforts: [{ reasoningEffort: 'low' }], defaultReasoningEffort: 'low', inputModalities: ['text', 'image'], isDefault: true }] })
+          if (m.type === 'crossing/model/list') this.emit({ type: 'crossing/models', models: [
+            { id: 'luna', model: 'gpt-5.6-luna', displayName: 'Luna fixture', supportedReasoningEfforts: [{ reasoningEffort: 'low' }], defaultReasoningEffort: 'low', inputModalities: ['text', 'image'], isDefault: true },
+            { id: 'terra', model: 'gpt-5.6-terra', displayName: 'Terra fixture', supportedReasoningEfforts: [{ reasoningEffort: 'medium' }], defaultReasoningEffort: 'medium', inputModalities: ['text', 'image'] },
+          ] })
+          if (m.type === 'crossing/model/apply') {
+            if (window.__rejectModelApply) this.emit({ type: 'crossing/error', operation: m.type, requestId: m.requestId, code: 'permission_or_auth', error: '测试拒绝模型设置' })
+            else {
+              localStorage.setItem(`fixture-model-${m.threadId}`, JSON.stringify({ model: m.model, effort: m.effort }))
+              this.emit({ type: 'crossing/model/confirmed', requestId: m.requestId, threadId: m.threadId, model: m.model, reasoningEffort: m.effort })
+            }
+          }
           if (['crossing/thread/read', 'crossing/thread/resume', 'crossing/thread/start'].includes(m.type)) this.emit({ type: 'crossing/thread', requestId: m.requestId, action: m.type.endsWith('read') ? 'read' : m.type.endsWith('start') ? 'started' : 'resumed', ready: !m.type.endsWith('read'), thread: window.__thread(m.threadId || 'new-thread') })
           if (m.type === 'crossing/turn/start') {
             this.emit({ type: 'crossing/turn/started', threadId: m.threadId, turn: { id: 'fake-turn' } })
@@ -181,14 +194,51 @@ test('real components: remount/reconnect/refresh, themes/IME geometry, speech an
   await textarea.click()
   await page.locator('.crossing-tool-links').waitFor({ state: 'hidden' })
   await toolsButton.click()
+  await textarea.fill('工具打开前的草稿')
+  const toolCases = [
+    ['通话记录', '.health-card', '通话记录'],
+    ['幸运轮盘', '.fw-modal', '幸运轮盘'],
+    ['命运牌阵', '.fate-modal', '命运牌阵'],
+    ['塔罗', '.tarot-modal', '苏堤柳塔罗'],
+    ['今日签', '.fdl-modal', '今日签'],
+  ]
+  for (const [name, selector, title] of toolCases) {
+    await page.getByRole('button', { name, exact: true }).click()
+    await page.locator(selector).waitFor()
+    assert.ok((await page.locator(selector).innerText()).includes(title))
+    await page.locator(selector).locator('.health-close, .roost-modal-close').click()
+    await page.locator(selector).waitFor({ state: 'hidden' })
+    assert.equal(await textarea.inputValue(), '工具打开前的草稿')
+    assert.ok((await page.locator('.crossing-session.active').innerText()).includes('thread-two'))
+  }
   await page.getByRole('button', { name: /语音通话/ }).click()
-  await page.getByRole('button', { name: '前往 Murmur', exact: true }).click()
-  await page.getByRole('region', { name: 'Murmur 语音通话' }).waitFor()
-  assert.ok(await page.evaluate(() => window.__audios.at(-1).cleaned), 'leaving for API call stops audio')
-  assert.equal(await page.getByRole('button', { name: '拨打 Murmur 通话' }).isDisabled(), true)
-  await page.getByRole('button', { name: '返回渡口', exact: true }).click(); await ready()
+  assert.ok((await page.getByRole('status').innerText()).includes('并不是当前 Codex Agent'))
+  assert.equal(await textarea.inputValue(), '工具打开前的草稿')
+  await page.getByRole('button', { name: '知道了', exact: true }).click()
+
+  await page.getByRole('button', { name: 'gpt-5.6-luna · low', exact: true }).click()
+  await page.getByLabel('模型').selectOption('gpt-5.6-terra')
+  await page.getByRole('button', { name: '应用到当前会话', exact: true }).click()
+  await page.getByRole('button', { name: 'gpt-5.6-terra · medium', exact: true }).waitFor()
+  assert.equal(await textarea.inputValue(), '工具打开前的草稿')
+  await page.evaluate(() => window.__sockets.at(-1).close())
+  await page.getByText('重连中', { exact: false }).first().waitFor()
+  await page.getByRole('button', { name: 'gpt-5.6-terra · medium', exact: true }).waitFor()
+
+  await page.getByRole('button', { name: 'gpt-5.6-terra · medium', exact: true }).click()
+  await page.getByLabel('模型').selectOption('gpt-5.6-luna')
+  await page.evaluate(() => { window.__rejectModelApply = true })
+  await page.getByRole('button', { name: '应用到当前会话', exact: true }).click()
+  await page.getByText(/测试拒绝模型设置.*当前仍为 gpt-5.6-terra · medium/).waitFor()
+  assert.equal(await page.getByRole('button', { name: 'gpt-5.6-terra · medium', exact: true }).count(), 1)
+  assert.equal(await page.getByText('模型未知', { exact: true }).count(), 0)
+  await page.evaluate(() => { window.__rejectModelApply = false })
   assert.equal(await page.evaluate(() => JSON.parse(localStorage.getItem('yanji_navigation_v1')).threadId), 'thread-two')
   await page.getByTitle('回到 Murmur', { exact: true }).click()
+  await page.getByRole('button', { name: '通话记录', exact: true }).waitFor()
+  await page.getByRole('button', { name: '通话记录', exact: true }).evaluate(node => node.click())
+  await page.locator('.health-card').waitFor()
+  await page.locator('.health-card .health-close').click()
   await page.getByRole('button', { name: 'Hollow', exact: true }).click()
   await page.getByRole('button', { name: 'Murmur', exact: true }).click()
   assert.equal(await page.locator('.crossing-panel').count(), 0)

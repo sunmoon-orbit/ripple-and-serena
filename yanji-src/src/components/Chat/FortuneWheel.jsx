@@ -73,7 +73,7 @@ export default function FortuneWheel({ onClose }) {
     <div className="roost-overlay" onClick={onClose}>
       <div className="roost-modal fw-modal" onClick={(e) => e.stopPropagation()}>
         <div className="roost-modal-header">
-          <span>🎰 幸运轮盘</span>
+          <span>幸运轮盘</span>
           <button className="roost-modal-close" onClick={onClose}>✕</button>
         </div>
 
@@ -93,7 +93,7 @@ export default function FortuneWheel({ onClose }) {
                 onClick={() => { if (!spinning) setGoreOn((v) => !v) }}
                 title="仅限虚构场景，默认锁定"
               >
-                {goreOn ? '⚠ GORE' : '🔒 GORE'}
+                {goreOn ? 'GORE 已解锁' : 'GORE 锁定'}
               </button>
             )}
           </div>

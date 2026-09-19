@@ -40,7 +40,7 @@ function timeLabel(ts) {
   return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
 }
 
-export default function CallHistory({ onClose, onJump }) {
+export default function CallHistory({ onClose, onJump, embedded = false }) {
   const chats = useStore((s) => s.chats)
   const messagesByChatId = useStore((s) => s.messagesByChatId)
 
@@ -82,14 +82,14 @@ export default function CallHistory({ onClose, onJump }) {
       <div className="health-card" onClick={(e) => e.stopPropagation()}>
         <div className="health-head">
           <div className="health-title">通话记录</div>
-          <div className="health-sub">{total ? `一共 ${total} 通 · 点一条跳回当时` : '打过的电话都会记在这里'}</div>
+          <div className="health-sub">{total ? `一共 ${total} 通${embedded ? ' · Murmur 通话记录' : ' · 点一条跳回当时'}` : '打过的电话都会记在这里'}</div>
           <button className="health-close" onClick={onClose} aria-label="关闭">✕</button>
         </div>
 
         {!total && (
           <div style={{ textAlign: 'center', padding: '28px 0 36px', color: 'var(--text-faint)', fontSize: 14 }}>
             <div style={{ marginBottom: 10, opacity: 0.6 }}><CallIcon kind="ended" size={30} /></div>
-            还没有通话记录——侧边栏「语音通话」打一个试试？
+            还没有通话记录——从 Murmur 的「语音通话」打一个试试？
           </div>
         )}
 
@@ -99,7 +99,7 @@ export default function CallHistory({ onClose, onJump }) {
             {g.items.map((c) => (
               <button
                 key={c.key}
-                onClick={() => { onClose?.(); onJump?.(c.chatId, c.mid) }}
+                onClick={() => { if (onJump) { onClose?.(); onJump(c.chatId, c.mid) } }}
                 style={{
                   display: 'flex', alignItems: 'center', gap: 10, width: '100%',
                   padding: '10px 10px', marginBottom: 4, borderRadius: 12, border: '1px solid var(--border)',

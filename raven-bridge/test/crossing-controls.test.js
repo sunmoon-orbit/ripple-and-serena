@@ -4,7 +4,7 @@ const { EventEmitter } = require('node:events')
 const fs = require('node:fs')
 const os = require('node:os')
 const path = require('node:path')
-const { createCrossingService } = require('../yanji-crossing')
+const { createCrossingService, diagnoseCrossingError } = require('../yanji-crossing')
 const { createModelControls, confirmedModel } = require('../crossing-models')
 const { createUploadStore, validateFile, safeImageURL, MAX_FILE } = require('../crossing-uploads')
 const { handleUpload } = require('../crossing-upload-http')
@@ -27,6 +27,11 @@ class Fixture extends EventEmitter {
       return { model, reasoningEffort, thread: this.thread }
     }
     if (method === 'thread/read') return { thread: this.thread }
+    if (method === 'thread/settings/update') {
+      this.thread.model = params.model
+      this.thread.reasoningEffort = params.effort
+      return {}
+    }
     if (method === 'turn/start') { this.thread.model = params.model; this.thread.reasoningEffort = params.effort; return { turn: { id: 'turn-fixture' } } }
     return {}
   }
@@ -45,7 +50,16 @@ test('model/list exhausts pages, filters hidden and preserves all picker fields'
   assert.deepEqual(confirmedModel({ thread: {} }), { model: null, reasoningEffort: null })
 })
 
-test('real model config for thread/start, resume switch, turn override, persistent reconnect and warning', async t => {
+test('Crossing failures retain actionable diagnostic categories', () => {
+  assert.equal(diagnoseCrossingError(new Error('unauthorized thread'), 'crossing/model/apply').code, 'permission_or_auth')
+  assert.equal(diagnoseCrossingError(new Error('thread not found'), 'crossing/model/apply').code, 'invalid_thread')
+  assert.equal(diagnoseCrossingError(new Error('model unavailable'), 'crossing/model/apply').code, 'invalid_model')
+  assert.equal(diagnoseCrossingError(new Error('unsupported reasoning effort'), 'crossing/model/apply').code, 'invalid_reasoning_effort')
+  assert.equal(diagnoseCrossingError(new Error('JSON-RPC invalid params'), 'crossing/model/apply').code, 'app_server_protocol')
+  assert.equal(diagnoseCrossingError(new Error('会话尚未恢复'), 'crossing/model/apply').code, 'socket_or_session_state')
+})
+
+test('model apply uses thread settings, confirms only after success, and survives reconnect', async t => {
   const cwd = temp(t), adapter = new Fixture(), events = []
   const stateFile = path.join(cwd, 'models.json')
   const service = createCrossingService({ authorize: () => true, adapter, cwd, modelStateFile: stateFile, send: (_, x) => events.push(x), broadcast: x => events.push(x) })
@@ -54,14 +68,19 @@ test('real model config for thread/start, resume switch, turn override, persiste
   assert.equal(start.params.model, 'vision-fixture')
   assert.deepEqual(start.params.config, { model_reasoning_effort: 'high' })
   assert.equal(events.find(x => x.type === 'crossing/thread').thread.model, 'vision-fixture')
-  await service.handle('phone', { type: 'crossing/thread/resume', threadId: 'thread-fixture', model: 'text-fixture', effort: 'medium' })
+  await service.handle('phone', { type: 'crossing/model/apply', threadId: 'thread-fixture', model: 'text-fixture', effort: 'medium', requestId: 'apply' })
+  const apply = adapter.calls.find(x => x.method === 'thread/settings/update')
+  assert.deepEqual(apply.params, { threadId: 'thread-fixture', model: 'text-fixture', effort: 'medium' })
+  assert.deepEqual(events.find(x => x.type === 'crossing/model/confirmed' && x.requestId === 'apply'), {
+    type: 'crossing/model/confirmed', requestId: 'apply', threadId: 'thread-fixture', model: 'text-fixture', reasoningEffort: 'medium',
+  })
   service.disconnect('phone')
   const restarted = createCrossingService({ authorize: () => true, adapter, cwd, modelStateFile: stateFile, send: (_, x) => events.push(x) })
   await restarted.handle('new-phone', { type: 'crossing/thread/list' })
   await restarted.handle('new-phone', { type: 'crossing/thread/resume', threadId: 'thread-fixture' })
   const resume = adapter.calls.filter(x => x.method === 'thread/resume').at(-1)
-  assert.equal(resume.params.model, 'text-fixture')
-  assert.equal(resume.params.config.model_reasoning_effort, 'medium')
+  assert.equal(resume.params.model, undefined)
+  assert.equal(resume.params.config, undefined)
   await restarted.handle('new-phone', { type: 'crossing/turn/start', threadId: 'thread-fixture', text: 'fixture only' })
   const turn = adapter.calls.find(x => x.method === 'turn/start')
   assert.equal(turn.params.model, 'text-fixture'); assert.equal(turn.params.effort, 'medium')
@@ -74,6 +93,19 @@ test('real model config for thread/start, resume switch, turn override, persiste
   assert.equal(adapter.calls.some(x => x.method.startsWith('config/')), false)
   adapter.emit('item', { threadId: 'thread-fixture', item: { type: 'userMessage', content: [{ type: 'localImage', path: '/private/test.png' }] }, summary: { type: 'userMessage' } })
   assert.equal(JSON.stringify(events.filter(x => x.type === 'crossing/item')).includes('/private/'), false)
+})
+
+test('rejected model apply emits no confirmation and preserves the confirmed thread', async t => {
+  const adapter = new Fixture(), events = []
+  const service = createCrossingService({ authorize: () => true, adapter, cwd: temp(t), send: (_, x) => events.push(x), broadcast: x => events.push(x) })
+  await service.handle('phone', { type: 'crossing/thread/start', model: 'vision-id', effort: 'high' })
+  const before = { ...adapter.thread }
+  const original = adapter.request.bind(adapter)
+  adapter.request = (method, params) => method === 'thread/settings/update' ? Promise.reject(new Error('invalid reasoning effort')) : original(method, params)
+  await assert.rejects(service.handle('phone', { type: 'crossing/model/apply', requestId: 'failed', threadId: 'thread-fixture', model: 'text-fixture', effort: 'medium' }), /reasoning effort/)
+  assert.equal(events.some(x => x.type === 'crossing/model/confirmed' && x.requestId === 'failed'), false)
+  assert.equal(adapter.thread.model, before.model)
+  assert.equal(adapter.thread.reasoningEffort, before.reasoningEffort)
 })
 
 const png = { name: 'photo.png', mime: 'image/png', data: Buffer.from([137,80,78,71,13,10,26,10,0]).toString('base64') }

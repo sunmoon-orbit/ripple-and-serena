@@ -7,7 +7,7 @@ import { prepareAttachment } from '../src/utils/attachments.js'
 
 test('/model is a local command and cannot become a turn; model labels use confirmed metadata', () => {
   assert.deepEqual(localCommand('/model'), { name: 'model', argument: '' })
-  assert.equal(modelLabel(null), '模型未知')
+  assert.equal(modelLabel(null), '尚未确认模型')
   assert.equal(modelLabel({ model: 'server-model', reasoningEffort: 'high' }), 'server-model · high')
   assert.equal(imageSupported([{ model: 'text', inputModalities: ['text'] }], 'text'), false)
   assert.equal(imageSupported([], 'unknown'), false)
@@ -19,8 +19,6 @@ test('/model is a local command and cannot become a turn; model labels use confi
   flow.receive({ type: 'crossing/thread', requestId: request.requestId, action: 'started', ready: true, thread: { id: 't', model: 'server-model', reasoningEffort: 'high' } })
   const count = sent.length
   assert.equal(flow.start('/model', 'm'), false); assert.equal(sent.length, count)
-  flow.switchModel({ model: 'other', effort: 'low' })
-  assert.equal(sent.at(-1).type, 'crossing/thread/resume'); assert.equal(sent.at(-1).model, 'other')
 })
 
 test('sticker attachment uses actual image input reference, text files retain content', async () => {

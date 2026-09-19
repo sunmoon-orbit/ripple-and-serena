@@ -43,6 +43,19 @@ function publicThread(thread) {
 
 function input(text) { return [{ type: 'text', text: String(text || '') }] }
 
+function diagnoseCrossingError(error, operation = '') {
+  const detail = clip(error?.message || error || 'unknown error', 500)
+  const source = `${error?.code || ''} ${detail}`.toLowerCase()
+  let code = 'app_server_error'
+  if (/unauthorized|permission|forbidden|not allowed/.test(source)) code = 'permission_or_auth'
+  else if (/thread/.test(source) && /(invalid|unknown|not found|missing|mismatch|does not exist)/.test(source)) code = 'invalid_thread'
+  else if (/reasoning|effort/.test(source) && /(invalid|unsupported|not support|不可用|不支持)/.test(source)) code = 'invalid_reasoning_effort'
+  else if (/model/.test(source) && /(invalid|unknown|not found|unavailable|unsupported|不可用|不支持)/.test(source)) code = 'invalid_model'
+  else if (/protocol|json-rpc|invalid params|unknown method|parse error/.test(source)) code = 'app_server_protocol'
+  else if (/socket|session|会话尚未恢复|disconnected|已断开|loading|正在加载/.test(source)) code = 'socket_or_session_state'
+  return { code, detail }
+}
+
 function approvalResult(method, choice) {
   if (method === 'item/commandExecution/requestApproval' || method === 'item/fileChange/requestApproval') {
     return { decision: choice === 'allow' ? 'accept' : 'decline' }
@@ -211,11 +224,24 @@ function createCrossingService(options = {}) {
     const type = message?.type
     if (!OPERATIONS.has(type)) throw new Error('unauthorized')
     const request = (method, params) => { check(clientId); return adapter.request(method, params) }
-    if (['crossing/thread/read', 'crossing/thread/resume'].includes(type) && !allowedThreads.get(clientId)?.has(message.threadId)) throw new Error('unauthorized')
+    if (['crossing/model/apply', 'crossing/thread/read', 'crossing/thread/resume'].includes(type) && !allowedThreads.get(clientId)?.has(message.threadId)) throw new Error('unauthorized thread')
     await ensureOnline()
     check(clientId)
     if (type === 'crossing/model/list') {
       send(clientId, { type: 'crossing/models', requestId: message.requestId, models: await modelControls.list(true) })
+      return
+    }
+    if (type === 'crossing/model/apply') {
+      const threadId = String(message.threadId || '')
+      if (!threadId || selecting.has(clientId) || sessions.get(clientId) !== threadId) throw new Error('会话尚未恢复，不能应用模型')
+      if (activeTurn || startingTurn) throw new Error('请先停止当前任务再应用模型')
+      const choice = await modelControls.validate(message)
+      await request('thread/settings/update', { threadId, model: choice.model, effort: choice.effort })
+      check(clientId)
+      rememberChoice(threadId, choice)
+      const meta = { model: choice.model, reasoningEffort: choice.effort }
+      metadata.set(threadId, meta)
+      send(clientId, { type: 'crossing/model/confirmed', requestId: message.requestId, threadId, ...meta })
       return
     }
     if (type === 'crossing/thread/list') {
@@ -246,10 +272,17 @@ function createCrossingService(options = {}) {
     }
     if (type === 'crossing/thread/resume') {
       sessions.delete(clientId)
-      const requested = message.model ? message : modelControls.remembered(message.threadId)
+      const requested = message.model ? message : null
       const choice = requested ? await modelControls.validate(requested) : null
-      const result = await request('thread/resume', { threadId: String(message.threadId || ''), cwd, sandbox: 'workspace-write', approvalPolicy: 'untrusted', approvalsReviewer: 'user', excludeTurns: false, ...threadOverrides(choice) })
+      let result = await request('thread/resume', { threadId: String(message.threadId || ''), cwd, sandbox: 'workspace-write', approvalPolicy: 'untrusted', approvalsReviewer: 'user', excludeTurns: false, ...(choice ? { model: choice.model } : {}) })
       if (!result.thread?.id || result.thread.id !== message.threadId) throw new Error('Codex 返回的会话编号不匹配')
+      // Backward compatibility for a briefly cached pre-model/apply client:
+      // resume may select a model, but current App Server schema only accepts
+      // reasoning effort through thread/settings/update.
+      if (choice) {
+        await request('thread/settings/update', { threadId: result.thread.id, model: choice.model, effort: choice.effort })
+        result = { ...result, ...confirmedModel({ model: choice.model, reasoningEffort: choice.effort }), thread: { ...result.thread, model: choice.model, reasoningEffort: choice.effort } }
+      }
       if (disconnectedClients.has(clientId)) return
       sessions.set(clientId, result.thread.id)
       if (choice) rememberChoice(result.thread.id, choice)
@@ -352,4 +385,4 @@ function createCrossingService(options = {}) {
   return { handle, disconnect, adapter, uploads, canReceive, getActiveTurn: () => activeTurn, publishRateLimits }
 }
 
-module.exports = { createCrossingService, fallbackRateLimits, publicThread, approvalResult }
+module.exports = { createCrossingService, fallbackRateLimits, publicThread, approvalResult, diagnoseCrossingError }

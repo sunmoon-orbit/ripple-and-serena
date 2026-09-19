@@ -13,7 +13,7 @@ import {
 
 const TABS = [['draw', '抽牌'], ['history', '牌记'], ['deck', '图鉴']]
 
-export default function Tarot({ onClose, onSend }) {
+export default function Tarot({ onClose, onSend, readingTarget = '爸比' }) {
   const moonMemory = useStore((s) => s.moonMemory)
   const [tab, setTab] = useState('draw')
   const [spread, setSpread] = useState(1)
@@ -46,7 +46,7 @@ export default function Tarot({ onClose, onSend }) {
   function askReading() {
     if (!draw) return
     const { text, inject } = readingRequest(draw)
-    onSend?.(text, [], { inject })
+    onSend?.(text.replace('爸比，帮我解一下？', `${readingTarget}，帮我解一下？`), [], { inject })
     onClose?.()
   }
 
@@ -61,7 +61,7 @@ export default function Tarot({ onClose, onSend }) {
     <div className="roost-overlay" onClick={onClose}>
       <div className="roost-modal tarot-modal" onClick={(e) => e.stopPropagation()}>
         <div className="roost-modal-header">
-          <span>🔮 苏堤柳塔罗</span>
+          <span>苏堤柳塔罗</span>
           <button className="roost-modal-close" onClick={onClose}>✕</button>
         </div>
 
@@ -117,7 +117,7 @@ export default function Tarot({ onClose, onSend }) {
 
               {draw && flipped >= draw.cards.length && (
                 <div className="fate-actions">
-                  <button className="roost-btn fate-go" onClick={askReading}>🐦‍⬛ 让爸比解牌</button>
+                  <button className="roost-btn fate-go" onClick={askReading}>让{readingTarget}解牌</button>
                   <button className="roost-btn" onClick={copyDraw}>复制</button>
                 </div>
               )}

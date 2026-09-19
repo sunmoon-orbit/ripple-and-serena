@@ -66,6 +66,8 @@ export default function Crossing() {
   const [modelOpen, setModelOpen] = useState(false)
   const [modelsError, setModelsError] = useState('')
   const [selection, setSelection] = useState({ model: '', effort: '' })
+  const [modelApply, setModelApply] = useState({ status: 'idle', error: '' })
+  const modelApplyRef = useRef(null)
   const [attachments, setAttachments] = useState([])
   const [uploading, setUploading] = useState(false)
   const [stickerOpen, setStickerOpen] = useState(false)
@@ -117,6 +119,7 @@ export default function Crossing() {
   useEffect(() => {
     if (!toolsOpen) return undefined
     const closeOnOutside = event => {
+      if (event.target.closest?.('.health-overlay, .roost-overlay, .receipt-overlay, .board-overlay, .idlej-overlay')) return
       if (!event.target.closest?.('.crossing-tool-card, .crossing-plus')) setToolsOpen(false)
     }
     document.addEventListener('pointerdown', closeOnOutside)
@@ -171,7 +174,16 @@ export default function Crossing() {
         if (msg.type === 'crossing/model/confirmed') {
           if (msg.threadId === activeThreadRef.current) {
             setActiveThread(prev => ({ ...prev, model: msg.model, reasoningEffort: msg.reasoningEffort }))
-            setSessionState(prev => prev.pendingModel?.model === msg.model && prev.pendingModel?.effort === msg.reasoningEffort ? { ...prev, pendingModel: null } : prev)
+            setSessionState(prev => ({ ...prev, thread: { ...prev.thread, model: msg.model, reasoningEffort: msg.reasoningEffort }, pendingModel: null }))
+            const pendingApply = modelApplyRef.current
+            const confirmsPending = pendingApply && (msg.requestId === pendingApply.requestId
+              || (!msg.requestId && msg.model === pendingApply.model && msg.reasoningEffort === pendingApply.effort))
+            if (!pendingApply || confirmsPending) {
+              modelApplyRef.current = null
+              setModelApply({ status: 'confirmed', error: '' })
+              setSelection({ model: msg.model || '', effort: msg.reasoningEffort || '' })
+              setModelOpen(false)
+            }
           }
           return
         }
@@ -181,7 +193,15 @@ export default function Crossing() {
           if (msg.error) setError(msg.error)
           return
         }
-        if (msg.type === 'crossing/error') { setStarting(false); if (msg.operation === 'crossing/model/list') setModelsError(msg.error || '模型列表读取失败'); else setError(msg.error || '渡口操作失败'); return }
+        if (msg.type === 'crossing/error') {
+          setStarting(false)
+          if (msg.operation === 'crossing/model/list') setModelsError(msg.error || '模型列表读取失败')
+          else if (msg.operation === 'crossing/model/apply' && msg.requestId === modelApplyRef.current?.requestId) {
+            modelApplyRef.current = null
+            setModelApply({ status: 'failed', error: msg.error || '模型应用失败' })
+          } else setError(msg.error || '渡口操作失败')
+          return
+        }
         if (msg.type === 'crossing/threads') { setThreads(msg.threads || []); return }
         if (msg.type === 'crossing/usage') { setUsage(msg.usage || null); return }
         if (msg.type === 'crossing/thread') {
@@ -220,6 +240,10 @@ export default function Crossing() {
       }
       ws.onclose = () => {
         if (disposed || denied) return
+        if (modelApplyRef.current) {
+          modelApplyRef.current = null
+          setModelApply({ status: 'failed', error: '连接已断开，模型没有应用；原设置保持不变' })
+        }
         clearTimeout(expiryTimer); setCapability('')
         flowRef.current.disconnect(); setStopEpoch(n => n + 1); setTurn(null); setStarting(false); setApproval(null)
         setConnection('reconnecting')
@@ -232,6 +256,15 @@ export default function Crossing() {
   }, [moonMemory?.apiToken, moonMemory?.baseUrl, moonMemory?.enabled, agentBlocked, send])
 
   const createThread = () => { if (turn || starting) return; setStopEpoch(n => n + 1); try { flowRef.current.create(selection.model ? selection : undefined) } catch (e) { setError(e.message) } }
+  const applyModel = () => {
+    const threadId = sessionState.thread?.id
+    if (!threadId || sessionState.phase !== 'ready' || modelApply.status === 'applying') return
+    const requestId = crypto.randomUUID()
+    modelApplyRef.current = { requestId, threadId, ...selection }
+    setModelApply({ status: 'applying', error: '' })
+    try { send({ type: 'crossing/model/apply', requestId, threadId, ...selection }) }
+    catch (e) { modelApplyRef.current = null; setModelApply({ status: 'failed', error: e.message }) }
+  }
   const startTurn = () => {
     const text = draft.trim()
     if ((!text && !attachments.length) || turn || starting || uploading || !sessionState.authenticated || sessionState.phase === 'loading') return
@@ -272,6 +305,21 @@ export default function Crossing() {
     send({ type: 'crossing/approval/respond', choice, requestId: approval.requestId, threadId: approval.threadId, turnId: approval.turnId, itemId: approval.itemId })
     setApproval(null)
   }
+  const sendToolMessage = useCallback((text, images = [], opts = {}) => {
+    const visibleText = String(text || '').trim()
+    if (!visibleText || turn || starting || uploading || sessionState.phase !== 'ready') {
+      setError('当前 Agent 会话尚未就绪，或正在执行任务')
+      return false
+    }
+    const requestText = [visibleText, opts.inject].filter(Boolean).join('\n\n')
+    const clientMessageId = crypto.randomUUID()
+    try { if (!flowRef.current.start(requestText, clientMessageId)) return false }
+    catch (e) { setError(e.message); return false }
+    setStarting(true)
+    setMessages(previous => [...previous, { id: clientMessageId, role: 'user', text: visibleText }])
+    setToolsOpen(false)
+    return true
+  }, [sessionState.phase, starting, turn, uploading])
 
   const activeId = sessionState.phase === 'ready' ? activeThread?.id : ''
   const shortcut = !!localCommand(draft)
@@ -306,10 +354,11 @@ export default function Crossing() {
       {modelOpen && <div className="crossing-controls">
         <label>模型<select value={selection.model} onChange={e => { const m = models.find(x => x.model === e.target.value); setSelection({ model: m.model, effort: m.defaultReasoningEffort }) }}><option value="" disabled>请选择模型</option>{models.map(m => <option key={m.id} value={m.model}>{m.displayName}{m.isDefault ? '（默认）' : ''}</option>)}</select></label>
         <label>推理强度<select value={selection.effort} onChange={e => setSelection(prev => ({ ...prev, effort: e.target.value }))}><option value="" disabled>默认／未知</option>{selectedEntry?.supportedReasoningEfforts.map(e => <option key={e.reasoningEffort} value={e.reasoningEffort}>{e.reasoningEffort}</option>)}</select></label>
-        <button disabled={!selection.model || !selection.effort || !!turn || starting || !sessionState.authenticated || sessionState.phase === 'loading'} onClick={() => { if (sessionState.thread?.id) flowRef.current.switchModel(selection); setModelOpen(false) }}>{sessionState.thread?.id ? '应用到当前会话' : '用于新建会话'}</button>
+        <button disabled={!selection.model || !selection.effort || !!turn || starting || modelApply.status === 'applying' || !sessionState.authenticated || sessionState.phase !== 'ready'} onClick={applyModel}>{modelApply.status === 'applying' ? '应用中…' : '应用到当前会话'}</button>
         <button onClick={() => { setModelsError(''); send({ type: 'crossing/model/list' }) }}>刷新列表</button>
         {modelsError && <p role="alert">{modelsError}</p>}
         {selection.model && models.length > 0 && !selectedEntry && <p role="alert">当前会话模型不在可用列表中，请重新选择。</p>}
+        {modelApply.error && <p role="alert">{modelApply.error}；当前仍为 {modelLabel(activeThread)}。</p>}
         <small>顶部只显示服务端确认值；选择仅作用于渡口会话。{sessionState.pendingModel && '所选模型将在下一次发送时覆盖，当前仍显示已确认模型。'}</small>
       </div>}
       {warning && <div className="crossing-error" role="status">{warning}<button onClick={() => setWarning('')}>×</button></div>}
@@ -329,7 +378,7 @@ export default function Crossing() {
           </div>
           {!!attachments.length && <div className="crossing-attachments">{attachments.map((a, i) => <div key={a.id || i}>{a.kind === 'image' && <img src={a.preview || a.url} alt="待发图片" />}<span>{a.name}</span><button onClick={() => setAttachments(prev => prev.filter((_, j) => j !== i))}>移除</button></div>)}</div>}
           <div ref={toolsRef} className="crossing-composer">
-            {toolsOpen && <div className="crossing-tool-card" role="dialog" aria-label="工具卡片"><div className="crossing-controls"><ToolMemoryContext.Provider value={{ ...moonMemory, baseUrl: `crossing+${moonMemory.baseUrl}`, apiToken: capability }}><CrossingTools /></ToolMemoryContext.Provider><div className="crossing-attachment-actions"><button disabled={!sessionState.authenticated || uploading || attachments.length >= 4} onClick={() => fileRef.current?.click()}>{uploading ? '上传中…' : imagesAllowed ? '图片／文件' : '文本文件'}</button><button disabled={!imagesAllowed || attachments.length >= 4} onClick={() => setStickerOpen(!stickerOpen)}>表情包</button>{!imagesAllowed && <small>模型未知或不支持图片</small>}</div>{stickerOpen && <div className="crossing-stickers"><StickerPicker customStickers={customStickers} onSelect={addSticker} /></div>}</div></div>}
+            {toolsOpen && <div className="crossing-tool-card" role="dialog" aria-label="工具卡片"><div className="crossing-controls"><ToolMemoryContext.Provider value={{ ...moonMemory, baseUrl: `crossing+${moonMemory.baseUrl}`, apiToken: capability }}><CrossingTools onSend={sendToolMessage} /></ToolMemoryContext.Provider><div className="crossing-attachment-actions"><button disabled={!sessionState.authenticated || uploading || attachments.length >= 4} onClick={() => fileRef.current?.click()}>{uploading ? '上传中…' : imagesAllowed ? '图片／文件' : '文本文件'}</button><button disabled={!imagesAllowed || attachments.length >= 4} onClick={() => setStickerOpen(!stickerOpen)}>表情包</button>{!imagesAllowed && <small>模型尚未确认或不支持图片</small>}</div>{stickerOpen && <div className="crossing-stickers"><StickerPicker customStickers={customStickers} onSelect={addSticker} /></div>}</div></div>}
             <AttachmentPicker strict ref={fileRef} imagesAllowed={imagesAllowed} onAttachment={addFile} onError={setError} onBusy={setUploading} />
             <div className="crossing-input"><button className="crossing-plus" onClick={() => setToolsOpen(open => !open)} aria-label="工具" aria-expanded={toolsOpen} title="工具"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M12 5v14M5 12h14" /></svg></button><textarea ref={inputRef} value={draft} onChange={(e) => setDraft(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); startTurn() } }} placeholder={sessionState.phase === 'ready' ? '输入消息；/model 选择模型' : sessionState.phase === 'loading' ? '正在加载会话…' : '先点击＋新建，或选择历史会话'} disabled={!sessionState.authenticated} rows="1" />{turn ? <button className="crossing-stop" onClick={interrupt}>停止</button> : <button disabled={(!shortcut && sessionState.phase !== 'ready') || !sessionState.authenticated || sessionState.phase === 'loading' || (!draft.trim() && !attachments.length) || starting || uploading} onClick={startTurn}>{starting ? '提交中' : shortcut ? '执行' : '发送'}</button>}</div>
           </div>

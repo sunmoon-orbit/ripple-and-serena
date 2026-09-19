@@ -4,7 +4,7 @@ import { showToast } from '../Toast'
 import { drawFate, fateToMessage, loadFateData } from '../../api/fateDeck'
 
 // 命运牌阵 —— 抽一张时空坐标+三枚骰子，抽完可以「请涟言去这里」（乌有乡联动）
-export default function FateDeck({ onClose, onSend }) {
+export default function FateDeck({ onClose, onSend, targetName = '涟言' }) {
   const [fate, setFate] = useState(null)
   const [drawing, setDrawing] = useState(false)
   const [flipped, setFlipped] = useState(false)
@@ -51,7 +51,7 @@ export default function FateDeck({ onClose, onSend }) {
     <div className="roost-overlay" onClick={onClose}>
       <div className="roost-modal fate-modal" onClick={(e) => e.stopPropagation()}>
         <div className="roost-modal-header">
-          <span>🃏 命运牌阵</span>
+          <span>命运牌阵</span>
           <button className="roost-modal-close" onClick={onClose}>✕</button>
         </div>
 
@@ -95,7 +95,7 @@ export default function FateDeck({ onClose, onSend }) {
 
           {fate && flipped && (
             <div className="fate-actions">
-              <button className="roost-btn fate-go" onClick={sendToChat}>🌍 请涟言去这里</button>
+              <button className="roost-btn fate-go" onClick={sendToChat}>请{targetName}去这里</button>
               <button className="roost-btn" onClick={copyResult}>复制</button>
             </div>
           )}
