@@ -1,6 +1,7 @@
 import { useState, useMemo, useRef, useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import { usePlayer, togglePlay, seek, stop, playNext, playPrev } from '../../utils/player'
+import SongSearch from './SongSearch'
 
 function fmt(s) {
   if (!s || !isFinite(s)) return '0:00'
@@ -10,6 +11,7 @@ function fmt(s) {
 export default function MiniPlayer() {
   const player = usePlayer()
   const [expanded, setExpanded] = useState(false)
+  const [picking, setPicking] = useState(false)
   const lyricRef = useRef(null)
 
   const track = player.track
@@ -35,6 +37,22 @@ export default function MiniPlayer() {
   useEffect(() => {
     document.body.classList.toggle('mp-active', !!track)
     return () => document.body.classList.remove('mp-active')
+  }, [track])
+
+  // The visual viewport shrinks while Android's IME is open. Hiding only the
+  // player chrome keeps the composer usable; playback and the singleton Audio continue.
+  useEffect(() => {
+    const viewport = window.visualViewport
+    const update = () => {
+      const keyboardOpen = !!track && !!viewport && viewport.height < window.innerHeight - 120
+      document.body.classList.toggle('mp-keyboard-open', keyboardOpen)
+    }
+    update()
+    viewport?.addEventListener('resize', update)
+    return () => {
+      viewport?.removeEventListener('resize', update)
+      document.body.classList.remove('mp-keyboard-open')
+    }
   }, [track])
 
   if (!track) return null
@@ -88,7 +106,7 @@ export default function MiniPlayer() {
         />
       </div>
       <div className="mp-body">
-        <div className="mp-info" onClick={() => setExpanded(true)}>
+        <button className="mp-info" onClick={() => { setPicking(false); setExpanded(true) }} aria-label="展开播放器">
           <div className="mp-cover">
             {track.cover
               ? <img src={track.cover} alt="" />
@@ -98,7 +116,7 @@ export default function MiniPlayer() {
             <div className="mp-title">{track.name}</div>
             <div className="mp-artist">{track.artist || '涟言点的歌'}</div>
           </div>
-        </div>
+        </button>
         {player.queue.length > 1 && <button className="mp-btn mp-skip" onClick={playPrev} aria-label="上一首">
           <svg viewBox="0 0 24 24" width="15" height="15" fill="currentColor"><polygon points="19,20 9,12 19,4"/><rect x="5" y="4" width="3" height="16"/></svg>
         </button>}
@@ -120,10 +138,16 @@ export default function MiniPlayer() {
   const full = expanded && createPortal(
     <div className="mp-full">
       <div className="mp-full-head">
-        <button className="mp-full-back" onClick={() => setExpanded(false)}>
+        <button className="mp-full-back" onClick={() => picking ? setPicking(false) : setExpanded(false)} aria-label={picking ? '返回播放器' : '收起播放器'}>
           <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
         </button>
+        <span className="mp-full-head-title">{picking ? '选歌' : '正在播放'}</span>
+        <button className="mp-full-pick" onClick={() => setPicking(!picking)} aria-label={picking ? '返回播放器' : '选歌'}>
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></svg>
+          <span>{picking ? '播放器' : '选歌'}</span>
+        </button>
       </div>
+      {picking ? <SongSearch onDone={() => setPicking(false)} /> : <>
       <div className="mp-full-cover">
         {track.cover
           ? <img src={track.cover} alt="" />
@@ -131,6 +155,7 @@ export default function MiniPlayer() {
       </div>
       <div className="mp-full-title">{track.name}</div>
       <div className="mp-full-artist">{track.artist || '涟言点的歌'}</div>
+      <div className="mp-full-source">{player.queue.length > 1 ? `播放队列 ${player.queueIdx + 1} / ${player.queue.length}` : '当前播放'}</div>
 
       <div className="mp-lyrics" ref={lyricRef}>
         {player.lyrics?.length ? player.lyrics.map((l, i) => (
@@ -178,6 +203,7 @@ export default function MiniPlayer() {
           <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor"><polygon points="5,4 15,12 5,20"/><rect x="16" y="4" width="3" height="16"/></svg>
         </button>}
       </div>
+      </>}
     </div>,
     document.body
   )

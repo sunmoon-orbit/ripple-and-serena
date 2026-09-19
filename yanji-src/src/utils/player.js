@@ -1,7 +1,7 @@
 // 全局单例播放器：一个 Audio 元素跨页面存活（挂在 App 根，切面板不中断）。
 // pub/sub 模式，组件用 usePlayer() 订阅状态。
 import { useState, useEffect } from 'react'
-import { resolvePlayable, getLyric } from '../api/music'
+import { resolvePlayable, getLyric } from '../api/music.js'
 
 let audio = null
 const state = {
@@ -16,6 +16,7 @@ const state = {
   queueIdx: -1,
 }
 const listeners = new Set()
+let playRequest = 0
 
 function emit() {
   const snap = { ...state }
@@ -144,13 +145,15 @@ export function subscribe(fn) {
 
 // meta: {name, artist, reason?, source?, id?, pic_id?, lyric_id?}
 export async function playTrack(meta) {
-  ensureAudio()
+  const request = ++playRequest
+  const player = ensureAudio()
   state.loading = true
   state.error = ''
   state.lyrics = []
   emit()
   try {
     const resolved = await resolvePlayable(meta)
+    if (request !== playRequest) return null
     if (!resolved || !resolved.url) {
       state.loading = false
       state.error = '这首几个源都没找到能放的版本'
@@ -158,8 +161,11 @@ export async function playTrack(meta) {
       return null
     }
     state.track = resolved
-    audio.src = resolved.url
-    await audio.play()
+    state.currentTime = 0
+    state.duration = 0
+    player.src = resolved.url
+    await player.play()
+    if (request !== playRequest) return null
     state.loading = false
     emit()
     // 歌词异步补
@@ -190,10 +196,20 @@ export function seek(t) {
 
 export function stop() {
   if (!audio) return
+  playRequest++
   audio.pause()
   audio.currentTime = 0
+  audio.removeAttribute('src')
+  audio.load()
   state.track = null
+  state.playing = false
+  state.currentTime = 0
+  state.duration = 0
   state.lyrics = []
+  state.loading = false
+  state.error = ''
+  state.queue = []
+  state.queueIdx = -1
   emit()
   if (isNativeApp()) {
     try { window.YanjiNative.clearNowPlaying() } catch {}
@@ -204,13 +220,26 @@ export function stop() {
 
 export function setQueue(tracks, startIdx = 0) {
   state.queue = tracks || []
-  state.queueIdx = startIdx
+  state.queueIdx = state.queue.length ? Math.min(Math.max(startIdx, 0), state.queue.length - 1) : -1
+  emit()
+}
+
+export function enqueueTrack(track) {
+  if (!track) return
+  if (state.track && !state.queue.length) {
+    state.queue = [state.track, track]
+    state.queueIdx = 0
+  } else {
+    state.queue = [...state.queue, track]
+    if (state.queueIdx < 0 && state.track) state.queueIdx = 0
+  }
+  emit()
 }
 
 export function playNext() {
   if (!state.queue.length || state.queueIdx >= state.queue.length - 1) return
   state.queueIdx++
-  playTrack(state.queue[state.queueIdx])
+  return playTrack(state.queue[state.queueIdx])
 }
 
 export function playPrev() {
@@ -218,7 +247,7 @@ export function playPrev() {
   if (audio && audio.currentTime > 3) { seek(0); return }
   if (state.queueIdx <= 0) return
   state.queueIdx--
-  playTrack(state.queue[state.queueIdx])
+  return playTrack(state.queue[state.queueIdx])
 }
 
 export function usePlayer() {

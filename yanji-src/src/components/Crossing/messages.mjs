@@ -1,8 +1,14 @@
+import { parseMusicShareContext } from '../../utils/musicShare.js'
+
 export function threadsFromRead(thread) {
   const out = []
   for (const turn of thread?.turns || []) {
     for (const item of turn.items || []) {
-      if (item.type === 'userMessage') out.push({ id: item.id, role: 'user', text: (item.content || []).filter(x => x.type === 'text').map(x => x.text).join('') })
+      if (item.type === 'userMessage') {
+        const text = (item.content || []).filter(x => x.type === 'text').map(x => x.text).join('')
+        const music = parseMusicShareContext(text)
+        out.push({ id: item.id, role: 'user', text: music ? `点给你：${music.name} — ${music.artist}` : text, music: music || undefined })
+      }
       if (item.type === 'agentMessage') out.push({ id: item.id, turnId: turn.id, role: 'assistant', text: item.text || '', completed: turn.status === 'completed' })
     }
   }

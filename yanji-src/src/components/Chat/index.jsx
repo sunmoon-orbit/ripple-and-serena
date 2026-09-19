@@ -26,6 +26,7 @@ import { syncChatsToL0 } from '../../utils/l0Sync'
 import { createStreamUpdateScheduler } from '../../utils/streamUpdateScheduler'
 import { formatShanghaiHm, hasRealSleepInterval } from '../../utils/healthSleep.js'
 import { extractFirstUrl, fetchLinkPreview, buildLinkPreviewContext } from '../../utils/linkPreview.js'
+import { buildMusicShareContext, subscribeMusicShares } from '../../utils/musicShare'
 import { pickAutoPostTrigger, markAutoPosted, postMoment, fetchAutopostSetting } from '../../api/moments'
 import { notifyReplyReady } from '../../api/push'
 import { acknowledgeAndcoWake, getAndcoWakePending, getAndcoWakeStatus } from '../../api/mcp'
@@ -468,7 +469,7 @@ export default function Chat() {
         const baseContent = !keepImages && m.images?.length
           ? `${imageMarker}${m.content ? ` ${m.content}` : ''}`
           : m.content
-        let c = baseContent
+        let c = m.music ? buildMusicShareContext(m.music) : baseContent
         if (m.quote) {
           const who = m.quote.role === 'user' ? '我之前说' : '你（涟言）之前说'
           c = `> 引用${who}：「${m.quote.content}」\n\n${c}`
@@ -977,6 +978,7 @@ export default function Chat() {
           images: last && images.length ? images : undefined,
           quote: i === 0 ? (opts.quote || undefined) : undefined,
           injected: last ? inject : undefined,
+          music: last ? (opts.music || undefined) : undefined,
         })
         if (last) imageMessage = message
       })
@@ -993,6 +995,7 @@ export default function Chat() {
         voiceTone: opts.voice ? (opts.voiceTone || undefined) : undefined,
         // 主动开口的触发消息：进上下文但不渲染成气泡
         hidden: opts.hidden || undefined,
+        music: opts.music || undefined,
       })
     }
     if (imageDescriptions !== false && images.length && imageMessage) {
@@ -1028,6 +1031,15 @@ export default function Chat() {
 
     await generateReply(chat, conn, { titleText: text, hidden: opts.hidden, voicemail: opts.voicemail, proactive: opts.proactive, contactGuard: opts.contactGuard })
   }, [isSending, activeChat, activeConn, connections, imageDescriptions, injectMode, injectPrompt, replyDelay, generateReply])
+
+  useEffect(() => subscribeMusicShares('chat', async (track) => {
+    if (isSending || !activeConn?.apiKey) {
+      if (!activeConn?.apiKey) showToast('请先配置 Murmur 的模型连接，再把歌点给 TA', 'error')
+      return false
+    }
+    await handleSend(`点给你：${track.name} — ${track.artist}`, [], { music: track, instant: true })
+    return true
+  }), [activeConn?.apiKey, handleSend, isSending])
 
   // AndCo 适配层只把明确 @/回复/定向事件交成普通 user turn；不造 system/developer。
   // 这里使用可见页 60 秒保守取件，且每次先重新读取后端总闸。平台尚无正式事件入口时

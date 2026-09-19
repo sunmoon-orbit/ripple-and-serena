@@ -18,6 +18,16 @@ export async function searchTracks(keyword, source = 'netease', count = 5) {
   } catch { return [] }
 }
 
+// 手动搜歌沿用模型解析歌曲时的同一组来源；主源没有结果才回退，避免一次输入
+// 就并发打满四个公开接口。返回项带上实际来源，后续播放仍由 resolvePlayable 验证。
+export async function searchCatalog(keyword, count = 10) {
+  for (const source of SOURCES) {
+    const list = await searchTracks(keyword, source, count)
+    if (list.length) return list.map((track) => ({ ...track, catalog_source: source }))
+  }
+  return []
+}
+
 export async function getUrl(source, id, br = 320) {
   try {
     const r = await fetch(`${GD}?types=url&source=${source}&id=${id}&br=${br}`)

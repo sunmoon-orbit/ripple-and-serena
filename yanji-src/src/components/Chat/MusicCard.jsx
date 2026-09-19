@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useStore } from '../../store'
-import { playTrack, togglePlay, usePlayer } from '../../utils/player'
+import { playTrack, setQueue, togglePlay, usePlayer } from '../../utils/player'
 import { findSubstitute } from '../../api/music'
 
 // 聊天里「涟言点给你的歌」卡片：推卡片给阿颖，她点了才播（绝不自动播）。
@@ -20,7 +20,9 @@ export default function MusicCard({ name, artist, reason }) {
     if (isCurrent) { togglePlay(); return }
     setErr('')
     setLoading(true)
-    const resolved = await playTrack({ name, artist })
+    const requested = { name, artist }
+    setQueue([requested], 0)
+    const resolved = await playTrack(requested)
     setLoading(false)
     if (!resolved) { setErr('几个源都没找到能放的版本'); return }
     setSubName('')

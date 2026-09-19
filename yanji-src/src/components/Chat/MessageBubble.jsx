@@ -10,6 +10,7 @@ import { useStore } from '../../store'
 import { useMessageSpeech } from './useMessageSpeech'
 import SpeechButton from './SpeechButton'
 import MusicCard from './MusicCard'
+import SharedMusicCard from './SharedMusicCard'
 import { shouldToggleMessageMeta } from './messageMetaToggle'
 import { applyInlineFx, stripUnknownAssistantTags } from '../../utils/moodFx'
 import { stripEmotionTag } from '../../utils/emotion'
@@ -601,12 +602,12 @@ function MessageBubble({ msg, onEdit, onQuote, onDelete, isLast, presentationCon
               </div>
             ) : (
               <>
-                {msg.images?.length > 0 && (
+                {msg.music ? <SharedMusicCard track={msg.music} /> : msg.images?.length > 0 && (
                   <div className="bubble-images">
                     {msg.images.map((src, i) => <img key={i} src={src} alt="" className="bubble-img" />)}
                   </div>
                 )}
-                {msg.call ? (
+                {msg.music ? null : msg.call ? (
                   // 通话记录条（微信同款）：通话中/已取消/通话时长 mm:ss
                   <div className="call-bubble">
                     <span>

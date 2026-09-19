@@ -8,6 +8,7 @@ export default function CrossingMessage({ message, config, stopEpoch }) {
       role: message.role,
       content: message.text || '',
       images: message.previews,
+      music: message.music,
       streaming: message.streaming,
       createdAt: message.createdAt,
     }}

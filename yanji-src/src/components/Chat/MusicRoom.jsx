@@ -5,6 +5,7 @@ import { toolFetch as fetch } from '../../api/toolFetch.mjs'
 import { showToast } from '../Toast'
 import { useThemedConfirm } from '../ThemedConfirmDialog'
 import { playTrack, setQueue } from '../../utils/player'
+import SongSearch from './SongSearch'
 
 export default function MusicRoom({ onClose }) {
   const confirmAction = useThemedConfirm()
@@ -15,7 +16,7 @@ export default function MusicRoom({ onClose }) {
 
   const [picks, setPicks] = useState([])
   const [playlists, setPlaylists] = useState([])
-  const [activeTab, setActiveTab] = useState('all') // 'all' | playlist id
+  const [activeTab, setActiveTab] = useState('search') // 'search' | 'all' | playlist id
   const [playlistSongs, setPlaylistSongs] = useState([])
   const [loading, setLoading] = useState(true)
   const [showNewPl, setShowNewPl] = useState(false)
@@ -39,7 +40,7 @@ export default function MusicRoom({ onClose }) {
   useEffect(() => { load() }, [load])
 
   useEffect(() => {
-    if (activeTab === 'all' || !token) return
+    if (activeTab === 'all' || activeTab === 'search' || !token) return
     fetch(`${base}/music/playlists/${activeTab}/songs`, { headers: auth })
       .then(r => r.ok ? r.json() : []).then(setPlaylistSongs).catch(() => setPlaylistSongs([]))
   }, [activeTab, base, token])
@@ -174,10 +175,11 @@ export default function MusicRoom({ onClose }) {
     <div className="roost-overlay" onClick={onClose}>
       <div className="roost-modal roost-modal-tall" onClick={(e) => e.stopPropagation()}>
         <div className="roost-modal-header">
-          <span>🎵 涟言点给你的歌</span>
-          <button className="roost-modal-close" onClick={onClose}>✕</button>
+          <span className="music-room-title"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>音乐</span>
+          <button className="roost-modal-close" onClick={onClose} aria-label="关闭"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
         </div>
         <div className="mpick-tabs">
+          <button className={'mpick-tab' + (activeTab === 'search' ? ' active' : '')} onClick={() => setActiveTab('search')}>选歌</button>
           <button className={'mpick-tab' + (activeTab === 'all' ? ' active' : '')} onClick={() => setActiveTab('all')}>全部</button>
           {playlists.map(pl => (
             <button key={pl.id} className={'mpick-tab' + (activeTab === pl.id ? ' active' : '')} onClick={() => setActiveTab(pl.id)}>
@@ -196,7 +198,9 @@ export default function MusicRoom({ onClose }) {
           </div>
         )}
         <div className="roost-modal-body">
-          {!token ? (
+          {activeTab === 'search' ? (
+            <SongSearch onDone={onClose} />
+          ) : !token ? (
             <div className="games-empty">开启记忆库后，我给你点的歌会存在这里</div>
           ) : loading ? (
             <div className="games-empty">载入中…</div>
@@ -206,7 +210,7 @@ export default function MusicRoom({ onClose }) {
             <>
               {activeTab !== 'all' && displayList.length > 1 && (
                 <button className="mpick-play-all" onClick={() => replay(displayList[0], displayList)}>
-                  ▶ 播放全部（{displayList.length} 首）
+                  播放全部（{displayList.length} 首）
                 </button>
               )}
               {displayList.map(p => renderCard(p, activeTab !== 'all'))}

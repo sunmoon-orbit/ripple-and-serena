@@ -4079,7 +4079,7 @@ textarea.form-input { display: block; margin: 8px 16px 12px; }
 
 /* 底部常驻迷你播放器 */
 .mini-player {
-  position: fixed; left: 0; right: 0; bottom: 0; z-index: 900;
+  position: fixed; left: var(--nav-w); right: 0; bottom: 0; z-index: 900;
   background: var(--bg-sidebar); border-top: 1px solid var(--border-md);
   box-shadow: 0 -2px 12px rgba(0,0,0,0.06);
   padding-bottom: env(safe-area-inset-bottom, 0);
@@ -4087,7 +4087,7 @@ textarea.form-input { display: block; margin: 8px 16px 12px; }
 .mp-progress { height: 3px; background: var(--border); cursor: pointer; }
 .mp-progress-fill { height: 100%; background: var(--accent); transition: width 0.15s linear; }
 .mp-body { display: flex; align-items: center; gap: 10px; padding: 8px 12px; }
-.mp-info { display: flex; align-items: center; gap: 10px; flex: 1; min-width: 0; cursor: pointer; }
+.mp-info { display: flex; align-items: center; gap: 10px; flex: 1; min-width: 0; cursor: pointer; border: 0; padding: 0; background: none; text-align: left; }
 .mp-cover {
   width: 38px; height: 38px; flex-shrink: 0; border-radius: 7px; overflow: hidden;
   background: var(--accent-soft); color: #fff;
@@ -4112,8 +4112,10 @@ textarea.form-input { display: block; margin: 8px 16px 12px; }
   animation: mpSlideUp 0.28s ease;
 }
 @keyframes mpSlideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
-.mp-full-head { width: 100%; padding: 8px 0; display: flex; }
+.mp-full-head { width: 100%; min-height: 52px; padding: 8px 0; display: flex; align-items: center; justify-content: space-between; }
 .mp-full-back { border: none; background: none; color: var(--text-mid); cursor: pointer; padding: 6px; }
+.mp-full-head-title { font-size: 13px; color: var(--text-muted); }
+.mp-full-pick { border: 0; background: none; color: var(--accent); display: flex; align-items: center; gap: 5px; padding: 7px; font-size: 12px; }
 .mp-full-cover {
   width: 180px; height: 180px; border-radius: 16px; margin: 14px 0 18px;
   background: var(--accent-soft); color: #fff; overflow: hidden;
@@ -4123,6 +4125,7 @@ textarea.form-input { display: block; margin: 8px 16px 12px; }
 .mp-full-cover img { width: 100%; height: 100%; object-fit: cover; }
 .mp-full-title { font-size: 19px; font-weight: 700; color: var(--text); text-align: center; }
 .mp-full-artist { font-size: 13.5px; color: var(--text-muted); margin-top: 4px; }
+.mp-full-source { font-size: 11px; color: var(--text-faint); margin-top: 5px; }
 .mp-lyrics {
   flex: 1; min-height: 0; width: 100%; max-width: 460px; overflow-y: auto;
   margin: 18px 0; text-align: center; -webkit-overflow-scrolling: touch;
@@ -4229,6 +4232,43 @@ textarea.form-input { display: block; margin: 8px 16px 12px; }
 
 /* 播放条出现时，把聊天输入框上推让位（约播放条高度 55px） */
 body.mp-active .chat-input-area { margin-bottom: 55px; }
+body.mp-active .crossing-input { margin-bottom: 55px; }
+body.mp-keyboard-open .mini-player { display: none; }
+body.mp-active.mp-keyboard-open .chat-input-area,
+body.mp-active.mp-keyboard-open .crossing-input { margin-bottom: 0; }
+
+/* 用户搜歌：与模型点歌共用同一曲库和播放器。 */
+.music-room-title { display: inline-flex; align-items: center; gap: 7px; }
+.song-search { width: 100%; max-width: 620px; margin: 0 auto; min-height: 0; display: flex; flex-direction: column; }
+.song-search-form { display: flex; align-items: center; gap: 8px; padding: 9px 11px; border: 1px solid var(--border-md); border-radius: 12px; background: var(--card); }
+.song-search-form svg { flex-shrink: 0; color: var(--text-muted); }
+.song-search-form input { flex: 1; min-width: 0; border: 0; outline: 0; background: transparent; color: var(--text); font-size: 14px; }
+.song-search-form button { border: 0; border-radius: 8px; padding: 6px 12px; background: var(--accent); color: #fff; font-size: 12px; }
+.song-search-form button:disabled { opacity: .55; }
+.song-share-play { display: flex; align-items: center; gap: 7px; padding: 10px 2px 6px; color: var(--text-muted); font-size: 12px; }
+.song-share-play input { accent-color: var(--accent); }
+.song-search-results { min-height: 0; overflow-y: auto; padding: 2px 0 16px; }
+.song-search-empty { padding: 32px 8px; text-align: center; color: var(--text-faint); font-size: 13px; }
+.song-result { display: grid; grid-template-columns: 44px minmax(0, 1fr); gap: 10px; align-items: center; padding: 10px 2px; border-bottom: 1px solid var(--border); }
+.song-result-cover { width: 44px; height: 44px; border-radius: 9px; overflow: hidden; display: flex; align-items: center; justify-content: center; background: var(--accent-soft); color: #fff; }
+.song-result-cover img { width: 100%; height: 100%; object-fit: cover; }
+.song-result-meta { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.song-result-meta strong, .song-result-meta span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.song-result-meta strong { color: var(--text); font-size: 13px; }
+.song-result-meta span { color: var(--text-muted); font-size: 11.5px; }
+.song-result-actions { grid-column: 2; display: flex; flex-wrap: wrap; gap: 6px; }
+.song-result-actions button { border: 1px solid var(--border-md); border-radius: 999px; padding: 5px 9px; background: var(--card); color: var(--text-mid); font-size: 11px; }
+.song-result-actions button.primary { border-color: var(--accent); background: var(--accent); color: #fff; }
+.song-result-actions button:disabled { opacity: .55; }
+.music-share-card { margin: 0; min-width: min(280px, 72vw); text-align: left; }
+.music-share-label { color: var(--accent); font-size: 10px; letter-spacing: .04em; margin-bottom: 2px; }
+
+@media (max-width: 699px) and (orientation: portrait) {
+  .mini-player { left: 0; bottom: calc(52px + env(safe-area-inset-bottom, 0px)); padding-bottom: 0; }
+  body.mp-active .toast-container { bottom: calc(116px + env(safe-area-inset-bottom, 0px)); }
+  .mp-body { gap: 5px; padding-inline: 8px; }
+  .mp-btn { width: 32px; height: 36px; }
+}
 
 /* ── 回到底部按钮 ────────────────────────────── */
 .scroll-bottom-btn {

@@ -10,6 +10,7 @@ import { sizeComposer } from './layout.mjs'
 import CrossingMessage from './Message'
 import { threadsFromRead, completeTurn } from './messages.mjs'
 import { bindAgentSession, canAuthenticate } from './authorization.mjs'
+import { buildMusicShareContext, subscribeMusicShares } from '../../utils/musicShare'
 
 function wsUrl(baseUrl) {
   const base = new URL(baseUrl || 'https://memory.ravenlove.cc')
@@ -246,6 +247,25 @@ export default function Crossing() {
     setAttachments([])
     setDraft('')
   }
+  useEffect(() => subscribeMusicShares('crossing', (track) => {
+    if (turn || starting || uploading || !sessionState.authenticated || sessionState.phase !== 'ready') return false
+    const clientMessageId = crypto.randomUUID()
+    const text = buildMusicShareContext(track)
+    try {
+      if (!flowRef.current.start(text, clientMessageId)) return false
+    } catch (e) {
+      setError(e.message)
+      return false
+    }
+    setStarting(true)
+    setMessages((previous) => [...previous, {
+      id: clientMessageId,
+      role: 'user',
+      text: `点给你：${track.name} — ${track.artist}`,
+      music: track,
+    }])
+    return true
+  }), [sessionState.authenticated, sessionState.phase, starting, turn, uploading])
   const interrupt = () => { setStopEpoch(n => n + 1); if (turn && activeThread) send({ type: 'crossing/turn/interrupt', threadId: activeThread.id || activeThread.threadId, turnId: turn.id }) }
   const respond = (choice) => {
     if (!approval) return
