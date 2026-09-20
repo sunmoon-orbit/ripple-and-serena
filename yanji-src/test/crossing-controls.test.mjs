@@ -42,3 +42,10 @@ test('all existing sidebar tools remain represented in Crossing', () => {
   assert.ok(names.length >= 15)
   for (const name of names) assert.ok(controls.includes(name), `missing tool: ${name}`)
 })
+
+test('mobile composer keeps Enter as newline and uses concise placeholders', () => {
+  const source = readFileSync(new URL('../src/components/Crossing/index.jsx', import.meta.url), 'utf8')
+  assert.ok(source.includes("placeholder={turn ? '补充消息…' : sessionState.phase === 'ready' ? '输入消息…'"))
+  assert.ok(source.includes("e.key === 'Enter' && (e.ctrlKey || e.metaKey)"))
+  assert.equal(source.includes('输入消息；回车换行'), false)
+})
