@@ -1,6 +1,5 @@
 const http = require('http')
 const { WebSocketServer } = require('ws')
-const { execFileSync, spawnSync } = require('child_process')
 const os = require('os')
 const fs = require('fs')
 const path = require('path')
@@ -9,6 +8,9 @@ const { getUsage } = require('./usage')
 const { contextSnapshot } = require('./claude-runtime')
 const { getLinkPreview } = require('./link-preview')
 const { createCrossingService, diagnoseCrossingError } = require('./yanji-crossing')
+const boundedSync = require('./bounded-sync')
+const eventLoopHealth = require('./event-loop-health').createEventLoopHealth()
+const { pingActiveSockets } = require('./ws-heartbeat')
 
 const PW_HASH = (() => {
   try {
@@ -236,7 +238,7 @@ function archiveMsg(role, content) {
 // 因为那会重新点亮那盏骗人的绿灯。--print 是它派生的子进程，同理排除。
 function findCcPane() {
   try {
-    const out = spawnSync('tmux', ['list-panes', '-a', '-F', '#{pane_pid} #{session_name}:#{window_index}.#{pane_index}'], { encoding: 'utf8' }).stdout || ''
+    const out = boundedSync.spawnBounded('tmux-list-panes', 'tmux', ['list-panes', '-a', '-F', '#{pane_pid} #{session_name}:#{window_index}.#{pane_index}']).stdout || ''
     const panes = new Map()   // pane_pid -> 'session:window.pane'
     for (const l of out.trim().split('\n')) {
       const [pid, target] = l.trim().split(/\s+/)
@@ -244,7 +246,7 @@ function findCcPane() {
     }
     if (!panes.size) return null
 
-    const ps = spawnSync('ps', ['-eo', 'pid=,ppid=,args='], { encoding: 'utf8' }).stdout || ''
+    const ps = boundedSync.spawnBounded('ps-process-tree', 'ps', ['-eo', 'pid=,ppid=,args=']).stdout || ''
     const parent = new Map(), args = new Map()
     for (const l of ps.split('\n')) {
       const m = l.match(/^\s*(\d+)\s+(\d+)\s+(.+)$/)
@@ -276,7 +278,7 @@ function tmuxCapture() {
   const target = ccTarget()
   if (!target) return ''
   try {
-    const r = spawnSync('tmux', ['capture-pane', '-p', '-S', '-500', '-t', target], { encoding: 'utf8' })
+    const r = boundedSync.spawnBounded('tmux-capture-pane', 'tmux', ['capture-pane', '-p', '-S', '-500', '-t', target])
     return r.stdout || ''
   } catch { return '' }
 }
@@ -326,9 +328,8 @@ function tmuxSend(text) {
   if (!target) return false
   const clean = text.replace(/\n/g, ' ')
   try {
-    execFileSync('tmux', ['send-keys', '-t', target, '-l', clean])
-    execFileSync('tmux', ['send-keys', '-t', target, 'Enter'])
-    return true
+    if (!boundedSync.execFileBounded('tmux-send-text', 'tmux', ['send-keys', '-t', target, '-l', clean])) return false
+    return boundedSync.execFileBounded('tmux-send-enter', 'tmux', ['send-keys', '-t', target, 'Enter'])
   } catch { return false }
 }
 
@@ -344,7 +345,7 @@ function ccOnline() {
 
 function diskUsage() {
   try {
-    const r = spawnSync('df', ['-h', '/'], { encoding: 'utf8' })
+    const r = boundedSync.spawnBounded('disk-usage', 'df', ['-h', '/'])
     const lines = r.stdout.trim().split('\n')
     const parts = lines[1].split(/\s+/)
     return { size: parts[1], used: parts[2], avail: parts[3], pct: parts[4] }
@@ -361,7 +362,7 @@ function memUsage() {
 
 function pm2Services() {
   try {
-    const r = spawnSync('pm2', ['jlist'], { encoding: 'utf8' })
+    const r = boundedSync.spawnBounded('pm2-jlist', 'pm2', ['jlist'])
     const list = JSON.parse(r.stdout)
     return list.map(p => ({ name: p.name, status: p.pm2_env.status, mem: Math.round((p.monit?.memory || 0) / 1024 / 1024) }))
   } catch { return [] }
@@ -460,9 +461,7 @@ function pushReplyNotif(text) {
 
 // 心跳：每 10 秒 ping 一次，减少 Android Chrome 后台掉线
 setInterval(() => {
-  for (const ws of clients) {
-    if (ws.readyState === 1) ws.ping()
-  }
+  pingActiveSockets(clients, crossingClients)
 }, 10000)
 
 // --- MCP JSON-RPC handler ---
@@ -803,7 +802,15 @@ const server = http.createServer((req, res) => {
 
   if (req.method === 'GET' && url.pathname === '/raven/health') {
     res.writeHead(200, { 'Content-Type': 'application/json' })
-    res.end(JSON.stringify({ ok: true }))
+    res.end(JSON.stringify({
+      ok: true,
+      ...eventLoopHealth.snapshot(),
+      activeWsCount: clients.size,
+      crossingWsCount: crossingClients.size,
+      mcp: { connectedClients: mcpSseClients.size },
+      codex: crossing.diagnostics(),
+      ...boundedSync.diagnostics(),
+    }))
     return  // 之前漏了 return，请求会继续掉进静态处理器二次写头把进程炸掉（2026-07-03 发现）
   }
 

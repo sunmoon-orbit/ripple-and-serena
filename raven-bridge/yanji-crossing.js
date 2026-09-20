@@ -422,12 +422,24 @@ function createCrossingService(options = {}) {
     }
     if (activeTurn?.clientId === clientId) {
       // 不杀掉 app-server；只中断属于已断开浏览器的实际 turn，避免迟到授权误用。
-      adapter.request('turn/interrupt', { threadId: activeTurn.threadId, turnId: activeTurn.turnId }).catch(() => {})
+      const { threadId, turnId } = activeTurn
+      clearTurn(turnId)
+      adapter.request('turn/interrupt', { threadId, turnId }).catch(() => {})
     }
   }
 
   const canReceive = (id, message) => !message.threadId || (sessions.get(id) === message.threadId && (!activeTurn || activeTurn.clientId === id))
-  return { handle, disconnect, adapter, uploads, canReceive, getActiveTurn: () => activeTurn, publishRateLimits }
+  const diagnostics = () => {
+    const child = adapter.diagnostics?.() || {}
+    return {
+      childState: child.state || (adapter.online ? 'online' : 'offline'),
+      activeTurn: !!activeTurn,
+      startingTurn: !!startingTurn,
+      pendingApprovals: approvals.size,
+      pendingRequests: child.pendingRequests || 0,
+    }
+  }
+  return { handle, disconnect, adapter, uploads, canReceive, getActiveTurn: () => activeTurn, diagnostics, publishRateLimits }
 }
 
 module.exports = { createCrossingService, fallbackRateLimits, publicThread, approvalResult, diagnoseCrossingError }

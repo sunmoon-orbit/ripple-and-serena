@@ -81,6 +81,14 @@ class CodexAppServer extends EventEmitter {
 
   get online() { return !!this.child && this.initialized }
 
+  diagnostics() {
+    return {
+      state: this.online ? 'online' : this.child ? 'starting' : 'offline',
+      pendingRequests: this.pending.size,
+      pendingApprovals: this.serverRequests.size,
+    }
+  }
+
   async start() {
     if (this.ready) return this.ready
     this.child = this.spawn(this.command, this.args, {

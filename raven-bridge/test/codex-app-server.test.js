@@ -98,6 +98,11 @@ test('Crossing binds approvals to exact client/thread/turn/item and declines on 
   service.disconnect('phone-a')
   assert.deepEqual(adapter.resolved[1], { id: 'request-2', result: { decision: 'decline' } })
   assert.deepEqual(adapter.calls.at(-1), { method: 'turn/interrupt', params: { threadId: 'thread-1', turnId: 'turn-1' } })
+  assert.equal(service.getActiveTurn(), null)
+  assert.equal(service.diagnostics().pendingApprovals, 0)
+  const interrupts = adapter.calls.filter(call => call.method === 'turn/interrupt').length
+  service.disconnect('phone-a')
+  assert.equal(adapter.calls.filter(call => call.method === 'turn/interrupt').length, interrupts, 'repeated disconnect is idempotent')
 })
 
 test('Crossing reserves the only active turn before turn/start resolves', async () => {
