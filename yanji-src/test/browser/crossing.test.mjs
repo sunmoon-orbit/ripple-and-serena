@@ -103,6 +103,76 @@ test('real Crossing components preserve thread state across tools and model appl
   await page.goto(origin)
   await page.locator('.home-screen').click()
   await ready()
+
+  const approvalCases = [
+    { width: 360, height: 740, visualHeight: 740, safeBottom: 0, choice: 'deny' },
+    { width: 412, height: 915, visualHeight: 915, safeBottom: 24, choice: 'allow' },
+    { width: 844, height: 390, visualHeight: 390, safeBottom: 0, choice: 'deny' },
+    { width: 360, height: 740, visualHeight: 320, offsetTop: 48, safeBottom: 24, choice: 'allow' },
+  ]
+  for (const [index, fixture] of approvalCases.entries()) {
+    await page.evaluate(() => {
+      delete visualViewport.height
+      delete visualViewport.offsetTop
+    })
+    await page.setViewportSize({ width: fixture.width, height: fixture.height })
+    await page.evaluate(safeBottom => document.documentElement.style.setProperty('--approval-safe-area-bottom', `${safeBottom}px`), fixture.safeBottom)
+    await page.evaluate(({ visualHeight, offsetTop = 0, index }) => {
+      Object.defineProperty(visualViewport, 'height', { configurable: true, value: visualHeight })
+      Object.defineProperty(visualViewport, 'offsetTop', { configurable: true, value: offsetTop })
+      visualViewport.dispatchEvent(new Event('resize'))
+      window.__sockets.at(-1).emit({
+        type: 'crossing/approval/request', requestId: `approval-${index}`, threadId: 'thread-luna', turnId: 'fixture-turn', itemId: `fixture-item-${index}`,
+        kind: 'command', command: Array(80).fill(`printf '很长的授权命令 ${index} /fixture/path/xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx'`).join('\n'),
+        reason: '移动端授权弹窗回归测试', cwd: '/home/ripple/ripple-and-serena',
+      })
+    }, { visualHeight: fixture.visualHeight, offsetTop: fixture.offsetTop, index })
+    const dialog = page.getByRole('dialog', { name: 'Codex 需要本次授权' })
+    await dialog.waitFor()
+    const geometry = await dialog.evaluate((node, fixture) => {
+      const rect = element => element.getBoundingClientRect()
+      const backdrop = node.parentElement
+      const title = node.querySelector('.crossing-approval-header')
+      const body = node.querySelector('.crossing-approval-body')
+      const actions = node.querySelector('.crossing-approval-actions')
+      const nav = document.querySelector('.icon-nav')
+      return {
+        modal: rect(node), backdrop: rect(backdrop), title: rect(title), body: rect(body), actions: rect(actions),
+        bodyScrolls: body.scrollHeight > body.clientHeight,
+        bodyOverflow: getComputedStyle(body).overflowY,
+        backdropZ: Number(getComputedStyle(backdrop).zIndex),
+        navZ: nav ? Number(getComputedStyle(nav).zIndex) : 0,
+        bodyLocked: getComputedStyle(document.body).overflow === 'hidden' && getComputedStyle(document.documentElement).overflow === 'hidden',
+        backdropPaddingBottom: parseFloat(getComputedStyle(backdrop).paddingBottom),
+        expectedBottom: (fixture.offsetTop || 0) + fixture.visualHeight,
+      }
+    }, fixture)
+    assert.ok(geometry.backdrop.top >= (fixture.offsetTop || 0) - 1)
+    assert.ok(geometry.backdrop.bottom <= geometry.expectedBottom + 1)
+    assert.ok(geometry.modal.top >= geometry.backdrop.top && geometry.modal.bottom <= geometry.backdrop.bottom)
+    assert.ok(geometry.title.top >= geometry.modal.top && geometry.actions.bottom <= geometry.modal.bottom)
+    assert.ok(geometry.bodyScrolls, `${fixture.width}x${fixture.height}/${fixture.visualHeight}: only approval body must scroll`)
+    assert.equal(geometry.bodyOverflow, 'auto')
+    assert.ok(geometry.backdropZ > geometry.navZ)
+    assert.equal(geometry.bodyLocked, true)
+    assert.ok(geometry.backdropPaddingBottom >= 8 + fixture.safeBottom)
+    const button = page.getByRole('button', { name: fixture.choice === 'allow' ? '允许本次' : '拒绝', exact: true })
+    assert.ok(await button.evaluate(node => {
+      const rect = node.getBoundingClientRect()
+      const hit = document.elementFromPoint(rect.left + rect.width / 2, rect.top + rect.height / 2)
+      return rect.height >= 44 && (hit === node || node.contains(hit))
+    }))
+    await button.click()
+    await dialog.waitFor({ state: 'hidden' })
+    assert.ok(await page.evaluate(({ index, choice }) => window.__wire.some(message => message.type === 'crossing/approval/respond' && message.requestId === `approval-${index}` && message.choice === choice), { index, choice: fixture.choice }))
+  }
+  await page.evaluate(() => {
+    document.documentElement.style.removeProperty('--approval-safe-area-bottom')
+    delete visualViewport.height
+    delete visualViewport.offsetTop
+    visualViewport.dispatchEvent(new Event('resize'))
+  })
+  await page.setViewportSize({ width: 360, height: 740 })
   await page.getByRole('button', { name: 'Hollow', exact: true }).click()
   await page.getByRole('button', { name: 'Murmur', exact: true }).click()
   await ready()

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { ToolMemoryContext } from '../Chat/ToolMemory'
 import { useStore } from '../../store'
 import { createSessionFlow } from './session-flow.mjs'
@@ -32,6 +33,58 @@ function usageText(usage) {
   const one = usage.primary ? `5h ${usage.primary.usedPercent}%` : ''
   const two = usage.secondary ? `7天 ${usage.secondary.usedPercent}%` : ''
   return [one, two].filter(Boolean).join(' · ') + (usage.source === 'snapshot' ? ' · 快照' : '')
+}
+
+function ApprovalDialog({ approval, onRespond }) {
+  const backdropRef = useRef(null)
+
+  useEffect(() => {
+    const viewport = window.visualViewport
+    const syncViewport = () => {
+      const node = backdropRef.current
+      if (!node) return
+      node.style.setProperty('--approval-viewport-top', `${viewport?.offsetTop || 0}px`)
+      node.style.setProperty('--approval-viewport-left', `${viewport?.offsetLeft || 0}px`)
+      node.style.setProperty('--approval-viewport-width', `${viewport?.width || window.innerWidth}px`)
+      node.style.setProperty('--approval-viewport-height', `${viewport?.height || window.innerHeight}px`)
+    }
+    const previousBodyOverflow = document.body.style.overflow
+    const previousRootOverflow = document.documentElement.style.overflow
+    document.body.style.overflow = 'hidden'
+    document.documentElement.style.overflow = 'hidden'
+    syncViewport()
+    viewport?.addEventListener('resize', syncViewport)
+    viewport?.addEventListener('scroll', syncViewport)
+    window.addEventListener('resize', syncViewport)
+    return () => {
+      viewport?.removeEventListener('resize', syncViewport)
+      viewport?.removeEventListener('scroll', syncViewport)
+      window.removeEventListener('resize', syncViewport)
+      document.body.style.overflow = previousBodyOverflow
+      document.documentElement.style.overflow = previousRootOverflow
+    }
+  }, [])
+
+  return createPortal(
+    <div ref={backdropRef} className="crossing-approval-backdrop">
+      <section className="crossing-approval" role="dialog" aria-modal="true" aria-labelledby="crossing-approval-title">
+        <header className="crossing-approval-header">
+          <b id="crossing-approval-title">Codex 需要本次授权</b>
+          <span>{approval.kind === 'file-change' ? '准备修改文件' : '准备执行命令'}</span>
+        </header>
+        <div className="crossing-approval-body">
+          {approval.command && <pre>{approval.command}</pre>}
+          {approval.reason && <p>{approval.reason}</p>}
+          {approval.cwd && <small>{approval.cwd}</small>}
+        </div>
+        <footer className="crossing-approval-actions">
+          <button className="crossing-deny" onClick={() => onRespond('deny')}>拒绝</button>
+          <button onClick={() => onRespond('allow')}>允许本次</button>
+        </footer>
+      </section>
+    </div>,
+    document.body,
+  )
 }
 
 export default function Crossing() {
@@ -395,7 +448,7 @@ export default function Crossing() {
           </div>
         </main>
       </div>
-      {approval && <div className="crossing-approval-backdrop"><div className="crossing-approval"><b>Codex 需要本次授权</b><p>{approval.kind === 'file-change' ? '准备修改文件' : '准备执行命令'}</p>{approval.command && <pre>{approval.command}</pre>}{approval.reason && <p>{approval.reason}</p>}<small>{approval.cwd}</small><div><button className="crossing-deny" onClick={() => respond('deny')}>拒绝</button><button onClick={() => respond('allow')}>允许本次</button></div></div></div>}
+      {approval && <ApprovalDialog approval={approval} onRespond={respond} />}
     </div>
   )
 }

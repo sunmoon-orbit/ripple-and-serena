@@ -5629,13 +5629,18 @@ body.mp-active .scroll-bottom-btn { bottom: 139px; }
 .crossing-call-entry { flex: 0 0 auto; padding: 10px 12px; border-bottom: 1px solid var(--border); color: var(--text-mid); background: var(--card); font-size: 12px; overflow-wrap: anywhere; }
 .crossing-call-entry > div { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 6px; }
 .crossing-call-entry button { min-height: 44px; }
-.crossing-approval-backdrop { position: fixed; z-index: 80; inset: 0; display: grid; place-items: end center; padding: 14px; background: rgba(20,15,25,.32); }
-.crossing-approval { width: min(500px, 100%); max-height: min(78dvh, 620px); overflow: auto; padding: 16px; border: 1px solid var(--border-md); border-radius: 17px; background: var(--bg); box-shadow: var(--shadow-md); }
-.crossing-approval b { font-size: 15px; }
+.crossing-approval-backdrop { position: fixed; z-index: 2147483000; top: var(--approval-viewport-top, 0); left: var(--approval-viewport-left, 0); width: var(--approval-viewport-width, 100vw); height: var(--approval-viewport-height, 100dvh); box-sizing: border-box; display: flex; align-items: center; justify-content: center; padding: calc(8px + max(env(safe-area-inset-top, 0px), var(--approval-safe-area-top, 0px))) calc(8px + max(env(safe-area-inset-right, 0px), var(--approval-safe-area-right, 0px))) calc(8px + max(env(safe-area-inset-bottom, 0px), var(--approval-safe-area-bottom, 0px))) calc(8px + max(env(safe-area-inset-left, 0px), var(--approval-safe-area-left, 0px))); overflow: hidden; overscroll-behavior: contain; touch-action: none; background: rgba(20,15,25,.32); }
+.crossing-approval { display: flex; flex-direction: column; min-height: 0; width: min(500px, 100%); max-height: min(620px, 100%); overflow: hidden; border: 1px solid var(--border-md); border-radius: 17px; background: var(--bg); box-shadow: var(--shadow-md); }
+.crossing-approval-header { flex: 0 0 auto; padding: 16px 16px 10px; }
+.crossing-approval-header b,.crossing-approval-header span { display: block; }
+.crossing-approval-header b { font-size: 15px; }
+.crossing-approval-header span { margin-top: 8px; font-size: 13px; color: var(--text-mid); }
+.crossing-approval-body { flex: 1 1 auto; min-height: 0; padding: 0 16px; overflow-x: hidden; overflow-y: auto; overscroll-behavior: contain; touch-action: pan-y; -webkit-overflow-scrolling: touch; }
+.crossing-approval .crossing-approval-body pre { max-height: none; overflow: visible; }
 .crossing-approval p { margin: 8px 0; font-size: 13px; color: var(--text-mid); overflow-wrap: anywhere; }
 .crossing-approval small { display: block; margin: 6px 0 12px; color: var(--text-muted); overflow-wrap: anywhere; }
-.crossing-approval > div { display: flex; justify-content: flex-end; gap: 8px; }
-.crossing-approval button { min-height: 38px; padding: 0 13px; border: 0; border-radius: 10px; background: var(--accent); color: var(--bubble-user-text); cursor: pointer; }
+.crossing-approval-actions { flex: 0 0 auto; display: flex; justify-content: flex-end; gap: 8px; padding: 12px 16px 16px; border-top: 1px solid var(--border); background: var(--bg); }
+.crossing-approval button { min-height: 44px; padding: 0 13px; border: 0; border-radius: 10px; background: var(--accent); color: var(--bubble-user-text); cursor: pointer; touch-action: manipulation; }
 .crossing-approval .crossing-deny { background: rgba(190,80,80,.13); color: #a34848; }
 @keyframes crossing-blink { 50% { opacity: 0; } }
 @media (max-width: 900px) {
