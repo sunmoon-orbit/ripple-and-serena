@@ -120,5 +120,5 @@ test('Crossing reserves the only active turn before turn/start resolves', async 
   await assert.rejects(() => service.handle('phone-b', { type: 'crossing/turn/start', threadId: 'thread-b', text: '第二条' }), /已有 Codex 任务/)
   adapter.resolveTurn({ turn: { id: 'turn-a' } })
   await first
-  assert.deepEqual(service.getActiveTurn(), { clientId: 'phone-a', threadId: 'thread-a', turnId: 'turn-a' })
+  assert.deepEqual(service.getActiveTurn(), { clientId: 'phone-a', threadId: 'thread-a', turnId: 'turn-a', imageAllowed: false })
 })

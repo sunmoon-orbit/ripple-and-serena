@@ -53,6 +53,7 @@ function diagnoseCrossingError(error, operation = '') {
   let code = 'app_server_error'
   if (/unauthorized|permission|forbidden|not allowed/.test(source)) code = 'permission_or_auth'
   else if (/附件|attachment/.test(source) && /(不可用|过期|重新添加|invalid|expired|unavailable)/.test(source)) code = 'invalid_attachment'
+  else if (/active.?turn.?not.?steerable|cannot accept same-turn steering|not steerable/.test(source)) code = 'turn_not_steerable'
   else if (/thread/.test(source) && /(invalid|unknown|not found|missing|mismatch|does not exist)/.test(source)) code = 'invalid_thread'
   else if (/reasoning|effort/.test(source) && /(invalid|unsupported|not support|不可用|不支持)/.test(source)) code = 'invalid_reasoning_effort'
   else if (/model/.test(source) && /(invalid|unknown|not found|unavailable|unsupported|不可用|不支持)/.test(source)) code = 'invalid_model'
@@ -294,6 +295,36 @@ function createCrossingService(options = {}) {
       return
     }
     if (type === 'crossing/usage/read') { await publishRateLimits(); return }
+    if (type === 'crossing/turn/steer') {
+      assertClientTurn(clientId, message)
+      const text = String(message.text || '').trim()
+      const attachments = Array.isArray(message.attachments) ? message.attachments : []
+      if (!text && !attachments.length) throw new Error('缺少补充内容')
+      const currentTurn = activeTurn
+      const uploadOwner = attachments.length ? attachmentOwner(clientId) : clientId
+      if (attachments.length && !uploadOwner) throw new Error('附件不可用，请重新添加')
+      let pinned = false
+      try {
+        const attachmentInputs = uploads.inputs(attachments, currentTurn.imageAllowed === true, uploadOwner)
+        uploads.pin(attachments, true, uploadOwner); pinned = true
+        const result = await request('turn/steer', {
+          threadId: currentTurn.threadId,
+          expectedTurnId: currentTurn.turnId,
+          input: [...(text ? input(text) : []), ...attachmentInputs],
+          clientUserMessageId: String(message.clientMessageId || ''),
+        })
+        if (result.turnId !== currentTurn.turnId || activeTurn !== currentTurn) throw new Error('当前任务已结束，补充内容未发送')
+        if (attachments.length) {
+          currentTurn.attachments = [...(currentTurn.attachments || []), ...attachments]
+          currentTurn.attachmentOwner = uploadOwner
+        }
+        send(clientId, { type: 'crossing/turn/steered', threadId: currentTurn.threadId, turnId: currentTurn.turnId, clientMessageId: String(message.clientMessageId || '') })
+      } catch (error) {
+        if (pinned) uploads.pin(attachments, false, uploadOwner)
+        throw error
+      }
+      return
+    }
     if (type === 'crossing/turn/start') {
       if (activeTurn || startingTurn) throw new Error('已有 Codex 任务正在运行；请先停止或等待完成')
       const threadId = String(message.threadId || '')
@@ -315,7 +346,8 @@ function createCrossingService(options = {}) {
         const choice = desired ? await modelControls.validate(desired) : null
         uploadOwner = message.attachments?.length ? attachmentOwner(clientId) : clientId
         if (message.attachments?.length && !uploadOwner) throw new Error('附件不可用，请重新添加')
-        const attachmentInputs = uploads.inputs(message.attachments, !!choice?.inputModalities.includes('image'), uploadOwner)
+        const imageAllowed = !!choice?.inputModalities.includes('image')
+        const attachmentInputs = uploads.inputs(message.attachments, imageAllowed, uploadOwner)
         uploads.pin(message.attachments, true, uploadOwner)
         const result = await request('turn/start', {
           threadId, input: [...(text ? input(text) : []), ...attachmentInputs], clientUserMessageId: String(message.clientMessageId || ''),
@@ -325,7 +357,7 @@ function createCrossingService(options = {}) {
         })
         const turnId = result.turn?.id
         if (!turnId) throw new Error('Codex 未返回任务编号')
-        activeTurn = { clientId, threadId, turnId, ...(message.attachments?.length ? { attachments: message.attachments, attachmentOwner: uploadOwner } : {}) }
+        activeTurn = { clientId, threadId, turnId, imageAllowed, ...(message.attachments?.length ? { attachments: message.attachments, attachmentOwner: uploadOwner } : {}) }
         if (choice) rememberChoice(threadId, choice)
         if (disconnectedClients.has(clientId)) {
           await adapter.request('turn/interrupt', { threadId, turnId }).catch(() => {})

@@ -54,6 +54,11 @@ export function createSessionFlow(send, changed = () => {}, options = {}) {
       send({ type: 'crossing/turn/start', threadId: state.thread.id, text, clientMessageId, ...options })
       return true
     },
+    steer(turnId, text, clientMessageId, options = {}) {
+      if (!state.authenticated || state.phase !== 'ready' || !state.thread?.id || !turnId || (!text.trim() && !options.attachments?.length) || localCommand(text)) return false
+      send({ type: 'crossing/turn/steer', threadId: state.thread.id, turnId, text, clientMessageId, ...options })
+      return true
+    },
   }
   return flow
 }

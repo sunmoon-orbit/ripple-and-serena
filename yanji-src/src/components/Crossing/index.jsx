@@ -112,6 +112,7 @@ export default function Crossing() {
   const [sessionState, setSessionState] = useState({ phase: 'disconnected' })
   const [sessionsOpen, setSessionsOpen] = useState(true)
   const [starting, setStarting] = useState(false)
+  const [steering, setSteering] = useState(false)
   const inputRef = useRef(null)
   const flowRef = useRef(null)
   const fileRef = useRef(null)
@@ -259,13 +260,13 @@ export default function Crossing() {
           return
         }
         if (msg.type === 'crossing/error') {
-          setStarting(false)
+          setStarting(false); setSteering(false)
           if (msg.operation === 'crossing/model/list') setModelsError(msg.error || '模型列表读取失败')
           else if (msg.operation === 'crossing/model/apply' && msg.requestId === modelApplyRef.current?.requestId) {
             modelApplyRef.current = null
             setModelApply({ status: 'failed', error: msg.error || '模型应用失败' })
           } else {
-            if (msg.operation === 'crossing/turn/start' && pendingTurnRef.current) {
+            if (['crossing/turn/start', 'crossing/turn/steer'].includes(msg.operation) && pendingTurnRef.current) {
               const pending = pendingTurnRef.current
               pendingTurnRef.current = null
               setMessages(previous => previous.filter(entry => entry.id !== pending.clientMessageId))
@@ -283,8 +284,9 @@ export default function Crossing() {
         }
         if (msg.threadId && msg.threadId !== activeThreadRef.current) return
         if (msg.type === 'crossing/turn/started') { pendingTurnRef.current = null; setStarting(false); setTurn(msg.turn); return }
-        if (msg.type === 'crossing/turn/completed') { setMessages(previous => completeTurn(previous, msg.turn)); setStarting(false); setTurn(null); setApproval(null); return }
-        if (msg.type === 'crossing/turn/interrupted') { setStopEpoch(n => n + 1); setTurn(null); return }
+        if (msg.type === 'crossing/turn/steered') { pendingTurnRef.current = null; setSteering(false); return }
+        if (msg.type === 'crossing/turn/completed') { pendingTurnRef.current = null; setMessages(previous => completeTurn(previous, msg.turn)); setStarting(false); setSteering(false); setTurn(null); setApproval(null); return }
+        if (msg.type === 'crossing/turn/interrupted') { pendingTurnRef.current = null; setSteering(false); setStopEpoch(n => n + 1); setTurn(null); return }
         if (msg.type === 'crossing/message/delta') {
           if (msg.threadId !== activeThreadRef.current) return
           setMessages((previous) => {
@@ -326,7 +328,7 @@ export default function Crossing() {
           setModelApply({ status: 'failed', error: '连接已断开，模型没有应用；原设置保持不变' })
         }
         clearTimeout(expiryTimer); setCapability('')
-        flowRef.current.disconnect(); setStopEpoch(n => n + 1); setTurn(null); setStarting(false); setApproval(null)
+        flowRef.current.disconnect(); setStopEpoch(n => n + 1); setTurn(null); setStarting(false); setSteering(false); setApproval(null)
         setConnection('reconnecting')
         reconnectRef.current = setTimeout(connect, 2500)
       }
@@ -359,6 +361,18 @@ export default function Crossing() {
     pendingTurnRef.current = { clientMessageId, text, attachments }
     setStarting(true)
     setMessages((previous) => [...previous, { id: clientMessageId, role: 'user', text: [text, ...attachments.map(a => `[附件：${a.name}]`)].filter(Boolean).join('\n'), previews: attachments.filter(a => a.kind === 'image').map(a => a.preview || a.url) }])
+    setAttachments([])
+    setDraft('')
+  }
+  const steerTurn = () => {
+    const text = draft.trim()
+    if ((!text && !attachments.length) || !turn?.id || steering || uploading || !sessionState.authenticated || sessionState.phase !== 'ready') return
+    if (localCommand(text)) { setError('Agent 工作中不能执行会话命令；请先停止，或把它作为普通文字改写'); return }
+    const clientMessageId = crypto.randomUUID()
+    try { if (!flowRef.current.steer(turn.id, text, clientMessageId, { attachments: attachments.map(({ id, url }) => id ? { id } : { url }) })) return } catch (e) { setError(e.message); return }
+    pendingTurnRef.current = { clientMessageId, text, attachments }
+    setSteering(true)
+    setMessages(previous => [...previous, { id: clientMessageId, role: 'user', text: [text, ...attachments.map(a => `[附件：${a.name}]`)].filter(Boolean).join('\n'), previews: attachments.filter(a => a.kind === 'image').map(a => a.preview || a.url) }])
     setAttachments([])
     setDraft('')
   }
@@ -462,7 +476,7 @@ export default function Crossing() {
           <div ref={toolsRef} className="crossing-composer">
             {toolsOpen && <div className="crossing-tool-card" role="dialog" aria-label="工具卡片"><div className="crossing-controls"><ToolMemoryContext.Provider value={{ ...moonMemory, baseUrl: `crossing+${moonMemory.baseUrl}`, apiToken: capability }}><CrossingTools onSend={sendToolMessage} /></ToolMemoryContext.Provider><div className="crossing-attachment-actions"><button disabled={!sessionState.authenticated || uploading || attachments.length >= 4} onClick={() => fileRef.current?.click()}>{uploading ? '上传中…' : imagesAllowed ? '图片／文件' : '文本文件'}</button><button disabled={!imagesAllowed || attachments.length >= 4} onClick={() => setStickerOpen(!stickerOpen)}>表情包</button>{!imagesAllowed && <small>模型尚未确认或不支持图片</small>}</div>{stickerOpen && <div className="crossing-stickers"><StickerPicker customStickers={customStickers} onSelect={addSticker} /></div>}</div></div>}
             <AttachmentPicker strict ref={fileRef} imagesAllowed={imagesAllowed} onAttachment={addFile} onError={setError} onBusy={setUploading} />
-            <div className="crossing-input"><button className="crossing-plus" onClick={() => setToolsOpen(open => !open)} aria-label="工具" aria-expanded={toolsOpen} title="工具"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M12 5v14M5 12h14" /></svg></button><textarea ref={inputRef} value={draft} onChange={(e) => setDraft(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); startTurn() } }} placeholder={sessionState.phase === 'ready' ? '输入消息；/model 选择模型' : sessionState.phase === 'loading' ? '正在加载会话…' : '先点击＋新建，或选择历史会话'} disabled={!sessionState.authenticated} rows="1" />{turn ? <button className="crossing-stop" onClick={interrupt}>停止</button> : <button disabled={(!shortcut && sessionState.phase !== 'ready') || !sessionState.authenticated || sessionState.phase === 'loading' || (!draft.trim() && !attachments.length) || starting || uploading} onClick={startTurn}>{starting ? '提交中' : shortcut ? '执行' : '发送'}</button>}</div>
+            <div className="crossing-input"><button className="crossing-plus" onClick={() => setToolsOpen(open => !open)} aria-label="工具" aria-expanded={toolsOpen} title="工具"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M12 5v14M5 12h14" /></svg></button><textarea ref={inputRef} value={draft} onChange={(e) => setDraft(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey) && !e.nativeEvent.isComposing) { e.preventDefault(); turn ? steerTurn() : startTurn() } }} enterKeyHint="enter" placeholder={turn ? '可以继续补充；回车换行' : sessionState.phase === 'ready' ? '输入消息；回车换行，Ctrl＋Enter 发送' : sessionState.phase === 'loading' ? '正在加载会话…' : '先点击＋新建，或选择历史会话'} disabled={!sessionState.authenticated} rows="1" />{turn ? <><button className="crossing-steer" disabled={(!draft.trim() && !attachments.length) || steering || uploading} onClick={steerTurn}>{steering ? '补充中' : '补充'}</button><button className="crossing-stop" onClick={interrupt}>停止</button></> : <button disabled={(!shortcut && sessionState.phase !== 'ready') || !sessionState.authenticated || sessionState.phase === 'loading' || (!draft.trim() && !attachments.length) || starting || uploading} onClick={startTurn}>{starting ? '提交中' : shortcut ? '执行' : '发送'}</button>}</div>
           </div>
         </main>
       </div>

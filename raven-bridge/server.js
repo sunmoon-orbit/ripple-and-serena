@@ -1402,6 +1402,8 @@ wss.on('connection', (ws) => {
                 ? '渡口授权已失效，请等待重新连接后再试'
                 : diagnostic.code === 'invalid_attachment'
                   ? '附件已失效，请重新添加后再发送'
+                : diagnostic.code === 'turn_not_steerable'
+                  ? '当前任务暂不接受补充；内容已保留，可停止后再发送'
                 : diagnostic.code === 'invalid_thread'
                   ? '当前会话已失效，请重新选择会话'
                   : diagnostic.code === 'invalid_model' || diagnostic.code === 'invalid_reasoning_effort'

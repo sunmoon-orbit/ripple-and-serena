@@ -29,6 +29,7 @@ class Fixture extends EventEmitter {
     }
     if (method === 'thread/read') return { thread: this.thread }
     if (method === 'turn/start') { this.thread.model = params.model; this.thread.reasoningEffort = params.effort; return { turn: { id: 'turn-fixture' } } }
+    if (method === 'turn/steer') return { turnId: params.expectedTurnId }
     return {}
   }
 }
@@ -54,6 +55,7 @@ test('Crossing failures retain actionable diagnostic categories', () => {
   assert.equal(diagnoseCrossingError(new Error('JSON-RPC invalid params'), 'crossing/model/apply').code, 'app_server_protocol')
   assert.equal(diagnoseCrossingError(new Error('会话尚未恢复'), 'crossing/model/apply').code, 'socket_or_session_state')
   assert.equal(diagnoseCrossingError(new Error('附件不可用，请重新添加'), 'crossing/turn/start').code, 'invalid_attachment')
+  assert.equal(diagnoseCrossingError(new Error('activeTurnNotSteerable'), 'crossing/turn/steer').code, 'turn_not_steerable')
 })
 
 test('image plus text survives a phone WebSocket reconnect for the same credential', async t => {
@@ -78,6 +80,19 @@ test('image plus text survives a phone WebSocket reconnect for the same credenti
   assert.equal(turn.params.input[0].text, '请看这张图片')
   assert.equal(turn.params.input[1].type, 'localImage')
   assert.ok(turn.params.input[1].path.endsWith(image.id))
+})
+
+test('an active Crossing turn accepts same-turn supplemental text', async t => {
+  const adapter = new Fixture(), sent = []
+  const service = createCrossingService({ authorize: () => true, adapter, cwd: temp(t), send: (_client, event) => sent.push(event) })
+  await service.handle('phone', { type: 'crossing/thread/start', model: 'vision-id', effort: 'low' })
+  await service.handle('phone', { type: 'crossing/turn/start', threadId: 'thread-fixture', text: '开始处理' })
+  await service.handle('phone', { type: 'crossing/turn/steer', threadId: 'thread-fixture', turnId: 'turn-fixture', text: '再补充这一点', clientMessageId: 'supplement-1' })
+  const steer = adapter.calls.find(call => call.method === 'turn/steer')
+  assert.deepEqual(steer.params, {
+    threadId: 'thread-fixture', expectedTurnId: 'turn-fixture', input: [{ type: 'text', text: '再补充这一点' }], clientUserMessageId: 'supplement-1',
+  })
+  assert.deepEqual(sent.at(-1), { type: 'crossing/turn/steered', threadId: 'thread-fixture', turnId: 'turn-fixture', clientMessageId: 'supplement-1' })
 })
 
 test('model selection queues a stable turn/start override, confirms from thread/read, and survives reconnect', async t => {

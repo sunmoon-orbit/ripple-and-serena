@@ -1,6 +1,6 @@
 const crypto = require('node:crypto')
 const digest = value => crypto.createHash('sha256').update(String(value || '')).digest('hex')
-const OPERATIONS = new Set(['crossing/model/list', 'crossing/model/apply', 'crossing/thread/list', 'crossing/thread/start', 'crossing/thread/read', 'crossing/thread/resume', 'crossing/usage/read', 'crossing/turn/start', 'crossing/turn/interrupt', 'crossing/approval/respond'])
+const OPERATIONS = new Set(['crossing/model/list', 'crossing/model/apply', 'crossing/thread/list', 'crossing/thread/start', 'crossing/thread/read', 'crossing/thread/resume', 'crossing/usage/read', 'crossing/turn/start', 'crossing/turn/steer', 'crossing/turn/interrupt', 'crossing/approval/respond'])
 
 // Capabilities live only as long as their authenticated WebSocket, at most 15 min.
 // Only fingerprints are retained; every use checks the current server credential.

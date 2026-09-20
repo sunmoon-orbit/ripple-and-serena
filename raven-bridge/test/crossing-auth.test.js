@@ -71,7 +71,7 @@ test('every Crossing operation fails before App Server startup when not authenti
   adapter.start = () => { calls++; throw new Error('must not start') }
   adapter.request = () => { calls++; throw new Error('must not request') }
   const service = createCrossingService({ adapter })
-  for (const type of [...OPERATIONS, 'crossing/turn/steer', 'crossing/unknown']) {
+  for (const type of [...OPERATIONS, 'crossing/unknown']) {
     await assert.rejects(service.handle('unauthenticated', { type }), /unauthorized/)
   }
   assert.equal(calls, 0)

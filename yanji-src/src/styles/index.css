@@ -5644,6 +5644,8 @@ body.mp-active .scroll-bottom-btn { bottom: 139px; }
 .crossing-input button { flex: 0 0 64px; min-width: 64px; min-height: 44px; padding: 0 8px; border: 0; border-radius: 10px; cursor: pointer; background: var(--accent); color: var(--bubble-user-text); font-size: 14px; }
 .crossing-error { flex: 0 0 auto; max-height: 64px; overflow-y: auto; }
 .crossing-input .crossing-stop { background: rgba(190,80,80,.14); color: #b14d4d; }
+.crossing-input .crossing-steer { flex-basis: 56px; min-width: 56px; }
+.crossing-input .crossing-stop { flex-basis: 52px; min-width: 52px; }
 .crossing-speech { display: flex; align-items: center; flex-wrap: wrap; gap: 4px; }
 .crossing-speech .msg-tts-btn,.crossing-copy-btn { min-width: 44px; min-height: 44px; justify-content: center; }
 .crossing-copy-btn.active { color: var(--accent); opacity: 1; }

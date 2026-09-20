@@ -88,6 +88,7 @@ test('real Crossing components preserve thread state across tools and model appl
             window.__finishTurn = () => this.emit({ type: 'crossing/turn/completed', threadId: m.threadId, turn: { id: 'fake-turn', status: 'completed' } })
           }
           if (m.type === 'crossing/turn/interrupt') this.emit({ type: 'crossing/turn/completed', threadId: m.threadId, turn: { id: m.turnId, status: 'interrupted' } })
+          if (m.type === 'crossing/turn/steer') this.emit({ type: 'crossing/turn/steered', threadId: m.threadId, turnId: m.turnId, clientMessageId: m.clientMessageId })
         }, 10)
       }
       close() { if (this.readyState === 3) return; this.readyState = 3; this.onclose?.() }
@@ -258,6 +259,11 @@ test('real Crossing components preserve thread state across tools and model appl
   assert.equal(await page.evaluate(() => window.__wire.filter(m => m.type === 'crossing/thread/resume').length), 2)
 
   const textarea = page.locator('.crossing-input textarea')
+  const turnsBeforeNewline = await page.evaluate(() => window.__wire.filter(message => message.type === 'crossing/turn/start').length)
+  await textarea.fill('第一行')
+  await textarea.press('Enter')
+  assert.equal(await textarea.inputValue(), '第一行\n')
+  assert.equal(await page.evaluate(() => window.__wire.filter(message => message.type === 'crossing/turn/start').length), turnsBeforeNewline)
   const themes = ['default', 'qingwu', 'glass', 'custom', 'chensi', 'claude', 'guanduan', 'xilan']
   for (const theme of themes) {
     await page.evaluate(async theme => { const { useStore } = await import('/src/store.js'); useStore.getState().setTheme(theme) }, theme)
@@ -302,6 +308,13 @@ test('real Crossing components preserve thread state across tools and model appl
   const streamingSpeech = page.locator('.crossing-speech button').last()
   await streamingSpeech.waitFor()
   assert.equal(await streamingSpeech.isDisabled(), true)
+  await textarea.fill('工作中补充这一条')
+  await page.getByRole('button', { name: '补充', exact: true }).click()
+  await page.waitForFunction(() => window.__wire.some(message => message.type === 'crossing/turn/steer' && message.text === '工作中补充这一条'))
+  const steerWire = await page.evaluate(() => window.__wire.find(message => message.type === 'crossing/turn/steer' && message.text === '工作中补充这一条'))
+  assert.equal(steerWire.turnId, 'fake-turn')
+  assert.equal(steerWire.threadId, 'thread-luna')
+  assert.equal(await page.getByRole('button', { name: '停止', exact: true }).count(), 1)
   await page.getByRole('button', { name: '停止', exact: true }).click()
   await page.waitForTimeout(40)
   assert.ok(await page.evaluate(() => window.__audios[0].cleaned))

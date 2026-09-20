@@ -19,7 +19,8 @@ function fixture() {
       const result = msg.method === 'thread/start' ? { thread: thread('new-thread') }
         : msg.method === 'thread/list' ? { data: [{ id: 'history', preview: '历史会话' }], nextCursor: null }
         : ['thread/read', 'thread/resume'].includes(msg.method) ? { thread: thread(msg.params.threadId) }
-        : msg.method === 'turn/start' ? { turn: { id: 'turn-1' } } : {}
+        : msg.method === 'turn/start' ? { turn: { id: 'turn-1' } }
+        : msg.method === 'turn/steer' ? { turnId: msg.params.expectedTurnId } : {}
       queueMicrotask(() => child.stdout.write(JSON.stringify({ id: msg.id, result }) + '\n'))
     }
   })
@@ -69,6 +70,10 @@ test('history click reads then resumes, reconnect confirms again; streaming and 
   assert.equal(f.calls.filter(x => x.method === 'thread/resume').length, 2)
   assert.equal(f.flow.start('fixture only', 'm1'), true); await f.drain()
   assert.equal(f.calls.find(x => x.method === 'turn/start').params.threadId, 'history')
+  assert.equal(f.flow.steer('turn-1', '补充要求', 'm2'), true); await f.drain()
+  assert.deepEqual(f.calls.find(x => x.method === 'turn/steer').params, {
+    threadId: 'history', expectedTurnId: 'turn-1', input: [{ type: 'text', text: '补充要求' }], clientUserMessageId: 'm2',
+  })
   f.notify('item/agentMessage/delta', { threadId: 'history', turnId: 'turn-1', itemId: 'item-1', delta: 'fixture reply' })
   assert.equal(f.events.find(x => x.type === 'crossing/message/delta').delta, 'fixture reply')
   await f.service.handle('phone-2', { type: 'crossing/turn/interrupt', threadId: 'history', turnId: 'turn-1' })
