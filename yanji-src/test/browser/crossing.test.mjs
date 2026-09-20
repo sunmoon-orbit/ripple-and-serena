@@ -42,7 +42,7 @@ test('real Crossing components preserve thread state across tools and model appl
     window.__wire = []; window.__sockets = []; window.__audios = []
     window.__thread = id => {
       const confirmed = JSON.parse(localStorage.getItem(`fixture-model-${id}`) || 'null') || { model: 'gpt-5.6-luna', effort: 'low' }
-      return { id, name: `Fixture ${id}`, model: confirmed.model, reasoningEffort: confirmed.effort, turns: [{ id: 'old-turn', status: 'completed', items: [{ id: 'old', type: 'agentMessage', text: '完整的历史回复' }] }] }
+      return { id, name: `Fixture ${id}`, model: confirmed.model, reasoningEffort: confirmed.effort, turns: [{ id: 'old-turn', status: 'completed', items: [{ id: 'old', type: 'agentMessage', text: '可选正文首段\n\n> 可选引用\n\n- 可选列表\n\n```js\nconst selectable = true\n```' }] }] }
     }
     class FakeSocket {
       static OPEN = 1
@@ -103,6 +103,43 @@ test('real Crossing components preserve thread state across tools and model appl
   await page.goto(origin)
   await page.locator('.home-screen').click()
   await ready()
+
+  // Android text selection regression: Crossing chrome must not join a body
+  // selection, while every Markdown shape inside the answer remains selectable.
+  const selectionContract = await page.evaluate(() => {
+    const style = selector => getComputedStyle(document.querySelector(selector)).userSelect
+    const body = document.querySelector('.crossing-messages .message-row-assistant .bubble-markdown')
+    const meta = document.querySelectorAll('.crossing-meta')
+    const markdown = Object.fromEntries(['p', 'blockquote', 'li', 'pre', 'code'].map(tag => [tag, getComputedStyle(body.querySelector(tag)).userSelect]))
+    return {
+      body: getComputedStyle(body).userSelect,
+      markdown,
+      chrome: {
+        topbar: style('.crossing-topbar'),
+        usage: getComputedStyle(meta[0]).userSelect,
+        model: getComputedStyle(meta[1]).userSelect,
+        avatar: style('.crossing-messages .message-avatar'),
+        time: style('.crossing-messages .message-time'),
+        action: style('.crossing-messages .msg-tts-btn'),
+        composer: style('.crossing-composer'),
+        navigation: style('.icon-nav'),
+      },
+    }
+  })
+  assert.equal(selectionContract.body, 'text')
+  assert.deepEqual(selectionContract.markdown, { p: 'text', blockquote: 'text', li: 'text', pre: 'text', code: 'text' })
+  assert.deepEqual(selectionContract.chrome, { topbar: 'none', usage: 'none', model: 'none', avatar: 'none', time: 'none', action: 'none', composer: 'none', navigation: 'none' })
+  const paragraphBox = await page.locator('.crossing-messages .message-row-assistant .bubble-markdown p').first().boundingBox()
+  const topbarBox = await page.locator('.crossing-topbar').boundingBox()
+  assert.ok(paragraphBox && topbarBox)
+  await page.mouse.move(paragraphBox.x + paragraphBox.width - 3, paragraphBox.y + paragraphBox.height / 2)
+  await page.mouse.down()
+  await page.mouse.move(topbarBox.x + topbarBox.width / 2, topbarBox.y + topbarBox.height / 2, { steps: 16 })
+  await page.mouse.up()
+  const selectedAnswer = await page.evaluate(() => window.getSelection()?.toString() || '')
+  assert.ok(selectedAnswer.includes('可选正文'), `answer body remains selectable: ${JSON.stringify(selectedAnswer)}`)
+  assert.doesNotMatch(selectedAnswer, /渡口|Codex|会话就绪|5h|7天|gpt-5\.6-luna/)
+  await page.evaluate(() => window.getSelection()?.removeAllRanges())
 
   const approvalCases = [
     { width: 360, height: 740, visualHeight: 740, safeBottom: 0, choice: 'deny' },

@@ -403,6 +403,8 @@ a { text-decoration: none; color: inherit; }
   padding: 12px 0;
   gap: 4px;
   z-index: 10;
+  -webkit-user-select: none;
+  user-select: none;
 }
 .icon-nav-logo {
   font-size: 15px;
@@ -5556,7 +5558,13 @@ body.mp-active .scroll-bottom-btn { bottom: 139px; }
 }
 
 /* ── 渡口：独立 Codex Agent 页面 ─────────────────────────────── */
-.crossing-panel { display: flex; flex-direction: column; min-height: 0; padding: 0; overflow: hidden; }
+.crossing-panel {
+  display: flex; flex-direction: column; min-height: 0; padding: 0; overflow: hidden;
+  /* Android 会把长按正文的选区沿 DOM 扩进标题、额度、模型和输入区。
+     Crossing 默认不参与文本选择，只在下面的正文容器重新打开。 */
+  -webkit-user-select: none;
+  user-select: none;
+}
 .crossing-topbar { flex: 0 0 auto; padding: 12px 14px; }
 .crossing-title { min-width: 0; flex: 1; }
 .crossing-title .panel-title { margin: 0; }
@@ -5600,6 +5608,20 @@ body.mp-active .scroll-bottom-btn { bottom: 139px; }
 .crossing-messages .message-row { width: 100%; }
 .crossing-messages .message-content-wrap { max-width: min(78%, 600px); }
 .crossing-bubble { max-width: min(760px, 92%); padding: 10px 13px; overflow-wrap: anywhere; word-break: break-word; }
+.crossing-messages .message-bubble :is(.bubble-markdown, .bubble-text, .bubble-zh),
+.crossing-messages .message-bubble :is(.bubble-markdown, .bubble-text, .bubble-zh) :is(p, li, blockquote, pre, code, h1, h2, h3, h4, h5, h6, td, th) {
+  -webkit-user-select: text;
+  user-select: text;
+}
+/* 代码正文仍可选；代码头、复制/运行按钮保持为交互控件，不混进系统选区。 */
+.crossing-messages .bubble-markdown :is(.code-head, .code-lang, .code-copy, .code-run-bar, .code-run-btn) {
+  -webkit-user-select: none;
+  user-select: none;
+}
+.crossing-messages .bubble-zh-badge {
+  -webkit-user-select: none;
+  user-select: none;
+}
 .crossing-bubble.bubble-user { align-self: flex-end; }
 .crossing-bubble.bubble-assistant { align-self: flex-start; }
 .crossing-caret { display: inline-block; width: 5px; height: 1em; margin-left: 3px; vertical-align: -2px; background: var(--accent); animation: crossing-blink 1s step-end infinite; }
