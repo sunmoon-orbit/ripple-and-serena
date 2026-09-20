@@ -6,7 +6,7 @@ const os = require('node:os')
 const path = require('node:path')
 const { createCrossingService, diagnoseCrossingError } = require('../yanji-crossing')
 const { createModelControls, confirmedModel } = require('../crossing-models')
-const { createUploadStore, validateFile, safeImageURL, MAX_FILE } = require('../crossing-uploads')
+const { createUploadStore, validateFile, safeImageURL, MAX_FILE, MAX_REMOTE_IMAGE } = require('../crossing-uploads')
 const { handleUpload } = require('../crossing-upload-http')
 
 const catalog = [
@@ -187,6 +187,34 @@ test('uploads validate MIME, extension, traversal, byte limits and UTF-8; cleanu
   store.pin([image], true, 'fixture-owner'); now += 1000; store.sweep()
   assert.ok(fs.existsSync(local.path)); assert.equal(fs.existsSync(path.join(cwd, '.crossing-uploads', text.id)), false)
   store.pin([image], false, 'fixture-owner'); store.sweep(); assert.equal(fs.existsSync(local.path), false)
+})
+
+test('trusted sticker URLs become bounded inline images for Codex App Server', async t => {
+  const bytes = Buffer.from([137,80,78,71,13,10,26,10,0])
+  const calls = []
+  const store = createUploadStore({
+    cwd: temp(t),
+    fetchImpl: async (url, options) => {
+      calls.push({ url, options })
+      return {
+        ok: true,
+        headers: { get: name => name === 'content-type' ? 'image/png' : name === 'content-length' ? String(bytes.length) : null },
+        body: null,
+        arrayBuffer: async () => bytes,
+      }
+    },
+  })
+  const url = 'https://memory.ravenlove.cc/raven/stickers/kaixin.png'
+  const result = await store.resolveInputs([{ url }], true, 'fixture-owner')
+  assert.deepEqual(result, [{ type: 'image', url: `data:image/png;base64,${bytes.toString('base64')}` }])
+  assert.equal(calls[0].url, url)
+  assert.equal(calls[0].options.redirect, 'error')
+
+  const oversized = createUploadStore({
+    cwd: temp(t),
+    fetchImpl: async () => ({ ok: true, headers: { get: name => name === 'content-type' ? 'image/png' : String(MAX_REMOTE_IMAGE + 1) } }),
+  })
+  await assert.rejects(oversized.resolveInputs([{ url }], true, 'fixture-owner'), /过大/)
 })
 
 test('HTTP upload rejects oversized body and returns only opaque attachment metadata', t => {

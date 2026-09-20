@@ -305,7 +305,9 @@ function createCrossingService(options = {}) {
       if (attachments.length && !uploadOwner) throw new Error('附件不可用，请重新添加')
       let pinned = false
       try {
-        const attachmentInputs = uploads.inputs(attachments, currentTurn.imageAllowed === true, uploadOwner)
+        const attachmentInputs = uploads.resolveInputs
+          ? await uploads.resolveInputs(attachments, currentTurn.imageAllowed === true, uploadOwner)
+          : uploads.inputs(attachments, currentTurn.imageAllowed === true, uploadOwner)
         uploads.pin(attachments, true, uploadOwner); pinned = true
         const result = await request('turn/steer', {
           threadId: currentTurn.threadId,
@@ -347,7 +349,9 @@ function createCrossingService(options = {}) {
         uploadOwner = message.attachments?.length ? attachmentOwner(clientId) : clientId
         if (message.attachments?.length && !uploadOwner) throw new Error('附件不可用，请重新添加')
         const imageAllowed = !!choice?.inputModalities.includes('image')
-        const attachmentInputs = uploads.inputs(message.attachments, imageAllowed, uploadOwner)
+        const attachmentInputs = uploads.resolveInputs
+          ? await uploads.resolveInputs(message.attachments, imageAllowed, uploadOwner)
+          : uploads.inputs(message.attachments, imageAllowed, uploadOwner)
         uploads.pin(message.attachments, true, uploadOwner)
         const result = await request('turn/start', {
           threadId, input: [...(text ? input(text) : []), ...attachmentInputs], clientUserMessageId: String(message.clientMessageId || ''),
