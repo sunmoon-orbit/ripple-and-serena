@@ -23,6 +23,9 @@ test('real Crossing components preserve thread state across tools and model appl
   await context.route('**/*', route => {
     const url = new URL(route.request().url())
     if (url.origin === origin) return route.continue()
+    if (url.pathname === '/raven/upload' && route.request().postDataJSON()?.action !== 'tts') {
+      return route.fulfill({ status: 200, json: { id: '0123456789abcdef0123456789abcdef.png', name: 'fixture.png', kind: 'image', size: 68 } })
+    }
     if (url.pathname === '/tts' || (url.pathname === '/raven/upload' && route.request().postDataJSON()?.action === 'tts')) {
       ttsRequests++
       if (delayTts) { heldTts = route; return }
@@ -70,6 +73,10 @@ test('real Crossing components preserve thread state across tools and model appl
           }
           if (['crossing/thread/read', 'crossing/thread/resume', 'crossing/thread/start'].includes(m.type)) this.emit({ type: 'crossing/thread', requestId: m.requestId, action: m.type.endsWith('read') ? 'read' : m.type.endsWith('start') ? 'started' : 'resumed', ready: !m.type.endsWith('read'), thread: window.__thread(m.threadId || 'new-thread') })
           if (m.type === 'crossing/turn/start') {
+            if (window.__rejectTurnStart) {
+              this.emit({ type: 'crossing/error', operation: m.type, code: 'invalid_attachment', error: '附件已失效，请重新添加后再发送' })
+              return
+            }
             if (window.__pendingModel) {
               const choice = window.__pendingModel
               localStorage.setItem(`fixture-model-${m.threadId}`, JSON.stringify(choice))
@@ -151,6 +158,25 @@ test('real Crossing components preserve thread state across tools and model appl
   assert.ok(selectedAnswer.includes('可选正文'), `answer body remains selectable: ${JSON.stringify(selectedAnswer)}`)
   assert.doesNotMatch(selectedAnswer, /渡口|Codex|会话就绪|5h|7天|gpt-5\.6-luna/)
   await page.evaluate(() => window.getSelection()?.removeAllRanges())
+
+  // A rejected image+text turn must restore both pieces for retry and remove
+  // the optimistic message that the server never accepted.
+  await page.getByRole('button', { name: '工具', exact: true }).click()
+  await page.locator('.crossing-panel input[type="file"]').setInputFiles({
+    name: 'fixture.png', mimeType: 'image/png',
+    buffer: Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=', 'base64'),
+  })
+  await page.getByText('fixture.png', { exact: true }).waitFor()
+  await page.evaluate(() => { window.__rejectTurnStart = true })
+  await page.locator('.crossing-input textarea').fill('请看这张测试图片')
+  await page.getByRole('button', { name: '发送', exact: true }).click()
+  await page.locator('.crossing-error').filter({ hasText: '附件已失效，请重新添加后再发送' }).waitFor()
+  assert.equal(await page.locator('.crossing-input textarea').inputValue(), '请看这张测试图片')
+  assert.equal(await page.locator('.crossing-attachments').count(), 1)
+  assert.equal(await page.locator('.crossing-messages .message-row-user').filter({ hasText: '请看这张测试图片' }).count(), 0)
+  await page.evaluate(() => { window.__rejectTurnStart = false })
+  await page.getByRole('button', { name: '移除', exact: true }).click()
+  await page.locator('.crossing-input textarea').fill('')
 
   const approvalCases = [
     { width: 360, height: 740, visualHeight: 740, safeBottom: 0, choice: 'deny' },

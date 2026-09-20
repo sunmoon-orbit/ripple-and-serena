@@ -52,6 +52,7 @@ function diagnoseCrossingError(error, operation = '') {
   const source = `${error?.code || ''} ${detail}`.toLowerCase()
   let code = 'app_server_error'
   if (/unauthorized|permission|forbidden|not allowed/.test(source)) code = 'permission_or_auth'
+  else if (/附件|attachment/.test(source) && /(不可用|过期|重新添加|invalid|expired|unavailable)/.test(source)) code = 'invalid_attachment'
   else if (/thread/.test(source) && /(invalid|unknown|not found|missing|mismatch|does not exist)/.test(source)) code = 'invalid_thread'
   else if (/reasoning|effort/.test(source) && /(invalid|unsupported|not support|不可用|不支持)/.test(source)) code = 'invalid_reasoning_effort'
   else if (/model/.test(source) && /(invalid|unknown|not found|unavailable|unsupported|不可用|不支持)/.test(source)) code = 'invalid_model'
@@ -91,6 +92,8 @@ function createCrossingService(options = {}) {
   const sessions = new Map()
   const allowedThreads = new Map()
   const authorize = options.authorize || (() => false)
+  const attachmentOwner = options.attachmentOwner || (id => id)
+  const retainUploadsOnDisconnect = options.retainUploadsOnDisconnect === true
   const check = id => { if (!authorize(id) || disconnectedClients.has(id)) throw new Error('unauthorized') }
   const selecting = new Set()
   const modelControls = createModelControls(adapter, options.modelStateFile)
@@ -150,7 +153,7 @@ function createCrossingService(options = {}) {
 
   function clearTurn(turnId) {
     if (activeTurn?.turnId !== turnId) return
-    uploads.pin(activeTurn.attachments, false, activeTurn.clientId)
+    uploads.pin(activeTurn.attachments, false, activeTurn.attachmentOwner || activeTurn.clientId)
     activeTurn = null
     for (const [requestId, approval] of approvals) {
       if (approval.turnId === turnId) clearApproval(requestId, true)
@@ -166,7 +169,7 @@ function createCrossingService(options = {}) {
 
   adapter.on('online', () => status('online'))
   adapter.on('offline', ({ error, pendingRequestIds }) => {
-    uploads.pin(activeTurn?.attachments, false, activeTurn?.clientId)
+    uploads.pin(activeTurn?.attachments, false, activeTurn?.attachmentOwner || activeTurn?.clientId)
     metadata.clear()
     sessions.clear()
     for (const requestId of pendingRequestIds || []) clearApproval(requestId)
@@ -304,13 +307,16 @@ function createCrossingService(options = {}) {
         return
       }
       startingTurn = { clientId, threadId }
+      let uploadOwner = null
       try {
         const saved = modelControls.remembered(threadId)
         const current = metadata.get(threadId)
         const desired = message.model ? message : saved || (current?.model ? { model: current.model, effort: current.reasoningEffort } : null)
         const choice = desired ? await modelControls.validate(desired) : null
-        const attachmentInputs = uploads.inputs(message.attachments, !!choice?.inputModalities.includes('image'), clientId)
-        uploads.pin(message.attachments, true, clientId)
+        uploadOwner = message.attachments?.length ? attachmentOwner(clientId) : clientId
+        if (message.attachments?.length && !uploadOwner) throw new Error('附件不可用，请重新添加')
+        const attachmentInputs = uploads.inputs(message.attachments, !!choice?.inputModalities.includes('image'), uploadOwner)
+        uploads.pin(message.attachments, true, uploadOwner)
         const result = await request('turn/start', {
           threadId, input: [...(text ? input(text) : []), ...attachmentInputs], clientUserMessageId: String(message.clientMessageId || ''),
           ...(choice ? { model: choice.model, effort: choice.effort } : {}),
@@ -319,7 +325,7 @@ function createCrossingService(options = {}) {
         })
         const turnId = result.turn?.id
         if (!turnId) throw new Error('Codex 未返回任务编号')
-        activeTurn = { clientId, threadId, turnId, ...(message.attachments?.length ? { attachments: message.attachments } : {}) }
+        activeTurn = { clientId, threadId, turnId, ...(message.attachments?.length ? { attachments: message.attachments, attachmentOwner: uploadOwner } : {}) }
         if (choice) rememberChoice(threadId, choice)
         if (disconnectedClients.has(clientId)) {
           await adapter.request('turn/interrupt', { threadId, turnId }).catch(() => {})
@@ -336,7 +342,7 @@ function createCrossingService(options = {}) {
           emit({ type: 'crossing/model/confirmed', threadId, ...meta })
         }).catch(() => {})
       } finally {
-        if (!activeTurn) uploads.pin(message.attachments, false, clientId)
+        if (!activeTurn) uploads.pin(message.attachments, false, uploadOwner || clientId)
         startingTurn = null
       }
       return
@@ -375,7 +381,7 @@ function createCrossingService(options = {}) {
   function disconnect(clientId) {
     sessions.delete(clientId)
     allowedThreads.delete(clientId)
-    uploads.revoke?.(clientId)
+    if (!retainUploadsOnDisconnect) uploads.revoke?.(attachmentOwner(clientId) || clientId)
     disconnectedClients.add(clientId)
     for (const [requestId, approval] of approvals) {
       if (approval.clientId !== clientId) continue

@@ -121,6 +121,7 @@ export default function Crossing() {
   const [selection, setSelection] = useState({ model: '', effort: '' })
   const [modelApply, setModelApply] = useState({ status: 'idle', error: '' })
   const modelApplyRef = useRef(null)
+  const pendingTurnRef = useRef(null)
   const [attachments, setAttachments] = useState([])
   const [uploading, setUploading] = useState(false)
   const [stickerOpen, setStickerOpen] = useState(false)
@@ -263,7 +264,16 @@ export default function Crossing() {
           else if (msg.operation === 'crossing/model/apply' && msg.requestId === modelApplyRef.current?.requestId) {
             modelApplyRef.current = null
             setModelApply({ status: 'failed', error: msg.error || '模型应用失败' })
-          } else setError(msg.error || '渡口操作失败')
+          } else {
+            if (msg.operation === 'crossing/turn/start' && pendingTurnRef.current) {
+              const pending = pendingTurnRef.current
+              pendingTurnRef.current = null
+              setMessages(previous => previous.filter(entry => entry.id !== pending.clientMessageId))
+              setDraft(previous => previous || pending.text)
+              setAttachments(previous => previous.length ? previous : pending.attachments)
+            }
+            setError(msg.error || '渡口操作失败')
+          }
           return
         }
         if (msg.type === 'crossing/threads') { setThreads(msg.threads || []); return }
@@ -272,7 +282,7 @@ export default function Crossing() {
           return
         }
         if (msg.threadId && msg.threadId !== activeThreadRef.current) return
-        if (msg.type === 'crossing/turn/started') { setStarting(false); setTurn(msg.turn); return }
+        if (msg.type === 'crossing/turn/started') { pendingTurnRef.current = null; setStarting(false); setTurn(msg.turn); return }
         if (msg.type === 'crossing/turn/completed') { setMessages(previous => completeTurn(previous, msg.turn)); setStarting(false); setTurn(null); setApproval(null); return }
         if (msg.type === 'crossing/turn/interrupted') { setStopEpoch(n => n + 1); setTurn(null); return }
         if (msg.type === 'crossing/message/delta') {
@@ -304,6 +314,13 @@ export default function Crossing() {
       }
       ws.onclose = () => {
         if (disposed || denied) return
+        if (pendingTurnRef.current) {
+          const pending = pendingTurnRef.current
+          pendingTurnRef.current = null
+          setMessages(previous => previous.filter(entry => entry.id !== pending.clientMessageId))
+          setDraft(previous => previous || pending.text)
+          setAttachments(previous => previous.length ? previous : pending.attachments)
+        }
         if (modelApplyRef.current) {
           modelApplyRef.current = null
           setModelApply({ status: 'failed', error: '连接已断开，模型没有应用；原设置保持不变' })
@@ -339,6 +356,7 @@ export default function Crossing() {
     if (command?.name === 'resume') { setDraft(''); if (command.argument) readThread(command.argument); else setError('用法：/resume 会话编号'); return }
     const clientMessageId = crypto.randomUUID()
     try { if (!flowRef.current.start(text, clientMessageId, { attachments: attachments.map(({ id, url }) => id ? { id } : { url }) })) return } catch (e) { setError(e.message); return }
+    pendingTurnRef.current = { clientMessageId, text, attachments }
     setStarting(true)
     setMessages((previous) => [...previous, { id: clientMessageId, role: 'user', text: [text, ...attachments.map(a => `[附件：${a.name}]`)].filter(Boolean).join('\n'), previews: attachments.filter(a => a.kind === 'image').map(a => a.preview || a.url) }])
     setAttachments([])

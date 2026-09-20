@@ -440,6 +440,10 @@ const agentSessions = createAgentSessions({
 setInterval(() => agentSessions.sweep(), 1000).unref()
 const crossing = createCrossingService({
   authorize: id => !!agentSessions.get(id),
+  attachmentOwner: id => agentSessions.get(id)?.fingerprint,
+  // Android may suspend the socket while its file picker is open. Uploads are
+  // still TTL-bound and scoped to the verified credential fingerprint.
+  retainUploadsOnDisconnect: true,
   modelStateFile: require('path').join(__dirname, '.crossing-models.json'),
   broadcast: broadcastCrossing,
   send: sendCrossing,
@@ -1396,6 +1400,8 @@ wss.on('connection', (ws) => {
               type: 'crossing/error', requestId: msg.requestId, operation: msg.type, code: diagnostic.code,
               error: diagnostic.code === 'permission_or_auth'
                 ? '渡口授权已失效，请等待重新连接后再试'
+                : diagnostic.code === 'invalid_attachment'
+                  ? '附件已失效，请重新添加后再发送'
                 : diagnostic.code === 'invalid_thread'
                   ? '当前会话已失效，请重新选择会话'
                   : diagnostic.code === 'invalid_model' || diagnostic.code === 'invalid_reasoning_effort'

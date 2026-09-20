@@ -13,6 +13,7 @@ const catalog = [
   { id: 'vision-id', model: 'vision-fixture', displayName: 'Fixture vision', hidden: false, inputModalities: ['text','image'], supportedReasoningEfforts: [{ reasoningEffort: 'low' }, { reasoningEffort: 'high' }], defaultReasoningEffort: 'low', isDefault: true },
   { id: 'text-id', model: 'text-fixture', displayName: 'Fixture text', hidden: false, inputModalities: ['text'], supportedReasoningEfforts: [{ reasoningEffort: 'medium' }], defaultReasoningEffort: 'medium', isDefault: false },
 ]
+const png = { name: 'photo.png', mime: 'image/png', data: Buffer.from([137,80,78,71,13,10,26,10,0]).toString('base64') }
 class Fixture extends EventEmitter {
   constructor() { super(); this.online = true; this.calls = []; this.thread = null }
   async rateLimits() { return {} }
@@ -52,6 +53,31 @@ test('Crossing failures retain actionable diagnostic categories', () => {
   assert.equal(diagnoseCrossingError(new Error('unsupported reasoning effort'), 'crossing/model/apply').code, 'invalid_reasoning_effort')
   assert.equal(diagnoseCrossingError(new Error('JSON-RPC invalid params'), 'crossing/model/apply').code, 'app_server_protocol')
   assert.equal(diagnoseCrossingError(new Error('会话尚未恢复'), 'crossing/model/apply').code, 'socket_or_session_state')
+  assert.equal(diagnoseCrossingError(new Error('附件不可用，请重新添加'), 'crossing/turn/start').code, 'invalid_attachment')
+})
+
+test('image plus text survives a phone WebSocket reconnect for the same credential', async t => {
+  const cwd = temp(t), adapter = new Fixture(), uploads = createUploadStore({ cwd })
+  const credential = 'verified-credential-fingerprint'
+  const image = uploads.put(png, credential)
+  const service = createCrossingService({
+    authorize: () => true,
+    attachmentOwner: () => credential,
+    retainUploadsOnDisconnect: true,
+    adapter, uploads, cwd,
+  })
+  await service.handle('phone-before-picker', { type: 'crossing/thread/start', model: 'vision-id', effort: 'low' })
+  service.disconnect('phone-before-picker')
+  await service.handle('phone-after-picker', { type: 'crossing/thread/list' })
+  await service.handle('phone-after-picker', { type: 'crossing/thread/resume', threadId: 'thread-fixture' })
+  await service.handle('phone-after-picker', {
+    type: 'crossing/turn/start', threadId: 'thread-fixture', text: '请看这张图片', attachments: [{ id: image.id }],
+  })
+  const turn = adapter.calls.filter(call => call.method === 'turn/start').at(-1)
+  assert.equal(turn.params.input[0].type, 'text')
+  assert.equal(turn.params.input[0].text, '请看这张图片')
+  assert.equal(turn.params.input[1].type, 'localImage')
+  assert.ok(turn.params.input[1].path.endsWith(image.id))
 })
 
 test('model selection queues a stable turn/start override, confirms from thread/read, and survives reconnect', async t => {
@@ -116,7 +142,6 @@ test('/model is intercepted by the bridge and never reaches turn/start', async t
   assert.equal(events.at(-1).type, 'crossing/model/open')
 })
 
-const png = { name: 'photo.png', mime: 'image/png', data: Buffer.from([137,80,78,71,13,10,26,10,0]).toString('base64') }
 test('uploads validate MIME, extension, traversal, byte limits and UTF-8; cleanup and inputs are real', t => {
   const cwd = temp(t); let now = Date.now()
   const store = createUploadStore({ cwd, now: () => now, ttl: 100 })
@@ -162,4 +187,15 @@ test('HTTP upload rejects oversized body and returns only opaque attachment meta
   assert.equal(run([Buffer.from(JSON.stringify(png))], false).code, 401)
   const result = run([Buffer.from(JSON.stringify(png))])
   assert.equal(result.code, 200); assert.equal(result.body.kind, 'image'); assert.equal(result.body.path, undefined)
+})
+
+test('HTTP upload uses a stable verified fingerprint when available', t => {
+  let owner = ''
+  const store = { put(_body, value) { owner = value; return { id: 'fixture' } } }
+  const req = new EventEmitter(); req.headers = { 'content-type': 'application/json' }; req.resume = () => {}
+  const res = { writeHead(code) { this.code = code }, end(data) { this.body = JSON.parse(data) } }
+  handleUpload(req, res, store, () => ({ id: 'socket-id', fingerprint: 'credential-fingerprint' }))
+  req.emit('data', Buffer.from(JSON.stringify(png))); req.emit('end')
+  assert.equal(res.code, 200)
+  assert.equal(owner, 'credential-fingerprint')
 })

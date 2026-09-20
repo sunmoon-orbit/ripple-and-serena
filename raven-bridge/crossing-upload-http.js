@@ -31,7 +31,11 @@ function handleUpload(req, res, store, authenticated = () => false, actions = {}
         if (!authenticated(req)) { reply(401, { error: 'unauthorized' }); return }
         reply(200, result); return
       }
-      reply(200, store.put(body, session.id))
+      // A phone may briefly drop its WebSocket while Android's system file
+      // picker is open. Bind uploads to the verified credential fingerprint,
+      // not that one socket's ephemeral id, so the same user can send after
+      // the automatic reconnect without making attachment ids transferable.
+      reply(200, store.put(body, session.fingerprint || session.id))
     }
     catch { reply(400, { error: '请求失败，请检查附件或重试' }) }
   })
