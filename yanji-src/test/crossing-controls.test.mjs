@@ -7,6 +7,7 @@ import { prepareAttachment } from '../src/utils/attachments.js'
 
 test('/model is a local command and cannot become a turn; model labels use confirmed metadata', () => {
   assert.deepEqual(localCommand('/model'), { name: 'model', argument: '' })
+  assert.deepEqual(localCommand(' /MODEL '), { name: 'model', argument: '' })
   assert.equal(modelLabel(null), '尚未确认模型')
   assert.equal(modelLabel({ model: 'server-model', reasoningEffort: 'high' }), 'server-model · high')
   assert.equal(imageSupported([{ model: 'text', inputModalities: ['text'] }], 'text'), false)

@@ -42,6 +42,7 @@ test('Codex App Server performs initialize handshake and maps stable lifecycle e
   adapter.on('serverRequest', (event) => requests.push(event))
   await adapter.start()
   assert.equal(sent[0].method, 'initialize')
+  assert.deepEqual(sent[0].params.capabilities, { experimentalApi: false })
   assert.equal(sent[1].method, 'initialized')
 
   child.stdout.write(`${JSON.stringify({ jsonrpc: '2.0', method: 'item/agentMessage/delta', params: { threadId: 't1', turnId: 'u1', itemId: 'i1', delta: '你好' } })}\n`)

@@ -27,11 +27,6 @@ class Fixture extends EventEmitter {
       return { model, reasoningEffort, thread: this.thread }
     }
     if (method === 'thread/read') return { thread: this.thread }
-    if (method === 'thread/settings/update') {
-      this.thread.model = params.model
-      this.thread.reasoningEffort = params.effort
-      return {}
-    }
     if (method === 'turn/start') { this.thread.model = params.model; this.thread.reasoningEffort = params.effort; return { turn: { id: 'turn-fixture' } } }
     return {}
   }
@@ -59,7 +54,7 @@ test('Crossing failures retain actionable diagnostic categories', () => {
   assert.equal(diagnoseCrossingError(new Error('会话尚未恢复'), 'crossing/model/apply').code, 'socket_or_session_state')
 })
 
-test('model apply uses thread settings, confirms only after success, and survives reconnect', async t => {
+test('model selection queues a stable turn/start override, confirms from thread/read, and survives reconnect', async t => {
   const cwd = temp(t), adapter = new Fixture(), events = []
   const stateFile = path.join(cwd, 'models.json')
   const service = createCrossingService({ authorize: () => true, adapter, cwd, modelStateFile: stateFile, send: (_, x) => events.push(x), broadcast: x => events.push(x) })
@@ -69,43 +64,56 @@ test('model apply uses thread settings, confirms only after success, and survive
   assert.deepEqual(start.params.config, { model_reasoning_effort: 'high' })
   assert.equal(events.find(x => x.type === 'crossing/thread').thread.model, 'vision-fixture')
   await service.handle('phone', { type: 'crossing/model/apply', threadId: 'thread-fixture', model: 'text-fixture', effort: 'medium', requestId: 'apply' })
-  const apply = adapter.calls.find(x => x.method === 'thread/settings/update')
-  assert.deepEqual(apply.params, { threadId: 'thread-fixture', model: 'text-fixture', effort: 'medium' })
-  assert.deepEqual(events.find(x => x.type === 'crossing/model/confirmed' && x.requestId === 'apply'), {
-    type: 'crossing/model/confirmed', requestId: 'apply', threadId: 'thread-fixture', model: 'text-fixture', reasoningEffort: 'medium',
+  assert.equal(adapter.calls.some(x => x.method === 'thread/settings/update'), false)
+  assert.deepEqual(events.find(x => x.type === 'crossing/model/pending' && x.requestId === 'apply'), {
+    type: 'crossing/model/pending', requestId: 'apply', threadId: 'thread-fixture', model: 'text-fixture', effort: 'medium',
   })
+  assert.equal(adapter.thread.model, 'vision-fixture')
   service.disconnect('phone')
-  const restarted = createCrossingService({ authorize: () => true, adapter, cwd, modelStateFile: stateFile, send: (_, x) => events.push(x) })
+  const restarted = createCrossingService({ authorize: () => true, adapter, cwd, modelStateFile: stateFile, send: (_, x) => events.push(x), broadcast: x => events.push(x) })
   await restarted.handle('new-phone', { type: 'crossing/thread/list' })
   await restarted.handle('new-phone', { type: 'crossing/thread/resume', threadId: 'thread-fixture' })
   const resume = adapter.calls.filter(x => x.method === 'thread/resume').at(-1)
   assert.equal(resume.params.model, undefined)
   assert.equal(resume.params.config, undefined)
+  assert.deepEqual(events.filter(x => x.type === 'crossing/thread').at(-1).pendingModel, { model: 'text-fixture', effort: 'medium' })
   await restarted.handle('new-phone', { type: 'crossing/turn/start', threadId: 'thread-fixture', text: 'fixture only' })
   const turn = adapter.calls.find(x => x.method === 'turn/start')
   assert.equal(turn.params.model, 'text-fixture'); assert.equal(turn.params.effort, 'medium')
+  await new Promise(resolve => setImmediate(resolve))
+  assert.deepEqual(events.filter(x => x.type === 'crossing/model/confirmed').at(-1), {
+    agent: 'codex', type: 'crossing/model/confirmed', threadId: 'thread-fixture', model: 'text-fixture', reasoningEffort: 'medium',
+  })
   adapter.emit('turnCompleted', { threadId: 'thread-fixture', turn: { id: 'turn-fixture' } })
   await restarted.handle('new-phone', { type: 'crossing/turn/start', threadId: 'thread-fixture', text: 'second fixture turn' })
   assert.equal(adapter.calls.filter(x => x.method === 'turn/start').at(-1).params.model, 'text-fixture')
   adapter.emit('notification', { method: 'warning', params: { threadId: 'thread-fixture', message: 'model switch fixture warning' } })
   adapter.emit('notification', { method: 'warning', params: { threadId: 'thread-fixture', message: 'model switch fixture warning' } })
-  assert.equal(events.filter(x => x.type === 'crossing/warning').length, 1)
+  assert.equal(events.filter(x => x.type === 'crossing/warning').length, 2, 'one warning per live service instance')
   assert.equal(adapter.calls.some(x => x.method.startsWith('config/')), false)
   adapter.emit('item', { threadId: 'thread-fixture', item: { type: 'userMessage', content: [{ type: 'localImage', path: '/private/test.png' }] }, summary: { type: 'userMessage' } })
   assert.equal(JSON.stringify(events.filter(x => x.type === 'crossing/item')).includes('/private/'), false)
 })
 
-test('rejected model apply emits no confirmation and preserves the confirmed thread', async t => {
+test('invalid model selection emits no pending/confirmation and preserves the confirmed thread', async t => {
   const adapter = new Fixture(), events = []
   const service = createCrossingService({ authorize: () => true, adapter, cwd: temp(t), send: (_, x) => events.push(x), broadcast: x => events.push(x) })
   await service.handle('phone', { type: 'crossing/thread/start', model: 'vision-id', effort: 'high' })
   const before = { ...adapter.thread }
-  const original = adapter.request.bind(adapter)
-  adapter.request = (method, params) => method === 'thread/settings/update' ? Promise.reject(new Error('invalid reasoning effort')) : original(method, params)
-  await assert.rejects(service.handle('phone', { type: 'crossing/model/apply', requestId: 'failed', threadId: 'thread-fixture', model: 'text-fixture', effort: 'medium' }), /reasoning effort/)
+  await assert.rejects(service.handle('phone', { type: 'crossing/model/apply', requestId: 'failed', threadId: 'thread-fixture', model: 'text-fixture', effort: 'ultra' }), /不支持/)
   assert.equal(events.some(x => x.type === 'crossing/model/confirmed' && x.requestId === 'failed'), false)
+  assert.equal(events.some(x => x.type === 'crossing/model/pending' && x.requestId === 'failed'), false)
   assert.equal(adapter.thread.model, before.model)
   assert.equal(adapter.thread.reasoningEffort, before.reasoningEffort)
+})
+
+test('/model is intercepted by the bridge and never reaches turn/start', async t => {
+  const adapter = new Fixture(), events = []
+  const service = createCrossingService({ authorize: () => true, adapter, cwd: temp(t), send: (_, x) => events.push(x), broadcast: x => events.push(x) })
+  await service.handle('phone', { type: 'crossing/thread/start' })
+  await service.handle('phone', { type: 'crossing/turn/start', threadId: 'thread-fixture', text: '  /MODEL  ' })
+  assert.equal(adapter.calls.some(x => x.method === 'turn/start'), false)
+  assert.equal(events.at(-1).type, 'crossing/model/open')
 })
 
 const png = { name: 'photo.png', mime: 'image/png', data: Buffer.from([137,80,78,71,13,10,26,10,0]).toString('base64') }

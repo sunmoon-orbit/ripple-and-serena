@@ -63,12 +63,18 @@ test('real Crossing components preserve thread state across tools and model appl
           if (m.type === 'crossing/model/apply') {
             if (window.__rejectModelApply) this.emit({ type: 'crossing/error', operation: m.type, requestId: m.requestId, code: 'permission_or_auth', error: '测试拒绝模型设置' })
             else {
-              localStorage.setItem(`fixture-model-${m.threadId}`, JSON.stringify({ model: m.model, effort: m.effort }))
-              this.emit({ type: 'crossing/model/confirmed', requestId: m.requestId, threadId: m.threadId, model: m.model, reasoningEffort: m.effort })
+              window.__pendingModel = { model: m.model, effort: m.effort }
+              this.emit({ type: 'crossing/model/pending', requestId: m.requestId, threadId: m.threadId, model: m.model, effort: m.effort })
             }
           }
           if (['crossing/thread/read', 'crossing/thread/resume', 'crossing/thread/start'].includes(m.type)) this.emit({ type: 'crossing/thread', requestId: m.requestId, action: m.type.endsWith('read') ? 'read' : m.type.endsWith('start') ? 'started' : 'resumed', ready: !m.type.endsWith('read'), thread: window.__thread(m.threadId || 'new-thread') })
           if (m.type === 'crossing/turn/start') {
+            if (window.__pendingModel) {
+              const choice = window.__pendingModel
+              localStorage.setItem(`fixture-model-${m.threadId}`, JSON.stringify(choice))
+              window.__pendingModel = null
+              this.emit({ type: 'crossing/model/confirmed', threadId: m.threadId, model: choice.model, reasoningEffort: choice.effort })
+            }
             this.emit({ type: 'crossing/turn/started', threadId: m.threadId, turn: { id: 'fake-turn' } })
             this.emit({ type: 'crossing/message/delta', threadId: m.threadId, turnId: 'fake-turn', itemId: 'stream', delta: 'fixture 流式回复' })
             window.__finishTurn = () => this.emit({ type: 'crossing/turn/completed', threadId: m.threadId, turn: { id: 'fake-turn', status: 'completed' } })
@@ -216,11 +222,28 @@ test('real Crossing components preserve thread state across tools and model appl
   assert.equal(await textarea.inputValue(), '工具打开前的草稿')
   await page.getByRole('button', { name: '知道了', exact: true }).click()
 
+  const turnsBeforeModelCommand = await page.evaluate(() => window.__wire.filter(m => m.type === 'crossing/turn/start').length)
+  await textarea.fill(' /MODEL ')
+  await page.locator('.crossing-input button').last().click()
+  await page.getByLabel('模型').waitFor()
+  assert.equal(await page.evaluate(() => window.__wire.filter(m => m.type === 'crossing/turn/start').length), turnsBeforeModelCommand)
+  assert.equal(await page.getByText('/MODEL', { exact: true }).count(), 0)
+  await page.getByRole('button', { name: 'gpt-5.6-luna · low', exact: true }).click()
+  await textarea.fill('工具打开前的草稿')
+
   await page.getByRole('button', { name: 'gpt-5.6-luna · low', exact: true }).click()
   await page.getByLabel('模型').selectOption('gpt-5.6-terra')
-  await page.getByRole('button', { name: '应用到当前会话', exact: true }).click()
+  await page.getByRole('button', { name: '下一条起使用', exact: true }).click()
+  await page.getByText(/待下一轮应用：gpt-5.6-terra · medium/).waitFor()
+  assert.equal(await page.getByRole('button', { name: 'gpt-5.6-luna · low', exact: true }).count(), 1)
+  await textarea.fill('切换模型验证')
+  await page.locator('.crossing-input button').last().click()
   await page.getByRole('button', { name: 'gpt-5.6-terra · medium', exact: true }).waitFor()
-  assert.equal(await textarea.inputValue(), '工具打开前的草稿')
+  await page.evaluate(() => window.__finishTurn())
+  await page.getByText('Codex 正在工作…').waitFor({ state: 'hidden' })
+  await textarea.fill('持续模型验证')
+  await page.locator('.crossing-input button').last().click()
+  await page.evaluate(() => window.__finishTurn())
   await page.evaluate(() => window.__sockets.at(-1).close())
   await page.getByText('重连中', { exact: false }).first().waitFor()
   await page.getByRole('button', { name: 'gpt-5.6-terra · medium', exact: true }).waitFor()
@@ -228,7 +251,7 @@ test('real Crossing components preserve thread state across tools and model appl
   await page.getByRole('button', { name: 'gpt-5.6-terra · medium', exact: true }).click()
   await page.getByLabel('模型').selectOption('gpt-5.6-luna')
   await page.evaluate(() => { window.__rejectModelApply = true })
-  await page.getByRole('button', { name: '应用到当前会话', exact: true }).click()
+  await page.getByRole('button', { name: '下一条起使用', exact: true }).click()
   await page.getByText(/测试拒绝模型设置.*当前仍为 gpt-5.6-terra · medium/).waitFor()
   assert.equal(await page.getByRole('button', { name: 'gpt-5.6-terra · medium', exact: true }).count(), 1)
   assert.equal(await page.getByText('模型未知', { exact: true }).count(), 0)

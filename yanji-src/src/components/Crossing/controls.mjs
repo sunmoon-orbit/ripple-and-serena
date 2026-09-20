@@ -1,6 +1,6 @@
 export function localCommand(text) {
-  const match = text.trim().match(/^\/(model|new|sessions|resume)(?:\s+(.*))?$/s)
-  return match ? { name: match[1], argument: match[2] || '' } : null
+  const match = String(text || '').trim().match(/^\/(model|new|sessions|resume)(?:\s+(.*))?$/is)
+  return match ? { name: match[1].toLowerCase(), argument: match[2] || '' } : null
 }
 export function imageSupported(models, model) {
   return !!models.find(m => m.model === model || m.id === model)?.inputModalities?.includes('image')

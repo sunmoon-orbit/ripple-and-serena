@@ -171,19 +171,30 @@ export default function Crossing() {
           return
         }
         if (msg.type === 'crossing/warning') { if (!msg.threadId || msg.threadId === activeThreadRef.current) setWarning(msg.message); return }
+        if (msg.type === 'crossing/model/open') {
+          if (msg.models) { setModels(msg.models); setModelsError('') }
+          setDraft(''); setModelOpen(true)
+          return
+        }
+        if (msg.type === 'crossing/model/pending') {
+          if (msg.threadId === activeThreadRef.current) {
+            const pendingModel = { model: msg.model, effort: msg.effort }
+            setSessionState(prev => ({ ...prev, pendingModel }))
+            modelApplyRef.current = null
+            setModelApply({ status: 'pending', error: '' })
+            setSelection(pendingModel)
+            setModelOpen(false)
+          }
+          return
+        }
         if (msg.type === 'crossing/model/confirmed') {
           if (msg.threadId === activeThreadRef.current) {
             setActiveThread(prev => ({ ...prev, model: msg.model, reasoningEffort: msg.reasoningEffort }))
-            setSessionState(prev => ({ ...prev, thread: { ...prev.thread, model: msg.model, reasoningEffort: msg.reasoningEffort }, pendingModel: null }))
-            const pendingApply = modelApplyRef.current
-            const confirmsPending = pendingApply && (msg.requestId === pendingApply.requestId
-              || (!msg.requestId && msg.model === pendingApply.model && msg.reasoningEffort === pendingApply.effort))
-            if (!pendingApply || confirmsPending) {
-              modelApplyRef.current = null
-              setModelApply({ status: 'confirmed', error: '' })
-              setSelection({ model: msg.model || '', effort: msg.reasoningEffort || '' })
-              setModelOpen(false)
-            }
+            setSessionState(prev => {
+              const confirmsPending = prev.pendingModel?.model === msg.model && prev.pendingModel?.effort === msg.reasoningEffort
+              return { ...prev, thread: { ...prev.thread, model: msg.model, reasoningEffort: msg.reasoningEffort }, pendingModel: confirmsPending ? null : prev.pendingModel }
+            })
+            setModelApply({ status: 'confirmed', error: '' })
           }
           return
         }
@@ -354,12 +365,12 @@ export default function Crossing() {
       {modelOpen && <div className="crossing-controls">
         <label>模型<select value={selection.model} onChange={e => { const m = models.find(x => x.model === e.target.value); setSelection({ model: m.model, effort: m.defaultReasoningEffort }) }}><option value="" disabled>请选择模型</option>{models.map(m => <option key={m.id} value={m.model}>{m.displayName}{m.isDefault ? '（默认）' : ''}</option>)}</select></label>
         <label>推理强度<select value={selection.effort} onChange={e => setSelection(prev => ({ ...prev, effort: e.target.value }))}><option value="" disabled>默认／未知</option>{selectedEntry?.supportedReasoningEfforts.map(e => <option key={e.reasoningEffort} value={e.reasoningEffort}>{e.reasoningEffort}</option>)}</select></label>
-        <button disabled={!selection.model || !selection.effort || !!turn || starting || modelApply.status === 'applying' || !sessionState.authenticated || sessionState.phase !== 'ready'} onClick={applyModel}>{modelApply.status === 'applying' ? '应用中…' : '应用到当前会话'}</button>
+        <button disabled={!selection.model || !selection.effort || !!turn || starting || modelApply.status === 'applying' || !sessionState.authenticated || sessionState.phase !== 'ready'} onClick={applyModel}>{modelApply.status === 'applying' ? '保存中…' : '下一条起使用'}</button>
         <button onClick={() => { setModelsError(''); send({ type: 'crossing/model/list' }) }}>刷新列表</button>
         {modelsError && <p role="alert">{modelsError}</p>}
         {selection.model && models.length > 0 && !selectedEntry && <p role="alert">当前会话模型不在可用列表中，请重新选择。</p>}
         {modelApply.error && <p role="alert">{modelApply.error}；当前仍为 {modelLabel(activeThread)}。</p>}
-        <small>顶部只显示服务端确认值；选择仅作用于渡口会话。{sessionState.pendingModel && '所选模型将在下一次发送时覆盖，当前仍显示已确认模型。'}</small>
+        <small>顶部只显示 App Server 已确认的会话设置；选择会在下一条消息的 turn/start 中应用，并成为此会话后续默认值。</small>
       </div>}
       {warning && <div className="crossing-error" role="status">{warning}<button onClick={() => setWarning('')}>×</button></div>}
       {error && <div className="crossing-error">{error}<button onClick={() => setError('')}>×</button></div>}

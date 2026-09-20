@@ -43,6 +43,10 @@ function publicThread(thread) {
 
 function input(text) { return [{ type: 'text', text: String(text || '') }] }
 
+function localModelCommand(text) {
+  return /^\s*\/model(?:\s+.*)?\s*$/i.test(String(text || ''))
+}
+
 function diagnoseCrossingError(error, operation = '') {
   const detail = clip(error?.message || error || 'unknown error', 500)
   const source = `${error?.code || ''} ${detail}`.toLowerCase()
@@ -236,12 +240,13 @@ function createCrossingService(options = {}) {
       if (!threadId || selecting.has(clientId) || sessions.get(clientId) !== threadId) throw new Error('会话尚未恢复，不能应用模型')
       if (activeTurn || startingTurn) throw new Error('请先停止当前任务再应用模型')
       const choice = await modelControls.validate(message)
-      await request('thread/settings/update', { threadId, model: choice.model, effort: choice.effort })
       check(clientId)
       rememberChoice(threadId, choice)
-      const meta = { model: choice.model, reasoningEffort: choice.effort }
-      metadata.set(threadId, meta)
-      send(clientId, { type: 'crossing/model/confirmed', requestId: message.requestId, threadId, ...meta })
+      // thread/settings/update is experimental in Codex 0.153.4 and this
+      // connection deliberately uses the stable API. Queue the stable
+      // turn/start override instead; that request makes it sticky for this and
+      // subsequent turns.
+      send(clientId, { type: 'crossing/model/pending', requestId: message.requestId, threadId, model: choice.model, effort: choice.effort })
       return
     }
     if (type === 'crossing/thread/list') {
@@ -274,19 +279,15 @@ function createCrossingService(options = {}) {
       sessions.delete(clientId)
       const requested = message.model ? message : null
       const choice = requested ? await modelControls.validate(requested) : null
-      let result = await request('thread/resume', { threadId: String(message.threadId || ''), cwd, sandbox: 'workspace-write', approvalPolicy: 'untrusted', approvalsReviewer: 'user', excludeTurns: false, ...(choice ? { model: choice.model } : {}) })
+      const result = await request('thread/resume', { threadId: String(message.threadId || ''), cwd, sandbox: 'workspace-write', approvalPolicy: 'untrusted', approvalsReviewer: 'user', excludeTurns: false })
       if (!result.thread?.id || result.thread.id !== message.threadId) throw new Error('Codex 返回的会话编号不匹配')
-      // Backward compatibility for a briefly cached pre-model/apply client:
-      // resume may select a model, but current App Server schema only accepts
-      // reasoning effort through thread/settings/update.
-      if (choice) {
-        await request('thread/settings/update', { threadId: result.thread.id, model: choice.model, effort: choice.effort })
-        result = { ...result, ...confirmedModel({ model: choice.model, reasoningEffort: choice.effort }), thread: { ...result.thread, model: choice.model, reasoningEffort: choice.effort } }
-      }
       if (disconnectedClients.has(clientId)) return
       sessions.set(clientId, result.thread.id)
       if (choice) rememberChoice(result.thread.id, choice)
-      send(clientId, { type: 'crossing/thread', requestId: message.requestId, action: 'resumed', ready: true, thread: threadView(result, true), pendingModel: choice && (confirmedModel(result).model !== choice.model || confirmedModel(result).reasoningEffort !== choice.effort) ? choice : null })
+      const remembered = choice || modelControls.remembered(result.thread.id)
+      const confirmed = confirmedModel(result)
+      const pendingModel = remembered && (confirmed.model !== remembered.model || confirmed.reasoningEffort !== remembered.effort) ? remembered : null
+      send(clientId, { type: 'crossing/thread', requestId: message.requestId, action: 'resumed', ready: true, thread: threadView(result, true), pendingModel })
       return
     }
     if (type === 'crossing/usage/read') { await publishRateLimits(); return }
@@ -296,6 +297,12 @@ function createCrossingService(options = {}) {
       const text = String(message.text || '').trim()
       if (!threadId || (!text && !message.attachments?.length)) throw new Error('缺少会话或消息内容')
       if (selecting.has(clientId) || sessions.get(clientId) !== threadId) throw new Error('会话尚未恢复，请重新选择会话')
+      // Defence in depth for stale/cached clients: /model is a local UI
+      // command and must never enter Codex conversation history.
+      if (localModelCommand(text)) {
+        send(clientId, { type: 'crossing/model/open', threadId, models: await modelControls.list(true) })
+        return
+      }
       startingTurn = { clientId, threadId }
       try {
         const saved = modelControls.remembered(threadId)
@@ -320,8 +327,8 @@ function createCrossingService(options = {}) {
           throw new Error('浏览器已断开，已停止该任务')
         }
         emit({ type: 'crossing/turn/started', threadId, turn: result.turn })
-        // A turn response has no model field. Read configured metadata instead of
-        // trusting the requested override or interpreting assistant prose.
+        // A turn response has no model field. Read the server's persisted thread
+        // metadata instead of trusting the requested override or assistant prose.
         void request('thread/read', { threadId, includeTurns: false }).then(result => {
           if (result.thread?.id !== threadId) return
           const meta = confirmedModel(result)
