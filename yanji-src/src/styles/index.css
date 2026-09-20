@@ -5645,8 +5645,10 @@ body.mp-active .scroll-bottom-btn { bottom: 139px; }
 .crossing-error { flex: 0 0 auto; max-height: 64px; overflow-y: auto; }
 .crossing-input .crossing-stop { background: rgba(190,80,80,.14); color: #b14d4d; }
 .crossing-speech { display: flex; align-items: center; flex-wrap: wrap; gap: 4px; }
-.crossing-speech .msg-tts-btn { min-width: 44px; min-height: 44px; }
+.crossing-speech .msg-tts-btn,.crossing-copy-btn { min-width: 44px; min-height: 44px; justify-content: center; }
+.crossing-copy-btn.active { color: var(--accent); opacity: 1; }
 .crossing-speech svg { width: 16px; height: 16px; }
+.crossing-copy-btn svg { width: 16px; height: 16px; }
 .msg-tts-error { color: var(--text-muted); font-size: 11px; overflow-wrap: anywhere; }
 .crossing-call-entry { flex: 0 0 auto; padding: 10px 12px; border-bottom: 1px solid var(--border); color: var(--text-mid); background: var(--card); font-size: 12px; overflow-wrap: anywhere; }
 .crossing-call-entry > div { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 6px; }

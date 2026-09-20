@@ -14,6 +14,7 @@ test('real Crossing components preserve thread state across tools and model appl
   const browser = await chromium.launch({ headless: true })
   t.after(() => browser.close())
   const context = await browser.newContext({ viewport: { width: 360, height: 740 }, isMobile: true, hasTouch: true, serviceWorkers: 'block' })
+  await context.grantPermissions(['clipboard-read', 'clipboard-write'], { origin })
   const page = await context.newPage()
   const errors = []
   page.on('pageerror', e => errors.push(e.message))
@@ -129,6 +130,16 @@ test('real Crossing components preserve thread state across tools and model appl
   assert.equal(selectionContract.body, 'text')
   assert.deepEqual(selectionContract.markdown, { p: 'text', blockquote: 'text', li: 'text', pre: 'text', code: 'text' })
   assert.deepEqual(selectionContract.chrome, { topbar: 'none', usage: 'none', model: 'none', avatar: 'none', time: 'none', action: 'none', composer: 'none', navigation: 'none' })
+
+  // Whole-message copy is separate from native partial selection and from the
+  // existing code-block copy action. It copies exactly this assistant message.
+  const wholeCopy = page.getByRole('button', { name: '复制整条消息', exact: true })
+  assert.equal(await wholeCopy.count(), 1)
+  await wholeCopy.click()
+  assert.equal(await page.evaluate(() => navigator.clipboard.readText()), '可选正文首段\n\n> 可选引用\n\n- 可选列表\n\n```js\nconst selectable = true\n```')
+  await page.getByRole('button', { name: '复制', exact: true }).click()
+  assert.equal((await page.evaluate(() => navigator.clipboard.readText())).trim(), 'const selectable = true')
+
   const paragraphBox = await page.locator('.crossing-messages .message-row-assistant .bubble-markdown p').first().boundingBox()
   const topbarBox = await page.locator('.crossing-topbar').boundingBox()
   assert.ok(paragraphBox && topbarBox)

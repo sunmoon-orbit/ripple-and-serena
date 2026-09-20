@@ -479,6 +479,7 @@ function MessageBubble({ msg, onEdit, onQuote, onDelete, isLast, presentationCon
   const useImages = avatarConfig?.mode === 'image'
   const avatarRadius = avatarConfig?.shape === 'square' ? '6px' : '50%'
   const [editing, setEditing] = useState(false)
+  const [copied, setCopied] = useState(false)
   // 每条消息独立控制；重新打开窗口时按清清要的默认重新显示。
   const [metaVisible, setMetaVisible] = useState(true)
   const [replyDlUrl, setReplyDlUrl] = useState(null)
@@ -496,6 +497,18 @@ function MessageBubble({ msg, onEdit, onQuote, onDelete, isLast, presentationCon
     setVoiceMode(true)
     return speech.toggle()
   }, [speech.available, speech.toggle])
+
+  const copyWholeMessage = useCallback(async () => {
+    try {
+      await navigator.clipboard.writeText(msg.content || '')
+      setCopied(true)
+      showToast('整条消息已复制', 'success')
+      setTimeout(() => setCopied(false), 1500)
+    } catch {
+      setCopied(false)
+      showToast('复制失败，请重试', 'error')
+    }
+  }, [msg.content])
 
   // 点音浪区。两种消息两种行为，是有意的：
   // - 本来就是语音的（留言 / 涟言用说的）→ 没有「原文视图」可回，就在下面展开转文字
@@ -782,6 +795,26 @@ function MessageBubble({ msg, onEdit, onQuote, onDelete, isLast, presentationCon
                     <line x1="12" y1="15" x2="12" y2="3"/>
                   </svg>
                 </button>
+          )}
+          {!isUser && !isStreaming && presentationConfig?.crossing && (
+            <button
+              type="button"
+              className={`msg-edit-icon-btn crossing-copy-btn${copied ? ' active' : ''}`}
+              title={copied ? '已复制整条消息' : '复制整条消息'}
+              aria-label={copied ? '已复制整条消息' : '复制整条消息'}
+              onClick={copyWholeMessage}
+            >
+              {copied ? (
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="20 6 9 17 4 12" />
+                </svg>
+              ) : (
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+                  <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+                </svg>
+              )}
+            </button>
           )}
           {!isUser && (!isStreaming || presentationConfig?.crossing) && (presentationConfig?.enabled ?? moonMemory?.enabled) && (
             <div className={presentationConfig?.crossing ? 'crossing-speech' : undefined}>
