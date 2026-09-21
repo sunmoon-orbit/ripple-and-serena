@@ -3849,6 +3849,62 @@ textarea.form-input { display: block; margin: 8px 16px 12px; }
 .coread-anno-actions { display: flex; justify-content: flex-end; gap: 8px; }
 .coread-reader { position: relative; }
 
+/* 阅读正文单独进入全屏；书架与上架表单仍保留原来的半屏抽屉。 */
+.bookread-reader-overlay {
+  align-items: stretch; padding: 0; background: var(--bg); backdrop-filter: none;
+}
+.coread-reader-fullscreen {
+  width: 100%; height: 100%; height: 100dvh;
+  max-width: none; max-height: none; border-radius: 0;
+  animation: bookreadFadeIn .18s ease;
+  padding-top: env(safe-area-inset-top);
+  padding-bottom: env(safe-area-inset-bottom);
+}
+@keyframes bookreadFadeIn { from { opacity: .55; } to { opacity: 1; } }
+.coread-reader-fullscreen .roost-modal-header { padding: 13px max(18px, env(safe-area-inset-right)) 12px max(18px, env(safe-area-inset-left)); }
+.bookread-header-actions { display: flex; align-items: center; gap: 5px; }
+.bookread-mode-toggle {
+  min-width: 48px; border: 1px solid var(--border); border-radius: 999px;
+  padding: 4px 10px; background: var(--card); color: var(--accent);
+  font: 12px/1.35 inherit; cursor: pointer;
+}
+.bookread-reader-body { position: relative; }
+.bookread-body-page { overflow: hidden; padding: 0; gap: 0; }
+.bookread-body-page .bookread-chapter-bar {
+  flex-shrink: 0; margin: 0; padding: 9px 18px 8px; border-bottom: 1px solid var(--border);
+}
+.bookread-body-page .bookread-toc {
+  position: absolute; z-index: 3; top: 48px; left: 16px; right: 16px;
+  max-height: min(58vh, 520px); box-shadow: 0 10px 30px rgba(0,0,0,.15);
+}
+.bookread-page-viewport {
+  --page-gutter: clamp(24px, 7vw, 78px);
+  flex: 1; min-height: 0; width: 100%; overflow: hidden; touch-action: pan-y;
+  background:
+    radial-gradient(circle at 92% 8%, color-mix(in srgb, var(--accent) 5%, transparent), transparent 22%),
+    var(--bg);
+}
+.bookread-text.bookread-text-paged {
+  box-sizing: border-box; width: calc(100% - (2 * var(--page-gutter))); height: 100%;
+  margin: 0 var(--page-gutter); padding: clamp(20px, 4vh, 46px) 0 32px;
+  column-width: calc(100vw - (2 * var(--page-gutter)));
+  column-gap: calc(2 * var(--page-gutter)); column-fill: auto;
+  font-size: clamp(17px, 2.1vw, 20px); line-height: 2.05;
+  transition: transform .22s cubic-bezier(.22,.7,.25,1);
+  will-change: transform;
+}
+.bookread-page-footer {
+  flex-shrink: 0; min-height: 48px; display: grid;
+  grid-template-columns: 44px minmax(48px, auto) 1fr minmax(48px, auto) 44px;
+  align-items: center; gap: 4px; padding: 3px max(12px, env(safe-area-inset-right)) 3px max(12px, env(safe-area-inset-left));
+  border-top: 1px solid var(--border); background: color-mix(in srgb, var(--bg) 92%, var(--accent));
+  color: var(--text-faint); font-size: 11px; text-align: center;
+}
+.bookread-page-footer button {
+  border: 0; background: none; color: var(--accent); cursor: pointer; font: 24px/1 inherit; padding: 7px;
+}
+.bookread-page-footer .bookread-page-tool { font-size: 11px; color: var(--text-muted); }
+
 /* ── 书架：真正的书 + 句级划线批注 ───────────────────────────── */
 .bookread-shelf { display: flex; flex-direction: column; gap: 14px; }
 /* 分层小标题：闲书层/正经层/工具层（2026-07-12） */
@@ -3968,6 +4024,11 @@ textarea.form-input { display: block; margin: 8px 16px 12px; }
 .bookread-anno-card.focus { outline: 2px dashed var(--accent); outline-offset: 2px; }
 .bookread-anno-quote { font-size: 12.5px; color: var(--text-muted); line-height: 1.5; margin-bottom: 4px; }
 .bookread-anno-row { display: flex; align-items: center; gap: 6px; font-size: 12px; }
+.bookread-card-link {
+  flex-shrink: 0; border: 0; background: none; padding: 2px 4px;
+  color: var(--accent); font: 11px/1.3 inherit; cursor: pointer;
+}
+.bookread-card-link:disabled { opacity: .5; }
 
 .bookread-pending {
   position: absolute; bottom: 0; left: 0; right: 0; z-index: 6;
@@ -3976,6 +4037,12 @@ textarea.form-input { display: block; margin: 8px 16px 12px; }
   padding: 10px 16px max(10px, env(safe-area-inset-bottom)); box-shadow: 0 -4px 16px rgba(0,0,0,0.12);
 }
 .bookread-pending-quote { font-size: 12.5px; color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bookread-pending-actions { display: flex; align-items: center; gap: 7px; flex-shrink: 0; }
+
+@media (max-width: 420px) {
+  .bookread-pending { align-items: stretch; flex-direction: column; }
+  .bookread-pending-actions { justify-content: flex-end; }
+}
 
 .bookread-author-toggle { display: flex; gap: 4px; margin-left: auto; }
 .bookread-author-toggle button {

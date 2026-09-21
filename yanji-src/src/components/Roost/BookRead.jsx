@@ -9,6 +9,8 @@ import {
 } from '../../api/moonMemory'
 import { sendMessage } from '../../api/llm'
 import { useThemedConfirm } from '../ThemedConfirmDialog'
+import { downloadBlob } from '../../utils/download'
+import { renderExcerptCardPng } from '../../utils/bookExcerptCard'
 
 const COLORS = [
   { id: 'yellow', hex: '#f5d76e' },
@@ -128,10 +130,19 @@ const POS_KEY = 'yanji_book_pos'
 function loadPos(bookId) {
   try { return JSON.parse(localStorage.getItem(POS_KEY) || '{}')[bookId] || null } catch { return null }
 }
-function savePos(bookId, ch, scroll) {
+function savePos(bookId, ch, position = {}) {
   try {
     const all = JSON.parse(localStorage.getItem(POS_KEY) || '{}')
-    all[bookId] = { ch, scroll: Math.round(scroll), at: Date.now() }
+    const previous = all[bookId] || {}
+    const next = typeof position === 'number' ? { scroll: position } : position
+    all[bookId] = {
+      ...previous,
+      ...next,
+      ch,
+      scroll: Math.max(0, Math.round(next.scroll ?? previous.scroll ?? 0)),
+      page: Math.max(0, Math.round(next.page ?? previous.page ?? 0)),
+      at: Date.now(),
+    }
     localStorage.setItem(POS_KEY, JSON.stringify(all))
   } catch { /* ignore */ }
 }
@@ -170,13 +181,19 @@ export default function BookRead({ onClose }) {
   const [chatLoading, setChatLoading] = useState(false)
   const [chatSending, setChatSending] = useState(false)
   const [readingSummary, setReadingSummary] = useState(null)
+  const [readingMode, setReadingMode] = useState('page')
+  const [pageIndex, setPageIndex] = useState(0)
+  const [pageCount, setPageCount] = useState(1)
+  const [savingCard, setSavingCard] = useState(false)
   const textRef = useRef(null)
   const annoRefs = useRef({})
   const fileRef = useRef(null)
   const bodyRef = useRef(null)          // 阅读视图的滚动容器
-  const restoreScrollRef = useRef(0)    // 章节渲染完后要恢复到的滚动位置
+  const pageViewportRef = useRef(null)
+  const restorePositionRef = useRef(null) // 章节渲染完后要恢复的位置（兼容旧版 scroll）
   const scrollTimerRef = useRef(null)
   const chatEndRef = useRef(null)
+  const touchStartRef = useRef(null)
 
   useEffect(() => {
     if (!cfg.apiToken) { setBooks([]); return }
@@ -220,7 +237,7 @@ export default function BookRead({ onClose }) {
     return () => { cancelled = true; clearInterval(t) }
   }, [active?.id, chapter?.idx, cfg.apiToken, cfg.baseUrl])
 
-  const openChapter = useCallback(async (book, idx, restoreScroll = 0) => {
+  const openChapter = useCallback(async (book, idx, restorePosition = null) => {
     setLoading(true)
     setChatOpen(false); setChatMessages([]); setChatLoading(true)
     setPending(null); setComposing(false); setFocusAnno(null)
@@ -229,14 +246,14 @@ export default function BookRead({ onClose }) {
         fetchBookChapter(cfg, book.id, idx),
         fetchBookChat(cfg, book.id, idx, 40).catch(() => []),
       ])
-      restoreScrollRef.current = restoreScroll
+      restorePositionRef.current = restorePosition
       setChapter(ch)
       setChapterViewKey((key) => key + 1)
       setChatMessages(Array.isArray(messages) ? messages : [])
-      savePos(book.id, idx, restoreScroll)
+      savePos(book.id, idx, restorePosition || { scroll: 0, page: 0, mode: readingMode, ratio: 0 })
       sendReadingHeartbeat(cfg, book.id, '阿颖', idx, 0).catch(() => {})
     } catch { showToast('章节加载失败', 'error') } finally { setLoading(false); setChatLoading(false) }
-  }, [])
+  }, [readingMode])
 
   useEffect(() => {
     if (chatOpen) chatEndRef.current?.scrollIntoView({ block: 'end' })
@@ -246,7 +263,10 @@ export default function BookRead({ onClose }) {
     const content = chapter?.content || ''
     const el = bodyRef.current
     const maxScroll = Math.max(1, (el?.scrollHeight || 1) - (el?.clientHeight || 0))
-    const center = Math.round(content.length * Math.min(1, Math.max(0, (el?.scrollTop || 0) / maxScroll)))
+    const ratio = readingMode === 'page'
+      ? pageIndex / Math.max(1, pageCount - 1)
+      : (el?.scrollTop || 0) / maxScroll
+    const center = Math.round(content.length * Math.min(1, Math.max(0, ratio)))
     const start = Math.max(0, center - 1200)
     return content.slice(start, start + 2400)
   }
@@ -311,22 +331,131 @@ export default function BookRead({ onClose }) {
     // 优先回到本机自动进度（章+滚动位置），没有再看共享书签
     const pos = loadPos(book.id)
     const startIdx = Math.min(pos?.ch ?? book.bookmark_chapter ?? 0, (book.chapter_count || 1) - 1)
-    await openChapter(book, startIdx, pos?.ch === startIdx ? pos.scroll : 0)
+    const restore = pos?.ch === startIdx ? pos : { scroll: 0, page: 0, mode: 'page', ratio: 0 }
+    // 旧版只记滚动像素：先按滚动模式原位恢复一次，避免升级后突然跳回章首。
+    const legacyScroll = !restore?.mode && (restore?.scroll || 0) > 0
+    setReadingMode(restore?.mode === 'scroll' || legacyScroll ? 'scroll' : 'page')
+    await openChapter(book, startIdx, restore)
   }
 
-  // 章节渲染完成后恢复滚动位置（直接设 scrollTop 会在内容挂载前丢失，放 effect 里）
+  // 滚动模式恢复旧版像素位置；新版额外保存 ratio，换屏幕后也能回到大致同一段。
   useEffect(() => {
-    if (!chapter || !bodyRef.current) return
-    bodyRef.current.scrollTop = restoreScrollRef.current
-    restoreScrollRef.current = 0
-  }, [chapterViewKey])
+    if (!chapter || readingMode !== 'scroll' || !bodyRef.current) return
+    const saved = restorePositionRef.current || {}
+    requestAnimationFrame(() => {
+      const el = bodyRef.current
+      if (!el) return
+      const max = Math.max(0, el.scrollHeight - el.clientHeight)
+      el.scrollTop = saved.ratio != null ? saved.ratio * max : (saved.scroll || 0)
+      restorePositionRef.current = null
+    })
+  }, [chapterViewKey, readingMode])
+
+  // CSS 多栏把正文排成横向书页；每一栏的跨度恰好等于视口宽度。
+  // 用实际渲染宽度计页，旋转屏幕或地址栏高度变化时会重新计算。
+  useEffect(() => {
+    if (!chapter || readingMode !== 'page') return undefined
+    let frame = 0
+    function measure() {
+      cancelAnimationFrame(frame)
+      frame = requestAnimationFrame(() => {
+        const viewport = pageViewportRef.current
+        const text = textRef.current
+        if (!viewport || !text) return
+        const width = Math.max(1, viewport.clientWidth)
+        const count = Math.max(1, Math.ceil(text.scrollWidth / width))
+        const saved = restorePositionRef.current
+        // 只有从翻页模式恢复时才沿用绝对页码。滚动模式保存的 page 可能是
+        // 上一次多栏布局留下的旧值（常见是 pageCount=1 时的 0），切回翻页
+        // 必须以正文比例按当前屏幕重新换算。
+        const savedPage = Number(saved?.page)
+        const savedRatio = Math.min(1, Math.max(0, Number(saved?.ratio) || 0))
+        const requested = saved?.mode === 'page' && Number.isFinite(savedPage)
+          ? savedPage
+          : Math.round(savedRatio * Math.max(0, count - 1))
+        setPageCount(count)
+        setPageIndex((current) => Math.max(0, Math.min(count - 1, saved ? requested : current)))
+        if (saved) restorePositionRef.current = null
+      })
+    }
+    measure()
+    const observer = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(measure) : null
+    if (pageViewportRef.current) observer?.observe(pageViewportRef.current)
+    window.addEventListener('resize', measure)
+    return () => {
+      cancelAnimationFrame(frame)
+      observer?.disconnect()
+      window.removeEventListener('resize', measure)
+    }
+  }, [chapterViewKey, readingMode, chapter])
 
   // 滚动时静默记进度（防抖 300ms；savePos 只写 localStorage，组件卸载后落笔也安全）
   function onBodyScroll(e) {
-    if (!active || !chapter) return
+    if (!active || !chapter || readingMode !== 'scroll') return
     const top = e.target.scrollTop
+    const max = Math.max(1, e.target.scrollHeight - e.target.clientHeight)
     clearTimeout(scrollTimerRef.current)
-    scrollTimerRef.current = setTimeout(() => savePos(active.id, chapter.idx, top), 300)
+    scrollTimerRef.current = setTimeout(() => savePos(active.id, chapter.idx, {
+      scroll: top, page: 0, mode: 'scroll', ratio: top / max,
+    }), 300)
+  }
+
+  function rememberPage(nextPage) {
+    if (!active || !chapter) return
+    savePos(active.id, chapter.idx, {
+      page: nextPage,
+      scroll: 0,
+      mode: 'page',
+      ratio: nextPage / Math.max(1, pageCount - 1),
+    })
+  }
+
+  function turnPage(direction) {
+    if (!chapter) return
+    const next = pageIndex + direction
+    if (next < 0) {
+      if (chapter.idx > 0) openChapter(active, chapter.idx - 1, { mode: 'page', page: Number.MAX_SAFE_INTEGER, ratio: 1 })
+      return
+    }
+    if (next >= pageCount) {
+      if (chapter.idx < chapterCount - 1) openChapter(active, chapter.idx + 1, { mode: 'page', page: 0, ratio: 0 })
+      return
+    }
+    setPageIndex(next)
+    rememberPage(next)
+  }
+
+  function switchReadingMode() {
+    const next = readingMode === 'page' ? 'scroll' : 'page'
+    const el = bodyRef.current
+    const ratio = readingMode === 'page'
+      ? pageIndex / Math.max(1, pageCount - 1)
+      : (el?.scrollTop || 0) / Math.max(1, (el?.scrollHeight || 1) - (el?.clientHeight || 0))
+    restorePositionRef.current = next === 'page'
+      ? { mode: next, ratio }
+      : { mode: next, ratio, page: pageIndex }
+    setReadingMode(next)
+    savePos(active.id, chapter.idx, {
+      mode: next,
+      ratio,
+      page: next === 'page' ? Math.round(ratio * Math.max(0, pageCount - 1)) : pageIndex,
+      scroll: el?.scrollTop || 0,
+    })
+  }
+
+  function onPageTouchStart(event) {
+    const touch = event.changedTouches?.[0]
+    if (touch) touchStartRef.current = { x: touch.clientX, y: touch.clientY }
+  }
+
+  function onPageTouchEnd(event) {
+    const start = touchStartRef.current
+    const touch = event.changedTouches?.[0]
+    touchStartRef.current = null
+    if (!start || !touch || pending) return
+    const dx = touch.clientX - start.x
+    const dy = touch.clientY - start.y
+    if (Math.abs(dx) > 52 && Math.abs(dx) > Math.abs(dy) * 1.25) turnPage(dx < 0 ? 1 : -1)
   }
 
   // 读讫章开合：阿颖的那枚从这里盖；涟言的那枚由他自己通过 API 盖
@@ -381,6 +510,32 @@ export default function BookRead({ onClose }) {
     } catch { showToast('批注失败', 'error') }
   }
 
+  async function saveExcerptCard(excerpt, note = '') {
+    const quote = String(excerpt || '').trim()
+    if (!quote || savingCard) return
+    setSavingCard(true)
+    try {
+      const blob = await renderExcerptCardPng({
+        quote,
+        note,
+        title: active.title,
+        author: active.author,
+        chapter: chapter.title || `第 ${chapter.idx + 1} 章`,
+        color: active.cover_color,
+      })
+      const safeTitle = String(active.title || '书摘').replace(/[\\/:*?"<>|]/g, '').slice(0, 28) || '书摘'
+      const day = new Intl.DateTimeFormat('sv-SE', { timeZone: 'Asia/Shanghai' }).format(new Date()).replaceAll('-', '')
+      downloadBlob(blob, `书摘-${safeTitle}-${day}.png`)
+      showToast('书摘卡已保存到手机')
+      setPending(null)
+      window.getSelection()?.removeAllRanges()
+    } catch (error) {
+      showToast(error?.message || '书摘卡生成失败', 'error')
+    } finally {
+      setSavingCard(false)
+    }
+  }
+
   async function removeAnno(id) {
     try {
       await deleteBookAnnotation(cfg, id)
@@ -398,7 +553,14 @@ export default function BookRead({ onClose }) {
 
   function jumpToAnno(id) {
     setFocusAnno(id)
-    annoRefs.current[id]?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    if (readingMode === 'page') {
+      const ratio = pageIndex / Math.max(1, pageCount - 1)
+      restorePositionRef.current = { mode: 'scroll', ratio }
+      setReadingMode('scroll')
+      setTimeout(() => annoRefs.current[id]?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 120)
+    } else {
+      annoRefs.current[id]?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    }
   }
 
   async function pickFile(e) {
@@ -627,12 +789,17 @@ export default function BookRead({ onClose }) {
   const segs = chapter ? buildSegments(chapter.content, annos) : []
 
   return (
-    <div className="roost-overlay" onClick={onClose}>
-      <div className="roost-modal roost-modal-tall coread-modal coread-reader" onClick={(e) => e.stopPropagation()}>
+    <div className="roost-overlay bookread-reader-overlay" onClick={onClose}>
+      <div className="roost-modal coread-modal coread-reader coread-reader-fullscreen" onClick={(e) => e.stopPropagation()}>
         <div className="roost-modal-header">
           <button className="coread-back" onClick={() => { setActive(null); setChapter(null); setPending(null); setComposing(false) }}>‹ 书架</button>
           <span className="coread-reader-title">{active.title}</span>
-          <button className="roost-modal-close" onClick={onClose}>✕</button>
+          <div className="bookread-header-actions">
+            <button className="bookread-mode-toggle" onClick={switchReadingMode} title="切换阅读模式">
+              {readingMode === 'page' ? '翻页' : '滚动'}
+            </button>
+            <button className="roost-modal-close" onClick={onClose}>✕</button>
+          </div>
         </div>
         {readingSummary && (() => {
           const maxSeconds = Math.max(60, ...readingSummary.days.map((item) => item.seconds))
@@ -652,7 +819,7 @@ export default function BookRead({ onClose }) {
             </div>
           )
         })()}
-        <div className="roost-modal-body" ref={bodyRef} onScroll={onBodyScroll}>
+        <div className={`roost-modal-body bookread-reader-body ${readingMode === 'page' ? 'bookread-body-page' : 'bookread-body-scroll'}`} ref={bodyRef} onScroll={onBodyScroll}>
           {loading && <div className="roost-empty">翻开书页……</div>}
           {!loading && chapter && (
             <>
@@ -680,49 +847,85 @@ export default function BookRead({ onClose }) {
                   ))}
                 </div>
               )}
-              <div className="bookread-text" ref={textRef}>
-                {segs.map((s) =>
-                  s.annos.length ? (
-                    <mark
-                      key={s.start}
-                      className="bookread-mark"
-                      style={{ backgroundColor: (COLOR_HEX[s.annos[0].color] || '#f5d76e') + '66', borderBottom: `2px solid ${COLOR_HEX[s.annos[0].color] || '#f5d76e'}` }}
-                      onClick={() => jumpToAnno(s.annos[0].id)}
-                    >{s.text}</mark>
-                  ) : (
-                    <span key={s.start}>{s.text}</span>
-                  )
-                )}
-              </div>
-              <div className="bookread-foot">
-                <button className="roost-btn roost-btn-ghost roost-btn-sm" onClick={markBookmark}>夹书签</button>
-                <button
-                  className={'roost-btn roost-btn-ghost roost-btn-sm' + (stamps.some((s) => s.reader === '阿颖') ? ' bookread-stamped' : '')}
-                  onClick={toggleStamp}
-                >
-                  {stamps.some((s) => s.reader === '阿颖') ? '读讫 ✓' : '盖读讫章'}
-                </button>
-                <span className="bookread-foot-hint">长按选中一句话，就能划线批注</span>
-              </div>
-              {annos.length > 0 && (
-                <div className="bookread-anno-list">
-                  <div className="roost-card-label" style={{ marginBottom: 8 }}>划线与批注</div>
-                  {annos.map((a) => (
+              {readingMode === 'page' ? (
+                <>
+                  <div
+                    className="bookread-page-viewport"
+                    ref={pageViewportRef}
+                    onTouchStart={onPageTouchStart}
+                    onTouchEnd={onPageTouchEnd}
+                  >
                     <div
-                      key={a.id}
-                      ref={(el) => { annoRefs.current[a.id] = el }}
-                      className={'bookread-anno-card' + (focusAnno === a.id ? ' focus' : '')}
-                      style={{ borderLeftColor: COLOR_HEX[a.color] || '#f5d76e' }}
+                      className="bookread-text bookread-text-paged"
+                      ref={textRef}
+                      style={{ transform: `translate3d(${-pageIndex * 100}vw, 0, 0)` }}
                     >
-                      <div className="bookread-anno-quote">「{a.quote}」</div>
-                      <div className="bookread-anno-row">
-                        <span className="coread-anno-author">{a.author}</span>
-                        <span className="coread-anno-note">{a.note || '（划线）'}</span>
-                        <button className="coread-anno-del" onClick={() => removeAnno(a.id)}>✕</button>
-                      </div>
+                      {segs.map((s) =>
+                        s.annos.length ? (
+                          <mark
+                            key={s.start}
+                            className="bookread-mark"
+                            style={{ backgroundColor: (COLOR_HEX[s.annos[0].color] || '#f5d76e') + '66', borderBottom: `2px solid ${COLOR_HEX[s.annos[0].color] || '#f5d76e'}` }}
+                            onClick={() => jumpToAnno(s.annos[0].id)}
+                          >{s.text}</mark>
+                        ) : <span key={s.start}>{s.text}</span>
+                      )}
                     </div>
-                  ))}
-                </div>
+                  </div>
+                  <div className="bookread-page-footer">
+                    <button onClick={() => turnPage(-1)} aria-label="上一页">‹</button>
+                    <button className="bookread-page-tool" onClick={markBookmark}>书签</button>
+                    <span>{pageIndex + 1} / {pageCount}</span>
+                    <button className="bookread-page-tool" onClick={toggleStamp}>{stamps.some((s) => s.reader === '阿颖') ? '读讫 ✓' : '读讫'}</button>
+                    <button onClick={() => turnPage(1)} aria-label="下一页">›</button>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="bookread-text" ref={textRef}>
+                    {segs.map((s) =>
+                      s.annos.length ? (
+                        <mark
+                          key={s.start}
+                          className="bookread-mark"
+                          style={{ backgroundColor: (COLOR_HEX[s.annos[0].color] || '#f5d76e') + '66', borderBottom: `2px solid ${COLOR_HEX[s.annos[0].color] || '#f5d76e'}` }}
+                          onClick={() => jumpToAnno(s.annos[0].id)}
+                        >{s.text}</mark>
+                      ) : <span key={s.start}>{s.text}</span>
+                    )}
+                  </div>
+                  <div className="bookread-foot">
+                    <button className="roost-btn roost-btn-ghost roost-btn-sm" onClick={markBookmark}>夹书签</button>
+                    <button
+                      className={'roost-btn roost-btn-ghost roost-btn-sm' + (stamps.some((s) => s.reader === '阿颖') ? ' bookread-stamped' : '')}
+                      onClick={toggleStamp}
+                    >
+                      {stamps.some((s) => s.reader === '阿颖') ? '读讫 ✓' : '盖读讫章'}
+                    </button>
+                    <span className="bookread-foot-hint">长按选中文字，可做书摘卡或划线</span>
+                  </div>
+                  {annos.length > 0 && (
+                    <div className="bookread-anno-list">
+                      <div className="roost-card-label" style={{ marginBottom: 8 }}>划线与批注</div>
+                      {annos.map((a) => (
+                        <div
+                          key={a.id}
+                          ref={(el) => { annoRefs.current[a.id] = el }}
+                          className={'bookread-anno-card' + (focusAnno === a.id ? ' focus' : '')}
+                          style={{ borderLeftColor: COLOR_HEX[a.color] || '#f5d76e' }}
+                        >
+                          <div className="bookread-anno-quote">「{a.quote}」</div>
+                          <div className="bookread-anno-row">
+                            <span className="coread-anno-author">{a.author}</span>
+                            <span className="coread-anno-note">{a.note || '（划线）'}</span>
+                            <button className="bookread-card-link" disabled={savingCard} onClick={() => saveExcerptCard(a.quote, a.note)}>书摘卡</button>
+                            <button className="coread-anno-del" onClick={() => removeAnno(a.id)}>✕</button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </>
               )}
             </>
           )}
@@ -767,7 +970,10 @@ export default function BookRead({ onClose }) {
         {pending && !composing && (
           <div className="bookread-pending" onClick={(e) => e.stopPropagation()}>
             <span className="bookread-pending-quote">「{pending.quote.length > 24 ? pending.quote.slice(0, 24) + '…' : pending.quote}」</span>
-            <button className="roost-btn roost-btn-sm" onClick={() => setComposing(true)}>划线批注</button>
+            <div className="bookread-pending-actions">
+              <button className="roost-btn roost-btn-ghost roost-btn-sm" disabled={savingCard} onClick={() => saveExcerptCard(pending.quote)}>{savingCard ? '生成中…' : '书摘卡'}</button>
+              <button className="roost-btn roost-btn-sm" onClick={() => setComposing(true)}>划线批注</button>
+            </div>
           </div>
         )}
 
