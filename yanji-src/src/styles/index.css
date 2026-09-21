@@ -3861,6 +3861,10 @@ textarea.form-input { display: block; margin: 8px 16px 12px; }
   padding-bottom: env(safe-area-inset-bottom);
 }
 .yanji-native .coread-reader-fullscreen { padding-top: 0; padding-bottom: 0; }
+.coread-reader-chrome-hidden > .roost-modal-header,
+.coread-reader-chrome-hidden > .bookread-reading-summary,
+.coread-reader-chrome-hidden .bookread-chapter-bar,
+.coread-reader-chrome-hidden .bookread-page-footer { display: none; }
 @keyframes bookreadFadeIn { from { opacity: .55; } to { opacity: 1; } }
 .coread-reader-fullscreen .roost-modal-header { padding: 13px max(18px, env(safe-area-inset-right)) 12px max(18px, env(safe-area-inset-left)); }
 .bookread-header-actions { display: flex; align-items: center; gap: 5px; }

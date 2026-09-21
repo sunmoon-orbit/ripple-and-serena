@@ -184,6 +184,7 @@ export default function BookRead({ onClose }) {
   const [readingMode, setReadingMode] = useState('page')
   const [pageIndex, setPageIndex] = useState(0)
   const [pageCount, setPageCount] = useState(1)
+  const [readerChromeVisible, setReaderChromeVisible] = useState(true)
   const [savingCard, setSavingCard] = useState(false)
   const textRef = useRef(null)
   const annoRefs = useRef({})
@@ -194,6 +195,7 @@ export default function BookRead({ onClose }) {
   const scrollTimerRef = useRef(null)
   const chatEndRef = useRef(null)
   const touchStartRef = useRef(null)
+  const lastPageSwipeAtRef = useRef(0)
 
   useEffect(() => {
     if (!cfg.apiToken) { setBooks([]); return }
@@ -325,6 +327,7 @@ export default function BookRead({ onClose }) {
 
   async function openBook(book) {
     setActive(book)
+    setReaderChromeVisible(true)
     setChapterCount(book.chapter_count || 1)
     setStamps(book.stamps || [])
     setToc(null); setTocOpen(false)
@@ -434,6 +437,7 @@ export default function BookRead({ onClose }) {
     restorePositionRef.current = next === 'page'
       ? { mode: next, ratio }
       : { mode: next, ratio, page: pageIndex }
+    setReaderChromeVisible(true)
     setReadingMode(next)
     savePos(active.id, chapter.idx, {
       mode: next,
@@ -455,7 +459,24 @@ export default function BookRead({ onClose }) {
     if (!start || !touch || pending) return
     const dx = touch.clientX - start.x
     const dy = touch.clientY - start.y
-    if (Math.abs(dx) > 52 && Math.abs(dx) > Math.abs(dy) * 1.25) turnPage(dx < 0 ? 1 : -1)
+    if (Math.abs(dx) > 52 && Math.abs(dx) > Math.abs(dy) * 1.25) {
+      lastPageSwipeAtRef.current = Date.now()
+      turnPage(dx < 0 ? 1 : -1)
+    }
+  }
+
+  function toggleReaderChrome() {
+    if (readingMode !== 'page' || pending || composing || chatOpen || tocOpen) return
+    if (Date.now() - lastPageSwipeAtRef.current < 450) return
+    const selection = window.getSelection?.()
+    if (selection && !selection.isCollapsed) return
+    // 菜单收放会改变书页高度。留下比例而非旧页码，让 ResizeObserver
+    // 按新的每页容量把当前位置换算回来，不让正文突然跳段。
+    restorePositionRef.current = {
+      mode: 'layout',
+      ratio: pageIndex / Math.max(1, pageCount - 1),
+    }
+    setReaderChromeVisible((visible) => !visible)
   }
 
   // 读讫章开合：阿颖的那枚从这里盖；涟言的那枚由他自己通过 API 盖
@@ -790,7 +811,7 @@ export default function BookRead({ onClose }) {
 
   return (
     <div className="roost-overlay bookread-reader-overlay" onClick={onClose}>
-      <div className="roost-modal coread-modal coread-reader coread-reader-fullscreen" onClick={(e) => e.stopPropagation()}>
+      <div className={`roost-modal coread-modal coread-reader coread-reader-fullscreen${readerChromeVisible ? '' : ' coread-reader-chrome-hidden'}`} onClick={(e) => e.stopPropagation()}>
         <div className="roost-modal-header">
           <button className="coread-back" onClick={() => { setActive(null); setChapter(null); setPending(null); setComposing(false) }}>‹ 书架</button>
           <span className="coread-reader-title">{active.title}</span>
@@ -854,6 +875,8 @@ export default function BookRead({ onClose }) {
                     ref={pageViewportRef}
                     onTouchStart={onPageTouchStart}
                     onTouchEnd={onPageTouchEnd}
+                    onClick={toggleReaderChrome}
+                    title={readerChromeVisible ? '轻触隐藏菜单' : '轻触显示菜单'}
                   >
                     <div
                       className="bookread-text bookread-text-paged"
@@ -866,7 +889,7 @@ export default function BookRead({ onClose }) {
                             key={s.start}
                             className="bookread-mark"
                             style={{ backgroundColor: (COLOR_HEX[s.annos[0].color] || '#f5d76e') + '66', borderBottom: `2px solid ${COLOR_HEX[s.annos[0].color] || '#f5d76e'}` }}
-                            onClick={() => jumpToAnno(s.annos[0].id)}
+                            onClick={(event) => { event.stopPropagation(); jumpToAnno(s.annos[0].id) }}
                           >{s.text}</mark>
                         ) : <span key={s.start}>{s.text}</span>
                       )}
