@@ -8,7 +8,7 @@ test('wrapExcerptText keeps a long excerpt inside the configured line budget', (
   assert.match(lines.at(-1), /…$/)
 })
 
-test('buildExcerptCardSvg escapes text and contains its decorative vector motifs', () => {
+test('buildExcerptCardSvg escapes text and uses the simplified photo-and-paper layout', () => {
   const svg = buildExcerptCardSvg({
     quote: '她说：“A & B”',
     note: '一条札记',
@@ -16,13 +16,23 @@ test('buildExcerptCardSvg escapes text and contains its decorative vector motifs
     author: '阿颖',
     chapter: '后记',
     color: '#4a7c59',
+    imageDataUrl: 'data:image/jpeg;base64,fixture',
   })
   assert.match(svg, /width="1080" height="1440"/)
   assert.match(svg, /A &amp; B/)
   assert.match(svg, /《&lt;小豆豆&gt;》/)
-  assert.match(svg, /mask="url\(#moon-cut\)"/)
-  assert.match(svg, /M161 1185/)
+  assert.match(svg, /<image href="data:image\/jpeg;base64,fixture"/)
+  assert.match(svg, /M0 548Q0 500 48 500/)
+  assert.match(svg, /言叽书架摘录/)
+  assert.doesNotMatch(svg, /moon-cut|M161 1185/)
   assert.doesNotMatch(svg, /<小豆豆>/)
+})
+
+test('buildExcerptCardSvg falls back to a quiet spine-color cover without a photo', () => {
+  const svg = buildExcerptCardSvg({ quote: '短句', color: '#4a7c59' })
+  assert.match(svg, /id="fallback"/)
+  assert.match(svg, /stop-color="#4a7c59"/)
+  assert.doesNotMatch(svg, /<image href=/)
 })
 
 test('buildExcerptCardSvg truncates an overly long source line', () => {
@@ -33,6 +43,6 @@ test('buildExcerptCardSvg truncates an overly long source line', () => {
     author: '阿颖',
     chapter: '同样很长的章节名字',
   })
-  assert.match(svg, /<text x="118" y="73" class="meta">[^<]{29}…<\/text>/u)
+  assert.match(svg, /<text x="84" y="1314" class="meta">[^<]{33}…<\/text>/u)
   assert.doesNotMatch(svg, new RegExp(longTitle))
 })

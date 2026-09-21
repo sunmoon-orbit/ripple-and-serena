@@ -1,5 +1,6 @@
 const CARD_WIDTH = 1080
 const CARD_HEIGHT = 1440
+const COVER_HEIGHT = 600
 
 function escapeXml(value = '') {
   return String(value)
@@ -15,7 +16,7 @@ function safeColor(value) {
 }
 
 // 中英文混排的轻量换行：汉字算 1，拉丁字母约算 0.55，避免卡片右侧溢出。
-export function wrapExcerptText(text, maxUnits = 17, maxLines = 11) {
+export function wrapExcerptText(text, maxUnits = 19, maxLines = 7) {
   const chars = Array.from(String(text || '').replace(/\s+/g, ' ').trim())
   const lines = []
   let line = ''
@@ -46,74 +47,105 @@ function textLines(lines, x, y, lineHeight, className) {
   )).join('')
 }
 
-export function buildExcerptCardSvg({ quote, note = '', title = '未命名', author = '', chapter = '', color = '#6f8274' }) {
+function compactSource({ author = '', title = '', chapter = '' }, limit = 34) {
+  const raw = [author, title ? `《${title}》` : '', chapter].filter(Boolean).join(' · ')
+  const chars = Array.from(raw)
+  return chars.length > limit ? `${chars.slice(0, limit - 1).join('')}…` : raw
+}
+
+export function buildExcerptCardSvg({
+  quote,
+  note = '',
+  title = '未命名',
+  author = '',
+  chapter = '',
+  color = '#6f8274',
+  imageDataUrl = '',
+}) {
   const accent = safeColor(color)
-  const quoteLines = wrapExcerptText(quote, 17, note ? 9 : 11)
-  const noteLines = note ? wrapExcerptText(note, 28, 3) : []
-  const sourceRaw = [author, title ? `《${title}》` : '', chapter].filter(Boolean).join(' · ')
-  const sourceChars = Array.from(sourceRaw)
-  const source = sourceChars.length > 30 ? `${sourceChars.slice(0, 29).join('')}…` : sourceRaw
-  const noteY = 355 + quoteLines.length * 76 + 72
+  const quoteLines = wrapExcerptText(quote, 19, 7)
+  const noteLines = note && quoteLines.length <= 5 ? wrapExcerptText(note, 29, 2) : []
+  const source = compactSource({ author, title, chapter })
+  const noteY = 650 + quoteLines.length * 72 + 48
+  const cover = imageDataUrl
+    ? `<image href="${escapeXml(imageDataUrl)}" width="1080" height="600" preserveAspectRatio="xMidYMid slice"/><rect width="1080" height="600" fill="url(#shade)"/>`
+    : `<rect width="1080" height="600" fill="url(#fallback)"/><rect width="1080" height="600" fill="url(#quiet)"/>`
+
   return `<?xml version="1.0" encoding="UTF-8"?>
-<svg xmlns="http://www.w3.org/2000/svg" width="${CARD_WIDTH}" height="${CARD_HEIGHT}" viewBox="0 0 ${CARD_WIDTH} ${CARD_HEIGHT}">
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="${CARD_WIDTH}" height="${CARD_HEIGHT}" viewBox="0 0 ${CARD_WIDTH} ${CARD_HEIGHT}">
   <defs>
-    <linearGradient id="paper" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0" stop-color="#fffdf7"/><stop offset="1" stop-color="#f4efe5"/>
+    <linearGradient id="fallback" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="${accent}" stop-opacity=".82"/><stop offset="1" stop-color="#20231f"/>
     </linearGradient>
-    <linearGradient id="wash" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0" stop-color="${accent}" stop-opacity=".28"/><stop offset="1" stop-color="${accent}" stop-opacity=".04"/>
+    <linearGradient id="quiet" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffffff" stop-opacity=".10"/><stop offset="1" stop-color="#000000" stop-opacity=".22"/>
     </linearGradient>
-    <pattern id="grain" width="38" height="38" patternUnits="userSpaceOnUse">
-      <circle cx="3" cy="5" r="1" fill="#453e34" opacity=".045"/><circle cx="27" cy="22" r=".8" fill="#453e34" opacity=".04"/>
-    </pattern>
-    <mask id="moon-cut"><rect width="100%" height="100%" fill="white"/><circle cx="930" cy="165" r="84" fill="black"/></mask>
+    <linearGradient id="shade" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#000000" stop-opacity=".02"/><stop offset="1" stop-color="#000000" stop-opacity=".38"/>
+    </linearGradient>
     <style>
-      .quote{font-family:'Noto Serif CJK SC','Songti SC','STSong',serif;font-size:50px;font-weight:600;fill:#27241f;letter-spacing:2px}
-      .note{font-family:'Noto Sans CJK SC','PingFang SC',sans-serif;font-size:29px;fill:#5d584f;letter-spacing:1px}
-      .meta{font-family:'Noto Sans CJK SC','PingFang SC',sans-serif;font-size:27px;fill:#645f56;letter-spacing:1px}
-      .brand{font-family:'Noto Serif CJK SC','Songti SC',serif;font-size:25px;fill:${accent};letter-spacing:7px}
+      .quote{font-family:'Noto Serif CJK SC','Songti SC','STSong',serif;font-size:48px;font-weight:500;fill:#292824;letter-spacing:1.5px}
+      .note{font-family:'Noto Sans CJK SC','PingFang SC',sans-serif;font-size:27px;fill:#77736b;letter-spacing:1px}
+      .meta{font-family:'Noto Sans CJK SC','PingFang SC',sans-serif;font-size:26px;fill:#54514b;letter-spacing:.8px}
+      .brand{font-family:'Noto Sans CJK SC','PingFang SC',sans-serif;font-size:23px;fill:#8f8a81;letter-spacing:3px}
     </style>
   </defs>
-  <rect width="1080" height="1440" fill="url(#paper)"/>
-  <rect width="1080" height="1440" fill="url(#grain)"/>
-  <path d="M0 0H1080V325C835 233 623 282 421 192C262 121 145 48 0 91Z" fill="url(#wash)"/>
-  <circle cx="873" cy="151" r="91" fill="${accent}" opacity=".3" mask="url(#moon-cut)"/>
-  <g fill="none" stroke="${accent}" stroke-linecap="round" opacity=".46">
-    <path d="M829 116c35 23 65 57 82 96" stroke-width="3"/>
-    <path d="M161 1185c44-97 103-171 174-222 42-31 82-41 105-25 26 18 13 59-20 91-54 53-139 89-259 156Z" stroke-width="4"/>
-    <path d="M180 1170c80-66 146-119 236-214M237 1112l-8-62M294 1068l3-67M346 1020l17-56" stroke-width="3"/>
-    <path d="M749 1267c82-31 147-35 214-16M789 1300c58-17 111-17 164-3" stroke-width="2"/>
-  </g>
-  <g fill="${accent}" opacity=".48"><circle cx="774" cy="116" r="6"/><circle cx="805" cy="83" r="3"/><circle cx="955" cy="276" r="4"/></g>
-  <path d="M118 248h112" stroke="${accent}" stroke-width="8" stroke-linecap="round"/>
-  <text x="118" y="198" class="brand">阅读书摘</text>
-  <text x="112" y="338" font-family="serif" font-size="90" fill="${accent}" opacity=".55">“</text>
-  ${textLines(quoteLines, 132, 405, 76, 'quote')}
-  ${noteLines.length ? `<path d="M132 ${noteY - 48}h816" stroke="${accent}" opacity=".2"/><text x="132" y="${noteY}" class="note" fill="${accent}">札记</text>${textLines(noteLines, 132, noteY + 55, 46, 'note')}` : ''}
-  <g transform="translate(0 1264)">
-    <path d="M118 0h844" stroke="#2d2923" opacity=".12"/>
-    <text x="118" y="73" class="meta">${escapeXml(source)}</text>
-    <text x="118" y="119" class="meta" opacity=".58">由言叽书架摘录</text>
-    <path d="M927 69l16 16 31-39" fill="none" stroke="${accent}" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
-  </g>
+  <rect width="1080" height="1440" fill="#e8e5df"/>
+  ${cover}
+  <text x="76" y="450" font-family="sans-serif" font-size="24" fill="#fff" opacity=".82" letter-spacing="5">书摘</text>
+  <path d="M0 548Q0 500 48 500H1032Q1080 500 1080 548V1440H0Z" fill="#faf8f2"/>
+  <path d="M84 612v54" stroke="${accent}" stroke-width="7" stroke-linecap="round"/>
+  ${textLines(quoteLines, 120, 650, 72, 'quote')}
+  ${noteLines.length ? `<path d="M120 ${noteY - 34}h840" stroke="#2d2923" opacity=".10"/>${textLines(noteLines, 120, noteY + 12, 42, 'note')}` : ''}
+  <path d="M84 1252h912" stroke="#2d2923" opacity=".11"/>
+  <text x="84" y="1314" class="meta">${escapeXml(source)}</text>
+  <text x="84" y="1370" class="brand">言叽书架摘录</text>
+  <circle cx="970" cy="1359" r="11" fill="${accent}" opacity=".75"/>
 </svg>`
+}
+
+function loadImage(source, message) {
+  return new Promise((resolve, reject) => {
+    const image = new Image()
+    image.decoding = 'async'
+    image.onload = () => resolve(image)
+    image.onerror = () => reject(new Error(message))
+    image.src = source
+  })
+}
+
+// 相册原图只在当前编辑会话里处理：缩到卡片需要的尺寸并居中裁切，
+// 返回的 data URL 只进本次 SVG，不写 localStorage / IndexedDB，也不上传。
+export async function prepareExcerptCover(file) {
+  if (!file || !String(file.type || '').startsWith('image/')) throw new Error('请选择一张图片')
+  const source = URL.createObjectURL(file)
+  try {
+    const image = await loadImage(source, '这张图片读取失败，请换一张试试')
+    const canvas = document.createElement('canvas')
+    canvas.width = CARD_WIDTH
+    canvas.height = COVER_HEIGHT
+    const context = canvas.getContext('2d')
+    if (!context) throw new Error('图片处理失败')
+    const scale = Math.max(CARD_WIDTH / image.naturalWidth, COVER_HEIGHT / image.naturalHeight)
+    const width = image.naturalWidth * scale
+    const height = image.naturalHeight * scale
+    context.drawImage(image, (CARD_WIDTH - width) / 2, (COVER_HEIGHT - height) / 2, width, height)
+    return canvas.toDataURL('image/jpeg', 0.88)
+  } finally {
+    URL.revokeObjectURL(source)
+  }
 }
 
 export async function renderExcerptCardPng(details) {
   const svg = buildExcerptCardSvg(details)
   const source = URL.createObjectURL(new Blob([svg], { type: 'image/svg+xml;charset=utf-8' }))
   try {
-    const image = new Image()
-    image.decoding = 'async'
-    await new Promise((resolve, reject) => {
-      image.onload = resolve
-      image.onerror = () => reject(new Error('书摘卡片渲染失败'))
-      image.src = source
-    })
+    const image = await loadImage(source, '书摘卡片渲染失败')
     const canvas = document.createElement('canvas')
     canvas.width = CARD_WIDTH
     canvas.height = CARD_HEIGHT
     const context = canvas.getContext('2d')
+    if (!context) throw new Error('书摘卡片生成失败')
     context.drawImage(image, 0, 0, CARD_WIDTH, CARD_HEIGHT)
     return await new Promise((resolve, reject) => {
       canvas.toBlob((blob) => blob ? resolve(blob) : reject(new Error('书摘卡片生成失败')), 'image/png', 0.94)

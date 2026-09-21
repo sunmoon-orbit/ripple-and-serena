@@ -10,7 +10,7 @@ import {
 import { sendMessage } from '../../api/llm'
 import { useThemedConfirm } from '../ThemedConfirmDialog'
 import { downloadBlob } from '../../utils/download'
-import { renderExcerptCardPng } from '../../utils/bookExcerptCard'
+import { prepareExcerptCover, renderExcerptCardPng } from '../../utils/bookExcerptCard'
 
 const COLORS = [
   { id: 'yellow', hex: '#f5d76e' },
@@ -185,10 +185,13 @@ export default function BookRead({ onClose }) {
   const [pageIndex, setPageIndex] = useState(0)
   const [pageCount, setPageCount] = useState(1)
   const [readerChromeVisible, setReaderChromeVisible] = useState(true)
+  const [excerptCard, setExcerptCard] = useState(null)
+  const [cardImageLoading, setCardImageLoading] = useState(false)
   const [savingCard, setSavingCard] = useState(false)
   const textRef = useRef(null)
   const annoRefs = useRef({})
   const fileRef = useRef(null)
+  const cardImageRef = useRef(null)
   const bodyRef = useRef(null)          // 阅读视图的滚动容器
   const pageViewportRef = useRef(null)
   const restorePositionRef = useRef(null) // 章节渲染完后要恢复的位置（兼容旧版 scroll）
@@ -531,23 +534,50 @@ export default function BookRead({ onClose }) {
     } catch { showToast('批注失败', 'error') }
   }
 
-  async function saveExcerptCard(excerpt, note = '') {
+  function openExcerptCard(excerpt, note = '') {
     const quote = String(excerpt || '').trim()
     if (!quote || savingCard) return
+    setExcerptCard({ quote, note: String(note || '').trim(), imageDataUrl: '' })
+  }
+
+  async function chooseExcerptImage(event) {
+    const file = event.target.files?.[0]
+    event.target.value = ''
+    if (!file) return
+    setCardImageLoading(true)
+    try {
+      const imageDataUrl = await prepareExcerptCover(file)
+      setExcerptCard((current) => current ? { ...current, imageDataUrl } : current)
+    } catch (error) {
+      showToast(error?.message || '图片读取失败', 'error')
+    } finally {
+      setCardImageLoading(false)
+    }
+  }
+
+  function closeExcerptCard() {
+    if (savingCard || cardImageLoading) return
+    setExcerptCard(null)
+  }
+
+  async function saveExcerptCard() {
+    if (!excerptCard?.quote || savingCard || cardImageLoading) return
     setSavingCard(true)
     try {
       const blob = await renderExcerptCardPng({
-        quote,
-        note,
+        quote: excerptCard.quote,
+        note: excerptCard.note,
         title: active.title,
         author: active.author,
         chapter: chapter.title || `第 ${chapter.idx + 1} 章`,
         color: active.cover_color,
+        imageDataUrl: excerptCard.imageDataUrl,
       })
       const safeTitle = String(active.title || '书摘').replace(/[\\/:*?"<>|]/g, '').slice(0, 28) || '书摘'
       const day = new Intl.DateTimeFormat('sv-SE', { timeZone: 'Asia/Shanghai' }).format(new Date()).replaceAll('-', '')
       downloadBlob(blob, `书摘-${safeTitle}-${day}.png`)
       showToast('书摘卡已保存到手机')
+      setExcerptCard(null)
       setPending(null)
       window.getSelection()?.removeAllRanges()
     } catch (error) {
@@ -942,7 +972,7 @@ export default function BookRead({ onClose }) {
                           <div className="bookread-anno-row">
                             <span className="coread-anno-author">{a.author}</span>
                             <span className="coread-anno-note">{a.note || '（划线）'}</span>
-                            <button className="bookread-card-link" disabled={savingCard} onClick={() => saveExcerptCard(a.quote, a.note)}>书摘卡</button>
+                            <button className="bookread-card-link" disabled={savingCard} onClick={() => openExcerptCard(a.quote, a.note)}>书摘卡</button>
                             <button className="coread-anno-del" onClick={() => removeAnno(a.id)}>✕</button>
                           </div>
                         </div>
@@ -990,12 +1020,51 @@ export default function BookRead({ onClose }) {
           <button className="bookread-chat-fab" onClick={() => setChatOpen(true)} aria-label="打开随读随聊" title="和涟言聊这一页">随读</button>
         )}
 
+        {excerptCard && (
+          <div className="bookread-card-editor-backdrop" onClick={closeExcerptCard}>
+            <section className="bookread-card-editor" onClick={(event) => event.stopPropagation()} aria-label="制作书摘卡">
+              <div className="bookread-card-editor-head">
+                <div>
+                  <strong>书摘卡</strong>
+                  <span>从相册选一张，只用于这一次</span>
+                </div>
+                <button onClick={closeExcerptCard} aria-label="关闭书摘卡编辑">✕</button>
+              </div>
+              <div className="bookread-card-preview" style={{ '--excerpt-accent': active.cover_color || '#6f8274' }}>
+                <div
+                  className={'bookread-card-preview-image' + (excerptCard.imageDataUrl ? ' has-image' : '')}
+                  style={excerptCard.imageDataUrl ? { backgroundImage: `url(${excerptCard.imageDataUrl})` } : undefined}
+                >
+                  <span>书摘</span>
+                </div>
+                <div className="bookread-card-preview-paper">
+                  <div className="bookread-card-preview-quote">{excerptCard.quote}</div>
+                  {excerptCard.note && <div className="bookread-card-preview-note">{excerptCard.note}</div>}
+                  <div className="bookread-card-preview-source">
+                    {[active.author, active.title ? `《${active.title}》` : '', chapter.title || `第 ${chapter.idx + 1} 章`].filter(Boolean).join(' · ')}
+                  </div>
+                  <small>言叽书架摘录</small>
+                </div>
+              </div>
+              <input ref={cardImageRef} type="file" accept="image/*" hidden onChange={chooseExcerptImage} />
+              <div className="bookread-card-editor-actions">
+                <button className="roost-btn roost-btn-ghost" disabled={savingCard || cardImageLoading} onClick={() => cardImageRef.current?.click()}>
+                  {cardImageLoading ? '处理图片中…' : excerptCard.imageDataUrl ? '换一张图片' : '从相册选图片'}
+                </button>
+                <button className="roost-btn" disabled={savingCard || cardImageLoading} onClick={saveExcerptCard}>
+                  {savingCard ? '生成中…' : '保存 PNG'}
+                </button>
+              </div>
+            </section>
+          </div>
+        )}
+
         {/* 选中文字 → 浮出划线入口 */}
         {pending && !composing && (
           <div className="bookread-pending" onClick={(e) => e.stopPropagation()}>
             <span className="bookread-pending-quote">「{pending.quote.length > 24 ? pending.quote.slice(0, 24) + '…' : pending.quote}」</span>
             <div className="bookread-pending-actions">
-              <button className="roost-btn roost-btn-ghost roost-btn-sm" disabled={savingCard} onClick={() => saveExcerptCard(pending.quote)}>{savingCard ? '生成中…' : '书摘卡'}</button>
+              <button className="roost-btn roost-btn-ghost roost-btn-sm" disabled={savingCard} onClick={() => openExcerptCard(pending.quote)}>书摘卡</button>
               <button className="roost-btn roost-btn-sm" onClick={() => setComposing(true)}>划线批注</button>
             </div>
           </div>
