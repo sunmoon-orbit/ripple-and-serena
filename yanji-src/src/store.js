@@ -4,7 +4,7 @@ import { bigGet, bigSet } from './utils/bigStore'
 import { showToast } from './components/Toast'
 import { normalizeGenerationConfig } from './utils/generationConfig'
 import { updateChatDraft, removeChatDraft } from './utils/chatDrafts'
-import { readNavigation, writeNavigation, navigate } from './components/Crossing/navigation.mjs'
+import { navigationForColdStart, readNavigation, writeNavigation, navigate } from './components/Crossing/navigation.mjs'
 import { invalidateAgent } from './components/Crossing/authorization.mjs'
 import { contactEnabled, invalidateContacts } from './utils/proactiveGates.mjs'
 
@@ -289,7 +289,7 @@ function mergeWithDefaults(persisted) {
 
 const persisted = loadPersistedState()
 const initialState = mergeWithDefaults(persisted)
-const navigation = readNavigation()
+const navigation = navigationForColdStart(readNavigation())
 initialState.activePanel = navigation.panel
 
 // 同步应用主题——在 React 首帧之前，避免开屏动画闪默认紫色

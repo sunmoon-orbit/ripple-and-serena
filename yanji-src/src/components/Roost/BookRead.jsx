@@ -877,6 +877,7 @@ export default function BookRead({ onClose }) {
                     <button className="bookread-page-tool" onClick={markBookmark}>书签</button>
                     <span>{pageIndex + 1} / {pageCount}</span>
                     <button className="bookread-page-tool" onClick={toggleStamp}>{stamps.some((s) => s.reader === '阿颖') ? '读讫 ✓' : '读讫'}</button>
+                    <button className="bookread-page-tool bookread-page-chat" onClick={() => setChatOpen(true)} aria-label="打开随读随聊">聊</button>
                     <button onClick={() => turnPage(1)} aria-label="下一页">›</button>
                   </div>
                 </>
@@ -962,8 +963,8 @@ export default function BookRead({ onClose }) {
             </div>
           </section>
         )}
-        {!chatOpen && chapter && !pending && (
-          <button className="bookread-chat-fab" onClick={() => setChatOpen(true)} aria-label="打开随读随聊" title="和涟言聊这一页">聊</button>
+        {!chatOpen && chapter && !pending && readingMode === 'scroll' && (
+          <button className="bookread-chat-fab" onClick={() => setChatOpen(true)} aria-label="打开随读随聊" title="和涟言聊这一页">随读</button>
         )}
 
         {/* 选中文字 → 浮出划线入口 */}

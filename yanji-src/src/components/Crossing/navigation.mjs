@@ -12,6 +12,11 @@ export function normalizeNavigation(value = {}) {
 export function readNavigation(storage = globalThis.localStorage) {
   try { return normalizeNavigation(JSON.parse(storage.getItem(KEY)) || {}) } catch { return normalizeNavigation() }
 }
+// 完整重载/冷启动时先落在 Roost，避免应用刚打开就把上次聊天露出来。
+// Murmur 类型与 threadId 仍保留，用户主动点进聊天后可以接着上次的位置。
+export function navigationForColdStart(value = {}) {
+  return { ...normalizeNavigation(value), panel: 'roost', callFromCrossing: false, settingsSection: '' }
+}
 export function writeNavigation(value, storage = globalThis.localStorage) {
   const next = normalizeNavigation(value)
   try { storage.setItem(KEY, JSON.stringify(next)) } catch { /* Private/full storage: in-memory navigation still works. */ }

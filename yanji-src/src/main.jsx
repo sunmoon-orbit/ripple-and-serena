@@ -4,6 +4,12 @@ import App from './App'
 import { ThemedConfirmProvider } from './components/ThemedConfirmDialog'
 import './styles/index.css'
 
+// 原生壳已经用 WindowInsets 给 WebView 避开了系统栏；标记出来，避免页面组件
+// 再叠加一遍 CSS safe-area，造成阅读器顶部/底部出现异常大块留白。
+if (/\bYanjiNative\//.test(navigator.userAgent)) {
+  document.documentElement.classList.add('yanji-native')
+}
+
 class ErrorBoundary extends React.Component {
   state = { error: null }
   static getDerivedStateFromError(error) { return { error } }

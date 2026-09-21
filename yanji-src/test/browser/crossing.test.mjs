@@ -109,8 +109,14 @@ test('real Crossing components preserve thread state across tools and model appl
       throw error
     }
   }
+  const enterCrossing = () => page.evaluate(async () => {
+    const { useStore } = await import('/src/store.js')
+    useStore.getState().setActivePanel('crossing')
+  })
   await page.goto(origin)
   await page.locator('.home-screen').click()
+  await page.locator('.roost-panel').waitFor()
+  await enterCrossing()
   await ready()
 
   // Android text selection regression: Crossing chrome must not join a body
@@ -252,7 +258,7 @@ test('real Crossing components preserve thread state across tools and model appl
   await page.getByRole('button', { name: 'Murmur', exact: true }).click()
   await ready()
   assert.equal(await page.locator('.crossing-panel').count(), 1)
-  await page.reload(); await page.locator('.home-screen').click(); await ready()
+  await page.reload(); await page.locator('.home-screen').click(); await page.locator('.roost-panel').waitFor(); await enterCrossing(); await ready()
   await page.evaluate(() => window.__sockets.at(-1).close())
   await page.getByText('重连中', { exact: false }).first().waitFor()
   await ready()
@@ -422,7 +428,9 @@ test('real Crossing components preserve thread state across tools and model appl
   await page.getByRole('button', { name: 'Hollow', exact: true }).click()
   await page.getByRole('button', { name: 'Murmur', exact: true }).click()
   assert.equal(await page.locator('.crossing-panel').count(), 0)
-  await page.reload(); await page.locator('.home-screen').click(); await page.locator('.chat-panel').waitFor()
+  await page.reload(); await page.locator('.home-screen').click(); await page.locator('.roost-panel').waitFor()
+  await page.evaluate(async () => { const { useStore } = await import('/src/store.js'); useStore.getState().setActivePanel('chat') })
+  await page.locator('.chat-panel').waitFor()
   assert.equal(await page.locator('.crossing-panel').count(), 0)
   assert.equal(modelRequests, 0, 'no API model call, including dialCall')
   assert.deepEqual(errors, [])

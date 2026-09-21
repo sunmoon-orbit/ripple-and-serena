@@ -1,7 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { createSessionFlow } from '../src/components/Crossing/session-flow.mjs'
-import { navigate, readNavigation, writeNavigation } from '../src/components/Crossing/navigation.mjs'
+import { navigate, navigationForColdStart, readNavigation, writeNavigation } from '../src/components/Crossing/navigation.mjs'
 import { sizeComposer } from '../src/components/Crossing/layout.mjs'
 import { canReadMessage, completeTurn, threadsFromRead } from '../src/components/Crossing/messages.mjs'
 import { createSpeechPlayer } from '../src/components/Chat/speech-player.mjs'
@@ -37,6 +37,18 @@ test('bottom navigation, component remount, refresh and explicit API back preser
   writeNavigation(navigate(nav, 'chat', 'api-back'), storage)
   assert.equal(navigate(readNavigation(storage), 'chat', 'bottom').panel, 'chat')
   assert.equal(readNavigation(storage).threadId, 'thread-luna')
+})
+
+test('cold start opens Roost without forgetting the last Murmur thread', () => {
+  const cold = navigationForColdStart({
+    panel: 'crossing', murmur: 'crossing', threadId: 'thread-private',
+    callFromCrossing: true, settingsSection: 'moon',
+  })
+  assert.equal(cold.panel, 'roost')
+  assert.equal(cold.murmur, 'crossing')
+  assert.equal(cold.threadId, 'thread-private')
+  assert.equal(cold.callFromCrossing, false)
+  assert.equal(cold.settingsSection, '')
 })
 
 test('pending model is never promoted to confirmed by persistence or resume', () => {

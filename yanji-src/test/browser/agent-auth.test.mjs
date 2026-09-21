@@ -41,7 +41,7 @@ test('locked first paint, verified unlock, logout/change/failure, settings targe
     try { await page.getByText('Codex · 请选择或新建会话', { exact: true }).waitFor({ timeout: 7000 }) }
     catch (error) { t.diagnostic(JSON.stringify({ errors, wire: await page.evaluate(() => window.__wireTypes), text: (await page.locator('body').innerText()).slice(0, 800) })); throw error }
   }
-  await page.goto(origin); await page.locator('.home-screen').click(); await locked()
+  await page.goto(origin); await page.locator('.home-screen').click(); await page.locator('.roost-panel').waitFor(); await enter(); await locked()
   assert.equal(await page.evaluate(() => window.__wireTypes.filter(type => String(type).startsWith('crossing/')).length), 0)
   await page.getByRole('button', { name: '前往设置', exact: true }).click()
   assert.equal(await page.evaluate(async () => { const { useStore } = await import('/src/store.js'); return useStore.getState().navigation.settingsSection }), 'moon')
@@ -58,7 +58,7 @@ test('locked first paint, verified unlock, logout/change/failure, settings targe
   await change({ apiToken: '' }); await locked()
   await change({ apiToken: 'fixture-valid' }); await ready()
   await page.evaluate(async () => { const { useStore } = await import('/src/store.js'); useStore.getState().setAgentBlocked(true) }); await locked()
-  await page.reload(); await page.locator('.home-screen').click(); await ready()
+  await page.reload(); await page.locator('.home-screen').click(); await page.locator('.roost-panel').waitFor(); await enter(); await ready()
   await page.evaluate(() => window.__sockets.at(-1).emit({ type: 'crossing/auth_failed' })); await locked()
   assert.deepEqual(errors, [])
 })

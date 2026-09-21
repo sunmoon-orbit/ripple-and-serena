@@ -43,6 +43,8 @@ test('voice call keeps transcript and controls inside the visual viewport', { ti
 
   await page.goto(origin)
   await page.locator('.home-screen').click()
+  await page.locator('.roost-panel').waitFor()
+  await page.evaluate(async () => { const { useStore } = await import('/src/store.js'); useStore.getState().setActivePanel('chat') })
   await page.locator('.chat-panel').waitFor()
   await page.getByTitle('对话列表').click()
   await page.getByRole('button', { name: '语音通话', exact: true }).click()
