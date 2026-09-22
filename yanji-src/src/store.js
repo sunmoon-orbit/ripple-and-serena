@@ -581,6 +581,13 @@ export const useStore = create((set, get) => ({
     return limitMessagesForContext(messages, get().contextLimit)
   },
 
+  snoozeContextRefresh: (chatId, metrics) => {
+    set(s => {
+      const chats = s.chats.map(c => c.id === chatId ? { ...c, contextRefreshSnooze: metrics } : c)
+      savePersistedState({ ...s, chats })
+      return { chats }
+    })
+  },
   // ─── summaries (context compaction) ───────────────────────────────
   getSummary: (chatId) => get().summariesByChatId[chatId] || null,
   setSummary: (chatId, summary) => {

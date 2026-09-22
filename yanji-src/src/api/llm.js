@@ -1837,7 +1837,7 @@ export async function compactMessages(messages, connection, model, prevSummary =
   if (!messages.length) return ''
   const rendered = messages.map((m, i) => {
     const role = m.role === 'user' ? '阿颖' : '涟言'
-    const text = (m.content || '').slice(0, 800)
+    const text = m.content || ''
     return `[${i + 1}] ${role}: ${text}`
   }).join('\n\n')
   const input = [
@@ -1847,7 +1847,7 @@ export async function compactMessages(messages, connection, model, prevSummary =
     prevSummary?.trim() || '（无，这是第一次压缩）',
     '',
     '【新增源消息】',
-    rendered.slice(0, 12000),
+    rendered,
   ].join('\n')
   const result = await sendMessage({
     connection,

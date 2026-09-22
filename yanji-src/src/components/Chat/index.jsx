@@ -13,6 +13,7 @@ async function readContactConfig() {
 }
 import { sendMessage, summarizeThinking, normalizeProvider, BUILTIN_MODELS, buildSystemPrompt, compactMessages, buildSummaryInjection } from '../../api/llm'
 import { uuid } from '../../utils'
+import { contextRefreshPlan, compactionBatches } from '../../utils/contextRefresh'
 import { downloadBlob } from '../../utils/download'
 import { applyTimeAway, getEmotionState, buildEmotionPrompt, extractEmotionUpdate, applyEmotionDelta, stripEmotionTag } from '../../utils/emotion'
 import { maybeSyncEmotion } from '../../utils/emotionSync'
@@ -486,20 +487,33 @@ export default function Chat() {
           tool_calls: m.tool_calls || undefined,
         }
       })
-      const limited = applyContextLimit(prepared)
+      const refreshChat = useStore.getState().chats.find(c => c.id === chat.id)
+      const plan = contextRefreshPlan(allMsgs.map((m, i) => ({ ...prepared[i], id: m.id })), refreshChat, Boolean(getSummary(chat.id)))
+      let requestedEnd = plan.start
+      if (!proactive && !hidden && plan.due) {
+        const accepted = await confirmAction({
+          title: '整理一下上下文，接着聊？',
+          description: '这段聊天有点长了。整理后会保留接续笔记和最近对话，减少后续发送的历史。标题和完整聊天记录都留在这里。',
+          note: '整理会概括较早的细节；旧消息仍可翻看和引用。',
+          confirmLabel: '整理后继续', cancelLabel: '暂时不要',
+        })
+        useStore.getState().snoozeContextRefresh(chat.id, { rounds: plan.rounds, tokens: plan.tokens })
+        if (accepted) requestedEnd = plan.end
+      }
+      const livePrepared = prepared.slice(plan.start)
+      const autoLimited = applyContextLimit(livePrepared)
+      const targetEnd = Math.max(requestedEnd, prepared.length - autoLimited.length)
+      let limited = prepared.slice(plan.start)
 
       // context compaction: 只合并游标之后新被裁掉的消息
-      const cutCount = prepared.length - limited.length
-      if (cutCount > 0) {
+      const cutCount = targetEnd
+      if (cutCount > plan.start) {
         const boundaryId = allMsgs[cutCount - 1]?.id
         const currentChat = useStore.getState().chats.find((c) => c.id === chat.id)
-        const hasCursorField = currentChat && Object.prototype.hasOwnProperty.call(currentChat, 'compactedThrough')
         const prev = getSummary(chat.id)
 
-        // 旧版有笔记却没游标：认领当前裁剪边界，不清空、不重压真实旧对话。
-        if (!hasCursorField && prev && boundaryId) {
-          commitCompaction(chat.id, prev, boundaryId, currentChat.compactionVersion || 0)
-        } else {
+        // Missing legacy cursors must be rebuilt; never claim unseen messages were summarized.
+        {
           const cursorId = currentChat?.compactedThrough || null
           const cursorIdx = cursorId ? allMsgs.findIndex((m) => m.id === cursorId) : -1
           const start = cursorIdx >= 0 ? cursorIdx + 1 : 0
@@ -513,16 +527,22 @@ export default function Chat() {
                   // 上下文压缩用轻连接：lightModel 已折入 lc.defaultModel，conn 本身不变
                   const lc = getLightConn(conn)
                   const lightModel = lc.defaultModel || 'deepseek-v4-flash'
-                  const newSummary = await compactMessages(cutMsgs, lc, lightModel, prev)
+                  let newSummary = prev || ''
+                  const batches = compactionBatches(cutMsgs)
+                  for (let i = 0; i < batches.length; i++) {
+                    setStatus(`整理上下文 ${i + 1}/${batches.length}…`)
+                    newSummary = await compactMessages(batches[i], lc, lightModel, newSummary)
+                    if (!newSummary || !looksLikeCompactionSummary(newSummary) || newSummary.length > 3000) throw new Error('接续笔记未通过校验')
+                  }
                   // 空文、拒答或上游错误文案都不能落进她看得见的接续笔记。
                   if (!newSummary || !looksLikeCompactionSummary(newSummary)) {
                     console.warn('[compaction] 返回内容不是有效笔记，沿用旧笔记')
                     return
                   }
-                  const safeSummary = newSummary.length > 3000 ? newSummary.slice(0, 3000) : newSummary
-                  commitCompaction(chat.id, safeSummary, boundaryId, currentChat?.compactionVersion || 0)
+                  commitCompaction(chat.id, newSummary, boundaryId, currentChat?.compactionVersion || 0)
                 } catch (e) {
                   console.warn('[compaction] 失败，沿用旧笔记:', e?.message)
+                  showToast('这次整理没有完成，保留原上下文继续聊')
                 }
               })()
               compactionJobs.set(chat.id, job)
@@ -533,6 +553,16 @@ export default function Chat() {
             await job
           }
         }
+      }
+
+      // Only exclude history after a valid summary and cursor have been committed together.
+      const settledChat = useStore.getState().chats.find(c => c.id === chat.id)
+      if (!settledChat || (settledChat.compactionVersion || 0) !== (refreshChat?.compactionVersion || 0)) throw new Error('聊天记录已变更，请重新发送')
+      const settledCursor = getSummary(chat.id) ? allMsgs.findIndex(m => m.id === settledChat.compactedThrough) : -1
+      limited = prepared.slice(settledCursor + 1)
+      if (requestedEnd > plan.start && settledCursor >= requestedEnd - 1) {
+        useStore.getState().snoozeContextRefresh(chat.id, null)
+        showToast('上下文已整理，继续在这里聊')
       }
 
       const merged = []
@@ -1859,6 +1889,7 @@ export default function Chat() {
           ) : (
             <MessageList
               messages={messages}
+              compactedThrough={getSummary(activeChatId) ? activeChat?.compactedThrough : null}
               status={status}
               onEdit={handleEditMessage}
               onDelete={handleDeleteMessage}

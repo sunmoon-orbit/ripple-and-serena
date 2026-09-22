@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, useCallback } from 'react'
 import MessageBubble from './MessageBubble'
 import { useStore } from '../../store'
 
-export default function MessageList({ messages, status, onEdit, onQuote, onDelete, activeChatId }) {
+export default function MessageList({ messages, status, onEdit, onQuote, onDelete, activeChatId, compactedThrough }) {
   const listRef = useRef(null)
   const bottomRef = useRef(null)
   // 初值用哨兵而不是 activeChatId：让「跳到底部」在首次挂载（刚打开页面）也触发，
@@ -112,7 +112,10 @@ export default function MessageList({ messages, status, onEdit, onQuote, onDelet
         {messages.filter((m) => !m.hidden).map((msg, i, arr) => (
           msg.sys
             ? <div key={msg.id} className="msg-sys-line">{msg.content}</div>
-            : <MessageBubble key={msg.id} msg={msg} onEdit={onEdit} onQuote={onQuote} onDelete={onDelete} isLast={i === arr.length - 1} />
+            : <div key={msg.id} style={{ display: 'contents' }}>
+                <MessageBubble msg={msg} onEdit={onEdit} onQuote={onQuote} onDelete={onDelete} isLast={i === arr.length - 1} />
+                {msg.id === compactedThrough && <div className="msg-sys-line">上文已整理 · 完整记录仍保留</div>}
+              </div>
         ))}
         {status && (
           <div className="message-status">{status}</div>
