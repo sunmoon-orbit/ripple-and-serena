@@ -184,6 +184,7 @@ export default function BookRead({ onClose }) {
   const [readingMode, setReadingMode] = useState('page')
   const [pageIndex, setPageIndex] = useState(0)
   const [pageCount, setPageCount] = useState(1)
+  const [pageWidth, setPageWidth] = useState(0)
   const [readerChromeVisible, setReaderChromeVisible] = useState(true)
   const [excerptCard, setExcerptCard] = useState(null)
   const [cardImageLoading, setCardImageLoading] = useState(false)
@@ -369,6 +370,7 @@ export default function BookRead({ onClose }) {
         const text = textRef.current
         if (!viewport || !text) return
         const width = Math.max(1, viewport.clientWidth)
+        setPageWidth(width)
         const count = Math.max(1, Math.ceil(text.scrollWidth / width))
         const saved = restorePositionRef.current
         // 只有从翻页模式恢复时才沿用绝对页码。滚动模式保存的 page 可能是
@@ -417,7 +419,8 @@ export default function BookRead({ onClose }) {
   }
 
   function turnPage(direction) {
-    if (!chapter) return
+    if (!chapter || loading) return
+    setFocusAnno(null)
     const next = pageIndex + direction
     if (next < 0) {
       if (chapter.idx > 0) openChapter(active, chapter.idx - 1, { mode: 'page', page: Number.MAX_SAFE_INTEGER, ratio: 1 })
@@ -451,18 +454,22 @@ export default function BookRead({ onClose }) {
   }
 
   function onPageTouchStart(event) {
+    if (event.touches?.length !== 1) { touchStartRef.current = null; return }
     const touch = event.changedTouches?.[0]
-    if (touch) touchStartRef.current = { x: touch.clientX, y: touch.clientY }
+    if (touch) touchStartRef.current = { x: touch.clientX, y: touch.clientY, time: Date.now() }
   }
 
   function onPageTouchEnd(event) {
     const start = touchStartRef.current
     const touch = event.changedTouches?.[0]
     touchStartRef.current = null
-    if (!start || !touch || pending) return
+    if (!start || !touch) return
     const dx = touch.clientX - start.x
     const dy = touch.clientY - start.y
-    if (Math.abs(dx) > 52 && Math.abs(dx) > Math.abs(dy) * 1.25) {
+    // A drag/long press must not become a synthetic tap that hides the reader chrome.
+    if (Math.hypot(dx, dy) > 10 || Date.now() - start.time > 500) lastPageSwipeAtRef.current = Date.now()
+    if (pending || composing || !window.getSelection()?.isCollapsed || Date.now() - start.time > 700) return
+    if (Math.abs(dx) > 36 && Math.abs(dx) > Math.abs(dy) * 1.4) {
       lastPageSwipeAtRef.current = Date.now()
       turnPage(dx < 0 ? 1 : -1)
     }
@@ -605,15 +612,13 @@ export default function BookRead({ onClose }) {
   }
 
   function jumpToAnno(id) {
-    setFocusAnno(id)
+    if (Date.now() - lastPageSwipeAtRef.current < 450 || !window.getSelection()?.isCollapsed) return
     if (readingMode === 'page') {
-      const ratio = pageIndex / Math.max(1, pageCount - 1)
-      restorePositionRef.current = { mode: 'scroll', ratio }
-      setReadingMode('scroll')
-      setTimeout(() => annoRefs.current[id]?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 120)
-    } else {
-      annoRefs.current[id]?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      setFocusAnno(current => current === id ? null : id)
+      return
     }
+    setFocusAnno(id)
+    annoRefs.current[id]?.scrollIntoView({ behavior: 'smooth', block: 'center' })
   }
 
   async function pickFile(e) {
@@ -843,7 +848,7 @@ export default function BookRead({ onClose }) {
 
   return (
     <div className="roost-overlay bookread-reader-overlay" onClick={onClose}>
-      <div className={`roost-modal coread-modal coread-reader coread-reader-fullscreen${readerChromeVisible ? '' : ' coread-reader-chrome-hidden'}`} onClick={(e) => e.stopPropagation()}>
+      <div className={`roost-modal coread-modal coread-reader coread-reader-fullscreen${readerChromeVisible ? '' : ' coread-reader-chrome-hidden'}`} onClick={(e) => { e.stopPropagation(); if (readingMode === 'page') setFocusAnno(null) }}>
         <div className="roost-modal-header">
           <button className="coread-back" onClick={() => { setActive(null); setChapter(null); setPending(null); setComposing(false) }}>‹ 书架</button>
           <span className="coread-reader-title">{active.title}</span>
@@ -907,13 +912,14 @@ export default function BookRead({ onClose }) {
                     ref={pageViewportRef}
                     onTouchStart={onPageTouchStart}
                     onTouchEnd={onPageTouchEnd}
-                    onClick={toggleReaderChrome}
+                    onTouchCancel={() => { touchStartRef.current = null; lastPageSwipeAtRef.current = Date.now() }}
+                    onClick={() => { if (!focusAnno) toggleReaderChrome() }}
                     title={readerChromeVisible ? '轻触隐藏菜单' : '轻触显示菜单'}
                   >
                     <div
                       className="bookread-text bookread-text-paged"
                       ref={textRef}
-                      style={{ transform: `translate3d(${-pageIndex * 100}vw, 0, 0)` }}
+                      style={{ transform: `translate3d(${-pageIndex * pageWidth}px, 0, 0)` }}
                     >
                       {segs.map((s) =>
                         s.annos.length ? (
@@ -1022,6 +1028,17 @@ export default function BookRead({ onClose }) {
           <button className="bookread-chat-fab" onClick={() => setChatOpen(true)} aria-label="打开随读随聊" title="和涟言聊这一页">随读</button>
         )}
 
+        {readingMode === 'page' && focusAnno != null && annos.some(a => a.id === focusAnno) && (
+          <section className="bookread-annotation-popover" role="dialog" aria-label="划线批注" onClick={e => e.stopPropagation()}>
+            <button className="roost-modal-close" aria-label="关闭批注" onClick={() => setFocusAnno(null)}>✕</button>
+            {annos.filter(a => a.id === focusAnno).map(a => <div key={a.id}>
+              <div className="bookread-anno-quote">「{a.quote}」</div>
+              <p>{a.note || '（仅划线，暂无批注）'}</p>
+              <small>{a.author}</small>
+              <button className="bookread-card-link" onClick={() => openExcerptCard(a.quote, a.note)}>书摘卡</button>
+            </div>)}
+          </section>
+        )}
         {excerptCard && (
           <div className="bookread-card-editor-backdrop" onClick={closeExcerptCard}>
             <section className="bookread-card-editor" onClick={(event) => event.stopPropagation()} aria-label="制作书摘卡">
