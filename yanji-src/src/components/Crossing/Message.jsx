@@ -3,11 +3,15 @@ import { canReadMessage } from './messages.mjs'
 import { downloadBlob } from '../../utils/download'
 
 export default function CrossingMessage({ message, config, stopEpoch }) {
+  // Old optimistic messages may retain an appended sticker label even with a preview.
+  const text = message.role === 'user' && message.previews?.length
+    ? (message.text || '').replace(/(?:^|\n)[ \t]*[\[［]附件[：:][ \t]*表情包[\]］][ \t]*(?=\n|$)/g, '').trim()
+    : message.text || ''
   return <><MessageBubble
     msg={{
       id: message.id,
       role: message.role,
-      content: message.text || '',
+      content: text,
       images: message.previews,
       music: message.music,
       streaming: message.streaming,
