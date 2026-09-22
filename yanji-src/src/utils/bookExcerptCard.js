@@ -61,6 +61,7 @@ export function buildExcerptCardSvg({
   chapter = '',
   color = '#6f8274',
   imageDataUrl = '',
+  readingTime = '',
 }) {
   const accent = safeColor(color)
   const quoteLines = wrapExcerptText(quote, 19, 7)
@@ -88,6 +89,7 @@ export function buildExcerptCardSvg({
       .note{font-family:'Noto Sans CJK SC','PingFang SC',sans-serif;font-size:27px;fill:#77736b;letter-spacing:1px}
       .meta{font-family:'Noto Sans CJK SC','PingFang SC',sans-serif;font-size:26px;fill:#54514b;letter-spacing:.8px}
       .brand{font-family:'Noto Sans CJK SC','PingFang SC',sans-serif;font-size:23px;fill:#8f8a81;letter-spacing:3px}
+      .reading{font-family:'Noto Sans CJK SC','PingFang SC',sans-serif;font-size:23px;fill:${accent};letter-spacing:.6px}
     </style>
   </defs>
   <rect width="1080" height="1440" fill="#e8e5df"/>
@@ -100,7 +102,7 @@ export function buildExcerptCardSvg({
   <path d="M84 1252h912" stroke="#2d2923" opacity=".11"/>
   <text x="84" y="1314" class="meta">${escapeXml(source)}</text>
   <text x="84" y="1370" class="brand">言叽书架摘录</text>
-  <circle cx="970" cy="1359" r="11" fill="${accent}" opacity=".75"/>
+  ${readingTime ? `<text x="996" y="1370" class="reading" text-anchor="end">本书近 7 天已读 ${escapeXml(readingTime)}</text>` : `<circle cx="970" cy="1359" r="11" fill="${accent}" opacity=".75"/>`}
 </svg>`
 }
 

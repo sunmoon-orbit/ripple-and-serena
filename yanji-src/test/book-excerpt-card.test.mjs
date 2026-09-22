@@ -17,6 +17,7 @@ test('buildExcerptCardSvg escapes text and uses the simplified photo-and-paper l
     chapter: '后记',
     color: '#4a7c59',
     imageDataUrl: 'data:image/jpeg;base64,fixture',
+    readingTime: '2 小时 12 分钟',
   })
   assert.match(svg, /width="1080" height="1440"/)
   assert.match(svg, /A &amp; B/)
@@ -24,6 +25,7 @@ test('buildExcerptCardSvg escapes text and uses the simplified photo-and-paper l
   assert.match(svg, /<image href="data:image\/jpeg;base64,fixture"/)
   assert.match(svg, /M0 548Q0 500 48 500/)
   assert.match(svg, /言叽书架摘录/)
+  assert.match(svg, /本书近 7 天已读 2 小时 12 分钟/)
   assert.doesNotMatch(svg, /moon-cut|M161 1185/)
   assert.doesNotMatch(svg, /<小豆豆>/)
 })

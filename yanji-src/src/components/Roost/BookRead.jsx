@@ -217,7 +217,7 @@ export default function BookRead({ onClose }) {
         const keys = recentDateKeys(7)
         const byDay = Object.fromEntries(keys.map((day) => [day, 0]))
         for (const item of (activity?.reading || [])) {
-          if (item.reader === '阿颖' && Object.hasOwn(byDay, item.day)) {
+          if (item.reader === '阿颖' && item.book_title === active.title && Object.hasOwn(byDay, item.day)) {
             byDay[item.day] += Number(item.seconds) || 0
           }
         }
@@ -572,6 +572,7 @@ export default function BookRead({ onClose }) {
         chapter: chapter.title || `第 ${chapter.idx + 1} 章`,
         color: active.cover_color,
         imageDataUrl: excerptCard.imageDataUrl,
+        readingTime: readingSummary ? formatReadingTime(readingSummary.weekSeconds) : '',
       })
       const safeTitle = String(active.title || '书摘').replace(/[\\/:*?"<>|]/g, '').slice(0, 28) || '书摘'
       const day = new Intl.DateTimeFormat('sv-SE', { timeZone: 'Asia/Shanghai' }).format(new Date()).replaceAll('-', '')
@@ -1043,7 +1044,10 @@ export default function BookRead({ onClose }) {
                   <div className="bookread-card-preview-source">
                     {[active.author, active.title ? `《${active.title}》` : '', chapter.title || `第 ${chapter.idx + 1} 章`].filter(Boolean).join(' · ')}
                   </div>
-                  <small>言叽书架摘录</small>
+                  <div className="bookread-card-preview-foot">
+                    <small>言叽书架摘录</small>
+                    {readingSummary && <small>本书近 7 天已读 {formatReadingTime(readingSummary.weekSeconds)}</small>}
+                  </div>
                 </div>
               </div>
               <input ref={cardImageRef} type="file" accept="image/*" hidden onChange={chooseExcerptImage} />

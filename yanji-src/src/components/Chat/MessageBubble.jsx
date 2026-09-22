@@ -19,6 +19,7 @@ import { underlineExtension } from '../../utils/markdownUnderline'
 import { downloadBlob, hasNativeDownloadBridge } from '../../utils/download'
 import { showToast } from '../Toast'
 import { extractRunnableHtmlMessage, looksRunnableHtml } from '../../utils/runnableCode'
+import { enhanceMarkdownTables } from '../../utils/markdownTables'
 
 marked.use({ extensions: [underlineExtension] })
 marked.setOptions({
@@ -181,7 +182,10 @@ function MarkdownBlock({ html, enhance = true, reveal = false, className = 'bubb
   const ref = useRef(null)
   const prevLenRef = useRef(0)
   // useLayoutEffect：在浏览器绘制前把新字包上雾，避免先闪清晰再变糊
-  useLayoutEffect(() => { if (reveal) revealNewTail(ref.current, prevLenRef) }, [html, reveal])
+  useLayoutEffect(() => {
+    if (reveal) revealNewTail(ref.current, prevLenRef)
+    enhanceMarkdownTables(ref.current)
+  }, [html, reveal])
   useEffect(() => { if (enhance) enhanceCodeBlocks(ref.current) }, [html, enhance])
   return <div ref={ref} className={className} dangerouslySetInnerHTML={{ __html: html }} />
 }

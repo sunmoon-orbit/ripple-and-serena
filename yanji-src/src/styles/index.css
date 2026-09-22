@@ -1555,7 +1555,7 @@ textarea.form-input { display: block; margin: 8px 16px 12px; }
 /* 代码就地运行：html 代码块下的运行按钮 + 沙箱渲染框 */
 .code-run-bar { margin: -4px 0 8px; }
 .message-bubble { min-width: 0; max-width: 100%; }
-.bubble-markdown { min-width: 0; max-width: 100%; }
+.bubble-markdown { min-width: 0; max-width: 100%; overflow-wrap: anywhere; }
 .runnable-user-html .code-run-bar { margin: 0; padding: 8px 0; }
 .runnable-user-html pre { max-height: 320px; overflow: auto; }
 .bubble-user .code-run-btn { color: inherit; border-color: currentColor; }
@@ -1580,8 +1580,15 @@ textarea.form-input { display: block; margin: 8px 16px 12px; }
 .bubble-user .bubble-markdown pre { background: rgba(255,255,255,0.14); border-color: rgba(255,255,255,0.22); }
 .bubble-user .bubble-markdown :not(pre) > code { background: rgba(255,255,255,0.16); }
 .bubble-markdown img { max-width: 160px; max-height: 160px; border-radius: 8px; display: block; margin: 4px 0; }
-.bubble-markdown table { border-collapse: collapse; width: 100%; margin: 8px 0; font-size: 13px; }
-.bubble-markdown th,.bubble-markdown td { border: 1px solid var(--border); padding: 6px 10px; text-align: left; }
+.markdown-table-scroll {
+  width: 100%; max-width: 100%; margin: 8px 0; overflow-x: auto; overflow-y: hidden;
+  box-sizing: border-box; -webkit-overflow-scrolling: touch; overscroll-behavior-inline: contain;
+}
+.bubble-markdown table { border-collapse: collapse; width: max-content; min-width: 100%; margin: 0; font-size: 13px; }
+.bubble-markdown th,.bubble-markdown td {
+  border: 1px solid var(--border); padding: 6px 10px; text-align: left;
+  overflow-wrap: normal; word-break: normal;
+}
 .bubble-markdown th { background: rgba(150,140,180,0.07); font-weight: 600; }
 .cursor-blink { animation: blink 1s step-end infinite; color: var(--accent); }
 .streaming .bubble-markdown::after { content: '▋'; color: var(--accent); animation: blink 1s step-end infinite; }
@@ -4104,7 +4111,9 @@ textarea.form-input { display: block; margin: 8px 16px 12px; }
   margin-top: auto; padding-top: 10px; border-top: 1px solid rgba(45,41,35,.10);
   color: #54514b; font-size: 8px;
 }
-.bookread-card-preview-paper small { margin-top: 5px; color: #8f8a81; font-size: 7px; letter-spacing: 1px; }
+.bookread-card-preview-foot { display: flex; align-items: center; justify-content: space-between; gap: 7px; margin-top: 5px; }
+.bookread-card-preview-paper small { color: #8f8a81; font-size: 7px; letter-spacing: 1px; white-space: nowrap; }
+.bookread-card-preview-foot small:last-child { color: var(--excerpt-accent); letter-spacing: 0; }
 .bookread-card-editor-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 13px; }
 .bookread-card-editor-actions .roost-btn { min-height: 40px; }
 
