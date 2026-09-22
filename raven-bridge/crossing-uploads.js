@@ -102,7 +102,7 @@ function createUploadStore({ cwd, now = Date.now, ttl = TTL, fetchImpl = fetch }
       if (fs.readdirSync(root).length >= 64) throw new Error('临时附件已满，请稍后再试')
       const id = crypto.randomBytes(16).toString('hex') + ext
       fs.writeFileSync(path.join(root, id), bytes, { flag: 'wx', mode: 0o600 })
-      records.set(id, { kind, owner, expiresAt: now() + ttl, pinned: false })
+      records.set(id, { kind, name: file.name, mime: file.mime, owner, expiresAt: now() + ttl, pinned: false })
       return { id, name: file.name, kind, size: bytes.length, expiresAt: now() + ttl }
     },
     inputs(attachments = [], imageAllowed = false, owner) {
@@ -131,9 +131,61 @@ function createUploadStore({ cwd, now = Date.now, ttl = TTL, fetchImpl = fetch }
     },
     async resolveInputs(attachments = [], imageAllowed = false, owner) {
       const prepared = this.inputs(attachments, imageAllowed, owner)
+      // Preserve sent attachments separately from the temporary upload quota/TTL.
+      const archive = path.join(root, 'history')
+      fs.mkdirSync(archive, { recursive: true, mode: 0o700 })
+      if (fs.lstatSync(archive).isSymbolicLink()) throw new Error('附件存档目录不可用')
+      for (const a of attachments) {
+        if (!a.id) continue
+        const record = records.get(a.id)
+        for (const suffix of ['', '.json', '.preview.jpg']) {
+          const dest = path.join(archive, a.id + suffix)
+          if (fs.existsSync(dest) && (!fs.lstatSync(dest).isFile() || fs.lstatSync(dest).isSymbolicLink())) throw new Error('附件存档不可用')
+        }
+        fs.copyFileSync(path.join(root, a.id), path.join(archive, a.id))
+        fs.chmodSync(path.join(archive, a.id), 0o600)
+        fs.writeFileSync(path.join(archive, a.id + '.json'), JSON.stringify({ name: record.name, mime: record.mime }), { mode: 0o600 })
+        if (record.kind === 'image') {
+          try {
+            await require('sharp')(path.join(root, a.id), { limitInputPixels: 40000000 }).resize({ width: 640, height: 640, fit: 'inside', withoutEnlargement: true }).jpeg({ quality: 75 }).toFile(path.join(archive, a.id + '.preview.jpg'))
+            fs.chmodSync(path.join(archive, a.id + '.preview.jpg'), 0o600)
+          } catch { /* Original remains available if a thumbnail cannot be generated. */ }
+        }
+      }
       return Promise.all(prepared.map(item => item.type === 'image' && /^https:/.test(item.url)
         ? inlineRemoteImage(item.url, fetchImpl)
         : item))
+    },
+    historyContent(content) {
+      // Called only while projecting an authorized thread; never accept browser-supplied paths.
+      let budget = 12 * 1024 * 1024
+      return content.map(item => {
+        if (item.type === 'image' && /^data:image\/(png|jpeg|webp|gif);base64,[A-Za-z0-9+/=]+$/.test(item.url || '') && item.url.length <= budget) {
+          budget -= item.url.length
+          return { type: 'image', url: item.url }
+        }
+        const textFile = item.type === 'text' && /^用户附加的 UTF-8 文本文件：\.crossing-uploads\/([a-f0-9]{32}\.[a-z]+)。/.exec(item.text || '')
+        const id = textFile?.[1] || (item.type === 'localImage' && typeof item.path === 'string' && path.dirname(item.path) === root ? path.basename(item.path) : null)
+        if (id && /^[a-f0-9]{32}\.[a-z]+$/.test(id)) {
+          try {
+            if (fs.lstatSync(root).isSymbolicLink()) throw new Error('unsafe')
+            const archive = path.join(root, 'history')
+            if (fs.existsSync(archive) && fs.lstatSync(archive).isSymbolicLink()) throw new Error('unsafe')
+            const thumbnail = !textFile && fs.existsSync(path.join(archive, id + '.preview.jpg'))
+            const file = thumbnail ? path.join(archive, id + '.preview.jpg') : fs.existsSync(path.join(archive, id)) ? path.join(archive, id) : path.join(root, id)
+            const stat = fs.lstatSync(file)
+            if (!stat.isFile() || stat.isSymbolicLink() || stat.size > MAX_FILE || stat.size * 1.4 > budget) throw new Error('unavailable')
+            let name = id
+            try { name = JSON.parse(fs.readFileSync(path.join(archive, id + '.json'), 'utf8')).name || id } catch {}
+            const mime = thumbnail ? 'image/jpeg' : IMAGE_TYPES[path.extname(id)] || 'text/plain'
+            const bytes = fs.readFileSync(file)
+            const url = `data:${mime};base64,${bytes.toString('base64')}`
+            budget -= url.length
+            return { type: textFile ? 'file' : 'image', name, url }
+          } catch { return { type: 'text', text: textFile ? '[文件附件已不可用]' : '[图片附件已不可用]' } }
+        }
+        return item.type === 'text' ? { type: 'text', text: item.text } : { type: 'text', text: '[图片附件已不可用]' }
+      })
     },
     pin(attachments, value, owner) { for (const a of attachments || []) if (owner && records.get(a.id)?.owner === owner) records.get(a.id).pinned = value },
     revoke(owner) { for (const record of records.values()) if (record.owner === owner) record.expiresAt = 0 },

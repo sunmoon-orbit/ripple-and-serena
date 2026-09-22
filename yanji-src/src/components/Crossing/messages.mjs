@@ -7,7 +7,9 @@ export function threadsFromRead(thread) {
       if (item.type === 'userMessage') {
         const text = (item.content || []).filter(x => x.type === 'text').map(x => x.text).join('')
         const music = parseMusicShareContext(text)
-        out.push({ id: item.id, role: 'user', text: music ? `点给你：${music.name} — ${music.artist}` : text, music: music || undefined })
+        const previews = (item.content || []).filter(x => x.type === 'image' && /^data:image\/(png|jpeg|webp|gif);base64,/.test(x.url || '')).map(x => x.url)
+        const files = (item.content || []).filter(x => x.type === 'file' && /^data:text\/plain;base64,/.test(x.url || ''))
+        out.push({ id: item.id, role: 'user', text: music ? `点给你：${music.name} — ${music.artist}` : text, previews, files, music: music || undefined })
       }
       if (item.type === 'agentMessage') out.push({ id: item.id, turnId: turn.id, role: 'assistant', text: item.text || '', completed: turn.status === 'completed' })
     }

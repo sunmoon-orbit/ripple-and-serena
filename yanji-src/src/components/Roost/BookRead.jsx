@@ -497,23 +497,24 @@ export default function BookRead({ onClose }) {
   useEffect(() => {
     if (!chapter) return
     function onSelChange() {
-      if (composing) return // 批注浮层打开时锁定当前选区
+      if (composing || excerptCard) return // 编辑器打开时锁定当前选区
       const sel = window.getSelection()
       const el = textRef.current
-      if (!el || !sel || sel.rangeCount === 0 || sel.isCollapsed) return
+      if (!el || !sel || sel.rangeCount === 0 || sel.isCollapsed) { setPending(null); return }
       const range = sel.getRangeAt(0)
-      if (!el.contains(range.commonAncestorContainer)) return
+      if (!el.contains(range.commonAncestorContainer)) { setPending(null); return }
       const pre = range.cloneRange()
       pre.selectNodeContents(el)
       pre.setEnd(range.startContainer, range.startOffset)
       const start = pre.toString().length
       const quote = range.toString()
-      if (!quote.trim()) return
-      setPending({ start, end: start + quote.length, quote })
+      if (!quote.trim()) { setPending(null); return }
+      const rect = range.getBoundingClientRect()
+      setPending({ start, end: start + quote.length, quote, above: rect.bottom > window.innerHeight / 2 })
     }
     document.addEventListener('selectionchange', onSelChange)
     return () => document.removeEventListener('selectionchange', onSelChange)
-  }, [chapter, composing])
+  }, [chapter, composing, excerptCard])
 
   async function submitAnno() {
     if (!pending) return
@@ -1065,9 +1066,10 @@ export default function BookRead({ onClose }) {
 
         {/* 选中文字 → 浮出划线入口 */}
         {pending && !composing && (
-          <div className="bookread-pending" onClick={(e) => e.stopPropagation()}>
+          <div className={`bookread-pending${pending.above ? ' bookread-pending-above' : ''}`} onPointerDown={(e) => e.preventDefault()} onClick={(e) => e.stopPropagation()}>
             <span className="bookread-pending-quote">「{pending.quote.length > 24 ? pending.quote.slice(0, 24) + '…' : pending.quote}」</span>
             <div className="bookread-pending-actions">
+              <button className="roost-btn roost-btn-ghost roost-btn-sm" onClick={() => { setPending(null); window.getSelection()?.removeAllRanges() }}>取消</button>
               <button className="roost-btn roost-btn-ghost roost-btn-sm" disabled={savingCard} onClick={() => openExcerptCard(pending.quote)}>书摘卡</button>
               <button className="roost-btn roost-btn-sm" onClick={() => setComposing(true)}>划线批注</button>
             </div>

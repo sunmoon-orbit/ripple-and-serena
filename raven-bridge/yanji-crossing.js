@@ -111,7 +111,7 @@ function createCrossingService(options = {}) {
     const meta = confirmedModel(result)
     metadata.set(result.thread.id, meta)
     const view = { ...publicThread(result.thread), ...meta }
-    if (history) view.turns = (result.thread.turns || []).map(t => ({ id: t.id, status: t.status || null, items: (t.items || []).filter(i => ['userMessage', 'agentMessage'].includes(i.type)).map(i => i.type === 'userMessage' ? { id: i.id, type: i.type, content: (i.content || []).map(c => c.type === 'text' ? { type: 'text', text: c.text } : { type: 'text', text: '[图片附件]' }) } : { id: i.id, type: i.type, text: i.text }) }))
+    if (history) view.turns = (result.thread.turns || []).map(t => ({ id: t.id, status: t.status || null, items: (t.items || []).filter(i => ['userMessage', 'agentMessage'].includes(i.type)).map(i => i.type === 'userMessage' ? { id: i.id, type: i.type, content: uploads.historyContent ? uploads.historyContent(i.content || []) : (i.content || []).map(c => c.type === 'text' ? { type: 'text', text: c.text } : { type: 'text', text: '[图片附件]' }) } : { id: i.id, type: i.type, text: i.text }) }))
     return view
   }
 

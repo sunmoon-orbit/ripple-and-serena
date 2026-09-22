@@ -360,7 +360,7 @@ export default function Crossing() {
     try { if (!flowRef.current.start(text, clientMessageId, { attachments: attachments.map(({ id, url }) => id ? { id } : { url }) })) return } catch (e) { setError(e.message); return }
     pendingTurnRef.current = { clientMessageId, text, attachments }
     setStarting(true)
-    setMessages((previous) => [...previous, { id: clientMessageId, role: 'user', text: [text, ...attachments.map(a => `[附件：${a.name}]`)].filter(Boolean).join('\n'), previews: attachments.filter(a => a.kind === 'image').map(a => a.preview || a.url) }])
+    setMessages((previous) => [...previous, { id: clientMessageId, role: 'user', text: [text, ...attachments.filter(a => a.kind !== 'image').map(a => `[附件：${a.name}]`)].filter(Boolean).join('\n'), previews: attachments.filter(a => a.kind === 'image').map(a => a.preview || a.url) }])
     setAttachments([])
     setDraft('')
   }
@@ -372,7 +372,7 @@ export default function Crossing() {
     try { if (!flowRef.current.steer(turn.id, text, clientMessageId, { attachments: attachments.map(({ id, url }) => id ? { id } : { url }) })) return } catch (e) { setError(e.message); return }
     pendingTurnRef.current = { clientMessageId, text, attachments }
     setSteering(true)
-    setMessages(previous => [...previous, { id: clientMessageId, role: 'user', text: [text, ...attachments.map(a => `[附件：${a.name}]`)].filter(Boolean).join('\n'), previews: attachments.filter(a => a.kind === 'image').map(a => a.preview || a.url) }])
+    setMessages(previous => [...previous, { id: clientMessageId, role: 'user', text: [text, ...attachments.filter(a => a.kind !== 'image').map(a => `[附件：${a.name}]`)].filter(Boolean).join('\n'), previews: attachments.filter(a => a.kind === 'image').map(a => a.preview || a.url) }])
     setAttachments([])
     setDraft('')
   }
