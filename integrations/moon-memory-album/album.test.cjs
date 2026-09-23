@@ -55,6 +55,26 @@ test('reject invalid images and enforce storage quota without creating photo fil
   assert.deepEqual(fs.readdirSync(directory), []);
 });
 
+test('card avatars overwrite atomically and remain available to REST and MCP readers', async t => {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'yanji-album-avatar-test-'));
+  const database = new Database(':memory:');
+  t.after(() => { database.close(); fs.rmSync(directory, { recursive: true, force: true }); });
+  const store = createAlbumStore({ directory, database });
+  const first = await sharp({ create: { width: 20, height: 30, channels: 3, background: '#123456' } }).png().toBuffer();
+  const second = await sharp({ create: { width: 30, height: 20, channels: 3, background: '#abcdef' } }).png().toBuffer();
+  assert.deepEqual(store.avatarStatus(), { user: false, assistant: false });
+  await store.saveAvatar('user', `data:image/png;base64,${first.toString('base64')}`);
+  const before = fs.readFileSync(store.avatar('user').path);
+  await store.saveAvatar('user', `data:image/png;base64,${second.toString('base64')}`);
+  const after = fs.readFileSync(store.avatar('user').path);
+  assert.notDeepEqual(before, after);
+  assert.deepEqual(store.avatarStatus(), { user: true, assistant: false });
+  assert.equal((await sharp(after).metadata()).format, 'webp');
+  const mcp = await call('read_album_avatar', { role: 'user' }, store);
+  assert.equal(mcp.content[1].mimeType, 'image/webp');
+  assert.throws(() => store.avatar('owner'), /角色无效/);
+});
+
 test('remote pictures cannot target private IPs, credential URLs, non-HTTPS or rebinding records', async () => {
   for (const address of ['127.0.0.1', '10.1.2.3', '172.16.0.2', '169.254.169.254', '192.168.1.1', '100.64.0.1', '198.18.0.1', '::1', '203.0.113.1']) assert.equal(publicIPv4(address), false);
   assert.equal(publicIPv4('93.184.216.34'), true);
@@ -91,6 +111,7 @@ test('backup includes a consistent album database and both image sizes', async t
   const store = createAlbumStore({ directory: source });
   const raw = await sharp({ create: { width: 10, height: 10, channels: 3, background: '#ffffff' } }).png().toBuffer();
   await store.save({ title: 'Fixture', image_data: `data:image/png;base64,${raw.toString('base64')}` });
+  await store.saveAvatar('user', `data:image/png;base64,${raw.toString('base64')}`);
   store.close();
   const destination = path.join(directory, 'backup');
   const parts = snapshotAlbum(source, destination);
@@ -98,7 +119,8 @@ test('backup includes a consistent album database and both image sizes', async t
   const entries = execFileSync('tar', ['tzf', path.join(destination, parts[0])], { encoding: 'utf8' });
   assert.match(entries, /album\/album.sqlite/);
   assert.match(entries, /\.thumb.jpg/);
-  assert.equal(entries.trim().split('\n').length, 4);
+  assert.match(entries, /card-avatar-user\.webp/);
+  assert.equal(entries.trim().split('\n').length, 5);
 });
 
 test('REST media and writes require authentication; authorized upload and thumbnail read succeed', async t => {
@@ -120,6 +142,11 @@ test('REST media and writes require authentication; authorized upload and thumbn
   const saved = await fetch(base, { method: 'POST', headers: { Authorization: 'Bearer fixture', 'Content-Type': 'application/json' }, body: JSON.stringify({ title: 'Fixture', image_data: `data:image/png;base64,${raw.toString('base64')}` }) });
   assert.equal(saved.status, 201);
   const item = await saved.json();
+  assert.equal((await fetch(`${base}/avatars`, { headers: { Authorization: 'Bearer fixture' } })).status, 200);
+  assert.equal((await fetch(`${base}/avatars/user`, { method: 'PUT', headers: { Authorization: 'Bearer fixture', 'Content-Type': 'application/json' }, body: JSON.stringify({ image_data: `data:image/png;base64,${raw.toString('base64')}` }) })).status, 200);
+  const avatar = await fetch(`${base}/avatars/user`, { headers: { Authorization: 'Bearer fixture' } });
+  assert.equal(avatar.status, 200);
+  assert.equal(avatar.headers.get('content-type'), 'image/webp');
   const thumbnail = await fetch(`${base}/${item.id}/thumb`, { headers: { Authorization: 'Bearer fixture' } });
   assert.equal(thumbnail.status, 200);
   assert.match(thumbnail.headers.get('cache-control'), /no-store/);

@@ -7,6 +7,15 @@ function createAlbumRouter(getStore = getAlbumStore) {
   // Mount under the already authenticated /moments router, before /:id routes.
   router.get('/', (req, res, next) => { try { res.json(getStore().list(req.query)); } catch (error) { next(error); } });
   router.get('/search', async (req, res, next) => { try { res.json({ items: await searchCommons(req.query.q) }); } catch (error) { next(error); } });
+  router.get('/avatars', (_req, res, next) => { try { res.json(getStore().avatarStatus()); } catch (error) { next(error); } });
+  router.put('/avatars/:role', async (req, res, next) => { try { res.json(await getStore().saveAvatar(req.params.role, req.body.image_data)); } catch (error) { next(error); } });
+  router.get('/avatars/:role', (req, res, next) => {
+    try {
+      const media = getStore().avatar(req.params.role);
+      res.set({ 'Content-Type': media.mime, 'Cache-Control': 'private, no-store', 'X-Content-Type-Options': 'nosniff' });
+      res.sendFile(media.path, error => { if (error) next(error); });
+    } catch (error) { next(error); }
+  });
   router.post('/', async (req, res, next) => {
     try { res.status(201).json(await getStore().save(req.body)); } catch (error) { next(error); }
   });

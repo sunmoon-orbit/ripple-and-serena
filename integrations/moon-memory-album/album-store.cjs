@@ -45,6 +45,30 @@ function createAlbumStore({ directory, database, fetchImage = downloadImage, max
     return { purged: rows.length };
   }
 
+  const avatarRole = role => {
+    if (!['user', 'assistant'].includes(role)) throw fail('头像角色无效');
+    return role;
+  };
+  const avatarFile = role => path.join(directory, `card-avatar-${avatarRole(role)}.webp`);
+  async function saveAvatar(role, imageData) {
+    const target = avatarFile(role); const temporary = `${target}.${randomUUID()}.tmp`;
+    const raw = decodeImage(imageData);
+    let result;
+    try {
+      result = await sharp(raw, { limitInputPixels: 16000000, animated: false }).rotate()
+        .resize(512, 512, { fit: 'cover', position: 'centre', withoutEnlargement: false })
+        .webp({ quality: 88 }).toBuffer({ resolveWithObject: true });
+      fs.writeFileSync(temporary, result.data, { flag: 'wx', mode: 0o600 });
+      fs.renameSync(temporary, target);
+      fs.chmodSync(target, 0o600);
+    } catch (error) {
+      try { fs.unlinkSync(temporary); } catch {}
+      if (error.status) throw error;
+      throw fail('头像图片无法解码，或分辨率过大');
+    }
+    return { role, width: result.info.width, height: result.info.height, updated_at: new Date().toISOString() };
+  }
+
   async function save(input = {}) {
     purgeExpired();
     // Keep concurrent image decoding bounded on the 2 GB VPS.
@@ -115,6 +139,9 @@ function createAlbumStore({ directory, database, fetchImage = downloadImage, max
     },
     hide(id) { return { ok: connection.prepare('UPDATE album_photos SET deleted_at = ? WHERE id = ? AND deleted_at IS NULL').run(new Date().toISOString(), Number(id)).changes > 0 }; },
     restore(id) { purgeExpired(); return { ok: connection.prepare('UPDATE album_photos SET deleted_at = NULL WHERE id = ? AND deleted_at IS NOT NULL').run(Number(id)).changes > 0 }; },
+    avatarStatus() { return { user: fs.existsSync(avatarFile('user')), assistant: fs.existsSync(avatarFile('assistant')) }; },
+    saveAvatar,
+    avatar(role) { const filename = avatarFile(role); if (!fs.existsSync(filename)) throw fail('头像尚未同步', 404); return { path: filename, mime: 'image/webp' }; },
     purgeExpired,
     close() { if (!database) connection.close(); },
   };

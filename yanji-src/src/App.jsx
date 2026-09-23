@@ -4,6 +4,7 @@ import { pushNative } from './utils/nativeInbox'
 import { findConversationChat } from './utils/proactiveRouting'
 import { squareDownscale } from './utils/squareDownscale'
 import { refreshNativePushToken } from './api/push'
+import { syncAlbumAvatars } from './api/album'
 import IconNav from './components/IconNav'
 import Chat from './components/Chat'
 import Memory from './components/Memory'
@@ -113,6 +114,7 @@ export default function App() {
   const ringtone = useStore((s) => s.ringtone)
   const homeStyle = useStore((s) => s.homeStyle || 'minimal')
   const avatarConfig = useStore((s) => s.avatarConfig)
+  const moonMemory = useStore((s) => s.moonMemory)
   // APK 已经展示过一次原生品牌名。代码雨本身也是完整开场，直接进雨幕；
   // 只有纪念卡模式继续保留网页的小鸟品牌动画。
   const [showSplash, setShowSplash] = useState(() => homeStyle !== 'minimal')
@@ -198,6 +200,16 @@ export default function App() {
   useEffect(() => {
     document.documentElement.style.setProperty('--avatar-size', `${avatarSize}px`)
   }, [avatarSize])
+
+  // 相册纪念卡会从模型视角重绘聊天。手机里的自定义头像原本只在 localStorage，
+  // Codex/CC 等外部入口读不到；变化后覆盖同步一份当前头像，不留历史版本。
+  useEffect(() => {
+    if (avatarConfig?.mode !== 'image') return
+    const timer = setTimeout(() => {
+      syncAlbumAvatars(moonMemory, avatarConfig).catch(() => { /* 离线时下次开言叽再补，不打扰聊天 */ })
+    }, 800)
+    return () => clearTimeout(timer)
+  }, [moonMemory?.enabled, moonMemory?.baseUrl, moonMemory?.apiToken, avatarConfig?.mode, avatarConfig?.userImage, avatarConfig?.assistantImage])
 
   // 推送 token 开机重报：重装 APK 之后服务器手里那条会失效/被删，
   // 而设置页那个开关只读 localStorage，照样显示「开着」——于是推送和来电

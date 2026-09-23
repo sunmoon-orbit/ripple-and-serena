@@ -23,7 +23,7 @@ test('photo album: authenticated thumbnails, paging, details, upload and model i
     const context = canvas.getContext('2d'); context.fillStyle = '#adcabc'; context.fillRect(0, 0, 60, 80)
     const image = canvas.toDataURL('image/png')
     const imageBlob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'))
-    window.__albumImage = image; window.__albumRequests = []; window.__albumSaves = []; window.__albumTrash = []
+    window.__albumImage = image; window.__albumRequests = []; window.__albumSaves = []; window.__albumTrash = []; window.__avatarStatus = { user: false, assistant: false }; window.__avatarPuts = []
     window.__albumConfig = { enabled: true, baseUrl: 'https://fixture.invalid', apiToken: 'fixture-key' }
     const items = [2, 1].map(id => ({ id, title: `照片 ${id}`, description: `照片 ${id} 的完整描述。` + '一段很长的说明。'.repeat(30), author: 'Fixture', created_at: '2026-09-23T12:00:00Z' }))
     const originalFetch = window.fetch
@@ -33,6 +33,11 @@ test('photo album: authenticated thumbnails, paging, details, upload and model i
       if (options.headers?.Authorization !== 'Bearer fixture-key') return new Response('{}', { status: 401 })
       const parsed = new URL(String(url))
       const id = Number(parsed.pathname.match(/\/album\/(\d+)/)?.[1])
+      if (parsed.pathname.endsWith('/album/avatars') && !options.method) return new Response(JSON.stringify(window.__avatarStatus))
+      if (options.method === 'PUT' && /\/album\/avatars\/(user|assistant)$/.test(parsed.pathname)) {
+        const role = parsed.pathname.split('/').at(-1); window.__avatarStatus[role] = true; window.__avatarPuts.push({ role, body: JSON.parse(options.body) })
+        return new Response(JSON.stringify({ role, width: 512, height: 512 }))
+      }
       if (options.method === 'DELETE') {
         const index = items.findIndex(item => item.id === id); if (index >= 0) window.__albumTrash.unshift({ ...items.splice(index, 1)[0], deleted_at: new Date().toISOString() })
         return new Response(JSON.stringify({ ok: index >= 0 }))
@@ -80,7 +85,7 @@ test('photo album: authenticated thumbnails, paging, details, upload and model i
   await page.getByRole('button', { name: '返回相册', exact: true }).click()
   await page.getByRole('button', { name: '展开：聊天里的图片', exact: true }).waitFor()
   const result = await page.evaluate(async () => {
-    const { executeAlbumTool } = await import('/src/api/album.js')
+    const { executeAlbumTool, syncAlbumAvatars } = await import('/src/api/album.js')
     const messages = [{ id: 'fixture-message', role: 'user', content: 'fixture', images: [window.__albumImage] }]
     const saved = await executeAlbumTool('save_album_image', { message_id: 'fixture-message', title: '模型收藏附件', author: 'Fixture', description: 'fixture' }, window.__albumConfig, messages)
     await executeAlbumTool('save_album_image', { image_url: 'https://example.org/image.jpg', source_url: 'https://example.org/photo', title: '网上图片', author: 'Fixture', description: 'fixture' }, window.__albumConfig)
@@ -89,7 +94,9 @@ test('photo album: authenticated thumbnails, paging, details, upload and model i
       { id: 'fixture-assistant', role: 'assistant', content: '从海边回来。[breath]' },
     ])
     const searched = await executeAlbumTool('search_album_images', { query: 'Fuzhou lake' }, window.__albumConfig, messages)
-    return { saved, conversation, conversationBody: window.__albumSaves.at(-1), searched, remote: window.__albumSaves.at(-2), overflow: document.querySelector('.photo-album').scrollWidth > document.querySelector('.photo-album').clientWidth, tokenInUrl: window.__albumRequests.some(r => r.url.includes('fixture-key')), fonts: ['Yanji Kaomoji Canadian', 'Yanji Kaomoji Marks', 'Yanji Kaomoji Yi'].every(name => document.fonts.check(`28px "${name}"`)) }
+    const firstAvatarSync = await syncAlbumAvatars(window.__albumConfig, { userImage: window.__albumImage, assistantImage: window.__albumImage })
+    const secondAvatarSync = await syncAlbumAvatars(window.__albumConfig, { userImage: window.__albumImage, assistantImage: window.__albumImage })
+    return { saved, conversation, conversationBody: window.__albumSaves.at(-1), searched, remote: window.__albumSaves.at(-2), firstAvatarSync, secondAvatarSync, avatarPuts: window.__avatarPuts, overflow: document.querySelector('.photo-album').scrollWidth > document.querySelector('.photo-album').clientWidth, tokenInUrl: window.__albumRequests.some(r => r.url.includes('fixture-key')), fonts: ['Yanji Kaomoji Canadian', 'Yanji Kaomoji Marks', 'Yanji Kaomoji Yi'].every(name => document.fonts.check(`28px "${name}"`)) }
   })
   assert.equal(result.saved.saved, true)
   assert.equal(result.remote.image_url, 'https://example.org/image.jpg')
@@ -97,6 +104,9 @@ test('photo album: authenticated thumbnails, paging, details, upload and model i
   assert.equal(result.conversation.saved, true)
   assert.equal(result.conversationBody.source, 'conversation')
   assert.match(result.conversationBody.image_data, /^data:image\/png;base64,/)
+  assert.deepEqual(result.firstAvatarSync.synced, ['user', 'assistant'])
+  assert.deepEqual(result.secondAvatarSync.synced, [])
+  assert.deepEqual(result.avatarPuts.map(item => item.role), ['user', 'assistant'])
   assert.equal(result.tokenInUrl, false)
   assert.equal(result.fonts, true)
   assert.equal(result.overflow, false)

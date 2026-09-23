@@ -29,6 +29,10 @@ function snapshotAlbum(sourceDir, backupDir) {
       if (!/^[a-f0-9-]+(?:\.thumb)?\.(?:jpg|png)$/.test(name)) throw new Error('album_backup_invalid_filename');
       fs.copyFileSync(path.join(sourceDir, name), path.join(snapshot, name));
     }
+    for (const name of ['card-avatar-user.webp', 'card-avatar-assistant.webp']) {
+      const source = path.join(sourceDir, name);
+      if (fs.existsSync(source)) fs.copyFileSync(source, path.join(snapshot, name));
+    }
     const archive = path.join(temp, 'album.tar.gz');
     execFileSync('tar', ['czf', archive, '-C', temp, 'album'], { timeout: 120000, stdio: 'pipe' });
     const parts = []; const chunk = Buffer.alloc(48 * 1024 * 1024);

@@ -24,6 +24,31 @@ export const restoreAlbumItem = (config, id) => albumRequest(config, `/${encodeU
 export const searchAlbumImages = (config, query) => albumRequest(config, `/search?q=${encodeURIComponent(query)}`)
 export const albumImage = (config, id, thumbnail = false, trash = false) => albumRequest(config, `/${encodeURIComponent(id)}/${thumbnail ? 'thumb' : 'image'}${trash ? '?trash=1' : ''}`, { blob: true })
 
+const AVATAR_SYNC_KEY = 'yanji-album-avatar-sync-v1'
+function avatarSignature(value = '') { return value ? `${value.length}:${value.slice(-72)}` : '' }
+
+export async function syncAlbumAvatars(config, avatarConfig = {}) {
+  if (!config?.enabled || !config?.baseUrl || !config?.apiToken) return { synced: [] }
+  const sources = { user: avatarConfig.userImage, assistant: avatarConfig.assistantImage }
+  if (!Object.values(sources).some(value => /^data:image\/(?:jpeg|png|webp|gif);base64,/i.test(value || ''))) return { synced: [] }
+  const status = await albumRequest(config, '/avatars')
+  let remembered = {}
+  try { remembered = JSON.parse(localStorage.getItem(AVATAR_SYNC_KEY) || '{}') } catch {}
+  const serverKey = config.baseUrl.replace(/\/$/, '')
+  const synced = []
+  for (const role of ['user', 'assistant']) {
+    const image = sources[role]
+    if (!/^data:image\/(?:jpeg|png|webp|gif);base64,/i.test(image || '')) continue
+    const signature = avatarSignature(image)
+    if (status[role] && remembered[serverKey]?.[role] === signature) continue
+    await albumRequest(config, `/avatars/${role}`, { method: 'PUT', body: JSON.stringify({ image_data: image }) })
+    remembered = { ...remembered, [serverKey]: { ...(remembered[serverKey] || {}), [role]: signature } }
+    localStorage.setItem(AVATAR_SYNC_KEY, JSON.stringify(remembered))
+    synced.push(role)
+  }
+  return { synced }
+}
+
 function loadImage(url) {
   return new Promise((resolve, reject) => {
     const image = new Image()
@@ -219,7 +244,7 @@ export const ALBUM_TOOLS = [
     message_id: { type: 'string', description: 'album_chat_sources 返回的当前消息 ID' }, image_index: { type: 'integer', description: '从 0 开始，默认 0' },
     image_url: { type: 'string', description: '与 message_id 二选一：公网 HTTPS 图片直链' }, source_url: { type: 'string', description: '原始网页地址（如有）' },
   }, required: ['title', 'description', 'author'] } },
-  { name: 'save_album_conversation', description: '把当前聊天里选中的原文重绘成自己视角的聊天画面并收藏：自己的话在右边，阿颖的话在左边，跟随当前主题、聊天背景与头像；不包含隐藏思考。先用 album_chat_sources 取得消息 ID，最多选 8 条。', parameters: { type: 'object', properties: { message_ids: { type: 'array', items: { type: 'string' }, maxItems: 8 }, title: { type: 'string' }, description: { type: 'string' }, author: { type: 'string' } }, required: ['message_ids', 'title', 'description', 'author'] } },
+  { name: 'save_album_conversation', description: '把当前聊天里选中的原文重绘成自己视角的聊天画面并收藏：自己的话在右边，阿颖的话在左边，跟随当前主题、聊天背景与头像；头像也会自动覆盖同步到相册服务，供其他入口读取。不包含隐藏思考。先用 album_chat_sources 取得消息 ID，最多选 8 条。', parameters: { type: 'object', properties: { message_ids: { type: 'array', items: { type: 'string' }, maxItems: 8 }, title: { type: 'string' }, description: { type: 'string' }, author: { type: 'string' } }, required: ['message_ids', 'title', 'description', 'author'] } },
 ]
 
 export async function executeAlbumTool(name, args, config, messages = []) {
