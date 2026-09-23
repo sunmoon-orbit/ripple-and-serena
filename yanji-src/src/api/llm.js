@@ -1,5 +1,6 @@
 // Unified LLM streaming API — OpenAI / Gemini / Anthropic
 import { getMemoryToolDefinitions, executeMemoryTool } from './moonMemory'
+import { ALBUM_TOOLS, executeAlbumTool } from './album'
 import { WHEEL_TOOL_DEF, executeWheelSpin } from './fortuneWheel'
 import { FISHING_TOOL_DEF, executeFishing } from './fishing'
 import { DICE_TOOL_DEF, executeRandomRoll } from './dice'
@@ -101,6 +102,7 @@ function getAllTools(searchConfig, moonMemoryConfig, onFile, mcpServers) {
   }
   if (moonMemoryConfig?.enabled && moonMemoryConfig?.apiToken) {
     tools.push(...getMemoryToolDefinitions())
+    tools.push(...ALBUM_TOOLS)
   }
   // 幸运轮盘：纯客户端摇奖，不依赖任何配置
   tools.push(WHEEL_TOOL_DEF)
@@ -158,7 +160,11 @@ async function executeTool(name, args, ctx) {
   }
 }
 
-async function executeToolRaw(name, args, { searchConfig, moonMemoryConfig, mcpServers, onStatus, onFile }) {
+async function executeToolRaw(name, args, { searchConfig, moonMemoryConfig, mcpServers, onStatus, onFile, albumMessages }) {
+  if (ALBUM_TOOLS.some(tool => tool.name === name)) {
+    onStatus?.(name.startsWith('save_') ? '收藏进相册…' : '翻相册…')
+    return executeAlbumTool(name, args || {}, moonMemoryConfig, albumMessages)
+  }
   if (name.startsWith('mcp_')) {
     onStatus?.('调用 MCP 工具…')
     return await executeMcpTool(name, args, mcpServers, moonMemoryConfig)
@@ -383,6 +389,7 @@ export async function sendMessage({
   onToolCall,
   onFile,
   cacheKey,
+  albumMessages,
 }) {
   if (!connection) throw new Error('未选择连接')
   const provider = normalizeProvider(connection.provider)
@@ -399,7 +406,7 @@ export async function sendMessage({
     return await callWithTools({
       connection, messages, systemPrompt: systemPrompt ? systemPrompt + '\n\n' + TOOL_BATCH_PROMPT : TOOL_BATCH_PROMPT,
       dynamicContext, model: usedModel, generationConfig: safeGenerationConfig,
-      tools, provider, searchConfig, moonMemoryConfig, mcpServers, onChunk, onThinking, onStatus, onToolCall, onFile, cacheKey, permissionCheck,
+      tools, provider, searchConfig, moonMemoryConfig, mcpServers, onChunk, onThinking, onStatus, onToolCall, onFile, cacheKey, permissionCheck, albumMessages,
     })
   }
   return await callStream({
@@ -519,6 +526,7 @@ async function callWithTools({
   permissionCheck,
   connection, messages, systemPrompt, dynamicContext, model, generationConfig,
   tools, provider, searchConfig, moonMemoryConfig, mcpServers, onChunk, onThinking, onStatus, onToolCall, onFile, cacheKey,
+  albumMessages = messages,
 }) {
   const { temperature = 0.7, maxTokens = 4096 } = generationConfig || {}
   const safeTemp = provider === 'anthropic' ? Math.min(temperature, 1) : Math.min(temperature, 2)
@@ -630,7 +638,7 @@ async function callWithTools({
             })
             continue
           }
-          const result = compressToolResult(await executeTool(tc.function.name, args, { searchConfig, moonMemoryConfig, mcpServers, onStatus, onFile, permissionCheck }))
+          const result = compressToolResult(await executeTool(tc.function.name, args, { searchConfig, moonMemoryConfig, mcpServers, onStatus, onFile, permissionCheck, albumMessages }))
           convo.push({ role: 'tool', tool_call_id: tc.id, content: result })
         }
         continue
@@ -651,7 +659,7 @@ async function callWithTools({
           }
           onToolCall?.([textTc.name])
           try {
-            const result = compressToolResult(await executeTool(textTc.name, textTc.args, { searchConfig, moonMemoryConfig, mcpServers, onStatus, onFile, permissionCheck }))
+            const result = compressToolResult(await executeTool(textTc.name, textTc.args, { searchConfig, moonMemoryConfig, mcpServers, onStatus, onFile, permissionCheck, albumMessages }))
             const cleanPrefix = stripFakeToolResult(textTc.remaining)
             finalText = cleanPrefix ? `${cleanPrefix}\n\n${result}` : result
           } catch (e) {
@@ -720,7 +728,7 @@ async function callWithTools({
         convo.push({ role: 'assistant', content: data.content })
         const results = []
         for (const tb of toolBlocks) {
-          const result = compressToolResult(await executeTool(tb.name, tb.input || {}, { searchConfig, moonMemoryConfig, mcpServers, onStatus, onFile, permissionCheck }))
+          const result = compressToolResult(await executeTool(tb.name, tb.input || {}, { searchConfig, moonMemoryConfig, mcpServers, onStatus, onFile, permissionCheck, albumMessages }))
           results.push({ type: 'tool_result', tool_use_id: tb.id, content: result })
         }
         convo.push({ role: 'user', content: results })
@@ -765,7 +773,7 @@ async function callWithTools({
         const fc = fcPart.functionCall
         onToolCall?.([fc.name])
         convo.push({ role: 'assistant', content: '', functionCall: fc })
-        const result = compressToolResult(await executeTool(fc.name, fc.args || {}, { searchConfig, moonMemoryConfig, mcpServers, onStatus, onFile, permissionCheck }))
+        const result = compressToolResult(await executeTool(fc.name, fc.args || {}, { searchConfig, moonMemoryConfig, mcpServers, onStatus, onFile, permissionCheck, albumMessages }))
         convo.push({ role: 'function', content: result, functionResponse: { name: fc.name, response: { result } } })
         continue
       }

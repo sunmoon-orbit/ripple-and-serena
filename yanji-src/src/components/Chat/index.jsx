@@ -56,6 +56,7 @@ import IncomingCall from './IncomingCall'
 import AnniversaryCard from './AnniversaryCard'
 import HeartCard from './HeartCard'
 import HeartCardAlbum from './HeartCardAlbum'
+import PhotoAlbum, { AlbumIcon } from './PhotoAlbum'
 import { fetchAnniversaryToday, fetchUnseenHeartCards, markHeartCardSeen, formatWeatherLine, fetchContactLastSeen } from '../../api/moonMemory'
 import CompletionEgg, { pickEgg } from './CompletionEgg'
 import { ThemedConfirmDialog, useThemedConfirm } from '../ThemedConfirmDialog'
@@ -294,7 +295,7 @@ export default function Chat() {
   const [tarotOpen, setTarotOpen] = useState(false)
   const [fortuneOpen, setFortuneOpen] = useState(false)
   const [quoted, setQuoted] = useState(null)
-  const [perspectiveFlip, setPerspectiveFlip] = useState(false)
+  const [photoAlbumOpen, setPhotoAlbumOpen] = useState(false)
   const [modelPanelOpen, setModelPanelOpen] = useState(false)
   const [isSending, setIsSending] = useState(false)
   const [status, setStatus] = useState('')
@@ -714,6 +715,7 @@ export default function Chat() {
         connection: conn,
         permissionCheck: proactive ? () => contactGuard.check() : undefined,
         messages: merged,
+        albumMessages: allMsgs,
         systemPrompt,
         dynamicContext,
         model: chat.model || conn.defaultModel,
@@ -1757,13 +1759,12 @@ export default function Chat() {
             )}
           </div>
           <button
-            className={'topbar-btn' + (perspectiveFlip ? ' active' : '')}
-            onClick={() => setPerspectiveFlip((v) => !v)}
-            title="视角翻转"
+            className="topbar-btn"
+            onClick={() => setPhotoAlbumOpen(true)}
+            title="相册"
+            aria-label="打开共同相册"
           >
-            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M7 16V4m0 0L3 8m4-4l4 4"/><path d="M17 8v12m0 0l4-4m-4 4l-4-4"/>
-            </svg>
+            <AlbumIcon />
           </button>
           <button
             className={'topbar-btn' + (injectMode ? ' active' : '')}
@@ -1876,7 +1877,7 @@ export default function Chat() {
 
         {/* Messages */}
         <div
-          className={'chat-messages' + (perspectiveFlip ? ' perspective-mode' : '')}
+          className="chat-messages"
           style={bgImage ? { backgroundImage: `url(${bgImage})`, backgroundSize: 'cover', backgroundPosition: 'center' } : {}}
           onClick={() => bgMenuOpen && setBgMenuOpen(false)}
         >
@@ -1967,6 +1968,7 @@ export default function Chat() {
       )}
       {periodOpen && <PeriodCard onClose={() => setPeriodOpen(false)} />}
       {albumOpen && <HeartCardAlbum onClose={() => setAlbumOpen(false)} />}
+      {photoAlbumOpen && <PhotoAlbum messages={messages} onClose={() => setPhotoAlbumOpen(false)} />}
       {idleJournalOpen && <IdleJournal onClose={() => setIdleJournalOpen(false)} />}
       {boardOpen && <BoardWall onClose={() => setBoardOpen(false)} />}
       {incomingCall && (
