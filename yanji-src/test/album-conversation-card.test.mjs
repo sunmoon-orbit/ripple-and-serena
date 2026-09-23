@@ -1,9 +1,15 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { cleanConversationCardText } from '../src/api/album.js'
+import { cleanConversationCardText, conversationCardSide } from '../src/api/album.js'
 
 test('conversation cards keep visible words and remove hidden voice or display protocol tags', () => {
   const input = '[glow]想你[/glow][breath]，[laughter]抱一下。<mood>tender</mood>[voice][call:想听你说话][MSG]'
   assert.equal(cleanConversationCardText(input, 'assistant'), '想你，抱一下。')
   assert.equal(cleanConversationCardText('ᔦ ° ꒳ ° ᔨ ( ¯꒳¯̥̥ )', 'user'), 'ᔦ ° ꒳ ° ᔨ ( ¯꒳¯̥̥ )')
+})
+
+test('conversation cards put the owner on the right for either point of view', () => {
+  assert.equal(conversationCardSide('assistant', 'assistant'), 'right')
+  assert.equal(conversationCardSide('user', 'assistant'), 'left')
+  assert.equal(conversationCardSide('user', 'user'), 'right')
 })

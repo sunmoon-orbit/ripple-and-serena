@@ -84,12 +84,19 @@ test('photo album: authenticated thumbnails, paging, details, upload and model i
     const messages = [{ id: 'fixture-message', role: 'user', content: 'fixture', images: [window.__albumImage] }]
     const saved = await executeAlbumTool('save_album_image', { message_id: 'fixture-message', title: '模型收藏附件', author: 'Fixture', description: 'fixture' }, window.__albumConfig, messages)
     await executeAlbumTool('save_album_image', { image_url: 'https://example.org/image.jpg', source_url: 'https://example.org/photo', title: '网上图片', author: 'Fixture', description: 'fixture' }, window.__albumConfig)
+    const conversation = await executeAlbumTool('save_album_conversation', { message_ids: ['fixture-user', 'fixture-assistant'], title: '模型视角', author: 'Fixture', description: 'fixture' }, window.__albumConfig, [
+      { id: 'fixture-user', role: 'user', content: '你从哪里回来？' },
+      { id: 'fixture-assistant', role: 'assistant', content: '从海边回来。[breath]' },
+    ])
     const searched = await executeAlbumTool('search_album_images', { query: 'Fuzhou lake' }, window.__albumConfig, messages)
-    return { saved, searched, remote: window.__albumSaves.at(-1), overflow: document.querySelector('.photo-album').scrollWidth > document.querySelector('.photo-album').clientWidth, tokenInUrl: window.__albumRequests.some(r => r.url.includes('fixture-key')), fonts: ['Yanji Kaomoji Canadian', 'Yanji Kaomoji Marks', 'Yanji Kaomoji Yi'].every(name => document.fonts.check(`28px "${name}"`)) }
+    return { saved, conversation, conversationBody: window.__albumSaves.at(-1), searched, remote: window.__albumSaves.at(-2), overflow: document.querySelector('.photo-album').scrollWidth > document.querySelector('.photo-album').clientWidth, tokenInUrl: window.__albumRequests.some(r => r.url.includes('fixture-key')), fonts: ['Yanji Kaomoji Canadian', 'Yanji Kaomoji Marks', 'Yanji Kaomoji Yi'].every(name => document.fonts.check(`28px "${name}"`)) }
   })
   assert.equal(result.saved.saved, true)
   assert.equal(result.remote.image_url, 'https://example.org/image.jpg')
   assert.equal(result.remote.source_url, 'https://example.org/photo')
+  assert.equal(result.conversation.saved, true)
+  assert.equal(result.conversationBody.source, 'conversation')
+  assert.match(result.conversationBody.image_data, /^data:image\/png;base64,/)
   assert.equal(result.tokenInUrl, false)
   assert.equal(result.fonts, true)
   assert.equal(result.overflow, false)

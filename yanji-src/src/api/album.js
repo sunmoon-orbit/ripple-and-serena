@@ -82,39 +82,127 @@ async function loadConversationCardFonts() {
   ])
 }
 
-// 本地原文排成纪念卡；不是操作系统截图，也不包含隐藏的思考或工具调用。
-export async function conversationCard(messages, title = '这一刻') {
+export function conversationCardSide(role, perspective = 'user') {
+  return role === perspective ? 'right' : 'left'
+}
+
+function cardAppearance() {
+  const css = getComputedStyle(document.documentElement)
+  const value = (name, fallback) => css.getPropertyValue(name).trim() || fallback
+  let avatarConfig = {}
+  try { avatarConfig = JSON.parse(localStorage.getItem('llm_hub_state_v1') || '{}').avatarConfig || {} } catch {}
+  return {
+    background: value('--bg', '#faf7f4'), text: value('--text', '#302830'), muted: value('--text-muted', '#8a7f88'),
+    border: value('--border', 'rgba(80,65,75,.12)'), selfText: value('--bubble-user-text', '#fff'),
+    selfRgb: value('--bubble-user-rgb', '191,181,216'), selfGradRgb: value('--bubble-user-grad-rgb', '200,190,221'),
+    otherRgb: value('--bubble-asst-rgb', '255,255,255'), otherGradRgb: value('--bubble-asst-grad-rgb', '253,250,255'),
+    opacity: Math.max(0.35, Math.min(1, Number(value('--bubble-opacity', '1')) || 1)),
+    wallpaper: localStorage.getItem('yanji-bg-image') || '', avatarConfig,
+  }
+}
+
+function wrapCardText(context, text, width) {
+  const lines = []
+  for (const paragraph of String(text).split('\n')) {
+    if (!paragraph) { lines.push(''); continue }
+    let line = ''
+    for (const char of paragraph) {
+      if (line && context.measureText(line + char).width > width) { lines.push(line); line = char } else line += char
+    }
+    lines.push(line)
+  }
+  return lines
+}
+
+function roundedPath(context, x, y, width, height, radius) {
+  const r = Math.min(radius, width / 2, height / 2)
+  context.beginPath(); context.moveTo(x + r, y); context.arcTo(x + width, y, x + width, y + height, r)
+  context.arcTo(x + width, y + height, x, y + height, r); context.arcTo(x, y + height, x, y, r)
+  context.arcTo(x, y, x + width, y, r); context.closePath()
+}
+
+async function optionalCardImage(src) {
+  if (!src) return null
+  try { return await loadImage(src) } catch { return null }
+}
+
+function drawCardImageCover(context, image, width, height) {
+  const ratio = Math.max(width / image.naturalWidth, height / image.naturalHeight)
+  const w = image.naturalWidth * ratio; const h = image.naturalHeight * ratio
+  context.drawImage(image, (width - w) / 2, (height - h) / 2, w, h)
+}
+
+function drawCardAvatar(context, image, x, y, size, color, fallback, square = false) {
+  context.save(); roundedPath(context, x, y, size, size, square ? 10 : size / 2); context.clip()
+  if (image) {
+    const ratio = Math.max(size / image.naturalWidth, size / image.naturalHeight)
+    const w = image.naturalWidth * ratio; const h = image.naturalHeight * ratio
+    context.drawImage(image, x + (size - w) / 2, y + (size - h) / 2, w, h)
+  } else {
+    context.fillStyle = color; context.fillRect(x, y, size, size)
+    context.fillStyle = '#fff'; context.font = `bold 25px ${CARD_FONT}`; context.textAlign = 'center'; context.textBaseline = 'middle'
+    context.fillText(fallback, x + size / 2, y + size / 2 + 1)
+  }
+  context.restore(); context.textAlign = 'left'; context.textBaseline = 'alphabetic'
+}
+
+// 把原文重绘成聊天画面；不是操作系统截图，也不包含隐藏思考或工具调用。
+export async function conversationCard(messages, title = '这一刻', { perspective = 'user' } = {}) {
   await loadConversationCardFonts()
   const canvas = document.createElement('canvas')
   const context = canvas.getContext('2d')
   if (!context) throw new Error('对话卡生成失败')
-  const lines = []
+  const appearance = cardAppearance()
+  const cardMessages = []
   context.font = `28px ${CARD_FONT}`
   for (const m of messages) {
     if (!['user', 'assistant'].includes(m.role)) continue
-    lines.push({ text: m.role === 'user' ? '我' : '你', label: true })
-    for (const paragraph of cleanConversationCardText(m.content, m.role).split('\n')) {
-      let line = ''
-      for (const char of paragraph) {
-        if (context.measureText(line + char).width > 760) { lines.push({ text: line }); line = '' }
-        line += char
-      }
-      lines.push({ text: line })
-    }
-    if (m.images?.length) lines.push({ text: `〔这条消息包含 ${m.images.length} 张图片，可单独收藏原图〕` })
-    lines.push({ text: '' })
+    let text = cleanConversationCardText(m.content, m.role)
+    if (m.images?.length) text += `${text ? '\n' : ''}〔这条消息包含 ${m.images.length} 张图片，可单独收藏原图〕`
+    const lines = wrapCardText(context, text || '…', 560)
+    const measured = Math.max(...lines.map(line => context.measureText(line || '　').width), 80)
+    cardMessages.push({ role: m.role, lines, width: Math.min(620, Math.max(170, Math.ceil(measured) + 54)), height: lines.length * 42 + 38 })
   }
-  if (lines.length > 110) throw new Error('这段对话太长，请减少选中的消息，分成几张收藏')
+  const totalLines = cardMessages.reduce((sum, message) => sum + message.lines.length, 0)
+  if (!cardMessages.length) throw new Error('这段对话没有可以收藏的文字')
+  if (totalLines > 110) throw new Error('这段对话太长，请减少选中的消息，分成几张收藏')
   canvas.width = 900
-  canvas.height = Math.max(480, 210 + lines.length * 44)
-  context.fillStyle = '#faf8f2'; context.fillRect(0, 0, canvas.width, canvas.height)
-  context.fillStyle = '#4e695d'; context.font = `bold 34px ${CARD_FONT}`
-  context.fillText(Array.from(title).slice(0, 22).join(''), 70, 80)
-  lines.forEach((line, i) => {
-    context.font = line.label ? `bold 24px ${CARD_FONT}` : `28px ${CARD_FONT}`
-    context.fillStyle = line.label ? '#7f8e82' : '#302e29'
-    context.fillText(line.text, 70, 150 + i * 44)
-  })
+  canvas.height = Math.max(720, 170 + cardMessages.reduce((sum, message) => sum + message.height + 30, 0) + 56)
+  const wallpaper = await optionalCardImage(appearance.wallpaper)
+  const useAvatarImages = appearance.avatarConfig?.mode === 'image'
+  const [userAvatar, assistantAvatar] = await Promise.all([
+    optionalCardImage(useAvatarImages ? appearance.avatarConfig.userImage : ''),
+    optionalCardImage(useAvatarImages ? appearance.avatarConfig.assistantImage : ''),
+  ])
+  context.fillStyle = appearance.background; context.fillRect(0, 0, canvas.width, canvas.height)
+  if (wallpaper) { drawCardImageCover(context, wallpaper, canvas.width, canvas.height); context.fillStyle = 'rgba(20,16,20,.10)'; context.fillRect(0, 0, canvas.width, canvas.height) }
+  context.fillStyle = wallpaper ? 'rgba(250,248,245,.90)' : 'rgba(255,255,255,.52)'; context.fillRect(0, 0, canvas.width, 126)
+  context.fillStyle = appearance.text; context.font = `bold 34px ${CARD_FONT}`; context.textAlign = 'center'
+  context.fillText(Array.from(title).slice(0, 22).join(''), canvas.width / 2, 59)
+  context.fillStyle = appearance.muted; context.font = `22px ${CARD_FONT}`
+  context.fillText(perspective === 'assistant' ? '从我这边看' : '从你这边看', canvas.width / 2, 94)
+  context.textAlign = 'left'
+  let y = 154
+  for (const message of cardMessages) {
+    const self = conversationCardSide(message.role, perspective) === 'right'
+    const avatarSize = 58; const margin = 48; const gap = 15
+    const avatarX = self ? canvas.width - margin - avatarSize : margin
+    const bubbleX = self ? avatarX - gap - message.width : avatarX + avatarSize + gap
+    const gradient = context.createLinearGradient(bubbleX, y, bubbleX + message.width, y + message.height)
+    const alpha = appearance.opacity
+    gradient.addColorStop(0, `rgba(${self ? appearance.selfRgb : appearance.otherRgb},${alpha})`)
+    gradient.addColorStop(1, `rgba(${self ? appearance.selfGradRgb : appearance.otherGradRgb},${alpha})`)
+    context.save(); context.shadowColor = 'rgba(35,25,32,.13)'; context.shadowBlur = 16; context.shadowOffsetY = 5
+    roundedPath(context, bubbleX, y, message.width, message.height, 24); context.fillStyle = gradient; context.fill(); context.restore()
+    roundedPath(context, bubbleX, y, message.width, message.height, 24); context.strokeStyle = self ? 'rgba(255,255,255,.16)' : appearance.border; context.lineWidth = 2; context.stroke()
+    context.fillStyle = self ? appearance.selfText : appearance.text; context.font = `28px ${CARD_FONT}`
+    message.lines.forEach((line, index) => context.fillText(line, bubbleX + 27, y + 37 + index * 42))
+    const roleIsUser = message.role === 'user'
+    drawCardAvatar(context, roleIsUser ? userAvatar : assistantAvatar, avatarX, y + 2, avatarSize,
+      roleIsUser ? `rgba(${appearance.selfRgb},.82)` : `rgba(${appearance.selfGradRgb},.82)`, roleIsUser ? '颖' : '言', appearance.avatarConfig?.shape === 'square')
+    y += message.height + 30
+  }
+  context.fillStyle = wallpaper ? 'rgba(250,248,245,.72)' : 'rgba(255,255,255,.34)'; context.fillRect(0, canvas.height - 36, canvas.width, 36)
   const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'))
   if (!blob) throw new Error('对话卡生成失败')
   // 保留长卡的原始分辨率，缩略图仍压缩。
@@ -131,7 +219,7 @@ export const ALBUM_TOOLS = [
     message_id: { type: 'string', description: 'album_chat_sources 返回的当前消息 ID' }, image_index: { type: 'integer', description: '从 0 开始，默认 0' },
     image_url: { type: 'string', description: '与 message_id 二选一：公网 HTTPS 图片直链' }, source_url: { type: 'string', description: '原始网页地址（如有）' },
   }, required: ['title', 'description', 'author'] } },
-  { name: 'save_album_conversation', description: '把当前聊天里选中的原文排成对话纪念卡并收藏。不是屏幕截图，不包含隐藏思考。先用 album_chat_sources 取得消息 ID，最多选 8 条。', parameters: { type: 'object', properties: { message_ids: { type: 'array', items: { type: 'string' }, maxItems: 8 }, title: { type: 'string' }, description: { type: 'string' }, author: { type: 'string' } }, required: ['message_ids', 'title', 'description', 'author'] } },
+  { name: 'save_album_conversation', description: '把当前聊天里选中的原文重绘成自己视角的聊天画面并收藏：自己的话在右边，阿颖的话在左边，跟随当前主题、聊天背景与头像；不包含隐藏思考。先用 album_chat_sources 取得消息 ID，最多选 8 条。', parameters: { type: 'object', properties: { message_ids: { type: 'array', items: { type: 'string' }, maxItems: 8 }, title: { type: 'string' }, description: { type: 'string' }, author: { type: 'string' } }, required: ['message_ids', 'title', 'description', 'author'] } },
 ]
 
 export async function executeAlbumTool(name, args, config, messages = []) {
@@ -147,7 +235,7 @@ export async function executeAlbumTool(name, args, config, messages = []) {
     if (!Array.isArray(args.message_ids) || !args.message_ids.length || args.message_ids.length > 8) throw new Error('请选择 1 至 8 条消息')
     const selected = messages.filter(m => args.message_ids.includes(m.id) && !m.streaming && ['user', 'assistant'].includes(m.role))
     if (selected.length !== new Set(args.message_ids).size) throw new Error('部分消息已不在当前聊天中')
-    image = await conversationCard(selected, args.title)
+    image = await conversationCard(selected, args.title, { perspective: 'assistant' })
     metadata.source = 'conversation'
   } else if (args.message_id) {
     const message = messages.find(m => m.id === args.message_id)
