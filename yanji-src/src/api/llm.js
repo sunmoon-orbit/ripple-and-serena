@@ -12,6 +12,7 @@ import { buildMoodFxPrompt } from '../utils/moodFx'
 import { normalizeGenerationConfig } from '../utils/generationConfig'
 import { executeMcpTool, getEnabledMcpToolDefinitions } from './mcp'
 import { createToolDrawer, TOOL_DRAWER_NAME } from './toolDrawer'
+import { createToolCommitGuard, TOOL_LOOP_REQUEST_LIMIT } from './toolCommitGuard'
 
 export function normalizeProvider(raw) {
   const v = (raw || '').toString().toLowerCase()
@@ -378,12 +379,11 @@ const TOOL_DRAWER_PROMPT = `【工具抽屉】
 - 一次选齐当前任务需要的组，下一轮再调用新出现的真正工具
 - open_toolbox 只是打开抽屉，不会替你执行查询或写入`
 
-const TOOL_LOOP_REQUEST_LIMIT = 6
 const TOOL_FINALIZE_PROMPT = `工具调用阶段已结束。现在不要再调用任何工具，请根据已有对话和工具结果，直接给用户一条完整的正文回复。`
 
-function appendAnthropicFinalInstruction(messages) {
+function appendAnthropicFinalInstruction(messages, prompt = TOOL_FINALIZE_PROMPT) {
   const last = messages[messages.length - 1]
-  const block = { type: 'text', text: TOOL_FINALIZE_PROMPT }
+  const block = { type: 'text', text: prompt }
   if (last?.role === 'user') {
     if (Array.isArray(last.content)) last.content.push(block)
     else last.content = [{ type: 'text', text: last.content || '' }, block]
@@ -552,6 +552,7 @@ async function callWithTools({
   const { temperature = 0.7, maxTokens = 4096 } = generationConfig || {}
   const safeTemp = provider === 'anthropic' ? Math.min(temperature, 1) : Math.min(temperature, 2)
   const toolDrawer = createToolDrawer(tools)
+  const commitGuard = createToolCommitGuard()
   const routedSystemPrompt = toolDrawer.enabled
     ? `${systemPrompt || ''}\n\n${TOOL_DRAWER_PROMPT}`.trim()
     : systemPrompt
@@ -566,22 +567,25 @@ async function callWithTools({
   let responseDiagnostic = ''
 
   const runTool = async (name, args) => {
-    if (name === TOOL_DRAWER_NAME && toolDrawer.enabled) return toolDrawer.open(args?.groups)
-    return executeTool(name, args, { searchConfig, moonMemoryConfig, mcpServers, onStatus, onFile, permissionCheck, albumMessages })
+    const result = name === TOOL_DRAWER_NAME && toolDrawer.enabled
+      ? toolDrawer.open(args?.groups)
+      : await executeTool(name, args, { searchConfig, moonMemoryConfig, mcpServers, onStatus, onFile, permissionCheck, albumMessages })
+    return commitGuard.observe(name, result)
   }
 
-  for (let iter = 0; iter < TOOL_LOOP_REQUEST_LIMIT; iter++) {
+  for (let iter = 0; iter < commitGuard.requestLimit(); iter++) {
     if (permissionCheck && !await permissionCheck()) throw new Error('主动联系已关闭')
-    const forceFinalize = iter === TOOL_LOOP_REQUEST_LIMIT - 1
-    const roundTools = forceFinalize ? [] : toolDrawer.getTools()
+    const forceFinalize = iter === commitGuard.requestLimit() - 1
+    const roundTools = forceFinalize ? [] : commitGuard.toolsForRound(iter, toolDrawer.getTools())
     const formattedTools = formatToolsForProvider(roundTools, provider)
+    const finalizePrompt = commitGuard.finalizePrompt(TOOL_FINALIZE_PROMPT)
     onStatus?.(forceFinalize ? '整理回答…' : iter === 0 ? '思考中...' : '继续思考...')
 
     // ── OpenAI ──────────────────────────────────────────────────────
     if (provider === 'openai') {
       const url = buildApiUrl(connection.baseUrl, 'openai')
       const baseMsgs = buildOpenAIMessages(convo, routedSystemPrompt, iter === 0 ? dynamicContext : undefined)
-      if (forceFinalize) baseMsgs.push({ role: 'user', content: TOOL_FINALIZE_PROMPT })
+      if (forceFinalize) baseMsgs.push({ role: 'user', content: finalizePrompt })
       const cacheHintMode = cacheKey ? getOpenAICacheHintMode(model) : null
       const bodyMsgs = addOpenAICacheBreakpoints(baseMsgs, cacheHintMode)
       // 流式：非流式请求在模型思考的几十秒里一个字节都不发，中转站/代理会把它
@@ -718,7 +722,7 @@ async function callWithTools({
       // 每次迭代都传 dynamicContext：工具循环后续步骤不再丢失注入内容；
       // buildAnthropicMessages 保证注入永远在断点后，不影响缓存命中
       const bodyMsgs = buildAnthropicMessages(convo, dynamicContext)
-      if (forceFinalize) appendAnthropicFinalInstruction(bodyMsgs)
+      if (forceFinalize) appendAnthropicFinalInstruction(bodyMsgs, finalizePrompt)
       // ⚠️ 必须流式。非流式的话，模型思考那几十秒里这条连接一个字节都不吐，
       // 中转站/代理/CDN 很容易按「空闲连接」把它掐掉——上游其实已经生成完并计了费，
       // 前端拿到的却是 Failed to fetch（0727 阿颖报的「后台有输出但前端报错」）。
@@ -791,7 +795,7 @@ async function callWithTools({
       base = base.replace(/\/$/, '')
       const url = `${base}/models/${encodeURIComponent(model)}:streamGenerateContent?alt=sse`
       const contents = buildGeminiContents(convo, routedSystemPrompt, iter === 0 ? dynamicContext : undefined)
-      if (forceFinalize) contents.push({ role: 'user', parts: [{ text: TOOL_FINALIZE_PROMPT }] })
+      if (forceFinalize) contents.push({ role: 'user', parts: [{ text: finalizePrompt }] })
       const body = {
         contents,
         generationConfig: { temperature: safeTemp, maxOutputTokens: maxTokens },
@@ -835,6 +839,7 @@ async function callWithTools({
   }
 
   // 空回一律抛错，别当成一次正常回复落盘（详见 assertNotEmpty 上方注释）
+  finalText = commitGuard.reconcile(finalText)
   assertNotEmpty({ text: finalText, usage, responseDiagnostic }, { provider, finishReason: lastFinish, blockReason: lastBlock })
   if (!streamedOut) onChunk?.(finalText)
   return { text: finalText, usage, responseDiagnostic: responseDiagnostic || undefined }
