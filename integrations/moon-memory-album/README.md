@@ -1,6 +1,6 @@
-# 共同相册：待接入的 moon-memory 补丁
+# 共同相册：接入与维护记录
 
-状态：后端文件尚未安装到 moon-memory，尚未部署。这里是隔离的待审补丁，避免覆盖后端工作目录已有改动。前端位于 `yanji-src/src/components/Chat/PhotoAlbum.jsx`，入口替换 Murmur 顶栏的视角翻转按钮，心意卡册不受影响。
+2026-09-23：用户明确授权在现有后端分支追加功能、提交推送和部署。后端提交 `45e8aa9` 已推送至 `fix/yanji-agent-auth-proactive-gates`，相册增量已应用到生产服务；两个工作目录原有未提交改动均保留。这里保留首版补丁作为接入参考，正式维护以 moon-memory `services/album-*.cjs` 和 `test/album.test.cjs` 为准，后端另含相册备份模块。前端位于 `yanji-src/src/components/Chat/PhotoAlbum.jsx`，入口替换 Murmur 顶栏的视角翻转按钮，心意卡册不受影响。
 
 ## 接入
 
@@ -32,7 +32,7 @@ REST 路径全部位于现有 `/moments/album` 下，沿用 `/moments` Bearer �
 - 同样的图片、标题、说明、作者和来源重复请求不会重复入册。删除是软隐藏，保留文件。默认总存储上限 200 MiB，含隐藏照片；满额返回错误，不清理用户照片。
 - API 模型工具：`browse_album`、`album_chat_sources`、`save_album_image`、`save_album_conversation`。聊天附件通过消息 ID 在本地读取，不让模型抄写 base64。对话卡仅使用选中消息正文，不是屏幕截图，不包含隐藏思考或工具输出。
 - MCP 工具：`browse_album`、`save_album_image`、`read_album_photo`。MCP 不授予浏览器或聊天软件额外附件访问能力；调用方必须有真实图片链接/字节。
-- 备份需同时包含相册数据库与图片文件。现有只备份 memory.db 的机制不自动覆盖它；正式上线需检查实际备份脚本并补全。
+- 已通过 `services/album-backup.cjs` 接入原有备份流程：对相册 SQLite 做一致性快照，将数据库、大图和缩略图打包成 `album.tar.gz.part-*`，与原备份一起发布。含软隐藏的照片。恢复时合并分块并解压到后端 `data/`；未额外启动任务或手动运行生产全量备份。
 
 ## 离线验证
 
@@ -51,4 +51,4 @@ npm test
 npm run build
 ```
 
-后端分支和生产操作权限确认后，完成实际挂载、验证带/不带认证的请求、MCP 工具发现与图片块、备份覆盖，再发布前端并核对 Pages 资源 hash。未接入时不要将前端构建推送为已可用版本。
+验证记录：前端 35 项测试、360px 宽度浏览器的翻页/大图/聊天附件/模型收藏流程及生产构建通过。后端 5 项隔离测试覆盖媒体、配额、地址限制、备份与 REST 鉴权，并通过原备份快照回归及 MCP 回归测试。没有向生产相册写入测试照片。
