@@ -4118,7 +4118,8 @@ textarea.form-input { display: block; margin: 8px 16px 12px; }
   font: 500 14px/1.75 serif; letter-spacing: .3px;
 }
 .bookread-card-preview-note {
-  display: -webkit-box; overflow: hidden; -webkit-box-orient: vertical; -webkit-line-clamp: 2;
+  display: -webkit-box; overflow: hidden; -webkit-box-orient: vertical; -webkit-line-clamp: var(--excerpt-note-lines, 2);
+  flex-shrink: 1; min-height: 0;
   margin-top: 10px; padding-top: 8px; border-top: 1px solid rgba(45,41,35,.10);
   color: #77736b; font-size: 9px; line-height: 1.5;
 }

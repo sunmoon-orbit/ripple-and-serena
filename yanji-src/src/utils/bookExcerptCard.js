@@ -53,6 +53,15 @@ function compactSource({ author = '', title = '', chapter = '' }, limit = 34) {
   return chars.length > limit ? `${chars.slice(0, limit - 1).join('')}…` : raw
 }
 
+// 正文短时把剩余纸面让给批注；正文变长时逐步缩减，始终给来源区留足空间。
+export function excerptCardTextLayout(quote, note = '') {
+  const quoteLines = wrapExcerptText(quote, 19, 7)
+  const noteFirstY = 650 + quoteLines.length * 72 + 60
+  const noteLineLimit = Math.max(0, Math.floor((1200 - noteFirstY) / 42) + 1)
+  const noteLines = note && noteLineLimit ? wrapExcerptText(note, 29, noteLineLimit) : []
+  return { quoteLines, noteLines, noteLineLimit, noteY: noteFirstY - 12 }
+}
+
 export function buildExcerptCardSvg({
   quote,
   note = '',
@@ -64,10 +73,8 @@ export function buildExcerptCardSvg({
   readingTime = '',
 }) {
   const accent = safeColor(color)
-  const quoteLines = wrapExcerptText(quote, 19, 7)
-  const noteLines = note && quoteLines.length <= 5 ? wrapExcerptText(note, 29, 2) : []
+  const { quoteLines, noteLines, noteY } = excerptCardTextLayout(quote, note)
   const source = compactSource({ author, title, chapter })
-  const noteY = 650 + quoteLines.length * 72 + 48
   const cover = imageDataUrl
     ? `<image href="${escapeXml(imageDataUrl)}" width="1080" height="600" preserveAspectRatio="xMidYMid slice"/><rect width="1080" height="600" fill="url(#shade)"/>`
     : `<rect width="1080" height="600" fill="url(#fallback)"/><rect width="1080" height="600" fill="url(#quiet)"/>`

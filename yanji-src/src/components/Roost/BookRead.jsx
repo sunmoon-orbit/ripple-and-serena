@@ -10,7 +10,7 @@ import {
 import { sendMessage } from '../../api/llm'
 import { useThemedConfirm } from '../ThemedConfirmDialog'
 import { downloadBlob } from '../../utils/download'
-import { prepareExcerptCover, renderExcerptCardPng } from '../../utils/bookExcerptCard'
+import { excerptCardTextLayout, prepareExcerptCover, renderExcerptCardPng } from '../../utils/bookExcerptCard'
 
 const COLORS = [
   { id: 'yellow', hex: '#f5d76e' },
@@ -845,6 +845,7 @@ export default function BookRead({ onClose }) {
   // ── 阅读视图 ──
   const annos = chapter?.annotations || []
   const segs = chapter ? buildSegments(chapter.content, annos) : []
+  const excerptLayout = excerptCard ? excerptCardTextLayout(excerptCard.quote, excerptCard.note) : null
 
   return (
     <div className="roost-overlay bookread-reader-overlay" onClick={onClose}>
@@ -1058,7 +1059,9 @@ export default function BookRead({ onClose }) {
                 </div>
                 <div className="bookread-card-preview-paper">
                   <div className="bookread-card-preview-quote">{excerptCard.quote}</div>
-                  {excerptCard.note && <div className="bookread-card-preview-note">{excerptCard.note}</div>}
+                  {excerptCard.note && excerptLayout?.noteLineLimit > 0 && (
+                    <div className="bookread-card-preview-note" style={{ '--excerpt-note-lines': excerptLayout.noteLineLimit }}>{excerptCard.note}</div>
+                  )}
                   <div className="bookread-card-preview-source">
                     {[active.author, active.title ? `《${active.title}》` : '', chapter.title || `第 ${chapter.idx + 1} 章`].filter(Boolean).join(' · ')}
                   </div>

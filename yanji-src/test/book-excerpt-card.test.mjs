@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { buildExcerptCardSvg, wrapExcerptText } from '../src/utils/bookExcerptCard.js'
+import { buildExcerptCardSvg, excerptCardTextLayout, wrapExcerptText } from '../src/utils/bookExcerptCard.js'
 
 test('wrapExcerptText keeps a long excerpt inside the configured line budget', () => {
   const lines = wrapExcerptText('列车载着不安的人们发出隆隆的声音奔驰在黑夜之中这是一段很长很长的书摘文字', 8, 3)
@@ -47,4 +47,21 @@ test('buildExcerptCardSvg truncates an overly long source line', () => {
   })
   assert.match(svg, /<text x="84" y="1314" class="meta">[^<]{33}…<\/text>/u)
   assert.doesNotMatch(svg, new RegExp(longTitle))
+})
+
+test('short excerpts give unused paper space to longer annotations', () => {
+  const note = '我时常觉得每个人都是有天赋的，极度贫瘠之人反而是少数。只是大多数人的天赋，在日复一日枯燥的生活中以及各种不同的原因中，慢慢被遮住了。等到偶然回头时，才会发现那些没有说出口的念头，其实一直安静地留在心里，并没有真正消失。'
+  const layout = excerptCardTextLayout('这是一段四行以内的短书摘，用来给批注留下更多纸面。', note)
+  assert.ok(layout.noteLineLimit >= 4)
+  assert.ok(layout.noteLines.length >= 4)
+  const svg = buildExcerptCardSvg({ quote: '这是一段四行以内的短书摘，用来给批注留下更多纸面。', note })
+  assert.match(svg, /大多数人的天赋/)
+  assert.match(svg, /并没有真正消失。/)
+})
+
+test('long excerpts shrink annotation space before the fixed source area', () => {
+  const layout = excerptCardTextLayout('很长的正文'.repeat(40), '很长的批注'.repeat(40))
+  assert.equal(layout.quoteLines.length, 7)
+  assert.equal(layout.noteLineLimit, 0)
+  assert.equal(layout.noteLines.length, 0)
 })
