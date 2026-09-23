@@ -11,6 +11,7 @@ const { call } = require('./album-mcp.cjs');
 const { snapshotAlbum } = require('./album-backup.cjs');
 const { execFileSync } = require('node:child_process');
 const { searchCommons, plain } = require('./album-search.cjs');
+const { cleanConversationText, renderConversationCard, wrapText } = require('./album-conversation-card.cjs');
 
 test('photos persist with thumbnails; retries deduplicate; pagination and soft hiding preserve files', async t => {
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'yanji-album-test-'));
@@ -73,6 +74,27 @@ test('card avatars overwrite atomically and remain available to REST and MCP rea
   const mcp = await call('read_album_avatar', { role: 'user' }, store);
   assert.equal(mcp.content[1].mimeType, 'image/webp');
   assert.throws(() => store.avatar('owner'), /角色无效/);
+});
+
+test('MCP renders selected visible messages as a model-perspective card with synced avatars', async t => {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'yanji-album-conversation-test-'));
+  const database = new Database(':memory:');
+  t.after(() => { database.close(); fs.rmSync(directory, { recursive: true, force: true }); });
+  const store = createAlbumStore({ directory, database });
+  const avatar = await sharp({ create: { width: 40, height: 40, channels: 3, background: '#334455' } }).png().toBuffer();
+  await store.saveAvatar('user', `data:image/png;base64,${avatar.toString('base64')}`);
+  await store.saveAvatar('assistant', `data:image/png;base64,${avatar.toString('base64')}`);
+  assert.equal(cleanConversationText('想你[breath][call:hello]<mood>tender</mood>'), '想你');
+  assert.ok(Array.from(wrapText('这是一段刚好会在末尾留下孤字的测试句子ᔦ ° ꒳ ° ᔨ').at(-1)).length >= 2);
+  const input = { messages: [{ role: 'user', content: '可以收藏这段吗？' }, { role: 'assistant', content: '可以。[laughter]' }], title: 'Fixture conversation', description: 'Visible messages only', author: 'Fixture' };
+  const rendered = await renderConversationCard(input, store);
+  assert.equal(rendered.info.format, 'png');
+  assert.equal(rendered.info.width, 900);
+  const result = await call('save_album_conversation_card', input, store);
+  assert.equal(result.saved, true);
+  assert.equal(store.get(result.id).source, 'conversation');
+  assert.equal((await sharp(store.media(result.id).path).metadata()).format, 'png');
+  await assert.rejects(call('save_album_conversation_card', { ...input, messages: [{ role: 'system', content: 'secret' }] }, store), /角色/);
 });
 
 test('remote pictures cannot target private IPs, credential URLs, non-HTTPS or rebinding records', async () => {
