@@ -54,7 +54,7 @@ export function fateToMessage(f) {
 
 export const FATE_TOOL_DEF = {
   name: 'draw_fate_card',
-  description: '命运牌阵——抽一张时空坐标（真实历史上的某时某地）+ 母题/身份/变数三枚骰子，组成一次穿越设定。抽到之后可以接着用 nowhere_open_door 去那个地方（用现代地名），把牌面设定代入你在乌有乡的行走见闻里。',
+  description: '命运牌阵——抽一张时空坐标（真实历史上的某时某地）+ 母题/身份/变数三枚骰子，组成一次穿越设定。抽到后可以用 nowhere_open_door 去现代地点旅行；走过、看过之后，若真有想带回来的景色，可用 search_album_images 找一张有来源的当地照片，再用 save_album_image 收进相册。一次旅程最多一张，也可以空手回来。',
   parameters: { type: 'object', properties: {} },
 }
 

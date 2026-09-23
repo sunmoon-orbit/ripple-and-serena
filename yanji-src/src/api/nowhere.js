@@ -45,7 +45,7 @@ export const NOWHERE_TOOL_DEFS = [
   },
   {
     name: 'nowhere_look',
-    description: '看看周围——观察这个地方有什么动物、植物、人类痕迹、艺术。',
+    description: '看看周围——观察这个地方有什么动物、植物、人类痕迹、艺术。如果旅途中真的遇到想带给阿颖看的景色，可以接着用 search_album_images 搜索当前位置和景物，再用 save_album_image 带一张有来源的照片回相册；一次旅行最多一张，也可以空手回来。',
     parameters: { type: 'object', properties: {} },
   },
   {

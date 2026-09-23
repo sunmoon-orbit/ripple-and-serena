@@ -1,6 +1,6 @@
 # 共同相册：接入与维护记录
 
-2026-09-23：用户明确授权在现有后端分支追加功能、提交推送和部署。后端提交 `45e8aa9` 已推送至 `fix/yanji-agent-auth-proactive-gates`，相册增量已应用到生产服务；两个工作目录原有未提交改动均保留。这里保留首版补丁作为接入参考，正式维护以 moon-memory `services/album-*.cjs` 和 `test/album.test.cjs` 为准，后端另含相册备份模块。前端位于 `yanji-src/src/components/Chat/PhotoAlbum.jsx`，入口替换 Murmur 顶栏的视角翻转按钮，心意卡册不受影响。
+2026-09-23：用户明确授权在现有后端分支追加功能、提交推送和部署。首版后端提交 `45e8aa9` 已推送至 `fix/yanji-agent-auth-proactive-gates`，相册增量已应用到生产服务；两个工作目录原有未提交改动均保留。这里保留补丁作为接入参考，正式维护以 moon-memory `services/album-*.cjs` 和 `test/album.test.cjs` 为准。前端位于 `yanji-src/src/components/Chat/PhotoAlbum.jsx`，入口替换 Murmur 顶栏的视角翻转按钮，心意卡册不受影响。
 
 ## 接入
 
@@ -32,7 +32,9 @@ REST 路径全部位于现有 `/moments/album` 下，沿用 `/moments` Bearer �
 - 同样的图片、标题、说明、作者和来源重复请求不会重复入册。删除是软隐藏，保留文件。默认总存储上限 200 MiB，含隐藏照片；满额返回错误，不清理用户照片。
 - API 模型工具：`browse_album`、`album_chat_sources`、`save_album_image`、`save_album_conversation`。聊天附件通过消息 ID 在本地读取，不让模型抄写 base64。对话卡仅使用选中消息正文，不是屏幕截图，不包含隐藏思考或工具输出。
 - MCP 工具：`browse_album`、`save_album_image`、`read_album_photo`。MCP 不授予浏览器或聊天软件额外附件访问能力；调用方必须有真实图片链接/字节。
-- 已通过 `services/album-backup.cjs` 接入原有备份流程：对相册 SQLite 做一致性快照，将数据库、大图和缩略图打包成 `album.tar.gz.part-*`，与原备份一起发布。含软隐藏的照片。恢复时合并分块并解压到后端 `data/`；未额外启动任务或手动运行生产全量备份。
+- 删除采用 30 天软删除：只有前端用户能移入回收站和恢复，模型没有删除工具；过期记录在相册访问和每日备份前彻底清理，释放原图与缩略图空间。
+- 已通过 `services/album-backup.cjs` 接入原有备份流程：先清理已过 30 天的回收站，再对相册 SQLite 做一致性快照，将数据库、大图和缩略图打包成 `album.tar.gz.part-*`，与原备份一起发布。恢复时合并分块并解压到后端 `data/`。
+- `album-search.cjs` 使用 Wikimedia Commons 固定 API 搜索图片和授权元数据。模型只拿真实的缩略图直链、作者、许可与来源页，再调用收藏；乌有乡和命运牌阵只在一次旅行中建议最多带回一张，也允许空手回来。
 
 ## 离线验证
 

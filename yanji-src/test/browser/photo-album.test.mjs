@@ -23,7 +23,7 @@ test('photo album: authenticated thumbnails, paging, details, upload and model i
     const context = canvas.getContext('2d'); context.fillStyle = '#adcabc'; context.fillRect(0, 0, 60, 80)
     const image = canvas.toDataURL('image/png')
     const imageBlob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'))
-    window.__albumImage = image; window.__albumRequests = []; window.__albumSaves = []
+    window.__albumImage = image; window.__albumRequests = []; window.__albumSaves = []; window.__albumTrash = []
     window.__albumConfig = { enabled: true, baseUrl: 'https://fixture.invalid', apiToken: 'fixture-key' }
     const items = [2, 1].map(id => ({ id, title: `照片 ${id}`, description: `照片 ${id} 的完整描述。` + '一段很长的说明。'.repeat(30), author: 'Fixture', created_at: '2026-09-23T12:00:00Z' }))
     const originalFetch = window.fetch
@@ -31,13 +31,23 @@ test('photo album: authenticated thumbnails, paging, details, upload and model i
       if (!String(url).startsWith('https://fixture.invalid')) return originalFetch(url, options)
       window.__albumRequests.push({ url: String(url), headers: options.headers })
       if (options.headers?.Authorization !== 'Bearer fixture-key') return new Response('{}', { status: 401 })
+      const parsed = new URL(String(url))
+      const id = Number(parsed.pathname.match(/\/album\/(\d+)/)?.[1])
+      if (options.method === 'DELETE') {
+        const index = items.findIndex(item => item.id === id); if (index >= 0) window.__albumTrash.unshift({ ...items.splice(index, 1)[0], deleted_at: new Date().toISOString() })
+        return new Response(JSON.stringify({ ok: index >= 0 }))
+      }
+      if (options.method === 'POST' && parsed.pathname.endsWith('/restore')) {
+        const index = window.__albumTrash.findIndex(item => item.id === id); if (index >= 0) items.unshift({ ...window.__albumTrash.splice(index, 1)[0], deleted_at: null })
+        return new Response(JSON.stringify({ ok: index >= 0 }))
+      }
       if (options.method === 'POST') {
         const body = JSON.parse(options.body); window.__albumSaves.push(body)
         const item = { ...body, id: items.length + 1, created_at: new Date().toISOString() }; items.unshift(item)
         return new Response(JSON.stringify(item))
       }
       if (/\/(thumb|image)$/.test(String(url))) return new Response(imageBlob)
-      return new Response(JSON.stringify({ items, next_cursor: null }))
+      return new Response(JSON.stringify({ items: parsed.searchParams.get('trash') === '1' ? window.__albumTrash : items, next_cursor: null }))
     }
     useStore.setState({ moonMemory: window.__albumConfig })
     const host = document.createElement('div'); document.body.append(host); document.getElementById('root').style.display = 'none'
@@ -59,17 +69,29 @@ test('photo album: authenticated thumbnails, paging, details, upload and model i
   await page.getByRole('button', { name: '展开：聊天里的图片', exact: true }).waitFor()
   assert.equal(await page.evaluate(() => window.__albumSaves[0].source), 'chat')
   assert.equal(await page.evaluate(() => 'thumb_data' in window.__albumSaves[0]), false)
+  await page.getByRole('button', { name: '展开：聊天里的图片', exact: true }).click()
+  await page.getByRole('button', { name: '移入回收站', exact: true }).click()
+  await page.getByRole('alertdialog').getByRole('button', { name: '移入回收站', exact: true }).click()
+  await page.getByRole('button', { name: '回收站', exact: true }).click()
+  await page.getByRole('button', { name: '展开：聊天里的图片', exact: true }).click()
+  assert.match(await page.locator('.photo-album-detail small').innerText(), /保留 30 天/)
+  await page.getByRole('button', { name: '恢复到相册', exact: true }).click()
+  await page.getByText('回收站是空的。', { exact: true }).waitFor()
+  await page.getByRole('button', { name: '返回相册', exact: true }).click()
+  await page.getByRole('button', { name: '展开：聊天里的图片', exact: true }).waitFor()
   const result = await page.evaluate(async () => {
     const { executeAlbumTool } = await import('/src/api/album.js')
     const messages = [{ id: 'fixture-message', role: 'user', content: 'fixture', images: [window.__albumImage] }]
     const saved = await executeAlbumTool('save_album_image', { message_id: 'fixture-message', title: '模型收藏附件', author: 'Fixture', description: 'fixture' }, window.__albumConfig, messages)
     await executeAlbumTool('save_album_image', { image_url: 'https://example.org/image.jpg', source_url: 'https://example.org/photo', title: '网上图片', author: 'Fixture', description: 'fixture' }, window.__albumConfig)
-    return { saved, remote: window.__albumSaves.at(-1), overflow: document.querySelector('.photo-album').scrollWidth > document.querySelector('.photo-album').clientWidth, tokenInUrl: window.__albumRequests.some(r => r.url.includes('fixture-key')) }
+    const searched = await executeAlbumTool('search_album_images', { query: 'Fuzhou lake' }, window.__albumConfig, messages)
+    return { saved, searched, remote: window.__albumSaves.at(-1), overflow: document.querySelector('.photo-album').scrollWidth > document.querySelector('.photo-album').clientWidth, tokenInUrl: window.__albumRequests.some(r => r.url.includes('fixture-key')), fonts: ['Yanji Kaomoji Canadian', 'Yanji Kaomoji Marks', 'Yanji Kaomoji Yi'].every(name => document.fonts.check(`28px "${name}"`)) }
   })
   assert.equal(result.saved.saved, true)
   assert.equal(result.remote.image_url, 'https://example.org/image.jpg')
   assert.equal(result.remote.source_url, 'https://example.org/photo')
   assert.equal(result.tokenInUrl, false)
+  assert.equal(result.fonts, true)
   assert.equal(result.overflow, false)
   assert.deepEqual(errors, [])
 })

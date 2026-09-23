@@ -1,4 +1,7 @@
 // 图片经过鉴权读取，令牌不放进图片 URL；列表只返回描述与缩略图地址。
+import { stripEmotionTag } from '../utils/emotion.js'
+import { stripInlineFx, stripMoodTag, stripUnknownAssistantTags } from '../utils/moodFx.js'
+
 export const ALBUM_PATH = '/moments/album'
 
 export async function albumRequest(config, path = '', options = {}) {
@@ -14,10 +17,12 @@ export async function albumRequest(config, path = '', options = {}) {
   return options.blob ? response.blob() : response.json()
 }
 
-export const listAlbum = (config, before = '') => albumRequest(config, `?limit=20${before ? `&before=${encodeURIComponent(before)}` : ''}`)
+export const listAlbum = (config, before = '', trash = false) => albumRequest(config, `?limit=20${before ? `&before=${encodeURIComponent(before)}` : ''}${trash ? '&trash=1' : ''}`)
 export const saveAlbum = (config, { thumb_data, ...body }) => albumRequest(config, '', { method: 'POST', body: JSON.stringify(body) })
 export const hideAlbumItem = (config, id) => albumRequest(config, `/${encodeURIComponent(id)}`, { method: 'DELETE' })
-export const albumImage = (config, id, thumbnail = false) => albumRequest(config, `/${encodeURIComponent(id)}/${thumbnail ? 'thumb' : 'image'}`, { blob: true })
+export const restoreAlbumItem = (config, id) => albumRequest(config, `/${encodeURIComponent(id)}/restore`, { method: 'POST', body: '{}' })
+export const searchAlbumImages = (config, query) => albumRequest(config, `/search?q=${encodeURIComponent(query)}`)
+export const albumImage = (config, id, thumbnail = false, trash = false) => albumRequest(config, `/${encodeURIComponent(id)}/${thumbnail ? 'thumb' : 'image'}${trash ? '?trash=1' : ''}`, { blob: true })
 
 function loadImage(url) {
   return new Promise((resolve, reject) => {
@@ -56,17 +61,39 @@ export function albumMessageSources(messages = []) {
   }))
 }
 
+export function cleanConversationCardText(text, role = 'assistant') {
+  let clean = stripInlineFx(stripMoodTag(stripEmotionTag(String(text || ''))))
+  if (role === 'assistant') clean = stripUnknownAssistantTags(clean)
+  return clean
+    .replace(/\[(?:breath|laughter|voice|endcall|MSG)\]/gi, '')
+    .replace(/\[(?:call|neg|music):[^\]\n]*\]/gi, '')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim()
+}
+
+const CARD_FONT = "'Yanji Kaomoji Canadian','Yanji Kaomoji Marks','Yanji Kaomoji Yi',system-ui,-apple-system,'Segoe UI',sans-serif"
+
+async function loadConversationCardFonts() {
+  if (!document.fonts?.load) return
+  await Promise.allSettled([
+    document.fonts.load("400 28px 'Yanji Kaomoji Canadian'", 'ᔦᔨ'),
+    document.fonts.load("400 28px 'Yanji Kaomoji Marks'", '¯̥'),
+    document.fonts.load("400 28px 'Yanji Kaomoji Yi'", '꒳'),
+  ])
+}
+
 // 本地原文排成纪念卡；不是操作系统截图，也不包含隐藏的思考或工具调用。
 export async function conversationCard(messages, title = '这一刻') {
+  await loadConversationCardFonts()
   const canvas = document.createElement('canvas')
   const context = canvas.getContext('2d')
   if (!context) throw new Error('对话卡生成失败')
   const lines = []
-  context.font = '28px sans-serif'
+  context.font = `28px ${CARD_FONT}`
   for (const m of messages) {
     if (!['user', 'assistant'].includes(m.role)) continue
     lines.push({ text: m.role === 'user' ? '我' : '你', label: true })
-    for (const paragraph of String(m.content || '').split('\n')) {
+    for (const paragraph of cleanConversationCardText(m.content, m.role).split('\n')) {
       let line = ''
       for (const char of paragraph) {
         if (context.measureText(line + char).width > 760) { lines.push({ text: line }); line = '' }
@@ -81,10 +108,10 @@ export async function conversationCard(messages, title = '这一刻') {
   canvas.width = 900
   canvas.height = Math.max(480, 210 + lines.length * 44)
   context.fillStyle = '#faf8f2'; context.fillRect(0, 0, canvas.width, canvas.height)
-  context.fillStyle = '#4e695d'; context.font = 'bold 34px sans-serif'
+  context.fillStyle = '#4e695d'; context.font = `bold 34px ${CARD_FONT}`
   context.fillText(Array.from(title).slice(0, 22).join(''), 70, 80)
   lines.forEach((line, i) => {
-    context.font = line.label ? 'bold 24px sans-serif' : '28px sans-serif'
+    context.font = line.label ? `bold 24px ${CARD_FONT}` : `28px ${CARD_FONT}`
     context.fillStyle = line.label ? '#7f8e82' : '#302e29'
     context.fillText(line.text, 70, 150 + i * 44)
   })
@@ -97,8 +124,9 @@ export async function conversationCard(messages, title = '这一刻') {
 
 export const ALBUM_TOOLS = [
   { name: 'browse_album', description: '翻共同相册，查看照片说明、收藏者和来源。返回轻量目录，不把整本图片塞进上下文。', parameters: { type: 'object', properties: { before: { type: 'integer' } } } },
+  { name: 'search_album_images', description: '从 Wikimedia Commons 搜索有真实来源和许可信息的照片。想从网上带一张图片回来、或在乌有乡旅行后找当地纪念照时用。先搜索，再把选中的 image_url 和 source_url 交给 save_album_image；一次旅行最多收藏一张，也可以空手回来。', parameters: { type: 'object', properties: { query: { type: 'string', description: '地点加具体景物，中文或英文均可' } }, required: ['query'] } },
   { name: 'album_chat_sources', description: '列出当前聊天可收藏的最近消息 ID、简述和图片数量。收藏用户图片或对话纪念卡前先调用。', parameters: { type: 'object', properties: {} } },
-  { name: 'save_album_image', description: '把用户发来的图片，或已找到的公开 HTTPS 图片直链收藏进共同相册。填写真实来源与自己的描述。不能凭空编造图片链接。', parameters: { type: 'object', properties: {
+  { name: 'save_album_image', description: '把用户发来的图片，或已找到的公开 HTTPS 图片直链收藏进共同相册。填写真实来源与自己的描述；若来自图片资料库，在描述末尾写明摄影者与许可。不能凭空编造图片链接。', parameters: { type: 'object', properties: {
     title: { type: 'string' }, description: { type: 'string' }, author: { type: 'string', description: '收藏者署名' },
     message_id: { type: 'string', description: 'album_chat_sources 返回的当前消息 ID' }, image_index: { type: 'integer', description: '从 0 开始，默认 0' },
     image_url: { type: 'string', description: '与 message_id 二选一：公网 HTTPS 图片直链' }, source_url: { type: 'string', description: '原始网页地址（如有）' },
@@ -111,6 +139,7 @@ export async function executeAlbumTool(name, args, config, messages = []) {
     const result = await albumRequest(config, `?limit=6${args.before ? `&before=${encodeURIComponent(args.before)}` : ''}`)
     return { items: result.items.map(({ id, title, description, author }) => ({ id, title, description: description.slice(0, 120), author })), next_cursor: result.next_cursor }
   }
+  if (name === 'search_album_images') return searchAlbumImages(config, args.query)
   if (name === 'album_chat_sources') return albumMessageSources(messages)
   const metadata = { title: args.title, description: args.description, author: args.author, source: 'api', source_url: args.source_url || '' }
   let image

@@ -29,10 +29,24 @@ function createAlbumStore({ directory, database, fetchImage = downloadImage, max
     fingerprint TEXT NOT NULL, deleted_at TEXT
   ); CREATE INDEX IF NOT EXISTS album_fingerprint ON album_photos(fingerprint);`);
   let pending = 0;
-  const publicItem = row => row && ({ id: row.id, title: row.title, description: row.description, author: row.author, source: row.source, source_url: row.source_url, created_at: row.created_at, width: row.width, height: row.height });
-  const find = id => connection.prepare('SELECT * FROM album_photos WHERE id = ? AND deleted_at IS NULL').get(Number(id));
+  const publicItem = row => row && ({ id: row.id, title: row.title, description: row.description, author: row.author, source: row.source, source_url: row.source_url, created_at: row.created_at, deleted_at: row.deleted_at || null, width: row.width, height: row.height });
+  const find = (id, includeDeleted = false) => connection.prepare(`SELECT * FROM album_photos WHERE id = ?${includeDeleted ? '' : ' AND deleted_at IS NULL'}`).get(Number(id));
+  function purgeExpired(days = 30, now = Date.now()) {
+    const cutoff = new Date(now - Math.max(1, days) * 86400000).toISOString();
+    const rows = connection.prepare('SELECT id, image_file, thumb_file FROM album_photos WHERE deleted_at IS NOT NULL AND deleted_at <= ?').all(cutoff);
+    if (!rows.length) return { purged: 0 };
+    const remove = connection.transaction(() => {
+      for (const row of rows) connection.prepare('DELETE FROM album_photos WHERE id = ? AND deleted_at IS NOT NULL').run(row.id);
+    });
+    remove();
+    for (const row of rows) for (const name of [row.image_file, row.thumb_file]) {
+      try { fs.unlinkSync(path.join(directory, name)); } catch (error) { if (error.code !== 'ENOENT') console.error('[album] purge_file_failed'); }
+    }
+    return { purged: rows.length };
+  }
 
   async function save(input = {}) {
+    purgeExpired();
     // Keep concurrent image decoding bounded on the 2 GB VPS.
     if (pending >= 2) throw fail('相册正在处理图片，请稍后再试', 429);
     pending++;
@@ -85,18 +99,23 @@ function createAlbumStore({ directory, database, fetchImage = downloadImage, max
   }
   return {
     save,
-    list({ before, limit = 20 } = {}) {
+    list({ before, limit = 20, trash = false } = {}) {
+      purgeExpired();
       const count = Math.min(20, Math.max(1, Math.floor(Number(limit) || 20)));
       const cursor = Number(before) > 0 ? Number(before) : Number.MAX_SAFE_INTEGER;
-      const rows = connection.prepare('SELECT * FROM album_photos WHERE deleted_at IS NULL AND id < ? ORDER BY id DESC LIMIT ?').all(cursor, count + 1);
+      const clause = trash === true || trash === '1' || trash === 'true' ? 'deleted_at IS NOT NULL' : 'deleted_at IS NULL';
+      const rows = connection.prepare(`SELECT * FROM album_photos WHERE ${clause} AND id < ? ORDER BY id DESC LIMIT ?`).all(cursor, count + 1);
       return { items: rows.slice(0, count).map(publicItem), next_cursor: rows.length > count ? rows[count - 1].id : null };
     },
-    get(id) { const row = find(id); if (!row) throw fail('照片不存在', 404); return publicItem(row); },
-    media(id, thumbnail = false) {
-      const row = find(id); if (!row) throw fail('照片不存在', 404);
+    get(id, includeDeleted = false) { purgeExpired(); const row = find(id, includeDeleted); if (!row) throw fail('照片不存在', 404); return publicItem(row); },
+    media(id, thumbnail = false, includeDeleted = false) {
+      purgeExpired();
+      const row = find(id, includeDeleted); if (!row) throw fail('照片不存在', 404);
       return { path: path.join(directory, thumbnail ? row.thumb_file : row.image_file), mime: thumbnail ? 'image/jpeg' : row.mime };
     },
     hide(id) { return { ok: connection.prepare('UPDATE album_photos SET deleted_at = ? WHERE id = ? AND deleted_at IS NULL').run(new Date().toISOString(), Number(id)).changes > 0 }; },
+    restore(id) { purgeExpired(); return { ok: connection.prepare('UPDATE album_photos SET deleted_at = NULL WHERE id = ? AND deleted_at IS NOT NULL').run(Number(id)).changes > 0 }; },
+    purgeExpired,
     close() { if (!database) connection.close(); },
   };
 }
