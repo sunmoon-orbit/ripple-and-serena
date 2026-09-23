@@ -11,6 +11,7 @@ import { NOWHERE_TOOL_DEFS, executeNowhereTool } from './nowhere'
 import { buildMoodFxPrompt } from '../utils/moodFx'
 import { normalizeGenerationConfig } from '../utils/generationConfig'
 import { executeMcpTool, getEnabledMcpToolDefinitions } from './mcp'
+import { createToolDrawer, TOOL_DRAWER_NAME } from './toolDrawer'
 
 export function normalizeProvider(raw) {
   const v = (raw || '').toString().toLowerCase()
@@ -371,6 +372,26 @@ const TOOL_BATCH_PROMPT = `【查东西的时候一次查完】
 - 只有当后一步真的依赖前一步的结果时（比如先拿到 id 才能读正文），才允许再开一轮
 - 拿不准要不要查的，宁可顺手一起查了，也别为它单开一轮`
 
+const TOOL_DRAWER_PROMPT = `【工具抽屉】
+为避免中转站因工具定义过多而截断回复，专用工具平时收在抽屉里。
+- 手头没有合适工具时，先调用 open_toolbox；不要声称工具不可用
+- 一次选齐当前任务需要的组，下一轮再调用新出现的真正工具
+- open_toolbox 只是打开抽屉，不会替你执行查询或写入`
+
+const TOOL_LOOP_REQUEST_LIMIT = 6
+const TOOL_FINALIZE_PROMPT = `工具调用阶段已结束。现在不要再调用任何工具，请根据已有对话和工具结果，直接给用户一条完整的正文回复。`
+
+function appendAnthropicFinalInstruction(messages) {
+  const last = messages[messages.length - 1]
+  const block = { type: 'text', text: TOOL_FINALIZE_PROMPT }
+  if (last?.role === 'user') {
+    if (Array.isArray(last.content)) last.content.push(block)
+    else last.content = [{ type: 'text', text: last.content || '' }, block]
+  } else {
+    messages.push({ role: 'user', content: [block] })
+  }
+}
+
 export async function sendMessage({
   permissionCheck,
   connection,
@@ -530,7 +551,10 @@ async function callWithTools({
 }) {
   const { temperature = 0.7, maxTokens = 4096 } = generationConfig || {}
   const safeTemp = provider === 'anthropic' ? Math.min(temperature, 1) : Math.min(temperature, 2)
-  const formattedTools = formatToolsForProvider(tools, provider)
+  const toolDrawer = createToolDrawer(tools)
+  const routedSystemPrompt = toolDrawer.enabled
+    ? `${systemPrompt || ''}\n\n${TOOL_DRAWER_PROMPT}`.trim()
+    : systemPrompt
   let convo = [...messages]
   let finalText = ''
   let usage = { promptTokens: 0, completionTokens: 0, totalTokens: 0 }
@@ -541,14 +565,23 @@ async function callWithTools({
   let lastBlock = null
   let responseDiagnostic = ''
 
-  for (let iter = 0; iter < 6; iter++) {
+  const runTool = async (name, args) => {
+    if (name === TOOL_DRAWER_NAME && toolDrawer.enabled) return toolDrawer.open(args?.groups)
+    return executeTool(name, args, { searchConfig, moonMemoryConfig, mcpServers, onStatus, onFile, permissionCheck, albumMessages })
+  }
+
+  for (let iter = 0; iter < TOOL_LOOP_REQUEST_LIMIT; iter++) {
     if (permissionCheck && !await permissionCheck()) throw new Error('主动联系已关闭')
-    onStatus?.(iter === 0 ? '思考中...' : '继续思考...')
+    const forceFinalize = iter === TOOL_LOOP_REQUEST_LIMIT - 1
+    const roundTools = forceFinalize ? [] : toolDrawer.getTools()
+    const formattedTools = formatToolsForProvider(roundTools, provider)
+    onStatus?.(forceFinalize ? '整理回答…' : iter === 0 ? '思考中...' : '继续思考...')
 
     // ── OpenAI ──────────────────────────────────────────────────────
     if (provider === 'openai') {
       const url = buildApiUrl(connection.baseUrl, 'openai')
-      const baseMsgs = buildOpenAIMessages(convo, systemPrompt, iter === 0 ? dynamicContext : undefined)
+      const baseMsgs = buildOpenAIMessages(convo, routedSystemPrompt, iter === 0 ? dynamicContext : undefined)
+      if (forceFinalize) baseMsgs.push({ role: 'user', content: TOOL_FINALIZE_PROMPT })
       const cacheHintMode = cacheKey ? getOpenAICacheHintMode(model) : null
       const bodyMsgs = addOpenAICacheBreakpoints(baseMsgs, cacheHintMode)
       // 流式：非流式请求在模型思考的几十秒里一个字节都不发，中转站/代理会把它
@@ -620,6 +653,12 @@ async function callWithTools({
         responseDiagnostic,
       }, { provider, finishReason: data.finish_reason })
       if (msg.tool_calls?.length) {
+        // 最后一轮没有下发工具；若不兼容的上游仍伪造 tool_calls，
+        // 也绝不再执行或追加请求，有正文就保留正文。
+        if (forceFinalize) {
+          finalText = stripFakeToolResult(msg.content || '')
+          break
+        }
         onToolCall?.(msg.tool_calls.map((t) => t.function.name))
         const aMsg = { role: 'assistant', content: msg.content || '', tool_calls: msg.tool_calls }
         if (msg.reasoning_content) aMsg.reasoning_content = msg.reasoning_content
@@ -638,7 +677,7 @@ async function callWithTools({
             })
             continue
           }
-          const result = compressToolResult(await executeTool(tc.function.name, args, { searchConfig, moonMemoryConfig, mcpServers, onStatus, onFile, permissionCheck, albumMessages }))
+          const result = compressToolResult(await runTool(tc.function.name, args))
           convo.push({ role: 'tool', tool_call_id: tc.id, content: result })
         }
         continue
@@ -650,7 +689,7 @@ async function callWithTools({
         if (textTc) {
           // 文本 JSON 不属于供应商保证过的 tool_calls 协议，必须再对照本轮实际
           // 下发的工具清单。否则模型写一段 JSON 就可能调用未启用的工具。
-          const advertised = tools.some((tool) => tool.name === textTc.name)
+          const advertised = roundTools.some((tool) => tool.name === textTc.name)
           if (!advertised) {
             const cleanPrefix = stripFakeToolResult(textTc.remaining)
             const unavailable = `我刚才想调用工具「${textTc.name}」，但它当前没有启用，所以没有执行，也没有写入或修改任何内容。`
@@ -659,7 +698,7 @@ async function callWithTools({
           }
           onToolCall?.([textTc.name])
           try {
-            const result = compressToolResult(await executeTool(textTc.name, textTc.args, { searchConfig, moonMemoryConfig, mcpServers, onStatus, onFile, permissionCheck, albumMessages }))
+            const result = compressToolResult(await runTool(textTc.name, textTc.args))
             const cleanPrefix = stripFakeToolResult(textTc.remaining)
             finalText = cleanPrefix ? `${cleanPrefix}\n\n${result}` : result
           } catch (e) {
@@ -679,18 +718,20 @@ async function callWithTools({
       // 每次迭代都传 dynamicContext：工具循环后续步骤不再丢失注入内容；
       // buildAnthropicMessages 保证注入永远在断点后，不影响缓存命中
       const bodyMsgs = buildAnthropicMessages(convo, dynamicContext)
+      if (forceFinalize) appendAnthropicFinalInstruction(bodyMsgs)
       // ⚠️ 必须流式。非流式的话，模型思考那几十秒里这条连接一个字节都不吐，
       // 中转站/代理/CDN 很容易按「空闲连接」把它掐掉——上游其实已经生成完并计了费，
       // 前端拿到的却是 Failed to fetch（0727 阿颖报的「后台有输出但前端报错」）。
       // 流式之后 SSE 一直有事件流过，连接不会被判死，她也能边看边等。
-      const body = { model, max_tokens: maxTokens, messages: bodyMsgs, tools: formattedTools, temperature: safeTemp, stream: true }
+      const body = { model, max_tokens: maxTokens, messages: bodyMsgs, temperature: safeTemp, stream: true }
+      if (formattedTools.length) body.tools = formattedTools
       // ⚠️ 这里**绝对不要**加 metadata:{user_id}。openai 分支那个 body.user 是好的，
       // 但 Anthropic 原生格式的 metadata 会让阿颖用的中转站（goodreamapi）直接 503
       // 「生成失败，重roll」。0728 服务器实测：不带 metadata 3/3 成功且缓存精确命中，
       // 带 metadata 3/3 硬失败。它同时解释了「缓存只写不读」（每次重roll换后端节点）、
       // 偶发 503、以及首字 4 秒后断流。粘性路由的好意在这家中转站上是反效果。
-      if (systemPrompt?.trim()) {
-        body.system = [{ type: 'text', text: systemPrompt, cache_control: { type: 'ephemeral', ttl: '1h' } }]
+      if (routedSystemPrompt?.trim()) {
+        body.system = [{ type: 'text', text: routedSystemPrompt, cache_control: { type: 'ephemeral', ttl: '1h' } }]
       }
       const resp = await fetch(url, {
         method: 'POST',
@@ -723,12 +764,16 @@ async function callWithTools({
       }, { provider, finishReason: data.stop_reason })
       const toolBlocks = data.content?.filter((b) => b.type === 'tool_use') || []
       if (toolBlocks.length) {
+        if (forceFinalize) {
+          finalText = anthropicText
+          break
+        }
         // 一次回复可能含多个 tool_use，每个都必须有对应 tool_result，否则 API 400
         onToolCall?.(toolBlocks.map((b) => b.name))
         convo.push({ role: 'assistant', content: data.content })
         const results = []
         for (const tb of toolBlocks) {
-          const result = compressToolResult(await executeTool(tb.name, tb.input || {}, { searchConfig, moonMemoryConfig, mcpServers, onStatus, onFile, permissionCheck, albumMessages }))
+          const result = compressToolResult(await runTool(tb.name, tb.input || {}))
           results.push({ type: 'tool_result', tool_use_id: tb.id, content: result })
         }
         convo.push({ role: 'user', content: results })
@@ -745,13 +790,14 @@ async function callWithTools({
       if (!base.includes('/v1')) base = base.replace(/\/$/, '') + '/' + apiVer
       base = base.replace(/\/$/, '')
       const url = `${base}/models/${encodeURIComponent(model)}:streamGenerateContent?alt=sse`
-      const contents = buildGeminiContents(convo, systemPrompt, iter === 0 ? dynamicContext : undefined)
+      const contents = buildGeminiContents(convo, routedSystemPrompt, iter === 0 ? dynamicContext : undefined)
+      if (forceFinalize) contents.push({ role: 'user', parts: [{ text: TOOL_FINALIZE_PROMPT }] })
       const body = {
         contents,
-        tools: formattedTools,
         generationConfig: { temperature: safeTemp, maxOutputTokens: maxTokens },
         safetySettings: geminiSafetyOff(),
       }
+      if (formattedTools.length) body.tools = formattedTools
       const resp = await geminiFetch(url, connection.apiKey, JSON.stringify(body))
       if (!resp.ok) throw new Error('Gemini ' + resp.status + ': ' + (await resp.text()).slice(0, 200))
       const data = await streamGeminiParts(resp, (t) => { streamedOut = true; onChunk?.(t) })
@@ -770,10 +816,14 @@ async function callWithTools({
       }, { provider, finishReason: lastFinish, blockReason: lastBlock })
       const fcPart = parts.find((p) => p.functionCall)
       if (fcPart) {
+        if (forceFinalize) {
+          finalText = geminiText
+          break
+        }
         const fc = fcPart.functionCall
         onToolCall?.([fc.name])
         convo.push({ role: 'assistant', content: '', functionCall: fc })
-        const result = compressToolResult(await executeTool(fc.name, fc.args || {}, { searchConfig, moonMemoryConfig, mcpServers, onStatus, onFile, permissionCheck, albumMessages }))
+        const result = compressToolResult(await runTool(fc.name, fc.args || {}))
         convo.push({ role: 'function', content: result, functionResponse: { name: fc.name, response: { result } } })
         continue
       }
