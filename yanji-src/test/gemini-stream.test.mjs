@@ -46,9 +46,10 @@ vm.runInContext([
   grab('parseProviderHttpMessage'),
   grab('providerRequestSummary'),
   grab('providerHttpError'),
+  grab('openAiTpmRetryDelay'),
   grab('streamGeminiParts'),
   grab('streamSSE'),
-  '__fns = { streamGeminiParts, streamSSE, assertStreamComplete, sanitizeResponseDiagnostic, isPromptCacheKeyCompatibilityError, isPromptCacheHintCompatibilityError, isToolsCompatibilityError, providerHttpError, extractTextToolCall };',
+  '__fns = { streamGeminiParts, streamSSE, assertStreamComplete, sanitizeResponseDiagnostic, isPromptCacheKeyCompatibilityError, isPromptCacheHintCompatibilityError, isToolsCompatibilityError, providerHttpError, openAiTpmRetryDelay, extractTextToolCall };',
 ].join('\n\n'), ctx)
 const {
   streamGeminiParts,
@@ -59,6 +60,7 @@ const {
   isPromptCacheHintCompatibilityError,
   isToolsCompatibilityError,
   providerHttpError,
+  openAiTpmRetryDelay,
   extractTextToolCall,
 } = ctx.__fns
 
@@ -231,7 +233,17 @@ const check = (name, cond, extra = '') => {
     !error.responseDiagnostic.includes('secret-chat-id'))
 }
 
-// ── 13. 非标准 tool_name 文本工具调用也要被识别 ─────────────────────
+// ── 13. 只对带精确等待时间的 OpenAI TPM 拒绝原地续跑 ──────────────
+{
+  console.log('用例13 OpenAI TPM 等待：')
+  const exact = JSON.stringify({ error: { code: 'rate_limit_exceeded', message: 'Rate limit reached on tokens per min (TPM). Please try again in 9.978s.' } })
+  check('秒数解析并留少量余量', openAiTpmRetryDelay(exact) === 10328, openAiTpmRetryDelay(exact))
+  check('毫秒格式也支持', openAiTpmRetryDelay('rate_limit_exceeded TPM Please try again in 850ms') === 1200)
+  check('笼统 429 不擅自重试', openAiTpmRetryDelay('rate_limit_exceeded: service busy') === 0)
+  check('非 TPM 限流不擅自重试', openAiTpmRetryDelay('rate_limit_exceeded requests per min. Please try again in 2s') === 0)
+}
+
+// ── 14. 非标准 tool_name 文本工具调用也要被识别 ─────────────────────
 {
   console.log('用例13 文本工具调用兼容：')
   const standard = extractTextToolCall('先记一下\n{"name":"write_memory","arguments":{"content":"标准"}}')

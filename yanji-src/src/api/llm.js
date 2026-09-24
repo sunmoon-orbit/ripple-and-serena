@@ -431,7 +431,7 @@ export async function sendMessage({
     })
   }
   return await callStream({
-    connection, messages, systemPrompt, dynamicContext, model: usedModel, generationConfig: safeGenerationConfig, provider, onChunk, onThinking, cacheKey,
+    connection, messages, systemPrompt, dynamicContext, model: usedModel, generationConfig: safeGenerationConfig, provider, onChunk, onThinking, onStatus, cacheKey,
   })
 }
 
@@ -541,6 +541,35 @@ function providerHttpError(provider, status, raw, body, details) {
   return error
 }
 
+// 工具循环会在一分钟内连续请求模型。小 TPM 套餐常见的失败形态是：前几步
+// 已经成功执行，最后一次回传工具结果时被 OpenAI 明确以 rate_limit_exceeded
+// 拒绝，并给出精确的重置秒数。这个请求没有进入生成，安全的做法是原地等到
+// token 桶复位后只重试这一步；若是笼统 429、没有等待时间，仍交给用户决定，
+// 避免对中转站未知的计费/重试语义作猜测。
+function openAiTpmRetryDelay(raw) {
+  const text = String(raw || '')
+  if (!/rate_limit_exceeded/i.test(text) || !/tokens per min(?:ute)?|\bTPM\b/i.test(text)) return 0
+  const match = text.match(/please try again in\s+([0-9]+(?:\.[0-9]+)?)\s*(ms|s|sec(?:ond)?s?)/i)
+  if (!match) return 0
+  const value = Number(match[1])
+  if (!Number.isFinite(value) || value <= 0) return 0
+  const milliseconds = match[2].toLowerCase() === 'ms' ? value : value * 1000
+  // 防止中转站伪造/误写超长等待，把前端悄悄挂住。正常 TPM 重置通常几十秒内。
+  return Math.min(30_000, Math.max(250, Math.ceil(milliseconds) + 350))
+}
+
+async function fetchOpenAiWithTpmWait(url, options, onStatus) {
+  let response = await fetch(url, options)
+  if (response.status !== 429) return response
+  const raw = await response.clone().text()
+  const waitMs = openAiTpmRetryDelay(raw)
+  if (!waitMs) return response
+  onStatus?.(`额度小憩 ${Math.ceil(waitMs / 1000)} 秒，接着完成这一步…`)
+  await new Promise(resolve => setTimeout(resolve, waitMs))
+  response = await fetch(url, options)
+  return response
+}
+
 // ─── Tool-use loop (non-streaming, supports multi-turn) ─────────────────────
 
 async function callWithTools({
@@ -610,7 +639,7 @@ async function callWithTools({
       }
       if (formattedTools.length) { body.tools = formattedTools; body.tool_choice = 'auto' }
       const hdrs = { 'Content-Type': 'application/json', Authorization: 'Bearer ' + connection.apiKey }
-      let resp = await fetch(url, { method: 'POST', headers: hdrs, body: JSON.stringify(body) })
+      let resp = await fetchOpenAiWithTpmWait(url, { method: 'POST', headers: hdrs, body: JSON.stringify(body) }, onStatus)
       if (!resp.ok && resp.status === 400) {
         const firstErrText = await resp.text()
         let fallbackReason = ''
@@ -632,7 +661,7 @@ async function callWithTools({
           throw providerHttpError('OpenAI', 400, firstErrText, body)
         }
         onStatus?.(`线路不兼容 ${fallbackReason}，仅重试一次…`)
-        resp = await fetch(url, { method: 'POST', headers: hdrs, body: JSON.stringify(body) })
+        resp = await fetchOpenAiWithTpmWait(url, { method: 'POST', headers: hdrs, body: JSON.stringify(body) }, onStatus)
         if (!resp.ok) {
           const retryErrText = await resp.text()
           throw providerHttpError('OpenAI', resp.status, retryErrText, body, {
@@ -847,7 +876,7 @@ async function callWithTools({
 
 // ─── Streaming (no tools) ───────────────────────────────────────────────────
 
-async function callStream({ connection, messages, systemPrompt, dynamicContext, model, generationConfig, provider, onChunk, onThinking, cacheKey }) {
+async function callStream({ connection, messages, systemPrompt, dynamicContext, model, generationConfig, provider, onChunk, onThinking, onStatus, cacheKey }) {
   const { temperature = 0.7, maxTokens = 4096 } = generationConfig || {}
   const safeTemp = provider === 'anthropic' ? Math.min(temperature, 1) : Math.min(temperature, 2)
 
@@ -869,7 +898,7 @@ async function callStream({ connection, messages, systemPrompt, dynamicContext, 
       body.temperature = safeTemp; body.max_tokens = maxTokens
     }
     const hdrs = { 'Content-Type': 'application/json', Authorization: 'Bearer ' + connection.apiKey }
-    let resp = await fetch(url, { method: 'POST', headers: hdrs, body: JSON.stringify(body) })
+    let resp = await fetchOpenAiWithTpmWait(url, { method: 'POST', headers: hdrs, body: JSON.stringify(body) }, onStatus)
     if (!resp.ok && resp.status === 400) {
       const firstErrText = await resp.text()
       // 无工具分支同样只对明确点名的不兼容缓存字段做一次回退；通用 400
@@ -886,7 +915,7 @@ async function callStream({ connection, messages, systemPrompt, dynamicContext, 
       if (!fallbackReason) {
         throw providerHttpError('OpenAI', 400, firstErrText, body)
       }
-      resp = await fetch(url, { method: 'POST', headers: hdrs, body: JSON.stringify(body) })
+      resp = await fetchOpenAiWithTpmWait(url, { method: 'POST', headers: hdrs, body: JSON.stringify(body) }, onStatus)
       if (!resp.ok) {
         const retryErrText = await resp.text()
         throw providerHttpError('OpenAI', resp.status, retryErrText, body, {
