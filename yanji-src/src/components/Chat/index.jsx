@@ -59,6 +59,7 @@ import HeartCardAlbum from './HeartCardAlbum'
 import PhotoAlbum, { AlbumIcon } from './PhotoAlbum'
 import { fetchAnniversaryToday, fetchUnseenHeartCards, markHeartCardSeen, formatWeatherLine, fetchContactLastSeen } from '../../api/moonMemory'
 import CompletionEgg, { pickEgg } from './CompletionEgg'
+import QuestionCard from './QuestionCard'
 import { ThemedConfirmDialog, useThemedConfirm } from '../ThemedConfirmDialog'
 
 // 同一对话的压缩共用一个 Promise，后来的生成不再发第二份轻模型请求。
@@ -345,6 +346,21 @@ export default function Chat() {
     retryDecisionRef.current = null
     setRetryPromptOpen(false)
     resolve?.(shouldRetry)
+  }, [])
+  const [questionRequest, setQuestionRequest] = useState(null)
+  const questionDecisionRef = useRef(null)
+  const askUser = useCallback((request) => new Promise((resolve) => {
+    questionDecisionRef.current?.('用户跳过了上一个问题。')
+    questionDecisionRef.current = resolve
+    setQuestionRequest(request)
+    setStatus('等你选一个…')
+  }), [])
+  const finishQuestion = useCallback((answer) => {
+    const resolve = questionDecisionRef.current
+    questionDecisionRef.current = null
+    setQuestionRequest(null)
+    setStatus('接着想…')
+    resolve?.(answer ? `用户选择/回答：${answer}` : '用户跳过了这个问题，请根据现有信息继续。')
   }, [])
   const [bgImage, setBgImage] = useState(() => localStorage.getItem('yanji-bg-image') || '')
   const bgFileRef = useRef(null)
@@ -744,6 +760,7 @@ export default function Chat() {
           genFiles.push(f)
           updateMessage(chat.id, assistantId, { files: [...genFiles] })
         },
+        onAskUser: askUser,
       })
       // 最终落盘会一次写入完整正文；先取消尚未执行的流式刷新，避免它随后把
       // streaming:true 覆盖回来，留下永不结束的光标。
@@ -966,7 +983,7 @@ export default function Chat() {
       setStatus('')
     }
   }, [connections, globalInstruction, memoryItems,
-      generationConfig, searchConfig, moonMemory, autoTools, customStickers, askRetry])
+      generationConfig, searchConfig, moonMemory, autoTools, customStickers, askRetry, askUser])
   generateReplyRef.current = generateReply
 
   // ── Send ─────────────────────────────────────────────────────────────────
@@ -2016,6 +2033,7 @@ export default function Chat() {
           onConfirm={() => finishRetryPrompt(true)}
         />
       )}
+      {questionRequest && <QuestionCard request={questionRequest} onAnswer={finishQuestion} />}
       {annCard && (
         <AnniversaryCard
           data={annCard}

@@ -4404,6 +4404,47 @@ body.mp-keyboard-open .mini-player { display: none; }
 body.mp-active.mp-keyboard-open .chat-input-area,
 body.mp-active.mp-keyboard-open .crossing-input { margin-bottom: 0; }
 
+/* 模型需要阿颖做决定时弹出的底部选项卡。固定在 body，避免聊天滚动层和软键盘裁切。 */
+.question-card-mask {
+  position: fixed; inset: 0; z-index: 1200; display: flex; align-items: flex-end; justify-content: center;
+  padding: 18px 12px calc(12px + env(safe-area-inset-bottom, 0px));
+  background: rgba(25, 20, 31, 0.32); backdrop-filter: blur(4px); animation: qc-fade .18s ease-out;
+}
+.question-card {
+  width: min(100%, 520px); max-height: min(82dvh, 680px); overflow-y: auto; box-sizing: border-box;
+  padding: 8px 18px 14px; border: 1px solid var(--border); border-radius: 24px;
+  background: color-mix(in srgb, var(--bg-sidebar) 95%, white 5%); color: var(--text);
+  box-shadow: 0 20px 60px rgba(25, 18, 36, .24); animation: qc-rise .24s cubic-bezier(.2,.8,.2,1);
+}
+.question-card-grip { width: 38px; height: 4px; margin: 0 auto 10px; border-radius: 99px; background: var(--border-md); }
+.question-card-head { display: flex; align-items: flex-start; gap: 12px; padding: 2px 2px 12px; }
+.question-card-head > div { flex: 1; min-width: 0; }
+.question-card-kicker { display: block; margin-bottom: 4px; color: var(--accent); font-size: 11px; font-weight: 650; letter-spacing: .08em; }
+.question-card-head h2 { margin: 0; font-size: 18px; line-height: 1.45; font-weight: 650; overflow-wrap: anywhere; }
+.question-card-close { flex: 0 0 34px; height: 34px; border: 0; border-radius: 50%; background: var(--bg-input); color: var(--text-muted); font: 26px/30px sans-serif; cursor: pointer; }
+.question-options { border-top: 1px solid var(--border); }
+.question-option {
+  width: 100%; min-height: 58px; display: flex; align-items: center; gap: 10px; padding: 12px 4px;
+  border: 0; border-bottom: 1px solid var(--border); background: transparent; color: var(--text); text-align: left; cursor: pointer;
+}
+.question-option:active { background: color-mix(in srgb, var(--accent) 9%, transparent); }
+.question-option-copy { flex: 1; min-width: 0; display: flex; align-items: center; flex-wrap: wrap; gap: 5px 7px; }
+.question-option-copy strong { font-size: 15px; font-weight: 600; overflow-wrap: anywhere; }
+.question-option-copy em { padding: 2px 7px; border-radius: 99px; background: var(--accent-dim); color: var(--accent); font-size: 10px; font-style: normal; font-weight: 650; }
+.question-option-copy small { flex-basis: 100%; color: var(--text-muted); font-size: 12px; line-height: 1.45; }
+.question-option-arrow { color: var(--text-faint); font: 28px/1 sans-serif; }
+.question-custom-open, .question-skip { width: 100%; border: 0; background: transparent; cursor: pointer; }
+.question-custom-open { padding: 14px 4px 9px; color: var(--accent); text-align: left; font-size: 14px; font-weight: 550; }
+.question-skip { padding: 8px 4px 2px; color: var(--text-faint); font-size: 12px; }
+.question-custom-row { display: flex; gap: 8px; padding-top: 12px; }
+.question-custom-row input { flex: 1; min-width: 0; padding: 11px 12px; border: 1px solid var(--border-md); border-radius: 12px; outline: 0; background: var(--bg-input); color: var(--text); font-size: 16px; }
+.question-custom-row input:focus { border-color: var(--accent); }
+.question-custom-row button { padding: 0 16px; border: 0; border-radius: 12px; background: var(--accent); color: white; font-weight: 600; cursor: pointer; }
+.question-custom-row button:disabled { opacity: .4; }
+@keyframes qc-fade { from { opacity: 0; } }
+@keyframes qc-rise { from { transform: translateY(24px); opacity: .4; } }
+@media (min-width: 700px) { .question-card-mask { align-items: center; } }
+
 /* 用户搜歌：与模型点歌共用同一曲库和播放器。 */
 .music-room-title { display: inline-flex; align-items: center; gap: 7px; }
 .song-search { width: 100%; max-width: 620px; margin: 0 auto; min-height: 0; display: flex; flex-direction: column; }

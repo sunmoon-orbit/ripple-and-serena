@@ -74,8 +74,34 @@ export function checkToolSupport(provider, model) {
 
 // ─── Tool definitions registry ─────────────────────────────────────────────
 
-function getAllTools(searchConfig, moonMemoryConfig, onFile, mcpServers) {
+function getAllTools(searchConfig, moonMemoryConfig, onFile, mcpServers, onAskUser) {
   const tools = []
+  if (onAskUser) {
+    tools.push({
+      name: 'ask_user',
+      description: '当你确实需要用户在几个明确选项中做决定，或缺少一个会显著改变结果的偏好时，弹出选项卡提问并等待回答。不要拿它代替普通聊天，也不要询问已经知道的信息；一次只问一个问题。',
+      parameters: {
+        type: 'object',
+        properties: {
+          question: { type: 'string', description: '简短、自然的问题' },
+          options: {
+            type: 'array', minItems: 2, maxItems: 4,
+            items: {
+              type: 'object',
+              properties: {
+                label: { type: 'string', description: '选项文字，尽量在 12 字以内' },
+                description: { type: 'string', description: '可选的一句补充说明' },
+                recommended: { type: 'boolean', description: '是否为推荐选项，最多一个' },
+              },
+              required: ['label'],
+            },
+          },
+          allow_custom: { type: 'boolean', description: '是否允许用户自己填写答案，默认允许' },
+        },
+        required: ['question', 'options'],
+      },
+    })
+  }
   if (onFile) {
     // 做文件工具：产物通过 onFile 回调交给 UI 渲染成文件卡片（可下载，html 可预览）
     tools.push({
@@ -409,6 +435,7 @@ export async function sendMessage({
   onStatus,
   onToolCall,
   onFile,
+  onAskUser,
   cacheKey,
   albumMessages,
 }) {
@@ -420,14 +447,14 @@ export async function sendMessage({
   // 各家严格线路会把它当成非法请求直接 400，所以请求出口必须再兜一次底。
   const safeGenerationConfig = normalizeGenerationConfig(generationConfig)
 
-  const tools = autoTools !== false ? getAllTools(searchConfig, moonMemoryConfig, onFile, mcpServers) : []
+  const tools = autoTools !== false ? getAllTools(searchConfig, moonMemoryConfig, onFile, mcpServers, onAskUser) : []
   const hasTools = tools.length > 0 && checkToolSupport(provider, usedModel)
 
   if (hasTools) {
     return await callWithTools({
       connection, messages, systemPrompt: systemPrompt ? systemPrompt + '\n\n' + TOOL_BATCH_PROMPT : TOOL_BATCH_PROMPT,
       dynamicContext, model: usedModel, generationConfig: safeGenerationConfig,
-      tools, provider, searchConfig, moonMemoryConfig, mcpServers, onChunk, onThinking, onStatus, onToolCall, onFile, cacheKey, permissionCheck, albumMessages,
+      tools, provider, searchConfig, moonMemoryConfig, mcpServers, onChunk, onThinking, onStatus, onToolCall, onFile, onAskUser, cacheKey, permissionCheck, albumMessages,
     })
   }
   return await callStream({
@@ -575,7 +602,7 @@ async function fetchOpenAiWithTpmWait(url, options, onStatus) {
 async function callWithTools({
   permissionCheck,
   connection, messages, systemPrompt, dynamicContext, model, generationConfig,
-  tools, provider, searchConfig, moonMemoryConfig, mcpServers, onChunk, onThinking, onStatus, onToolCall, onFile, cacheKey,
+  tools, provider, searchConfig, moonMemoryConfig, mcpServers, onChunk, onThinking, onStatus, onToolCall, onFile, onAskUser, cacheKey,
   albumMessages = messages,
 }) {
   const { temperature = 0.7, maxTokens = 4096 } = generationConfig || {}
@@ -598,7 +625,9 @@ async function callWithTools({
   const runTool = async (name, args) => {
     const result = name === TOOL_DRAWER_NAME && toolDrawer.enabled
       ? toolDrawer.open(args?.groups)
-      : await executeTool(name, args, { searchConfig, moonMemoryConfig, mcpServers, onStatus, onFile, permissionCheck, albumMessages })
+      : name === 'ask_user' && onAskUser
+        ? await onAskUser(args || {})
+        : await executeTool(name, args, { searchConfig, moonMemoryConfig, mcpServers, onStatus, onFile, permissionCheck, albumMessages })
     return commitGuard.observe(name, result)
   }
 
