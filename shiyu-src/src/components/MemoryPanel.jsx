@@ -1,9 +1,10 @@
 import { useState, useEffect, useCallback } from 'react'
 import { api } from '../api'
+import { APP, IS_ZHAOHUA } from '../config'
 import { showToast } from './Toast'
 import { Plus, RefreshCw, Search, Clock, Pencil, Trash2, Share2, Sparkles, ArrowUpDown } from 'lucide-react'
 
-export const SCOPES = { shared: '共享', private_阿颖: '阿颖私密', private_阿言: '阿言私密' }
+export const SCOPES = { shared: '共享', private_阿颖: '阿颖私密', private_阿言: IS_ZHAOHUA ? '昭华私密' : '阿言私密' }
 export const LAYERS = { core: '核心', long: '长期', short: '短期', consciousness: '意识' }
 const LAYER_COLORS = { core: '#D4807A', long: '#D4A070', short: '#C4B070', consciousness: '#A080C0' }
 const META = new Set(['core', 'long', 'short', 'consciousness', 'shared', 'private_阿颖', 'private_阿言', '阿言', '阿颖'])
@@ -18,7 +19,7 @@ const TABS = [
   { l: '书单',    scope: '',            type: 'book' },
   { l: '日记',    scope: '',            type: 'diary' },
   { l: '阿颖私密', scope: 'private_阿颖', type: '' },
-  { l: '阿言私密', scope: 'private_阿言', type: '' },
+  { l: IS_ZHAOHUA ? '昭华私密' : '阿言私密', scope: 'private_阿言', type: '' },
 ]
 
 const IMP_OPTS = [{ v: 10, l: '珍藏' }, { v: 7, l: '重要' }, { v: 5, l: '普通' }, { v: 3, l: '琐碎' }]
@@ -136,7 +137,7 @@ function Editor({ initial, onClose, onSaved }) {
   const [memType, setMemType] = useState(initial?.type || 'memory')
   const [importance, setImportance] = useState(initial?.importance || 5)
   const [memorable, setMemorable] = useState((initial?.arousal || 0) > 0.6)
-  const [agent, setAgent] = useState(initial?.agent || (initial?.type === 'diary' ? '阿颖' : '阿言'))
+  const [agent, setAgent] = useState(IS_ZHAOHUA ? APP.agent : (initial?.agent || (initial?.type === 'diary' ? '阿颖' : APP.agent)))
   const [saving, setSaving] = useState(false)
 
   async function save() {
@@ -168,7 +169,7 @@ function Editor({ initial, onClose, onSaved }) {
           <select className="select" style={{ flex: 1 }} value={memType} onChange={(e) => {
             const t = e.target.value
             setMemType(t)
-            if (!initial?.id) setAgent(t === 'diary' ? '阿颖' : '阿言')
+            if (!initial?.id && !IS_ZHAOHUA) setAgent(t === 'diary' ? '阿颖' : APP.agent)
           }}>
             {MEM_TYPES.map((o) => <option key={o.v} value={o.v}>{o.l}</option>)}
           </select>
@@ -184,10 +185,14 @@ function Editor({ initial, onClose, onSaved }) {
           </select>
         </div>
         <div style={{ display: 'flex', gap: 10, marginTop: 12, alignItems: 'center', justifyContent: 'space-between' }}>
-          <select className="select" style={{ flex: 1 }} value={agent} onChange={(e) => setAgent(e.target.value)}>
-            <option value="阿颖">阿颖写的</option>
-            <option value="阿言">阿言写的</option>
-          </select>
+          {IS_ZHAOHUA ? (
+            <div className="select" style={{ flex: 1, display: 'flex', alignItems: 'center' }}>记录于昭华</div>
+          ) : (
+            <select className="select" style={{ flex: 1 }} value={agent} onChange={(e) => setAgent(e.target.value)}>
+              <option value="阿颖">阿颖写的</option>
+              <option value="阿言">阿言写的</option>
+            </select>
+          )}
           <label className="memorable-toggle" onClick={() => setMemorable(!memorable)}>
             <span className={'toggle' + (memorable ? ' on' : '')} />
             <span>难忘</span>
@@ -339,6 +344,7 @@ export default function MemoryPanel() {
 
   // 在一起多少天
   useEffect(() => {
+    if (IS_ZHAOHUA) return
     api.anniversaries().then((list) => {
       const a = list.find((x) => x.anniversary_date?.startsWith('2025-10-10'))
       if (a) {
@@ -394,7 +400,7 @@ export default function MemoryPanel() {
       {/* 顶栏 */}
       <div className="topbar">
         <div>
-          <h1 className="plume-title">Plume</h1>
+          <h1 className="plume-title">{IS_ZHAOHUA ? APP.name : 'Plume'}</h1>
           {days != null && (
             <div className="together-line">
               <span>🐦‍⬛</span><span className="together-heart">♡</span><span>🐦</span>

@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
+import { APP } from './config'
 
 // 前端本地锁的简单哈希（非加密强度，只为不把明文密码存在 localStorage）
 export function hashPassword(s) {
@@ -35,7 +36,7 @@ export const useStore = create(
       setMemoryView: (memoryView) => set({ memoryView }),
     }),
     {
-      name: 'shiyu-store',
+      name: APP.storeKey,
       partialize: (s) => ({
         baseUrl: s.baseUrl,
         apiToken: s.apiToken,

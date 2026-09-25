@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import Feather from './Feather'
+import { APP, IS_ZHAOHUA } from '../config'
 
 // 开场（2026-07-20 二稿，阿颖点单：跟「涟言」的涟呼应）：
 // 一根羽毛钟摆式摇曳飘落——落到水面的一瞬化为液体融进水里，
@@ -26,14 +27,14 @@ export default function Splash({ onLeave, onDone }) {
       <div className="splash-stage2">
         <div className="feather-fall">
           <div className="feather-sway">
-            <Feather className="feather-svg" />
+            {IS_ZHAOHUA ? <span className="zhaohua-light" /> : <Feather className="feather-svg" />}
           </div>
         </div>
         {/* 落水点荡开的三圈涟漪 */}
         <div className="ripple-set" aria-hidden="true"><i /><i /><i /></div>
       </div>
-      <div className="splash2-title">拾羽</div>
-      <div className="splash2-sub">picking up feathers</div>
+      <div className="splash2-title">{APP.name}</div>
+      <div className="splash2-sub">{APP.english}</div>
     </div>
   )
 }

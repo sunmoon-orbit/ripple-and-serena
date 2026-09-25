@@ -1024,3 +1024,10 @@ input, textarea, select { font-family: inherit; font-size: 15px; color: var(--in
   }
   .starmap-detail-body { font-size: 15px; line-height: 1.8; }
 }
+/* 昭华构建复用拾羽的水面动画，把羽毛换成一枚晨光。 */
+.zhaohua-light {
+  display: block; width: 34px; height: 34px; border-radius: 50%;
+  background: radial-gradient(circle at 38% 35%, #fff 0 12%, #ffe9a8 30%, #e8ad58 58%, rgba(206,132,47,.18) 72%);
+  box-shadow: 0 0 18px rgba(226,170,76,.7), 0 0 46px rgba(240,201,124,.42);
+}
+.gate-light { position: relative; margin: 0 auto 24px; transform: none; }

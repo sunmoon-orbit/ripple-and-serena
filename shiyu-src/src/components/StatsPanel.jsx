@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { api } from '../api'
 import { Sparkles } from 'lucide-react'
 import { SCOPES, LAYERS } from './MemoryPanel'
+import { IS_ZHAOHUA } from '../config'
 
 const TYPE_LABELS = { memory: '记忆', tech: '技术', dream: '梦境', deep: '深层', handoff: '交接信', diary: '日记', window: '窗口', anchor: '锚点', treasure: '宝藏', boot: '开窗', craft: '手作', book: '书单' }
 
@@ -13,7 +14,7 @@ export default function StatsPanel() {
   useEffect(() => {
     (async () => {
       try {
-        const [a, m] = await Promise.all([api.anniversaries(), api.list({ limit: 1000 })])
+        const [a, m] = await Promise.all([IS_ZHAOHUA ? Promise.resolve([]) : api.anniversaries(), api.list({ limit: 1000 })])
         setAnniv(a); setMems(m)
       } catch (e) { setError(e.message) }
     })()

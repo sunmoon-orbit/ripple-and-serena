@@ -2,6 +2,7 @@ import { useState, useRef } from 'react'
 import { api } from '../api'
 import { useStore, hashPassword } from '../store'
 import { showToast } from './Toast'
+import { IS_ZHAOHUA } from '../config'
 import { Plug, KeyRound, Palette, Activity, RefreshCw, CheckCircle2, AlertTriangle, XCircle, Upload } from 'lucide-react'
 
 const THEMES = [
@@ -185,25 +186,27 @@ export default function SettingsPanel() {
         </button>
       </div>
 
-      <div className="section-title"><KeyRound size={15} style={{ verticalAlign: -2, marginRight: 6 }} />修改访问密码</div>
-      <div className="settings-card">
-        <div className="field"><label>旧密码</label><input className="input" type="password" value={oldPw} onChange={(e) => setOldPw(e.target.value)} /></div>
-        <div className="field"><label>新密码</label><input className="input" type="password" value={newPw} onChange={(e) => setNewPw(e.target.value)} /></div>
-        <button className="btn btn-primary" style={{ width: '100%', justifyContent: 'center' }} onClick={changePw}>更新密码</button>
-      </div>
+      {!IS_ZHAOHUA && <>
+        <div className="section-title"><KeyRound size={15} style={{ verticalAlign: -2, marginRight: 6 }} />修改访问密码</div>
+        <div className="settings-card">
+          <div className="field"><label>旧密码</label><input className="input" type="password" value={oldPw} onChange={(e) => setOldPw(e.target.value)} /></div>
+          <div className="field"><label>新密码</label><input className="input" type="password" value={newPw} onChange={(e) => setNewPw(e.target.value)} /></div>
+          <button className="btn btn-primary" style={{ width: '100%', justifyContent: 'center' }} onClick={changePw}>更新密码</button>
+        </div>
 
-      <div className="section-title"><Upload size={15} style={{ verticalAlign: -2, marginRight: 6 }} />导入对话历史</div>
-      <div className="settings-card">
-        <p style={{ fontSize: 13, opacity: 0.6, margin: '0 0 10px' }}>
-          上传 Claude 官方导出的 <code>conversations.json</code>，或言叽导出的 .md 文件（.md 请用命令行脚本）。文件会在本地分批上传，再大也不怕；重复导入安全，已存在的对话会跳过。
-        </p>
-        <input ref={importRef} type="file" accept=".json" style={{ display: 'none' }} onChange={handleImportClaudeAI} />
-        <button className="btn btn-ghost" style={{ width: '100%', justifyContent: 'center' }}
-          onClick={() => importRef.current?.click()} disabled={importing}>
-          <Upload size={14} style={{ marginRight: 6 }} />
-          {importing ? (importProgress ? `导入中… ${importProgress}` : '导入中…') : '选择 conversations.json'}
-        </button>
-      </div>
+        <div className="section-title"><Upload size={15} style={{ verticalAlign: -2, marginRight: 6 }} />导入对话历史</div>
+        <div className="settings-card">
+          <p style={{ fontSize: 13, opacity: 0.6, margin: '0 0 10px' }}>
+            上传 Claude 官方导出的 <code>conversations.json</code>，或言叽导出的 .md 文件（.md 请用命令行脚本）。文件会在本地分批上传，再大也不怕；重复导入安全，已存在的对话会跳过。
+          </p>
+          <input ref={importRef} type="file" accept=".json" style={{ display: 'none' }} onChange={handleImportClaudeAI} />
+          <button className="btn btn-ghost" style={{ width: '100%', justifyContent: 'center' }}
+            onClick={() => importRef.current?.click()} disabled={importing}>
+            <Upload size={14} style={{ marginRight: 6 }} />
+            {importing ? (importProgress ? `导入中… ${importProgress}` : '导入中…') : '选择 conversations.json'}
+          </button>
+        </div>
+      </>}
 
       <div className="section-title"><Palette size={15} style={{ verticalAlign: -2, marginRight: 6 }} />外观</div>
       <div className="settings-card">

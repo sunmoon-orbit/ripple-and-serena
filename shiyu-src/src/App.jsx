@@ -10,6 +10,7 @@ import StatsPanel from './components/StatsPanel'
 import SettingsPanel from './components/SettingsPanel'
 import EventsPanel from './components/EventsPanel'
 import { NotebookPen, Trash2, Sparkles, ScrollText, Settings as SettingsIcon } from 'lucide-react'
+import { IS_ZHAOHUA } from './config'
 
 const NAV = [
   { id: 'memory', label: 'Rings', Icon: NotebookPen },
@@ -17,7 +18,7 @@ const NAV = [
   { id: 'events', label: 'Scrolls', Icon: ScrollText },
   { id: 'trash', label: 'Fossils', Icon: Trash2 },
   { id: 'settings', label: 'Settings', Icon: SettingsIcon },
-]
+].filter((item) => !IS_ZHAOHUA || item.id !== 'events')
 
 export default function App() {
   const theme = useStore((s) => s.theme)

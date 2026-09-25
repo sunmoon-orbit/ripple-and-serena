@@ -1,6 +1,8 @@
 import { useState } from 'react'
 import { useStore, hashPassword } from '../store'
+import { loginZhaohua } from '../api'
 import Feather from './Feather'
+import { APP, IS_ZHAOHUA } from '../config'
 
 // 密码门（2026-07-20 随新开场翻新）：
 // 开屏飘落的那根羽毛就躺在这里；输入框改成墨线——聚焦时墨痕从中间向两侧洇开。
@@ -8,7 +10,8 @@ import Feather from './Feather'
 export default function PasswordGate({ onUnlock }) {
   const passwordHash = useStore((s) => s.passwordHash)
   const setPassword  = useStore((s) => s.setPassword)
-  const isSetup = !passwordHash
+  const setConn = useStore((s) => s.setConn)
+  const isSetup = !passwordHash && !IS_ZHAOHUA
 
   const [pw,  setPw]  = useState('')
   const [pw2, setPw2] = useState('')
@@ -20,8 +23,19 @@ export default function PasswordGate({ onUnlock }) {
     setTimeout(onUnlock, 420)
   }
 
-  function submit() {
+  async function submit() {
     if (out) return
+    if (IS_ZHAOHUA) {
+      try {
+        const token = await loginZhaohua(pw)
+        setConn({ apiToken: token })
+        if (!passwordHash) setPassword(pw)
+        pass()
+      } catch (error) {
+        setErr(error.message || '密码不对'); setPw('')
+      }
+      return
+    }
     if (isSetup) {
       if (pw.length < 4) return setErr('密码至少 4 位')
       if (pw !== pw2)    return setErr('两次输入不一致')
@@ -35,12 +49,12 @@ export default function PasswordGate({ onUnlock }) {
   return (
     <div className={'gate-minimal gate-ink' + (out ? ' gate-out' : '')}>
       {/* 开屏落下的那根羽毛，落地后微微歪着 */}
-      <Feather className="gate-feather2" />
+      {IS_ZHAOHUA ? <span className="gate-feather2 zhaohua-light gate-light" /> : <Feather className="gate-feather2" />}
 
       {/* 标题 */}
       <div className="gate-brand">
-        <h1 className="gate-title-cn">拾羽</h1>
-        <p className="gate-brand-sub">Plume · picking up feathers</p>
+        <h1 className="gate-title-cn">{APP.name}</h1>
+        <p className="gate-brand-sub">{IS_ZHAOHUA ? 'Zhaohua · luminous memory' : 'Plume · picking up feathers'}</p>
       </div>
 
       {/* 输入区 */}
@@ -50,7 +64,7 @@ export default function PasswordGate({ onUnlock }) {
           <input
             className="ink-input" type="password"
             value={pw} autoFocus
-            placeholder={isSetup ? '设置访问密码' : '···'}
+            placeholder={IS_ZHAOHUA ? '昭华访问密码' : isSetup ? '设置访问密码' : '···'}
             onChange={(e) => { setPw(e.target.value); setErr('') }}
             onKeyDown={(e) => e.key === 'Enter' && (isSetup ? null : submit())}
           />

@@ -1,4 +1,5 @@
 import { useStore } from './store'
+import { APP } from './config'
 
 const DEFAULT_BASE = 'https://memory.ravenlove.cc'
 function conn() {
@@ -15,12 +16,23 @@ async function req(path, options = {}) {
   const { baseUrl, token } = conn()
   const headers = { 'Content-Type': 'application/json', ...(options.headers || {}) }
   if (token) headers.Authorization = `Bearer ${token}`
-  const res = await fetch(baseUrl + path, { ...options, headers })
+  const res = await fetch(baseUrl + APP.apiPrefix + path, { ...options, headers })
   if (!res.ok) {
     const t = await res.text().catch(() => '')
     throw new Error(`${res.status}: ${t.slice(0, 140)}`)
   }
   return res.status === 204 ? null : res.json()
+}
+
+export async function loginZhaohua(password) {
+  const { baseUrl } = conn()
+  const res = await fetch(baseUrl + '/zhaohua/session', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ password }),
+  })
+  const data = await res.json().catch(() => ({}))
+  if (!res.ok || !data.token) throw new Error(data.error || `登录失败 (${res.status})`)
+  return data.token
 }
 
 function qs(params = {}) {
