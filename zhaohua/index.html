@@ -1,39 +1,30 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="zh-CN">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
-  <title>昭华记忆库</title>
-  <meta name="theme-color" content="#ECEEF4" id="theme-color-meta" />
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Dancing+Script:wght@600&display=swap" rel="stylesheet" />
-  <link rel="manifest" href="manifest.json" />
-  <link rel="icon" type="image/png" href="icon-192.png" />
-  <link rel="apple-touch-icon" href="icon-192.png" />
-  <meta name="apple-mobile-web-app-capable" content="yes" />
-  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
-  <meta name="apple-mobile-web-app-title" content="昭华" />
-  <script type="module" crossorigin src="/ripple-and-serena/zhaohua/assets/index-CbAt1XGV.js"></script>
-  <link rel="stylesheet" crossorigin href="/ripple-and-serena/zhaohua/assets/index-CkxPyy8o.css">
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#071321">
+  <meta http-equiv="refresh" content="0;url=https://sunmoon-orbit.github.io/chaomu/zhaohua/">
+  <title>昭华已搬家</title>
 </head>
 <body>
-  <div id="root"></div>
-  <!-- 在 React 加载前立即读取主题，避免白色闪烁和地址栏颜色错误 -->
+  <p>昭华已搬到「日月轨道·朝暮」，正在前往新地址…</p>
+  <p><a href="https://sunmoon-orbit.github.io/chaomu/zhaohua/">点此进入昭华</a></p>
   <script>
-    (function () {
-      var bg = { light: '#ECEEF4', blossom: '#F9F0F3', midnight: '#151B29', dawn: '#F7F2EA' };
+    (async () => {
       try {
-        var s = JSON.parse(localStorage.getItem('zhaohua-store') || '{}');
-        var t = (s.state && s.state.theme) || 'light';
-        var color = bg[t] || bg.light;
-        document.documentElement.setAttribute('data-theme', t);
-        document.documentElement.style.background = color;
-        document.body.style.background = color;
-        var meta = document.getElementById('theme-color-meta');
-        if (meta) meta.setAttribute('content', color);
-      } catch (e) {}
-    })();
+        if ('serviceWorker' in navigator) {
+          const regs = await navigator.serviceWorker.getRegistrations()
+          await Promise.all(regs.filter(r => r.scope.includes('/ripple-and-serena/zhaohua/')).map(r => r.unregister()))
+        }
+        if ('caches' in window) {
+          const keys = await caches.keys()
+          await Promise.all(keys.filter(k => k.startsWith('zhaohua-')).map(k => caches.delete(k)))
+        }
+      } finally {
+        location.replace('https://sunmoon-orbit.github.io/chaomu/zhaohua/')
+      }
+    })()
   </script>
 </body>
 </html>
