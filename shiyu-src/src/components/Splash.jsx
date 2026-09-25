@@ -8,12 +8,14 @@ import { APP, IS_ZHAOHUA } from '../config'
 // 点一下屏幕可跳过。
 export default function Splash({ onLeave, onDone }) {
   const [leaving, setLeaving] = useState(false)
+  const revealAt = IS_ZHAOHUA ? 3800 : 4300
+  const doneAt = IS_ZHAOHUA ? 4550 : 5200
 
   useEffect(() => {
-    const t1 = setTimeout(() => { setLeaving(true); onLeave() }, 4300) // 涟漪散尽，开始退场
-    const t2 = setTimeout(onDone, 5200) // 退场完成，卸载
+    const t1 = setTimeout(() => { setLeaving(true); onLeave() }, revealAt)
+    const t2 = setTimeout(onDone, doneAt)
     return () => { clearTimeout(t1); clearTimeout(t2) }
-  }, [onLeave, onDone])
+  }, [onLeave, onDone, revealAt, doneAt])
 
   const skip = () => {
     if (leaving) return
@@ -21,6 +23,22 @@ export default function Splash({ onLeave, onDone }) {
     onLeave()
     setTimeout(onDone, 900)
   }
+
+  if (IS_ZHAOHUA) return (
+    <div className={'zhaohua-dawn' + (leaving ? ' leaving' : '')} onClick={skip}>
+      <div className="dawn-sky" aria-hidden="true">
+        <span className="dawn-haze dawn-haze-far" />
+        <span className="dawn-haze dawn-haze-near" />
+        <span className="dawn-sun" />
+        <span className="dawn-horizon" />
+      </div>
+      <div className="dawn-wordmark">
+        <div className="dawn-title">{APP.name}</div>
+        <div className="dawn-rule" aria-hidden="true" />
+        <div className="dawn-sub">{APP.english}</div>
+      </div>
+    </div>
+  )
 
   return (
     <div className={'splash2' + (leaving ? ' leaving' : '')} onClick={skip}>
