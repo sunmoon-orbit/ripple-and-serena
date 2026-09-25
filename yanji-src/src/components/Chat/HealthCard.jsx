@@ -11,7 +11,7 @@ import {
 
 // 身体气象站（阿颖的主意，2026-07-10）
 // 手环→Tasker 上报的健康快照，此前只有三个涟言能查（check_health），
-// 这里给阿颖自己也开一扇可视化的窗：今日四指标 + 近七天睡眠/步数小柱图。
+// 这里给阿颖自己也开一扇可视化的窗：今日四指标 + 可切换的近七天趋势。
 
 const WEEK_CN = ['日', '一', '二', '三', '四', '五', '六']
 
@@ -45,6 +45,7 @@ export default function HealthCard({ onClose }) {
   const cfg = { baseUrl: moonMemory?.baseUrl, apiToken: moonMemory?.apiToken }
   const [rows, setRows] = useState(null)
   const [error, setError] = useState('')
+  const [trend, setTrend] = useState('sleep')
 
   useEffect(() => {
     fetchVitals(cfg, 24 * 7, 1000)
@@ -75,6 +76,17 @@ export default function HealthCard({ onClose }) {
     value: s.data?.steps || 0,
     label: s.data?.steps >= 1000 ? `${(s.data.steps / 1000).toFixed(1)}k` : String(s.data?.steps || ''),
   }))
+  const calorieSeries = series.map((s) => ({
+    ...s,
+    value: s.data?.calories || 0,
+    label: s.data?.calories ? String(Math.round(s.data.calories)) : '',
+  }))
+  const trends = {
+    sleep: { label: '睡眠', series: sleepSeries, unit: '小时', color: 'var(--accent)' },
+    steps: { label: '步数', series: stepSeries, unit: '步', color: 'var(--accent-soft)' },
+    calories: { label: '活动消耗', series: calorieSeries, unit: '千卡', color: '#d79a67' },
+  }
+  const activeTrend = trends[trend]
 
   const lastReport = latest ? parseUtcTimestamp(latest.created_at) : null
 
@@ -119,10 +131,24 @@ export default function HealthCard({ onClose }) {
 
         {rows?.length > 0 && (
           <>
-            <div className="health-section-title">近七天 · 睡眠</div>
-            <Bars series={sleepSeries} unit="小时" color="var(--accent)" />
-            <div className="health-section-title">近七天 · 步数</div>
-            <Bars series={stepSeries} unit="步" color="var(--accent-soft)" />
+            <div className="health-trend-head">
+              <div className="health-section-title">近七天</div>
+              <div className="health-trend-tabs" role="tablist" aria-label="近七天健康指标">
+                {Object.entries(trends).map(([key, item]) => (
+                  <button
+                    type="button"
+                    role="tab"
+                    aria-selected={trend === key}
+                    className={'health-trend-tab' + (trend === key ? ' active' : '')}
+                    onClick={() => setTrend(key)}
+                    key={key}
+                  >
+                    {item.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <Bars series={activeTrend.series} unit={activeTrend.unit} color={activeTrend.color} />
           </>
         )}
 
