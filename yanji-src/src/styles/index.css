@@ -4966,10 +4966,6 @@ body.mp-active .scroll-bottom-btn { bottom: 139px; }
 .health-bar-fill { width: 100%; border-radius: 6px 6px 0 0; transition: height 0.4s ease; }
 .health-bar-day { font-size: 10px; color: var(--text-faint); }
 .health-bar-col.today .health-bar-day { color: var(--accent); font-weight: 700; }
-.health-bars-unit {
-  position: absolute; top: -14px; right: 2px;
-  font-size: 9.5px; color: var(--text-faint);
-}
 .health-foot {
   margin-top: 14px; padding-top: 10px;
   border-top: 1px dashed var(--border);

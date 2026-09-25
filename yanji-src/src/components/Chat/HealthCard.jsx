@@ -22,7 +22,7 @@ function fmtSleep(ms) {
   return `${h}小时${String(m).padStart(2, '0')}分`
 }
 
-function Bars({ series, unit, color }) {
+function Bars({ series, color }) {
   const max = Math.max(...series.map((s) => s.value), 1)
   return (
     <div className="health-bars">
@@ -35,7 +35,6 @@ function Bars({ series, unit, color }) {
           <div className="health-bar-day">{s.week}</div>
         </div>
       ))}
-      <div className="health-bars-unit">{unit}</div>
     </div>
   )
 }
@@ -132,7 +131,7 @@ export default function HealthCard({ onClose }) {
         {rows?.length > 0 && (
           <>
             <div className="health-trend-head">
-              <div className="health-section-title">近七天</div>
+              <div className="health-section-title">近七天 · {activeTrend.unit}</div>
               <div className="health-trend-tabs" role="tablist" aria-label="近七天健康指标">
                 {Object.entries(trends).map(([key, item]) => (
                   <button
@@ -148,7 +147,7 @@ export default function HealthCard({ onClose }) {
                 ))}
               </div>
             </div>
-            <Bars series={activeTrend.series} unit={activeTrend.unit} color={activeTrend.color} />
+            <Bars series={activeTrend.series} color={activeTrend.color} />
           </>
         )}
 
