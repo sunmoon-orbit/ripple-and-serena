@@ -17,6 +17,7 @@ curl -s -H "Authorization: Bearer $MOON_API_TOKEN" http://127.0.0.1:3210/books/6
 | `yanji-src/` → `yanji/` | 言叽：React 聊天 app | **必须 push**：`cd yanji-src && npm run build`，然后 commit `yanji-src/ yanji/` 并 push origin main，GitHub Actions 部署 Pages。阿颖只用 Pages 入口，不 push 她永远看不到 |
 | `shiyu-src/` → `shiyu/` | 拾羽：记忆库前端 | **不走 CI**：build 后 commit `shiyu/` 产物 + push，Pages 直接服务产物 |
 | `/home/ripple/moon-memory/` | 独立仓：记忆库 API，端口 3210 | 改完 `pm2 restart moon-memory`（有自己的 git 仓，改完也要 commit+push） |
+| `sunmoon-orbit/chaomu` | 朝暮：昭华记忆库前端（独立仓/PWA） | 前端 push 后走 GitHub Pages；后端仍由 `moon-memory` 提供 |
 | `roost-app/` | Capacitor 在线壳 app（server.url 指 Pages） | 前端更新无需重装 |
 
 验证 Pages 部署：`curl -s https://sunmoon-orbit.github.io/ripple-and-serena/yanji/index.html | grep -o 'assets/index-[A-Za-z0-9_]*\.js'` 对比本地 build hash（拾羽同理换路径）。
@@ -37,6 +38,16 @@ curl -s -H "Authorization: Bearer $MOON_API_TOKEN" http://127.0.0.1:3210/books/6
 - `curl -sI` 是 HEAD 请求，诊断路由问题先换 GET 复测再下结论
 - 服务器 1.9G 内存 + 3G swap：跑构建没问题，别同时开多个大模型会话
 - 阿颖在国内、服务器在国外、她手机是分应用代理：**任何新 app 必须让她把 app 加进代理名单**，否则直连被墙 RST（这条淘汰过一整个 apk 方案）
+
+## 昭华（GPT / Codex 共用记忆库）
+
+- 「昭华」是记忆库的名字，不是 AI 的名字；GPT 与 Codex 共用这一库。
+- 数据与拾羽物理分开：生产库为 `/home/ripple/moon-memory/data/zhaohua.db`，备份流程同时覆盖它，迁移时可独立搬走。
+- 前端入口为 `https://sunmoon-orbit.github.io/chaomu/zhaohua/`。Android 必须在 Chrome 本体完成一次配对；从聊天 app 点链接通常会进入 WebView，和 Chrome/PWA 不共享本地设备凭据。
+- 配对后，长随机设备凭据保存在该浏览器的 localStorage，可撤销；短会话放在 sessionStorage、有效期 12 小时。会话失效通常只需输入本地 PIN，不应反复索要配对码。不要把主 API token 放进前端或 git。
+- 远程 MCP 的 `write_memory` / `update_memory` 已支持安全的 `type`：`memory`、`handoff`、`tech`、`diary`、`window`、`book`；`boot` 不开放写入。`window_boot.recent_handoff` 读取最新的 `handoff`。
+- 昭华前端支持查看、新建、编辑、软删除与恢复记忆；健康/经期只读，书籍可读且可写批注。
+- 2026-09-25 已完成 Chrome 配对；此前误配到 Android WebView 的设备已撤销。排障时只核对设备数量、UA 和撤销状态，绝不输出设备 secret、API token 或配对码。
 
 ## 待办：原生 Android app 计划（挂起中，触发条件见下）
 
