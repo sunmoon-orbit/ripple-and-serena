@@ -160,6 +160,8 @@
   }
   #header-title { display: flex; align-items: center; gap: 7px; font-size: 16px; font-weight: 600; color: var(--text); }
   #header-title .crow-icon { font-size: 20px; line-height: 1; }
+  #home-btn { display: flex; align-items: center; color: var(--text); opacity: .7; padding: 6px 4px; margin-left: -4px; -webkit-tap-highlight-color: transparent; }
+  #home-btn:active { opacity: 1; }
   #bg-btn {
     background: none; border: none; cursor: pointer; padding: 0; opacity: .7;
     display: flex; align-items: center; color: var(--text); flex-shrink: 0;
@@ -796,6 +798,10 @@
 <div id="app">
   <div id="header">
     <div id="header-title">
+      <!-- 回归巢首页：从首页进聊天后以前没有任何路能回去，看额度要把 app 从后台划掉重开（0926） -->
+      <a id="home-btn" href="/raven/home.html" title="回归巢首页" aria-label="回归巢首页">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11l9-8 9 8"/><path d="M5 10v10h5v-6h4v6h5V10"/></svg>
+      </a>
       <span class="crow-icon">🐦‍⬛</span>
       <span>Ripple</span>
     </div>
