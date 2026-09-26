@@ -55,13 +55,19 @@
     modelSelect.value = preferred || modelSelect.options[0].value
     modelApply.disabled = busy || !modelSelect.value
   }
+  function modelMatchesSelection(actual, selected) {
+    if (!actual || !selected) return false
+    if (actual === selected) return true
+    if (['opus', 'sonnet', 'haiku', 'fable'].includes(selected)) return actual.startsWith('claude-' + selected + '-')
+    return selected === 'default'
+  }
   function confirmModelSwitch(expected, attempt = 0) {
     clearTimeout(modelRefreshTimer)
     modelRefreshTimer = setTimeout(async () => {
       try {
         const data = await api({ kind: 'model' })
         applyModelData(data)
-        if (data.currentModel === expected) { say('已切换到 ' + expected); return }
+        if (modelMatchesSelection(data.currentModel, expected)) { say('已切换到 ' + expected); return }
         if (attempt < 2) { confirmModelSwitch(expected, attempt + 1); return }
         say('切换指令已发送；状态栏还没确认，下一条消息前可再刷新一次。')
       } catch (e) { say(e.message) }
@@ -96,6 +102,10 @@
     run(async () => {
       say('正在切换模型…')
       await api({}, { kind: 'model-switch', model })
+      if (['default', 'opus', 'sonnet', 'haiku', 'fable'].includes(model)) {
+        say('已选择 ' + model + '（最新可用版本）；下一条回复后会显示实际模型。')
+        return
+      }
       say('切换指令已发送，正在等 Claude Code 确认…')
       confirmModelSwitch(model)
     })

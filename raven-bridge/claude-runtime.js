@@ -42,6 +42,15 @@ function modelCatalog({ stateFile, settingsFile, usageFile }) {
     }
   }
 
+  // Claude Code exposes its standard tiers as stable aliases. The CLI resolves
+  // these aliases to the newest model available to the signed-in account, so
+  // they are a better source of truth than lastModelUsage (which is only
+  // history and used to make Opus disappear from Raven's picker).
+  add('default', '默认（Claude Code 推荐）', 'alias')
+  add('opus', 'Opus（自动使用最新版本）', 'alias')
+  add('sonnet', 'Sonnet（自动使用最新版本）', 'alias')
+  add('haiku', 'Haiku（自动使用最新版本）', 'alias')
+
   const usage = readJson(usageFile)
   add(usage?.model, usage?.model, 'active')
 
@@ -54,16 +63,16 @@ function modelCatalog({ stateFile, settingsFile, usageFile }) {
   for (const entry of cached) {
     if (typeof entry === 'string') add(entry, entry, 'claude_cache')
     else if (entry && typeof entry === 'object') {
-      add(entry.value || entry.model || entry.id, entry.label || entry.displayName || entry.name, 'claude_cache')
+      const descriptionName = typeof entry.description === 'string' ? entry.description.split(' · ')[0] : ''
+      add(entry.value || entry.model || entry.id, descriptionName || entry.label || entry.displayName || entry.name, 'claude_cache')
     }
   }
-  for (const project of Object.values(state?.projects || {})) {
-    if (!project || typeof project !== 'object' || !project.lastModelUsage || typeof project.lastModelUsage !== 'object') continue
-    for (const id of Object.keys(project.lastModelUsage)) add(id, id, 'recent')
-  }
 
-  const rank = { active: 0, configured: 1, claude_cache: 2, recent: 3 }
-  return [...found.values()].sort((a, b) => (rank[a.source] ?? 9) - (rank[b.source] ?? 9) || a.label.localeCompare(b.label))
+  const rank = { alias: 0, active: 1, configured: 2, claude_cache: 3 }
+  const aliasRank = { default: 0, opus: 1, sonnet: 2, haiku: 3 }
+  return [...found.values()].sort((a, b) => (rank[a.source] ?? 9) - (rank[b.source] ?? 9)
+    || (aliasRank[a.id] ?? 9) - (aliasRank[b.id] ?? 9)
+    || a.label.localeCompare(b.label))
 }
 
 module.exports = { MODEL_RE, contextSnapshot, modelCatalog, validModel }

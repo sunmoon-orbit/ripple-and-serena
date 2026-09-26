@@ -20,19 +20,21 @@ test('context usage uses the real window size from the active status snapshot', 
   })
 })
 
-test('model catalog is populated from Claude state instead of a fixed list', t => {
+test('model catalog uses current aliases and account options instead of stale project history', t => {
   const root = temp(t)
   const stateFile = path.join(root, 'state.json')
   const settingsFile = path.join(root, 'settings.json')
   const usageFile = path.join(root, 'usage.json')
   fs.writeFileSync(stateFile, JSON.stringify({
-    additionalModelOptionsCache: [{ value: 'cached-model', label: 'Cached model' }],
+    additionalModelOptionsCache: [{ value: 'claude-fable-5-1[1m]', label: 'Fable', description: 'Fable 5.1 · Most capable' }],
     projects: { one: { lastModelUsage: { 'recent-model': { inputTokens: 1 } } } },
   }))
   fs.writeFileSync(settingsFile, JSON.stringify({ model: 'configured-model' }))
   fs.writeFileSync(usageFile, JSON.stringify({ model: 'active-model' }))
   assert.deepEqual(modelCatalog({ stateFile, settingsFile, usageFile }).map(item => item.id), [
-    'active-model', 'configured-model', 'cached-model', 'recent-model',
+    'default', 'opus', 'sonnet', 'haiku', 'active-model', 'configured-model', 'claude-fable-5-1[1m]',
   ])
+  assert.equal(modelCatalog({ stateFile, settingsFile, usageFile }).find(item => item.id === 'claude-fable-5-1[1m]').label, 'Fable 5.1')
+  assert.equal(modelCatalog({ stateFile, settingsFile, usageFile }).some(item => item.id === 'recent-model'), false)
   assert.equal(validModel('opus; touch /tmp/no'), false)
 })

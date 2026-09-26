@@ -24,8 +24,9 @@ test('归巢 CC 设置可从列表切换当前 Claude Code 模型', { timeout: 6
       if (url.searchParams.get('kind') === 'model') return route.fulfill({ json: {
         model: '', currentModel: 'claude-opus-5', revision: 'model-revision',
         models: [
-          { id: 'claude-opus-5', label: 'Opus 5', source: 'active' },
-          { id: 'claude-sonnet-4-6', label: 'Sonnet 4.6', source: 'recent' },
+          { id: 'opus', label: 'Opus（自动使用最新版本）', source: 'alias' },
+          { id: 'sonnet', label: 'Sonnet（自动使用最新版本）', source: 'alias' },
+          { id: 'claude-opus-5', label: 'claude-opus-5', source: 'active' },
         ],
       } })
       return route.fulfill({ json: { content: '# Fixture', exists: true, revision: 'document-revision' } })
@@ -38,8 +39,8 @@ test('归巢 CC 设置可从列表切换当前 Claude Code 模型', { timeout: 6
   await page.goto(origin + '/raven/index.html')
   assert.match(await page.locator('script[src*="cc-settings.js"]').getAttribute('src'), /\?v=/)
   await page.evaluate(() => document.getElementById('cc-settings-open').click())
-  await page.locator('#cc-model-select').selectOption('claude-sonnet-4-6', { timeout: 10000 })
+  await page.locator('#cc-model-select').selectOption('sonnet', { timeout: 10000 })
   await page.getByRole('button', { name: '切换当前会话' }).click()
-  await page.getByText(/切换指令已发送/).waitFor({ timeout: 10000 })
-  assert.deepEqual(switched, { kind: 'model-switch', model: 'claude-sonnet-4-6' })
+  await page.getByText(/已选择 sonnet（最新可用版本）/).waitFor({ timeout: 10000 })
+  assert.deepEqual(switched, { kind: 'model-switch', model: 'sonnet' })
 })
