@@ -44,6 +44,26 @@ export default function CoRead({ onClose }) {
   const [annoAuthor, setAnnoAuthor] = useState('阿颖')
   const [bookmark, setBookmark] = useState(null)
   const msgRefs = useRef({})
+  const annoTargetRef = useRef(null)
+  const activeIdRef = useRef(null)
+  activeIdRef.current = active?.id ?? null
+
+  function openAnnoComposer(messageId) {
+    annoTargetRef.current = messageId
+    setAnnoTarget(messageId)
+    setAnnoNote('')
+    setAnnoColor('yellow')
+  }
+
+  function closeAnnoComposer() {
+    // Android Chrome can keep the textarea/IME focused briefly after React removes it.
+    // Blur explicitly so the composer and keyboard both get out of the reader's way.
+    if (typeof document !== 'undefined' && document.activeElement instanceof HTMLElement) {
+      document.activeElement.blur()
+    }
+    annoTargetRef.current = null
+    setAnnoTarget(null)
+  }
 
   const loadConversations = useCallback(async () => {
     if (!cfg.apiToken) {
@@ -93,13 +113,33 @@ export default function CoRead({ onClose }) {
 
   async function submitAnno() {
     if (!annoTarget) return
+    const draft = {
+      conversationId: active.id,
+      messageId: annoTarget,
+      author: annoAuthor,
+      color: annoColor,
+      note: annoNote,
+    }
+
+    // Do not pin the whole composer over the text while a network request is in flight.
+    // The annotation is appended when the request returns; if it fails, restore this draft.
+    closeAnnoComposer()
     try {
-      const created = await createAnnotation(cfg, active.id, {
-        message_id: annoTarget, author: annoAuthor, color: annoColor, note: annoNote.trim(),
+      const created = await createAnnotation(cfg, draft.conversationId, {
+        message_id: draft.messageId, author: draft.author, color: draft.color, note: draft.note.trim(),
       })
       setAnnos((prev) => [...prev, created])
-      setAnnoTarget(null); setAnnoNote(''); setAnnoColor('yellow')
-    } catch { showToast('标注失败', 'error') }
+      setAnnoNote(''); setAnnoColor('yellow')
+    } catch {
+      showToast('标注失败，刚才的内容已保留', 'error')
+      if (activeIdRef.current === draft.conversationId && annoTargetRef.current === null) {
+        annoTargetRef.current = draft.messageId
+        setAnnoTarget(draft.messageId)
+        setAnnoAuthor(draft.author)
+        setAnnoColor(draft.color)
+        setAnnoNote(draft.note)
+      }
+    }
   }
 
   async function removeAnno(id) {
@@ -259,7 +299,7 @@ export default function CoRead({ onClose }) {
                 <div
                   className="coread-bubble"
                   style={msgAnnos.length ? { boxShadow: `inset 4px 0 0 ${COLOR_HEX[msgAnnos[0].color] || '#f5d76e'}` } : undefined}
-                  onClick={() => { setAnnoTarget(m.id); setAnnoNote(''); setAnnoColor('yellow') }}
+                  onClick={() => openAnnoComposer(m.id)}
                 >
                   {m.content}
                 </div>
@@ -271,7 +311,7 @@ export default function CoRead({ onClose }) {
                   </div>
                 ))}
                 <div className="coread-msg-tools">
-                  <button onClick={() => { setAnnoTarget(m.id); setAnnoNote(''); setAnnoColor('yellow') }}>批注</button>
+                  <button onClick={() => openAnnoComposer(m.id)}>批注</button>
                   <button onClick={() => markBookmark(m.id)}>{isBookmarked ? '✓ 书签' : '夹书签'}</button>
                 </div>
               </div>
@@ -306,7 +346,7 @@ export default function CoRead({ onClose }) {
               autoFocus
             />
             <div className="coread-anno-actions">
-              <button className="roost-btn roost-btn-ghost roost-btn-sm" onClick={() => setAnnoTarget(null)}>取消</button>
+              <button className="roost-btn roost-btn-ghost roost-btn-sm" onClick={closeAnnoComposer}>取消</button>
               <button className="roost-btn roost-btn-sm" onClick={submitAnno}>留下</button>
             </div>
           </div>
