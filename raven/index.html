@@ -1244,25 +1244,36 @@ function ackReceived(cid) {
   awaitingAck.delete(cid)
 }
 
+// ⚠️ 同一时刻只能有一条活连接（0926 阿颖看到每条回复画两遍）。
+// 半开连接 close() 之后可能卡在 CLOSING 很久，这期间 ensureLiveConnection 看到
+// CLOSING 就立刻 connect() 开了新连接；旧连接的 onmessage 还挂着照收广播，
+// 等它的 onclose 迟到又再排一次重连——于是两三条连接同时收同一条回复。
+// 所以每个回调都先认一下「我还是不是当前那条」，不是就闭嘴，也不许排重连。
 function connect() {
-  ws = new WebSocket(WS_URL)
-  window._ravenWs = ws
-  ws.onopen = () => {
+  const old = ws
+  const sock = new WebSocket(WS_URL)
+  ws = sock
+  window._ravenWs = sock
+  if (old && old !== sock) { try { old.close() } catch { } }
+  sock.onopen = () => {
+    if (sock !== ws) { try { sock.close() } catch { } ; return }
     setConn(true)
     if (reconnectTimer) { clearTimeout(reconnectTimer); reconnectTimer = null }
     // 先认证：服务端在认证通过前不会推送任何数据（防偷听加固 2026-07-03）
-    ws.send(JSON.stringify({ type: 'auth', token: localStorage.getItem('raven-token') || '' }))
+    sock.send(JSON.stringify({ type: 'auth', token: localStorage.getItem('raven-token') || '' }))
     // 重连后补发积压的消息（同样要等回执，补发路上再断一次也不会丢）
     while (pendingOutbox.length) {
       wsSendWithAck(pendingOutbox.shift())
     }
   }
-  ws.onclose = () => {
+  sock.onclose = () => {
+    if (sock !== ws) return
     setConn(false)
-    reconnectTimer = setTimeout(connect, 3000)
+    if (!reconnectTimer) reconnectTimer = setTimeout(() => { reconnectTimer = null; connect() }, 3000)
   }
-  ws.onerror = () => ws.close()
-  ws.onmessage = (e) => {
+  sock.onerror = () => { try { sock.close() } catch { } }
+  sock.onmessage = (e) => {
+    if (sock !== ws) return
     lastWsActivity = Date.now()
     try {
       const msg = JSON.parse(e.data)
@@ -1282,8 +1293,8 @@ function connect() {
         appendMsg(msg.text, 'user')
       }
       else if (msg.type === 'reply') {
-        const alreadyShown = msg.replayed && (
-          msg.id ? shownMsgIds.has(msg.id) :
+        // 有 id 的回复不管是不是补发，见过就不再画（兜底：万一又有两条连接同时收）
+        const alreadyShown = msg.id ? shownMsgIds.has(msg.id) : msg.replayed && (
           chatHistory.length && chatHistory[chatHistory.length - 1].text === msg.text && chatHistory[chatHistory.length - 1].role === 'assistant'
         )
         if (msg.id && !msg.replayed) shownMsgIds.add(msg.id)
@@ -2489,6 +2500,6 @@ document.getElementById('perm-modal').addEventListener('click', e => {
   <div class="cc-row"><button id="cc-document-save">保存说明</button></div>
   <p id="cc-settings-status" role="status" aria-live="polite"></p>
 </dialog>
-<script src="/raven/cc-settings.js?v=20260926-live-models"></script>
+<script src="/raven/cc-settings.js?v=20260926-model-truth"></script>
 </body>
 </html>

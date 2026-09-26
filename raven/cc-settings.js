@@ -35,14 +35,26 @@
       preview.append(el)
     }
   }
-  function applyModelData(data) {
-    currentModel.textContent = data.currentModel || '未知'
-    const selected = modelSelect.value
+  // claude-opus-5-5 → Opus 5.5；认不出的原样返回
+  function prettyModel(id) {
+    const m = /^claude-([a-z]+)-(\d+)-(\d+)(?:-\d{8})?(\[1m\])?$/.exec(id || '')
+    return m ? m[1][0].toUpperCase() + m[1].slice(1) + ' ' + m[2] + '.' + m[3] + (m[4] ? '（1M 上下文）' : '') : (id || '')
+  }
+  // keepSelection：只有「刷新列表」保留她手上正在挑的那项；
+  // 每次打开面板都回到「实际在跑的那个」，不然勾选和（当前）会指着两行（0926 阿颖：怪怪的）
+  function applyModelData(data, keepSelection = false) {
+    const age = Number(data.currentModelAgeSeconds)
+    currentModel.textContent = data.currentModel
+      ? prettyModel(data.currentModel) + (prettyModel(data.currentModel) !== data.currentModel ? '（' + data.currentModel + '）' : '')
+        + (age > 120 ? ' · ' + Math.round(age / 60) + ' 分钟前的状态，刚切换的话等下一条回复后刷新' : '')
+      : '未知'
+    const selected = keepSelection ? modelSelect.value : ''
     modelSelect.replaceChildren()
     for (const model of Array.isArray(data.models) ? data.models : []) {
       const option = document.createElement('option')
       option.value = model.id
-      option.textContent = model.label + (model.id === data.currentModel ? '（当前）' : '')
+      const label = model.label === model.id ? prettyModel(model.id) : model.label
+      option.textContent = label + (model.id === data.currentModel ? '（正在用）' : '')
       modelSelect.append(option)
     }
     if (!modelSelect.options.length) {
@@ -86,7 +98,8 @@
   }
   document.getElementById('cc-settings-open').onclick = () => {
     dialog.showModal()
-    if (revision !== null) return
+    // 模型状态每次打开都重读（以前只读第一次，关了再开永远是旧的）；文档草稿不动
+    if (revision !== null) { run(async () => { applyModelData(await api({ kind: 'model' })) }); return }
     run(async () => {
       say('正在读取…')
       const data = await api({ kind: 'model' })
@@ -112,7 +125,7 @@
   }
   document.getElementById('cc-model-reload').onclick = () => run(async () => {
     say('正在刷新模型列表…')
-    applyModelData(await api({ kind: 'model' }))
+    applyModelData(await api({ kind: 'model' }), true)
     say('模型列表已刷新。')
   })
   dialog.addEventListener('cancel', e => { if (busy) e.preventDefault() })

@@ -63,6 +63,8 @@ function createStore({ project, home, backups, claudeState = path.join(home, '.c
       return {
         model: settings.model || '',
         currentModel: validModel(snapshot?.model) ? snapshot.model : '',
+        // 快照是状态栏每次重绘时写的，终端里切了模型、还没出下一条回复前它是旧的
+        currentModelAgeSeconds: Number(snapshot?.updated_at) ? Math.max(0, Math.round(Date.now() / 1000 - Number(snapshot.updated_at))) : null,
         models: modelCatalog({ stateFile: claudeState, settingsFile: targets.model, usageFile: usageSnapshot }),
         revision: item.revision,
         applies: 'next_session',
