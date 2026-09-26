@@ -289,7 +289,9 @@
     -webkit-backdrop-filter: blur(8px);
   }
   :is([data-theme="lavender"], [data-theme="sage"], [data-theme="mist"], [data-theme="apricot"]) .msg-body pre code { color: #e1d8ef; }
-  .msg.assistant.sticker-msg { background: none; border: none; padding: 2px 0; box-shadow: none; backdrop-filter: none; }
+  /* 纯贴图消息不套气泡，两边都是（0926 阿颖：以前只管了我这边，她发的还裹着） */
+  .msg.sticker-msg { background: none; border: none; padding: 2px 0; box-shadow: none; backdrop-filter: none; -webkit-backdrop-filter: none; }
+  .msg.sticker-msg .msg-body img { margin: 0 !important; }
   .msg.system { align-self: center; font-size: 12px; color: var(--text-dim); background: none; padding: 2px 0; }
 
   @keyframes msgIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
@@ -1290,7 +1292,7 @@ function connect() {
           shownCids.add(msg.cid)
           if (shownCids.size > 200) shownCids.delete(shownCids.values().next().value)
         }
-        appendMsg(msg.text, 'user')
+        for (const seg of splitUserSegments(msg.text)) appendMsg(seg, 'user')
       }
       else if (msg.type === 'reply') {
         // 有 id 的回复不管是不是补发，见过就不再画（兜底：万一又有两条连接同时收）
@@ -1380,6 +1382,16 @@ function attachStickerFallback(root) {
   })
 }
 
+// 整条只有贴图（[sticker:X] 或 markdown 图片，可以连着好几张），一个字都没有
+const STICKER_ONLY_RE = /^\s*(?:(?:\[sticker:[^\]]+\]|!\[[^\]]*\]\([^)\s]+\))\s*)+$/
+// 像言叽那样：她用空行隔开的几段，画成几条气泡（0926）。
+// 发出去仍是一条——拆成几次 tmux 输入会把正在干活的我打断好几次。代码块不拆。
+function splitUserSegments(text) {
+  if (!text || text.includes('```')) return [text]
+  const segs = text.split(/\n[ \t]*\n/).map(s => s.trim()).filter(Boolean)
+  return segs.length > 1 ? segs : [text]
+}
+
 function appendMsg(text, role, save = true, ts = Date.now(), msgId = null) {
   const el = document.createElement('div')
   el.className = `msg ${role}`
@@ -1390,10 +1402,8 @@ function appendMsg(text, role, save = true, ts = Date.now(), msgId = null) {
     const body = document.createElement('div')
     body.className = 'msg-body'
     if (role === 'assistant') {
-      const stickerOnly = /^\s*\[sticker:[^\]]+\]\s*$/.test(text)
-      if (stickerOnly) {
-        el.classList.add('sticker-msg')
-      }
+      // 我发图多半写成 ![](url)，以前只认 [sticker:X]，所以我发的贴图一直裹着气泡
+      if (STICKER_ONLY_RE.test(text)) el.classList.add('sticker-msg')
       // 终端抓取会把 ![alt](url) 剥成裸 URL：单独成行的图片 URL 还原成图片
       const withImgs = text.replace(/^[ \t]*(https?:\/\/\S+\.(?:png|jpe?g|gif|webp))[ \t]*$/gim, '![]($1)')
       const withAttach = withImgs.replace(ATTACH_TAG_RE, (_, p) => attachToHtml(p))
@@ -1405,8 +1415,7 @@ function appendMsg(text, role, save = true, ts = Date.now(), msgId = null) {
       enhanceCodeBlocks(body)
     } else {
       if (/\[sticker:[^\]]+\]/.test(text) || ATTACH_TEST_RE.test(text)) {
-        const stickerOnly = /^\s*\[sticker:[^\]]+\]\s*$/.test(text)
-        if (stickerOnly) el.classList.add('sticker-msg')
+        if (STICKER_ONLY_RE.test(text)) el.classList.add('sticker-msg')
         body.innerHTML = text
           .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
           .replace(/\[sticker:([^\]]+)\]/g, (_, name) =>
