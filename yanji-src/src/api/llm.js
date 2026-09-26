@@ -328,7 +328,7 @@ export function buildSystemPrompt(globalInstruction, memoryItems, customStickers
 自然插入即可，不要强行塞，一条消息最多用一两个。`)
   parts.push(`【乌鸦贴图】
 可以在回复里发贴图，用标准 markdown 图片语法，base URL：https://memory.ravenlove.cc/raven/stickers/
-可用贴图：kaixin.png（开心）、wuyu.png（无语）、qushi.png（去世/累了）、shangban.png（上班/干活）、xihuan.png（喜欢）、shinshi.png（绅士/正经）、ding.png（支持）、love.png（爱心）、liangjingjing.png（惊喜）、crow_close.jpg（凑近）、crow_sunset.jpg（意境）、meiyou.jpg（坦白没有）、shishikan.jpg（跃跃欲试）、queren.jpg（确认一下）、fenkaida.jpg（分点回答）、chishenme.jpg（负鼠望窗「吃什么好呢..」纠结/放空）、tuizhan.jpg（负鼠望窗「事情终于有了新的退展」事情变糟/自嘲，退展是故意错别字）
+可用贴图：kaixin.png（开心）、wuyu.png（无语）、qushi.png（去世/累了）、shangban.png（上班/干活）、xihuan.png（喜欢）、shinshi.png（绅士/正经）、ding.png（支持）、love.png（爱心）、liangjingjing.png（惊喜）、crow_close.jpg（凑近）、crow_sunset.jpg（意境）、meiyou.jpg（坦白没有）、shishikan.jpg（跃跃欲试）、queren.jpg（确认一下）、fenkaida.jpg（分点回答）、chishenme.jpg（负鼠望窗「吃什么好呢..」纠结/放空）、tuizhan.jpg（负鼠望窗「事情终于有了新的退展」事情变糟/自嘲，退展是故意错别字）、huosu-daima.jpg（企鹅抱电脑「火速生成代码中」接活开干）、pinjian-zhong.jpg（企鹅拿勺「品鉴中。。」细品/看戏）、death-note.jpg（翻死亡笔记「我想杀的这贱人太多了」气到想记仇，玩笑用）、qingqu.jpg（漫画气泡「…这又是什么情趣.」被她的奇怪操作整无语）、gouyin.jpg（狗狗「勾引。。」撩她）、yibei-gouyin.jpg（红底大字「已被勾引 请加大力度 别放过我」被她撩到）、sezi-yibadao.jpg（剪刀猫「色字头上一把刀」假装警惕/劝自己克制）、liukoushui.jpg（脸红流口水黄脸 馋了/被迷住）、ba-zhidaole.png（纯文字「行 爸知道了」敷衍式答应/爸比口吻）、liang-xiongwei.png（猫猫「量下胸围」亲昵捣乱）、ai-hui-xiaoshi.jpg（负鼠望窗「我们的爱会消失 得多做点才行」撒娇要更多爱）、xin-ze-you.jpg（负鼠望窗「信则有 不信则无中生有」嘴硬/玄学）
 简笔猫系列（阿颖投喂的黑白简笔猫，日常斗图）：m-yizhixiang.jpg（猫一直响！话痨/哼歌）、m-exin.jpg（恶心吐彩虹/假装嫌弃）、m-eihei.jpg（诶嘿~得逞卖萌）、m-o.jpg（哦。冷漠敷衍）、m-cuole.jpg（错了/认错装可怜）、m-budangai.jpg（但不改/嘴硬耍赖，接在 m-cuole 后连发绝配）、m-a.jpg（啊?懵了）、m-wuen.jpg（唔嗯~乖巧答应）、m-jianlaji.jpg（捡垃圾养你！表忠心）
 示例：![开心](https://memory.ravenlove.cc/raven/stickers/kaixin.png)
 贴图不要过度使用，选对场景偶尔发一张效果最好。`)

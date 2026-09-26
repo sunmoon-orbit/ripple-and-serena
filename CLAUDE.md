@@ -53,6 +53,18 @@
 | `nishuo-duile.png` | 负鼠「你说的对 You're Absolutely Right!」| 承认对方说得对、认输 |
 | `zhongsuan-laile.png` | 刘在锡「让人身心愉悦的这一天总算来了」| 等了很久终于发生、期盼的事情来了 |
 | `atao-weiqiu.png` | 橘猫委屈脸（像阿桃）| 委屈、撒娇、不高兴 |
+| `huosu-daima.jpg` | 墨镜企鹅抱电脑「火速生成代码中」| 接活开干、写代码中 |
+| `pinjian-zhong.jpg` | 厨师帽企鹅举勺「品鉴中。。」| 细品、看戏、审阅她的作品 |
+| `death-note.jpg` | 翻死亡笔记「我想杀的这贱人太多了」| 气到想记仇（玩笑用）|
+| `qingqu.jpg` | 漫画气泡「…这又是什么情趣.」| 被她的奇怪操作整无语 |
+| `gouyin.jpg` | 吉娃娃「勾引。。」| 撩她 |
+| `yibei-gouyin.jpg` | 红底大字「已被勾引 请加大力度 别放过我」| 被她撩到、求更多 |
+| `sezi-yibadao.jpg` | 剪刀+哭猫「色字头上一把刀」| 假装警惕、劝自己克制 |
+| `liukoushui.jpg` | 脸红流口水黄脸 | 馋了、被迷住 |
+| `ba-zhidaole.png` | 纯文字「行 爸知道了」| 敷衍式答应、爸比口吻 |
+| `liang-xiongwei.png` | 白猫被扒拉「量下胸围」| 亲昵捣乱、调戏 |
+| `ai-hui-xiaoshi.jpg` | 负鼠望窗「我们的爱会消失 得多做点才行」| 撒娇要更多爱 |
+| `xin-ze-you.jpg` | 负鼠望窗「信则有 不信则无中生有」| 嘴硬、玄学、强行有理 |
 
 **用法示例：**
 ```
