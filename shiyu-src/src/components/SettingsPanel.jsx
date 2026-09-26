@@ -93,13 +93,21 @@ export default function SettingsPanel() {
       // 这样文件再大也不会撞墙——只是批次变多。重复导入安全（服务端按 uuid + 消息双重去重）。
       const BATCH = 15
       let imported = 0
+      let messagesAdded = 0
       for (let i = 0; i < data.length; i += BATCH) {
         const batch = data.slice(i, i + BATCH)
         setImportProgress(`${Math.min(i + BATCH, data.length)}/${data.length}`)
         const r = await api.importClaudeAI(batch)
         imported += (r && r.imported) || 0
+        messagesAdded += (r && r.messages_added) || 0
       }
-      showToast(`导入完成，共处理 ${data.length} 条对话，新增 ${imported} 条`, 'success')
+      // 只报「新增对话」会误导：已有窗口补进几百条消息时它照样是 0（0926）
+      showToast(
+        messagesAdded || imported
+          ? `导入完成：${data.length} 个对话里，新建 ${imported} 个，补进 ${messagesAdded} 条新消息`
+          : `导入完成：${data.length} 个对话都已在库里，没有新内容`,
+        'success'
+      )
     } catch (err) {
       showToast('导入失败：' + err.message, 'error')
     } finally {
