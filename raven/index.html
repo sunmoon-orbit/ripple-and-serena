@@ -2462,6 +2462,9 @@ document.getElementById('perm-modal').addEventListener('click', e => {
 #cc-settings-dialog button,#cc-settings-dialog select,#cc-settings-dialog input { font:inherit; padding:9px 12px; border:1px solid var(--border); border-radius:10px; color:var(--text); background:var(--surface); }
 #cc-settings-dialog button { cursor:pointer; }
 #cc-settings-dialog button:disabled { opacity:.5; cursor:wait; }
+#cc-model-controls { align-items:flex-end; }
+#cc-model-controls label { display:flex; flex:1 1 300px; min-width:0; flex-direction:column; gap:6px; color:var(--text-dim); font-size:13px; }
+#cc-model-select { box-sizing:border-box; width:100%; min-width:0; }
 #cc-document { box-sizing:border-box; display:block; width:100%; max-width:100%; min-width:0; min-height:clamp(120px,34dvh,240px); resize:vertical; padding:12px; font:14px/1.7 monospace; border:1px solid var(--border); border-radius:12px; color:var(--text); background:var(--surface); overflow-x:auto; }
 #cc-preview { box-sizing:border-box; width:100%; max-width:100%; min-width:0; min-height:clamp(120px,34dvh,240px); max-height:min(52dvh,520px); padding-right:4px; white-space:pre-wrap; overflow-wrap:anywhere; word-break:break-word; line-height:1.7; overflow-x:hidden; overflow-y:auto; overscroll-behavior:contain; }
 .cc-help,#cc-settings-status { font-size:13px; line-height:1.6; color:var(--text-dim); }
@@ -2472,7 +2475,13 @@ document.getElementById('perm-modal').addEventListener('click', e => {
 <dialog id="cc-settings-dialog" aria-labelledby="cc-settings-title">
   <div class="cc-row"><h2 id="cc-settings-title">CC 设置</h2><button id="cc-settings-close" style="margin-left:auto" aria-label="关闭设置">关闭</button></div>
   <h3>Claude Code 模型</h3>
-  <p class="cc-help">当前模型：<strong id="cc-current-model">未知</strong>。如需切换，请在聊天输入框发送 <code>/model 模型别名或完整模型 ID</code>；例如 <code>/model sonnet</code>。单独发送 <code>/model</code> 会打开 Claude Code 自带的选择器。</p>
+  <p class="cc-help">当前模型：<strong id="cc-current-model">未知</strong></p>
+  <div class="cc-row" id="cc-model-controls">
+    <label>选择模型<select id="cc-model-select" aria-label="Claude Code 模型"><option value="">正在读取…</option></select></label>
+    <button id="cc-model-apply">切换当前会话</button>
+    <button id="cc-model-reload">刷新列表</button>
+  </div>
+  <p class="cc-help">从 Claude Code 已提供或用过的模型中选择。请在当前回复结束后切换；切换结果会自动确认。</p>
   <h3>CLAUDE.md · 对话说明</h3>
   <div class="cc-row"><select id="cc-scope" aria-label="说明文件范围"><option value="project">归巢项目说明</option><option value="global">全局说明</option></select><button id="cc-reload">重新读取</button><button id="cc-preview-toggle">阅读预览</button></div>
   <p class="cc-help">全局说明适用于该服务器账号的 CC；项目说明适用于归巢项目。未保存的草稿留在此面板，刷新网页前请保存。</p>

@@ -670,7 +670,10 @@ const handleCcSettings = ccSettings.createHandler(ccSettings.createStore({
   project: path.resolve(__dirname, '..'),
   home: os.homedir(),
   backups: path.join(os.homedir(), '.raven-cc-backups'),
-}), tokenIsValid, { switchModel: model => tmuxSend(`/model ${model}`) })
+}), tokenIsValid, {
+  canSwitchModel: () => !isThinking,
+  switchModel: model => tmuxSend(`/model ${model}`),
+})
 
 const server = http.createServer((req, res) => {
   res.setHeader('Access-Control-Allow-Origin', '*')

@@ -74,3 +74,15 @@ test('HTTP can queue a validated model switch without changing the saved default
   assert.equal(store.readModel().model, '')
   assert.equal((await request(handler, { method: 'POST', token: 'fixture-only', body: JSON.stringify({ kind: 'model-switch', model: 'bad model' }) })).status, 400)
 })
+test('HTTP refuses to type a model command while Claude Code is replying', async t => {
+  const { store } = fixture(t)
+  const switched = []
+  const handler = createHandler(store, token => token === 'fixture-only', {
+    canSwitchModel: () => false,
+    switchModel: value => { switched.push(value); return true },
+  })
+  const response = await request(handler, { method: 'POST', token: 'fixture-only', body: JSON.stringify({ kind: 'model-switch', model: 'claude-sonnet-4-6' }) })
+  assert.equal(response.status, 409)
+  assert.match(response.body.error, /当前回复结束/)
+  assert.deepEqual(switched, [])
+})

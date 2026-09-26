@@ -78,7 +78,7 @@ function createStore({ project, home, backups, claudeState = path.join(home, '.c
   }
 }
 
-function createHandler(store, authenticate, { switchModel } = {}) {
+function createHandler(store, authenticate, { switchModel, canSwitchModel } = {}) {
   return async function handle(req, res, url) {
     const send = (status, data) => {
       res.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' })
@@ -104,6 +104,7 @@ function createHandler(store, authenticate, { switchModel } = {}) {
       let data
       if (body.kind === 'model-switch') {
         if (!validModel(body.model)) throw fail(400, '模型名称无效')
+        if (typeof canSwitchModel === 'function' && !canSwitchModel()) throw fail(409, '请等当前回复结束后再切换模型')
         if (typeof switchModel !== 'function' || !switchModel(body.model)) throw fail(409, '当前没有可接收切换指令的 Claude Code 会话')
         data = { model: body.model, applied: 'current_session', queued: true }
       } else {

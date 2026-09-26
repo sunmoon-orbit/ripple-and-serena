@@ -4,12 +4,15 @@
   const scope = document.getElementById('cc-scope')
   const status = document.getElementById('cc-settings-status')
   const currentModel = document.getElementById('cc-current-model')
+  const modelSelect = document.getElementById('cc-model-select')
+  const modelApply = document.getElementById('cc-model-apply')
   const preview = document.getElementById('cc-preview')
-  let revision = null, original = '', activeScope = 'project', busy = false
+  let revision = null, original = '', activeScope = 'project', busy = false, modelRefreshTimer = null
   const say = text => { status.textContent = text }
   function lock(value) {
     busy = value
     dialog.querySelectorAll('button,select,input,textarea').forEach(el => { el.disabled = value })
+    if (!value) modelApply.disabled = !modelSelect.value
   }
   async function api(params, body) {
     const response = await fetch('/raven/cc-settings?' + new URLSearchParams(params), {
@@ -34,6 +37,35 @@
   }
   function applyModelData(data) {
     currentModel.textContent = data.currentModel || '未知'
+    const selected = modelSelect.value
+    modelSelect.replaceChildren()
+    for (const model of Array.isArray(data.models) ? data.models : []) {
+      const option = document.createElement('option')
+      option.value = model.id
+      option.textContent = model.label + (model.id === data.currentModel ? '（当前）' : '')
+      modelSelect.append(option)
+    }
+    if (!modelSelect.options.length) {
+      const option = document.createElement('option')
+      option.value = ''
+      option.textContent = '暂未读取到可用模型'
+      modelSelect.append(option)
+    }
+    const preferred = [selected, data.currentModel, data.model].find(value => value && [...modelSelect.options].some(option => option.value === value))
+    modelSelect.value = preferred || modelSelect.options[0].value
+    modelApply.disabled = busy || !modelSelect.value
+  }
+  function confirmModelSwitch(expected, attempt = 0) {
+    clearTimeout(modelRefreshTimer)
+    modelRefreshTimer = setTimeout(async () => {
+      try {
+        const data = await api({ kind: 'model' })
+        applyModelData(data)
+        if (data.currentModel === expected) { say('已切换到 ' + expected); return }
+        if (attempt < 2) { confirmModelSwitch(expected, attempt + 1); return }
+        say('切换指令已发送；状态栏还没确认，下一条消息前可再刷新一次。')
+      } catch (e) { say(e.message) }
+    }, attempt === 0 ? 1800 : 2500)
   }
   async function loadDocument() {
     const data = await api({ scope: scope.value })
@@ -57,6 +89,22 @@
     })
   }
   document.getElementById('cc-settings-close').onclick = () => dialog.close()
+  modelSelect.onchange = () => { modelApply.disabled = busy || !modelSelect.value }
+  modelApply.onclick = () => {
+    const model = modelSelect.value
+    if (!model) return
+    run(async () => {
+      say('正在切换模型…')
+      await api({}, { kind: 'model-switch', model })
+      say('切换指令已发送，正在等 Claude Code 确认…')
+      confirmModelSwitch(model)
+    })
+  }
+  document.getElementById('cc-model-reload').onclick = () => run(async () => {
+    say('正在刷新模型列表…')
+    applyModelData(await api({ kind: 'model' }))
+    say('模型列表已刷新。')
+  })
   dialog.addEventListener('cancel', e => { if (busy) e.preventDefault() })
   scope.onchange = () => {
     if (editor.value !== original && !confirm('切换文件会放弃当前未保存的修改，继续吗？')) { scope.value = activeScope; return }
