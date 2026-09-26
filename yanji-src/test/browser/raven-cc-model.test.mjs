@@ -36,6 +36,7 @@ test('归巢 CC 设置可从列表切换当前 Claude Code 模型', { timeout: 6
   await context.addInitScript(() => localStorage.setItem('raven-token', 'fixture-only'))
   const page = await context.newPage()
   await page.goto(origin + '/raven/index.html')
+  assert.match(await page.locator('script[src*="cc-settings.js"]').getAttribute('src'), /\?v=/)
   await page.evaluate(() => document.getElementById('cc-settings-open').click())
   await page.locator('#cc-model-select').selectOption('claude-sonnet-4-6', { timeout: 10000 })
   await page.getByRole('button', { name: '切换当前会话' }).click()
