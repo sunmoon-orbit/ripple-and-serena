@@ -115,10 +115,7 @@
     run(async () => {
       say('正在切换模型…')
       await api({}, { kind: 'model-switch', model })
-      if (['default', 'opus', 'sonnet', 'haiku', 'fable'].includes(model)) {
-        say('已选择 ' + model + '（最新可用版本）；下一条回复后会显示实际模型。')
-        return
-      }
+      // 别名也要等确认：以前别名直接说「已选择」就收工，指令被吞了也看不出来（0926）
       say('切换指令已发送，正在等 Claude Code 确认…')
       confirmModelSwitch(model)
     })

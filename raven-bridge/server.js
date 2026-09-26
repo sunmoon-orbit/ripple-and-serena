@@ -671,7 +671,10 @@ const handleCcSettings = ccSettings.createHandler(ccSettings.createStore({
   home: os.homedir(),
   backups: path.join(os.homedir(), '.raven-cc-backups'),
 }), tokenIsValid, {
-  canSwitchModel: () => !isThinking,
+  // 只看「屏幕在不在变」不够：工具跑着但屏幕静止时（比如 sleep 轮询）isThinking 是 false，
+  // /model 会被敲进正在干活的 CC 里吞掉（0926 阿颖切 sonnet 没生效）。
+  // CC 忙的时候底部有一行「✽ Churning… (35s · …」，看到它就不许切。
+  canSwitchModel: () => !isThinking && !/…\s*\(\d+[smh]/.test(tmuxCapture().split('\n').slice(-12).join('\n')),
   switchModel: model => tmuxSend(`/model ${model}`),
 })
 
