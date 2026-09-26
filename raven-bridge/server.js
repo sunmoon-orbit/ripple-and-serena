@@ -218,11 +218,41 @@ async function getOrCreateTodayConv() {
 // 结果言叽那个我看不见半边关系。这条路要是也悄悄断了，同样没人会发现——
 // 所以宁可日志吵一点，也别静默丢。
 function archiveMsg(role, content) {
-  getOrCreateTodayConv().then(convId => {
-    if (!convId) return
-    moonPost(`/archive/conversations/${convId}/messages`, { role, content })
-      .catch(e => console.error('[archive] 存消息失败:', e.message))
-  }).catch(e => console.error('[archive] 取当天对话失败:', e.message))
+  // 记账只记我的回复：她的话有 tmuxSend/取件箱兜底，我的回复存不存得上才是这次踩的坑
+  const track = role === 'assistant'
+  if (track) bumpArchiveStat('sent')
+  ;(async () => {
+    let lastErr
+    // 记忆库重启那几秒连不上：退避重试。moonPost 只在「没拿到响应」时 reject，
+    // 所以重试不会造成重复存入；拿到 4xx 说明请求本身有问题，重试没用，直接算失败。
+    for (const wait of [0, 2000, 8000, 30000]) {
+      if (wait) await new Promise(r => setTimeout(r, wait))
+      try {
+        const convId = await getOrCreateTodayConv()
+        if (!convId) throw new Error('取当天对话失败')
+        const r = await moonPost(`/archive/conversations/${convId}/messages`, { role, content })
+        if (r.status >= 500) throw new Error('moon-memory 返回 ' + r.status)
+        if (r.status >= 400) { lastErr = new Error('moon-memory 返回 ' + r.status); break }
+        if (track) bumpArchiveStat('saved')
+        return
+      } catch (e) { lastErr = e }
+    }
+    console.error('[archive] 存消息最终失败:', lastErr && lastErr.message)
+    if (track) bumpArchiveStat('failed')
+  })()
+}
+
+// 存档记账（0926）：每天 sent / saved / failed 各多少条，落盘给每日检查脚本读。
+// 以前存档失败只有一行 console.error，没人会看——6/16 起三个月我的回复全没存，也没人知道。
+const ARCHIVE_STATS_FILE = path.join(__dirname, 'archive-stats.json')
+let archiveStats = (() => { try { return JSON.parse(fs.readFileSync(ARCHIVE_STATS_FILE, 'utf8')) } catch { return {} } })()
+function bumpArchiveStat(kind) {
+  const day = todayBj()
+  const d = archiveStats[day] || (archiveStats[day] = { sent: 0, saved: 0, failed: 0 })
+  d[kind]++
+  const keys = Object.keys(archiveStats).sort()
+  if (keys.length > 14) keys.slice(0, keys.length - 14).forEach(k => delete archiveStats[k])
+  try { fs.writeFileSync(ARCHIVE_STATS_FILE, JSON.stringify(archiveStats)) } catch { /* 记账失败不能影响回复 */ }
 }
 
 // --- tmux helpers ---
