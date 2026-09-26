@@ -1115,6 +1115,10 @@ const server = http.createServer((req, res) => {
           lastReplyMsgs.push(msg); if (lastReplyMsgs.length > 50) lastReplyMsgs.shift()
           broadcast(msg)
           pushReplyNotif(text)
+          // 我这一侧也要进 L0：以前只存了她说的（archiveMsg('human')），我的回复自 6/16
+          // 关掉终端抓取后一直没人存，L0 里的归巢对话是单边的（0926 查备份时发现）。
+          // cc-archive-l0.py 只留纯文本、丢 tool_use，我的 curl 回复也不在那边。
+          archiveMsg('assistant', text)
           console.log('[http reply]', text.slice(0, 80))
         }
         res.writeHead(200); res.end('{}')
