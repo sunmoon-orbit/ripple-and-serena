@@ -10,7 +10,13 @@ import CrossingTools from './Tools'
 import { sizeComposer } from './layout.mjs'
 import CrossingMessage from './Message'
 import VoiceCall from '../Chat/VoiceCall'
-import { threadsFromRead, completeTurn } from './messages.mjs'
+import {
+  CROSSING_CALL_BILINGUAL_NOTE,
+  CROSSING_CALL_NOTE,
+  completeTurn,
+  threadsFromRead,
+  withHiddenContext,
+} from './messages.mjs'
 import { bindAgentSession, canAuthenticate } from './authorization.mjs'
 import { buildMusicShareContext, subscribeMusicShares } from '../../utils/musicShare'
 
@@ -35,9 +41,6 @@ function usageText(usage) {
   const two = usage.secondary ? `7天 ${usage.secondary.usedPercent}%` : ''
   return [one, two].filter(Boolean).join(' · ') + (usage.source === 'snapshot' ? ' · 快照' : '')
 }
-
-const CROSSING_CALL_NOTE = '【语音通话】现在正在和阿颖通话。请直接回答她刚说的话，保持自然、口语化、简短（通常 2-4 句）；不要使用标题、清单、代码块或链接。'
-const CROSSING_CALL_BILINGUAL_NOTE = '【双语语音通话】阿颖说中文，请用自然、简短的英文回答（通常 2-4 句），并在末尾另起一行写 [译:完整中文翻译]。方括号内只放中文翻译。'
 
 function ApprovalDialog({ approval, onRespond }) {
   const backdropRef = useRef(null)
@@ -412,7 +415,7 @@ export default function Crossing() {
       setError('当前 Agent 会话尚未就绪，或正在执行任务')
       return false
     }
-    const requestText = [visibleText, opts.inject].filter(Boolean).join('\n\n')
+    const requestText = withHiddenContext(visibleText, opts.inject)
     const clientMessageId = crypto.randomUUID()
     try { if (!flowRef.current.start(requestText, clientMessageId)) return false }
     catch (e) { setError(e.message); return false }
