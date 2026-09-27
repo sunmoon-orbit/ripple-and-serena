@@ -1,41 +1,43 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="200" height="200">
-  <!-- background -->
-  <circle cx="100" cy="100" r="100" fill="#1c1c24"/>
-  <circle cx="100" cy="100" r="92" fill="none" stroke="#c4a882" stroke-width="0.8" opacity="0.18"/>
-
-  <!-- tail feathers (behind body) -->
-  <path d="M 75 162 Q 58 182 50 196" stroke="#111116" stroke-width="10" stroke-linecap="round" fill="none"/>
-  <path d="M 88 168 Q 76 188 70 200" stroke="#111116" stroke-width="8" stroke-linecap="round" fill="none"/>
-  <path d="M 100 170 Q 95 190 93 202" stroke="#111116" stroke-width="6" stroke-linecap="round" fill="none"/>
-
-  <!-- left wing -->
-  <path d="M 56 118 Q 40 145 52 168 Q 68 160 76 140 Q 82 122 65 110 Z" fill="#111116"/>
-
-  <!-- body -->
-  <ellipse cx="98" cy="132" rx="42" ry="36" fill="#18181e"/>
-
-  <!-- head -->
-  <circle cx="108" cy="78" r="36" fill="#18181e"/>
-
-  <!-- head tuft feathers -->
-  <path d="M 94 44 Q 88 26 93 14" stroke="#18181e" stroke-width="7" stroke-linecap="round" fill="none"/>
-  <path d="M 106 42 Q 103 24 109 13" stroke="#18181e" stroke-width="5.5" stroke-linecap="round" fill="none"/>
-  <path d="M 117 47 Q 118 30 124 20" stroke="#18181e" stroke-width="4" stroke-linecap="round" fill="none"/>
-
-  <!-- eye -->
-  <circle cx="122" cy="70" r="12" fill="#e8c84a"/>
-  <circle cx="123" cy="70" r="7.5" fill="#0a0a0c"/>
-  <circle cx="126" cy="67" r="2.8" fill="white" opacity="0.9"/>
-
-  <!-- beak: thick curved raven beak -->
-  <path d="M 140 76 Q 172 70 174 80 Q 172 92 148 90 Q 138 88 138 82 Z" fill="#2c2a2a"/>
-  <path d="M 162 70 Q 174 71 174 80" stroke="#1a1818" stroke-width="2" fill="none" stroke-linecap="round"/>
-
-  <!-- tiny feet -->
-  <line x1="88" y1="166" x2="80" y2="184" stroke="#2a2828" stroke-width="3.5" stroke-linecap="round"/>
-  <line x1="82" y1="184" x2="72" y2="188" stroke="#2a2828" stroke-width="2.5" stroke-linecap="round"/>
-  <line x1="82" y1="184" x2="80" y2="192" stroke="#2a2828" stroke-width="2.5" stroke-linecap="round"/>
-  <line x1="104" y1="168" x2="98" y2="186" stroke="#2a2828" stroke-width="3.5" stroke-linecap="round"/>
-  <line x1="98" y1="186" x2="88" y2="190" stroke="#2a2828" stroke-width="2.5" stroke-linecap="round"/>
-  <line x1="98" y1="186" x2="97" y2="194" stroke="#2a2828" stroke-width="2.5" stroke-linecap="round"/>
+  <defs>
+    <radialGradient id="bg" cx="50%" cy="40%" r="65%">
+      <stop offset="0" stop-color="#dfe6ee"/><stop offset="1" stop-color="#bcc8d6"/>
+    </radialGradient>
+    <linearGradient id="feather" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#2a2f3d"/><stop offset="0.55" stop-color="#15171f"/><stop offset="1" stop-color="#0c0d12"/>
+    </linearGradient>
+    <linearGradient id="sheen" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#4b5a8c" stop-opacity="0"/><stop offset="0.5" stop-color="#5d6fa8" stop-opacity=".55"/><stop offset="1" stop-color="#7b5ea0" stop-opacity="0"/>
+    </linearGradient>
+    <clipPath id="c"><circle cx="100" cy="100" r="96"/></clipPath>
+  </defs>
+  <circle cx="100" cy="100" r="96" fill="url(#bg)"/>
+  <!-- 镜像：聊天里乌鸦在左边，让它朝右看，跟右边朝左的蜂鸟面对面 -->
+  <g clip-path="url(#c)">
+  <g transform="translate(200 0) scale(-1 1)">
+    <!-- 树枝，跟蜂鸟那张一家 -->
+    <path d="M12 152 C 70 140, 124 150, 190 136" stroke="#5e4a3b" stroke-width="7" fill="none" stroke-linecap="round"/>
+    <!-- 尾巴 -->
+    <path d="M126 128 L 168 164 L 160 146 L 176 150 Z" fill="#101218"/>
+    <!-- 身体 -->
+    <ellipse cx="108" cy="108" rx="38" ry="30" fill="url(#feather)" transform="rotate(-22 108 108)"/>
+    <!-- 翅膀 -->
+    <path d="M104 88 C 142 84, 164 108, 158 132 C 138 130, 116 118, 100 104 Z" fill="#191c26"/>
+    <path d="M112 96 C 134 96, 150 110, 152 124" stroke="url(#sheen)" stroke-width="5" fill="none" stroke-linecap="round"/>
+    <!-- 头 -->
+    <circle cx="78" cy="78" r="21" fill="url(#feather)"/>
+    <path d="M66 66 C 76 60, 90 62, 96 70" stroke="url(#sheen)" stroke-width="3" fill="none" stroke-linecap="round"/>
+    <!-- 嘴：乌鸦是粗壮微弯的嘴，不是香肠 -->
+    <path d="M60 78 C 50 78, 38 82, 32 88 C 42 88, 54 88, 62 86 Z" fill="#20222a"/>
+    <path d="M60 78 C 52 79, 42 83, 36 86" stroke="#3a3e4a" stroke-width="1.2" fill="none"/>
+    <!-- 眼睛：乌鸦的眼睛其实是深褐色的，不是黄的 -->
+    <circle cx="76" cy="74" r="5.2" fill="#6a7384"/>
+    <circle cx="76" cy="74" r="4.2" fill="#2b1e14"/>
+    <circle cx="77.4" cy="72.6" r="1.4" fill="#e9eef5"/>
+    <!-- 腿和脚，稳稳站着 -->
+    <path d="M102 134 L 100 147 M116 132 L 116 145" stroke="#1a1c22" stroke-width="3" stroke-linecap="round"/>
+    <path d="M94 148 q 6 -4 12 0 M110 146 q 6 -4 12 0" stroke="#1a1c22" stroke-width="2.6" fill="none" stroke-linecap="round"/>
+  </g>
+  </g>
+  <circle cx="100" cy="100" r="96" fill="none" stroke="#9aa9bb" stroke-width="2"/>
 </svg>
