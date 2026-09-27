@@ -189,6 +189,10 @@
     font-family: inherit; transition: background .15s;
   }
   #bg-menu button:hover { background: var(--border); }
+  #bg-menu .menu-sep { height: 1px; background: var(--border); margin: 4px 6px; }
+  #bg-menu .avatar-size-row { display: flex; align-items: center; gap: 8px; padding: 6px 12px; font-size: 13px; color: var(--text); }
+  #bg-menu .avatar-size-row input { flex: 1; min-width: 80px; accent-color: var(--accent); }
+  #bg-menu .avatar-preview { width: var(--avatar-size); height: var(--avatar-size); border-radius: var(--avatar-radius); object-fit: cover; border: 1.5px solid rgba(196,168,130,.3); flex-shrink: 0; }
   #theme-btn {
     width: 22px; height: 22px; border-radius: 50%; border: 2px solid var(--border);
     cursor: pointer; background: none; padding: 0; flex-shrink: 0;
@@ -267,8 +271,10 @@
   /* ========= CHAT PANEL ========= */
   #chat-messages { flex: 1; min-height: 0; width: 100%; overflow-y: auto; padding: 12px; display: flex; flex-direction: column; gap: 8px; }
   .msg-wrap { display: flex; align-items: flex-start; gap: 8px; }
+  /* 头像大小/形状可调（0927 阿颖：想要圆/方切换，而且 32px 配我们的长消息太小了） */
+  :root { --avatar-size: 40px; --avatar-radius: 50%; }
   .msg-avatar {
-    width: 32px; height: 32px; border-radius: 50%; object-fit: cover; flex-shrink: 0;
+    width: var(--avatar-size); height: var(--avatar-size); border-radius: var(--avatar-radius); object-fit: cover; flex-shrink: 0;
     border: 1.5px solid rgba(196,168,130,.2); cursor: pointer; transition: border-color .2s;
     margin-top: 2px;
   }
@@ -905,6 +911,13 @@
     <button id="bg-upload-btn">选择图片</button>
     <button id="bg-fit-btn">显示方式：完整图片</button>
     <button id="bg-clear-btn">恢复纯色</button>
+    <div class="menu-sep"></div>
+    <button id="avatar-shape-btn">头像：圆形（点此换方形）</button>
+    <div class="avatar-size-row">
+      <span>大小</span>
+      <input type="range" id="avatar-size-range" min="28" max="60" step="2" aria-label="头像大小">
+      <img class="avatar-preview" id="avatar-size-preview" alt="">
+    </div>
   </div>
 
   <!-- CHAT -->
@@ -2277,6 +2290,28 @@ document.getElementById('bg-upload').addEventListener('change', (e) => {
   reader.readAsDataURL(file)
   e.target.value = ''
 })
+
+// --- 头像形状/大小（0927）：存 raven- 前缀，搬家会一起带走 ---
+const AV_SHAPE_KEY = 'raven-avatar-shape', AV_SIZE_KEY = 'raven-avatar-size'
+function applyAvatarStyle() {
+  const shape = localStorage.getItem(AV_SHAPE_KEY) === 'square' ? 'square' : 'round'
+  const size = Math.min(60, Math.max(28, parseInt(localStorage.getItem(AV_SIZE_KEY)) || 40))
+  document.documentElement.style.setProperty('--avatar-size', size + 'px')
+  // 方形不做死直角，留一点圆角，跟气泡的圆角是一家人
+  document.documentElement.style.setProperty('--avatar-radius', shape === 'square' ? Math.round(size * 0.22) + 'px' : '50%')
+  document.getElementById('avatar-shape-btn').textContent = shape === 'square' ? '头像：方形（点此换圆形）' : '头像：圆形（点此换方形）'
+  document.getElementById('avatar-size-range').value = size
+  document.getElementById('avatar-size-preview').src = localStorage.getItem('raven-avatar') || '/raven/avatar-ripple.svg'
+}
+document.getElementById('avatar-shape-btn').addEventListener('click', () => {
+  localStorage.setItem(AV_SHAPE_KEY, localStorage.getItem(AV_SHAPE_KEY) === 'square' ? 'round' : 'square')
+  applyAvatarStyle()
+})
+document.getElementById('avatar-size-range').addEventListener('input', (e) => {
+  localStorage.setItem(AV_SIZE_KEY, e.target.value)
+  applyAvatarStyle()
+})
+applyAvatarStyle()
 
 // --- 搬家：导出/导入本机数据 ---
 // 归巢的聊天记录、便签、待办、头像、主题全在 localStorage 里，卸载 app 或者
