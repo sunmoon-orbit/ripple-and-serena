@@ -196,6 +196,8 @@ const LEGACY_UPLOAD_DIR = '/tmp/raven-uploads'  // 老消息里的附件回看�
 // 目录**故意在仓库外**：STATIC_DIR 是 git 仓库里的 raven/，往里丢 6.6MB 的包会把仓库撑肥。
 const DOWNLOAD_DIR = '/home/ripple/raven-downloads'
 const MIME = {
+  // 语音消息（0927）：我能发 [附件: xxx.mp3] 给她
+  '.mp3': 'audio/mpeg', '.m4a': 'audio/mp4', '.wav': 'audio/wav', '.ogg': 'audio/ogg',
   '.html': 'text/html; charset=utf-8',
   '.js':   'application/javascript',
   '.css':  'text/css',
