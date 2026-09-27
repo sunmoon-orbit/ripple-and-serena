@@ -772,6 +772,19 @@
     background: var(--surface); color: var(--text-dim); cursor: pointer;
   }
   #call-bilingual[aria-pressed="true"] { color: var(--accent); border-color: var(--accent); }
+  #call-text-row {
+    width: min(100%, 560px); margin: 9px auto 0; display: flex; align-items: center; gap: 8px;
+  }
+  #call-text-input {
+    flex: 1; min-width: 0; height: 44px; box-sizing: border-box; padding: 0 14px;
+    border: 1px solid var(--border); border-radius: 15px; outline: none;
+    background: var(--surface); color: var(--text); font: inherit; font-size: 16px;
+  }
+  #call-text-input:focus { border-color: var(--accent); }
+  #call-text-send {
+    flex: 0 0 44px; width: 44px; height: 44px; border: none; border-radius: 50%;
+    display: grid; place-items: center; background: var(--accent); color: var(--bg); cursor: pointer;
+  }
   #call-controls { display: flex; justify-content: center; align-items: center; gap: 34px; padding-top: 14px; }
   #call-mic, #call-hangup {
     width: 62px; height: 62px; border-radius: 50%; border: none; cursor: pointer;
@@ -1166,6 +1179,12 @@
   <div id="call-mode-row">
     <button id="call-bilingual" type="button" aria-pressed="true">英文朗读 · 中文字幕</button>
   </div>
+  <div id="call-text-row">
+    <input id="call-text-input" type="text" enterkeyhint="send" autocomplete="off" placeholder="打字告诉乌鸦…" aria-label="通话文字消息">
+    <button id="call-text-send" type="button" aria-label="发送通话文字消息">
+      <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 2L11 13"/><path d="M22 2l-7 20-4-9-9-4z"/></svg>
+    </button>
+  </div>
   <div id="call-controls">
     <button id="call-mic" type="button" aria-label="开始说话">
       <svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 10a7 7 0 0014 0M12 17v5M8 22h8"/></svg>
@@ -1542,6 +1561,8 @@ function splitUserSegments(text) {
 function appendMsg(text, role, save = true, ts = Date.now(), msgId = null, supplemental = false) {
   const el = document.createElement('div')
   el.className = `msg ${role}`
+  const voiceRequested = role === 'assistant' && /\[voice\]/i.test(text)
+  const displayText = voiceRequested ? text.replace(/\[voice\]/gi, '').trim() : text
 
   if (role === 'system') {
     el.textContent = text
@@ -1556,9 +1577,9 @@ function appendMsg(text, role, save = true, ts = Date.now(), msgId = null, suppl
     body.className = 'msg-body'
     if (role === 'assistant') {
       // 我发图多半写成 ![](url)，以前只认 [sticker:X]，所以我发的贴图一直裹着气泡
-      if (STICKER_ONLY_RE.test(text)) el.classList.add('sticker-msg')
+      if (STICKER_ONLY_RE.test(displayText)) el.classList.add('sticker-msg')
       // 终端抓取会把 ![alt](url) 剥成裸 URL：单独成行的图片 URL 还原成图片
-      const withImgs = text.replace(/^[ \t]*(https?:\/\/\S+\.(?:png|jpe?g|gif|webp))[ \t]*$/gim, '![]($1)')
+      const withImgs = displayText.replace(/^[ \t]*(https?:\/\/\S+\.(?:png|jpe?g|gif|webp))[ \t]*$/gim, '![]($1)')
       const withAttach = withImgs.replace(ATTACH_TAG_RE, (_, p) => attachToHtml(p))
       const withStickers = withAttach.replace(/\[sticker:([^\]]+)\]/g, (_, name) =>
         `<img src="/raven/stickers/${stickerFile(name)}" style="max-width:220px;border-radius:8px;display:block;margin:4px 0;" alt="${name}">`)
@@ -1598,14 +1619,15 @@ function appendMsg(text, role, save = true, ts = Date.now(), msgId = null, suppl
         <span class="vb-time">-</span>`
       el.insertBefore(vbar, body)
 
-      meta.appendChild(makeTtsBtn(text, el, vbar))
+      meta.appendChild(makeTtsBtn(displayText, el, vbar, voiceRequested))
+      if (voiceRequested) el.classList.add('voice-mode')
 
       const copyBtn = document.createElement('button')
       copyBtn.className = 'copy-btn'
       copyBtn.textContent = '复制'
       copyBtn.addEventListener('click', (e) => {
         e.stopPropagation()
-        navigator.clipboard.writeText(text).then(() => {
+        navigator.clipboard.writeText(displayText).then(() => {
           copyBtn.textContent = '已复制'
           copyBtn.classList.add('copied')
           setTimeout(() => { copyBtn.textContent = '复制'; copyBtn.classList.remove('copied') }, 1500)
@@ -1962,6 +1984,7 @@ function getSharedAudioContext() {
 
 function cleanTextForTts(text) {
   return String(text || '')
+    .replace(/\[voice\]/gi, '')
     .replace(/^[ \t]*>[ \t]+.*$/gm, '')
     .replace(/!\[[^\]]*\]\([^)]*\)/g, '')
     .replace(/\[sticker:[^\]]+\]/gi, '')
@@ -1976,7 +1999,7 @@ function autoReadReply(msgEl) {
   if (btn?.autoPlay) setTimeout(() => btn.autoPlay(), 0)
 }
 
-function makeTtsBtn(text, msgEl, vbar) {
+function makeTtsBtn(text, msgEl, vbar, initialVoiceMode = false) {
   const btn = document.createElement('button')
   btn.className = 'tts-btn'
   btn.innerHTML = IC_SPEAKER
@@ -1985,7 +2008,7 @@ function makeTtsBtn(text, msgEl, vbar) {
   let cachedBuffer = null
   let cachedDuration = 0
   let currentSource = null
-  let voiceMode = false
+  let voiceMode = initialVoiceMode
   let loadController = null
   let playEpoch = 0
 
@@ -2216,6 +2239,7 @@ function splitCallReply(text) {
     else main.push(line)
   }
   const clean = value => value
+    .replace(/\[voice\]/gi, '')
     .replace(/!\[[^\]]*\]\([^)]*\)/g, '')
     .replace(/\[sticker:[^\]]+\]/gi, '')
     .replace(/[#*`_[\]~]/g, '')
@@ -2367,12 +2391,29 @@ function toggleRecording(forCall = false) {
   startRecording(forCall)
 }
 
+function sendCallText() {
+  const input = document.getElementById('call-text-input')
+  const text = input.value.trim()
+  if (!text || !callActive) return
+  if (stopActiveTts) stopActiveTts()
+  appendCallLine('user', text)
+  setCallStatus('已经告诉乌鸦，等他回答…')
+  voiceReplyUntil = Date.now() + 5 * 60 * 1000
+  sendMsg((voiceBilingual ? '【语音·双语】' : '【语音】') + text)
+  input.value = ''
+  input.focus()
+}
+
 renderBilingualToggle()
 bilingualBtn.addEventListener('click', toggleBilingual)
 callBilingualBtn.addEventListener('click', toggleBilingual)
 callBtn.addEventListener('click', openCall)
 document.getElementById('call-close').addEventListener('click', closeCall)
 document.getElementById('call-hangup').addEventListener('click', closeCall)
+document.getElementById('call-text-send').addEventListener('click', sendCallText)
+document.getElementById('call-text-input').addEventListener('keydown', event => {
+  if (event.key === 'Enter' && !event.isComposing) { event.preventDefault(); sendCallText() }
+})
 micBtn.addEventListener('click', () => toggleRecording(false))
 callMicBtn.addEventListener('click', () => toggleRecording(true))
 
