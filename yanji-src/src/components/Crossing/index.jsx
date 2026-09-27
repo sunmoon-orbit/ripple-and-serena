@@ -9,6 +9,7 @@ import { AttachmentPicker } from '../Chat/AttachmentPicker'
 import CrossingTools from './Tools'
 import { sizeComposer } from './layout.mjs'
 import CrossingMessage from './Message'
+import VoiceCall from '../Chat/VoiceCall'
 import { threadsFromRead, completeTurn } from './messages.mjs'
 import { bindAgentSession, canAuthenticate } from './authorization.mjs'
 import { buildMusicShareContext, subscribeMusicShares } from '../../utils/musicShare'
@@ -34,6 +35,9 @@ function usageText(usage) {
   const two = usage.secondary ? `7天 ${usage.secondary.usedPercent}%` : ''
   return [one, two].filter(Boolean).join(' · ') + (usage.source === 'snapshot' ? ' · 快照' : '')
 }
+
+const CROSSING_CALL_NOTE = '【语音通话】现在正在和阿颖通话。请直接回答她刚说的话，保持自然、口语化、简短（通常 2-4 句）；不要使用标题、清单、代码块或链接。'
+const CROSSING_CALL_BILINGUAL_NOTE = '【双语语音通话】阿颖说中文，请用自然、简短的英文回答（通常 2-4 句），并在末尾另起一行写 [译:完整中文翻译]。方括号内只放中文翻译。'
 
 function ApprovalDialog({ approval, onRespond }) {
   const backdropRef = useRef(null)
@@ -130,6 +134,7 @@ export default function Crossing() {
   const toolsRef = useRef(null)
   const [warning, setWarning] = useState('')
   const [stopEpoch, setStopEpoch] = useState(0)
+  const [callOpen, setCallOpen] = useState(false)
 
   useEffect(() => { activeThreadRef.current = activeThread?.id || activeThread?.threadId || '' }, [activeThread])
   useEffect(() => { scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' }) }, [messages, items, approval])
@@ -191,7 +196,7 @@ export default function Crossing() {
     let disposed = false
     let denied = false
     const lock = () => {
-      denied = true; setCapability(''); flowRef.current.disconnect(); setMessages([]); setThreads([]); setModels([]); setUsage(null); setApproval(null); setTurn(null); setAttachments([]); setStopEpoch(n => n + 1)
+      denied = true; setCapability(''); flowRef.current.disconnect(); setMessages([]); setThreads([]); setModels([]); setUsage(null); setApproval(null); setTurn(null); setAttachments([]); setStopEpoch(n => n + 1); setCallOpen(false)
       setConnection('locked'); clearTimeout(reconnectRef.current); clearTimeout(expiryTimer)
       try { wsRef.current?.close() } catch {}
     }
@@ -417,6 +422,10 @@ export default function Crossing() {
     return true
   }, [sessionState.phase, starting, turn, uploading])
 
+  const sendCallMessage = useCallback((text, _images = [], opts = {}) => sendToolMessage(text, [], {
+    inject: opts.bilingual ? CROSSING_CALL_BILINGUAL_NOTE : CROSSING_CALL_NOTE,
+  }), [sendToolMessage])
+
   const activeId = sessionState.phase === 'ready' ? activeThread?.id : ''
   const shortcut = !!localCommand(draft)
   const selectedEntry = models.find(m => m.model === selection.model)
@@ -433,6 +442,12 @@ export default function Crossing() {
     setAttachments(prev => [...prev, { url, name: '表情包', kind: 'image' }].slice(0, 4)); setStickerOpen(false)
   }
   const toolItems = useMemo(() => items.filter((item) => item.type !== 'reasoning'), [items])
+  const callMessages = useMemo(() => messages.map(message => ({
+    id: message.id,
+    role: message.role,
+    content: message.text || '',
+    streaming: !!message.streaming,
+  })), [messages])
   if (!canAuthenticate(moonMemory) || agentBlocked || !sessionState.authenticated || !capability) return <div className="panel-shell crossing-panel"><div className="panel-empty"><p>渡口已锁定</p><p>{connection === 'reconnecting' ? '连接已断开，重连中；正在重新验证身份…' : connection === 'connecting' ? '正在验证拾羽记忆库连接…' : '请启用拾羽记忆库，并验证 API Token。'}</p><button className="btn-sm" onClick={() => setActivePanel('settings', 'moon-settings')}>前往设置</button></div></div>
 
   return (
@@ -474,12 +489,20 @@ export default function Crossing() {
           </div>
           {!!attachments.length && <div className="crossing-attachments">{attachments.map((a, i) => <div key={a.id || i}>{a.kind === 'image' && <img src={a.preview || a.url} alt="待发图片" />}<span>{a.name}</span><button onClick={() => setAttachments(prev => prev.filter((_, j) => j !== i))}>移除</button></div>)}</div>}
           <div ref={toolsRef} className="crossing-composer">
-            {toolsOpen && <div className="crossing-tool-card" role="dialog" aria-label="工具卡片"><div className="crossing-controls"><ToolMemoryContext.Provider value={{ ...moonMemory, baseUrl: `crossing+${moonMemory.baseUrl}`, apiToken: capability }}><CrossingTools onSend={sendToolMessage} /></ToolMemoryContext.Provider><div className="crossing-attachment-actions"><button disabled={!sessionState.authenticated || uploading || attachments.length >= 4} onClick={() => fileRef.current?.click()}>{uploading ? '上传中…' : imagesAllowed ? '图片／文件' : '文本文件'}</button><button disabled={!imagesAllowed || attachments.length >= 4} onClick={() => setStickerOpen(!stickerOpen)}>表情包</button>{!imagesAllowed && <small>模型尚未确认或不支持图片</small>}</div>{stickerOpen && <div className="crossing-stickers"><StickerPicker customStickers={customStickers} onSelect={addSticker} /></div>}</div></div>}
+            {toolsOpen && <div className="crossing-tool-card" role="dialog" aria-label="工具卡片"><div className="crossing-controls"><ToolMemoryContext.Provider value={{ ...moonMemory, baseUrl: `crossing+${moonMemory.baseUrl}`, apiToken: capability }}><CrossingTools onSend={sendToolMessage} onCall={() => { setCallOpen(true); setToolsOpen(false) }} callDisabled={!!turn || starting || sessionState.phase !== 'ready'} /></ToolMemoryContext.Provider><div className="crossing-attachment-actions"><button disabled={!sessionState.authenticated || uploading || attachments.length >= 4} onClick={() => fileRef.current?.click()}>{uploading ? '上传中…' : imagesAllowed ? '图片／文件' : '文本文件'}</button><button disabled={!imagesAllowed || attachments.length >= 4} onClick={() => setStickerOpen(!stickerOpen)}>表情包</button>{!imagesAllowed && <small>模型尚未确认或不支持图片</small>}</div>{stickerOpen && <div className="crossing-stickers"><StickerPicker customStickers={customStickers} onSelect={addSticker} /></div>}</div></div>}
             <AttachmentPicker strict ref={fileRef} imagesAllowed={imagesAllowed} onAttachment={addFile} onError={setError} onBusy={setUploading} />
             <div className="crossing-input"><button className="crossing-plus" onClick={() => setToolsOpen(open => !open)} aria-label="工具" aria-expanded={toolsOpen} title="工具"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M12 5v14M5 12h14" /></svg></button><textarea ref={inputRef} value={draft} onChange={(e) => setDraft(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey) && !e.nativeEvent.isComposing) { e.preventDefault(); turn ? steerTurn() : startTurn() } }} enterKeyHint="enter" placeholder={turn ? '补充消息…' : sessionState.phase === 'ready' ? '输入消息…' : sessionState.phase === 'loading' ? '正在加载会话…' : '先点击＋新建，或选择历史会话'} disabled={!sessionState.authenticated} rows="1" />{turn ? <><button className="crossing-steer" disabled={(!draft.trim() && !attachments.length) || steering || uploading} onClick={steerTurn}>{steering ? '补充中' : '补充'}</button><button className="crossing-stop" onClick={interrupt}>停止</button></> : <button disabled={(!shortcut && sessionState.phase !== 'ready') || !sessionState.authenticated || sessionState.phase === 'loading' || (!draft.trim() && !attachments.length) || starting || uploading} onClick={startTurn}>{starting ? '提交中' : shortcut ? '执行' : '发送'}</button>}</div>
           </div>
         </main>
       </div>
+      {callOpen && <VoiceCall
+        onClose={() => setCallOpen(false)}
+        onSend={sendCallMessage}
+        messages={callMessages}
+        ttsConfig={{ ...moonMemory, apiToken: capability, crossing: true }}
+        assistantName="Codex"
+        sendDisabled={!!turn || starting || sessionState.phase !== 'ready'}
+      />}
       {approval && <ApprovalDialog approval={approval} onRespond={respond} />}
     </div>
   )

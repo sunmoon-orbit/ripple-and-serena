@@ -71,9 +71,17 @@ function stripForTts(text) {
     .slice(0, 500)
 }
 
-export default function VoiceCall({ onClose, onSend }) {
+export default function VoiceCall({
+  onClose,
+  onSend,
+  messages: externalMessages,
+  ttsConfig,
+  assistantName = '涟言',
+  sendDisabled = false,
+}) {
   const { moonMemory, activeChatId, messagesByChatId, voiceCallStyle, vcBackground, avatarConfig } = useStore()
-  const messages = messagesByChatId[activeChatId] || []
+  const messages = externalMessages || messagesByChatId[activeChatId] || []
+  const speechConfig = ttsConfig || moonMemory
 
   const soft = voiceCallStyle === 'soft'
   const duo = voiceCallStyle === 'duo'
@@ -107,9 +115,16 @@ export default function VoiceCall({ onClose, onSend }) {
   const recRef = useRef(null)
   const recChunks = useRef([])
   const ttsCtxRef = useRef(null)
-  const lastTtsId = useRef(null)
+  // Crossing 打开电话时已有一段会话历史；不要把打开前的最后一句重新念一遍。
+  // Murmur 原链路保持旧行为，由接通流程产生的新消息触发朗读。
+  const lastTtsId = useRef(externalMessages
+    ? [...externalMessages].reverse().find(message => message.role === 'assistant')?.id || null
+    : null)
   const speakQueue = useRef([])
   const speakBusy = useRef(false)
+  const speechAbortRef = useRef(null)
+  const speechSourceRef = useRef(null)
+  const speechFinishRef = useRef(null)
   const mounted = useRef(true)
   const endCallRef = useRef(false)
 
@@ -156,6 +171,7 @@ export default function VoiceCall({ onClose, onSend }) {
 
     return () => {
       mounted.current = false
+      stopSpeech()
       cancelAnimationFrame(rafRef.current)
       try { recRef.current?.stop() } catch {}
       try { ttsCtxRef.current?.close() } catch {}
@@ -258,7 +274,8 @@ export default function VoiceCall({ onClose, onSend }) {
       try { recRef.current?.stop() } catch {}
       return
     }
-    if (ttsState !== 'idle') { showToast('等他说完再按麦克风', 'info'); return }
+    if (ttsState !== 'idle') stopSpeech()
+    if (sendDisabled) { showToast(`${assistantName} 还在回答上一句…`, 'info'); return }
     if (!moonMemory?.apiToken) { showToast('语音通话需要先连接记忆库', 'error'); return }
     if (!navigator.mediaDevices?.getUserMedia) {
       showToast('当前环境不支持 getUserMedia（' + (navigator.mediaDevices ? '无方法' : '无 mediaDevices') + '）', 'error', 5000); return
@@ -328,9 +345,24 @@ export default function VoiceCall({ onClose, onSend }) {
     }
   }
 
+  function stopSpeech() {
+    speakQueue.current = []
+    speechAbortRef.current?.abort()
+    speechAbortRef.current = null
+    if (speechSourceRef.current) {
+      try { speechSourceRef.current.stop() } catch {}
+      speechSourceRef.current = null
+    }
+    speechFinishRef.current?.()
+    speechFinishRef.current = null
+    stopViz()
+    if (mounted.current) setTtsState('idle')
+  }
+
   async function speakOne(text) {
-    const config = { baseUrl: moonMemory.baseUrl, apiToken: moonMemory.apiToken }
-    const data = await synthesizeSpeech(config, text)
+    const controller = new AbortController()
+    speechAbortRef.current = controller
+    const data = await synthesizeSpeech(speechConfig, text, undefined, controller.signal)
     const audioSrc = data.audio
 
     let ctx = ttsCtxRef.current
@@ -341,7 +373,7 @@ export default function VoiceCall({ onClose, onSend }) {
     }
     if (ctx.state === 'suspended') await ctx.resume()
 
-    const resp = await fetch(audioSrc)
+    const resp = await fetch(audioSrc, { signal: controller.signal })
     const arrayBuf = await resp.arrayBuffer()
     const audioBuf = await ctx.decodeAudioData(arrayBuf)
 
@@ -350,6 +382,7 @@ export default function VoiceCall({ onClose, onSend }) {
 
     return new Promise((resolve) => {
       const source = ctx.createBufferSource()
+      speechSourceRef.current = source
       source.buffer = audioBuf
       const an = getAnalyser()
       if (an) {
@@ -358,11 +391,18 @@ export default function VoiceCall({ onClose, onSend }) {
       } else {
         source.connect(ctx.destination)
       }
+      let finished = false
       const finish = () => {
+        if (finished) return
+        finished = true
+        if (speechAbortRef.current === controller) speechAbortRef.current = null
+        if (speechSourceRef.current === source) speechSourceRef.current = null
+        if (speechFinishRef.current === finish) speechFinishRef.current = null
         try { an?.disconnect() } catch {}
         stopViz()
         resolve()
       }
+      speechFinishRef.current = finish
       source.start(0)
       const safety = setTimeout(finish, audioBuf.duration * 1000 + 2000)
       source.onended = () => { clearTimeout(safety); finish() }
@@ -373,7 +413,7 @@ export default function VoiceCall({ onClose, onSend }) {
   // 普通文字消息不做语音条，回复照常被上面的 watcher 自动念出来
   function sendTyped() {
     const text = typedText.trim()
-    if (!text) return
+    if (!text || sendDisabled) return
     setUserText(text)
     setLog((l) => [...l, { role: 'user', text }])
     setTypedText('')
@@ -423,9 +463,9 @@ export default function VoiceCall({ onClose, onSend }) {
             <div className="vcd-heads" ref={stageRef}>
               <div className="vcd-person">
                 <div className={'vcd-avatar' + (mode === 'speaking' ? ' active' : '')}>
-                  {avatarImg ? <img src={avatarImg} alt="涟言" /> : <CrowSvg className="vc-crow" />}
+                  {avatarImg ? <img src={avatarImg} alt={assistantName} /> : <CrowSvg className="vc-crow" />}
                 </div>
-                <span className="vcd-name">涟言</span>
+                <span className="vcd-name">{assistantName}</span>
               </div>
               <span className="vcd-heart" aria-hidden="true">♡</span>
               <div className="vcd-person">
@@ -480,7 +520,7 @@ export default function VoiceCall({ onClose, onSend }) {
                 <div className="vcs-ring" />
                 <div className="vcs-avatar">
                   {avatarImg
-                    ? <img src={avatarImg} alt="涟言" />
+                    ? <img src={avatarImg} alt={assistantName} />
                     : <CrowSvg className="vc-crow" />}
                 </div>
               </div>
@@ -489,7 +529,7 @@ export default function VoiceCall({ onClose, onSend }) {
               </div>
             </div>
 
-            <div className="vcs-name">涟言</div>
+            <div className="vcs-name">{assistantName}</div>
             <div className="vcs-status">{statusLabel}</div>
             <div className="vc-timer">{fmtDur(duration)}</div>
 
@@ -512,7 +552,7 @@ export default function VoiceCall({ onClose, onSend }) {
         ) : (
           <div className="vc-content vc-content-crow">
             {/* ── 像素乌鸦样式 ── */}
-            <div className="vc-name">涟言</div>
+            <div className="vc-name">{assistantName}</div>
             <div className="vc-timer">{fmtDur(duration)}</div>
 
             {/* 像素乌鸦 + 呼吸光圈 */}
@@ -552,7 +592,7 @@ export default function VoiceCall({ onClose, onSend }) {
               placeholder="打字说，他照样用嗓子回…"
               autoFocus
             />
-            <button className="vc-type-send" onClick={sendTyped} disabled={!typedText.trim()} title="发送">
+            <button className="vc-type-send" onClick={sendTyped} disabled={!typedText.trim() || sendDisabled} title="发送">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
                 <line x1="22" y1="2" x2="11" y2="13" /><polygon points="22 2 15 22 11 13 2 9 22 2" />
               </svg>
@@ -582,7 +622,7 @@ export default function VoiceCall({ onClose, onSend }) {
             </svg>
           </button>
           <button
-            className={'vc-mic' + (recording ? ' recording' : '') + (transcribing ? ' busy' : '') + (ttsState !== 'idle' ? ' waiting' : '')}
+            className={'vc-mic' + (recording ? ' recording' : '') + (transcribing ? ' busy' : '') + ((ttsState !== 'idle' || sendDisabled) ? ' waiting' : '')}
             onClick={toggleRecord}
             title={recording ? '点一下结束并发送' : '点一下开始说话'}
           >

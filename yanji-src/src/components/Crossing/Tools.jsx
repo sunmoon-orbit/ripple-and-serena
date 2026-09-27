@@ -21,7 +21,7 @@ const entries = [
   ['通话记录', CallHistory], ['幸运轮盘', FortuneWheel],
   ['命运牌阵', FateDeck], ['塔罗', Tarot], ['今日签', DailyFortune],
 ]
-export default function CrossingTools({ onSend }) {
+export default function CrossingTools({ onSend, onCall, callDisabled = false }) {
   const [selected, setSelected] = useState(null)
   const [notice, setNotice] = useState('')
   const View = selected === null ? null : entries[selected][1]
@@ -33,5 +33,5 @@ export default function CrossingTools({ onSend }) {
       : selectedName === '塔罗'
         ? { onSend, readingTarget: 'Codex' }
         : {}
-  return <><div className="crossing-tool-links"><button className="sb-tool-item" onClick={() => setNotice('语音通话当前连接的是 Murmur 对话、模型和消息会话，并不是当前 Codex Agent。请回到 Murmur 后再发起通话。')}>语音通话<small>Murmur 通话链路</small></button>{entries.map(([name], i) => <button key={name} className="sb-tool-item" onClick={() => { setNotice(''); setSelected(i) }}>{name}</button>)}</div>{notice && <p role="status">{notice}<button onClick={() => setNotice('')}>知道了</button></p>}<small>除语音通话外，工具会留在当前 Agent 会话中打开；关闭后仍回到这里。</small>{View && <View onClose={() => setSelected(null)} {...viewProps} />}</>
+  return <><div className="crossing-tool-links"><button className="sb-tool-item" disabled={callDisabled} onClick={() => { setNotice(''); onCall?.() }}>语音通话<small>当前 Codex 会话</small></button>{entries.map(([name], i) => <button key={name} onClick={() => { setNotice(''); setSelected(i) }} className="sb-tool-item">{name}</button>)}</div>{notice && <p role="status">{notice}<button onClick={() => setNotice('')}>知道了</button></p>}<small>工具会留在当前 Agent 会话中打开；关闭后仍回到这里。</small>{View && <View onClose={() => setSelected(null)} {...viewProps} />}</>
 }

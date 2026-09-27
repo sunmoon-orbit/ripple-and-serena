@@ -381,9 +381,24 @@ test('real Crossing components preserve thread state across tools and model appl
     assert.ok((await page.locator('.crossing-session.active').innerText()).includes('thread-two'))
   }
   await page.getByRole('button', { name: /语音通话/ }).click()
-  assert.ok((await page.getByRole('status').innerText()).includes('并不是当前 Codex Agent'))
+  await page.locator('.vc-overlay').waitFor()
+  assert.equal(await page.locator('.vc-name, .vcs-name, .vcd-name').first().innerText(), 'Codex')
   assert.equal(await textarea.inputValue(), '工具打开前的草稿')
-  await page.getByRole('button', { name: '知道了', exact: true }).click()
+  await page.getByTitle('打字说').click()
+  await page.locator('.vc-type-input').fill('在渡口电话里回答我')
+  await page.locator('.vc-type-send').click()
+  await page.waitForFunction(() => window.__wire.some(message => message.type === 'crossing/turn/start' && message.text?.includes('【语音通话】')))
+  await page.locator('.crossing-working').waitFor()
+  delayTts = true
+  await page.evaluate(() => window.__finishTurn())
+  await page.locator('.crossing-working').waitFor({ state: 'hidden' })
+  await page.waitForTimeout(80)
+  assert.ok(heldTts, 'completed Codex call reply starts Crossing TTS')
+  await page.locator('.vc-mic').click()
+  const callTtsAborted = await heldTts.fulfill({ json: { audio: 'late-call-audio' } }).then(() => false, () => true)
+  assert.equal(callTtsAborted, true, 'tapping the call microphone aborts in-flight speech synthesis')
+  delayTts = false; heldTts = null
+  await page.getByTitle('挂断').click()
 
   const turnsBeforeModelCommand = await page.evaluate(() => window.__wire.filter(m => m.type === 'crossing/turn/start').length)
   await textarea.fill(' /MODEL ')
