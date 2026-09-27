@@ -730,6 +730,13 @@
   @keyframes vb-bounce { 0%,100% { transform: scaleY(.4) } 50% { transform: scaleY(1) } }
   .vb-time { font-size: 11px; color: var(--text-dim); flex-shrink: 0; min-width: 24px; text-align: right; }
 
+  /* 通话结束记录：沿用言叽的微信式小气泡 */
+  .msg.call-record .msg-body {
+    display: flex; align-items: center; gap: 8px; min-width: 142px;
+    font-size: 15px; font-weight: 600; user-select: none;
+  }
+  .msg.call-record .msg-body svg { flex: 0 0 auto; opacity: .86; }
+
   /* 归巢通话：独立界面，底层仍是按下说话 → STT → CC → TTS */
   #call-overlay {
     position: fixed; inset: 0; z-index: 9800; display: none; flex-direction: column;
@@ -1687,8 +1694,29 @@ function appendMsg(text, role, save = true, ts = Date.now(), msgId = null, suppl
   return el
 }
 
+function appendCallRecord(call, save = true, ts = Date.now()) {
+  const duration = Math.max(0, Number(call?.duration) || 0)
+  const label = call?.status === 'cancelled'
+    ? '已取消'
+    : `通话时长 ${String(Math.floor(duration / 60)).padStart(2, '0')}:${String(duration % 60).padStart(2, '0')}`
+  const el = appendMsg(label, 'user', false, ts)
+  el.classList.add('call-record')
+  const body = el.querySelector('.msg-body')
+  body.textContent = ''
+  const text = document.createElement('span')
+  text.textContent = label
+  body.appendChild(text)
+  body.insertAdjacentHTML('beforeend', '<svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07 19.5 19.5 0 01-6-6A19.79 19.79 0 012.12 4.18 2 2 0 014.11 2h3a2 2 0 012 1.72c.13.96.36 1.9.69 2.8a2 2 0 01-.45 2.11L8.09 9.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45c.91.33 1.85.56 2.81.69A2 2 0 0122 16.92z"/></svg>')
+  if (save) {
+    chatHistory.push({ role: 'user', ts, call: { status: call?.status === 'cancelled' ? 'cancelled' : 'ended', duration } })
+    saveHistory(chatHistory)
+  }
+  return el
+}
+
 function restoreHistory() {
   chatHistory.forEach(m => {
+    if (m.call) { appendCallRecord(m.call, false, m.ts || Date.now()); return }
     const el = appendMsg(m.text, m.role, false, m.ts || Date.now(), m.msgId || null, !!m.supplemental)
     if (m.thinking) appendThinkingBlock(m.thinking, el)
   })
@@ -2157,6 +2185,7 @@ let activeSttController = null
 let callActive = false
 let callStartedAt = 0
 let callTimerId = null
+let callHadInteraction = false
 
 function renderBilingualToggle() {
   bilingualBtn.setAttribute('aria-pressed', voiceBilingual ? 'true' : 'false')
@@ -2187,6 +2216,7 @@ function openCall() {
   callActive = true
   voiceReplyUntil = 0
   callStartedAt = Date.now()
+  callHadInteraction = false
   document.getElementById('call-avatar').src = localStorage.getItem('raven-avatar') || '/raven/avatar-ripple.svg'
   document.getElementById('call-log').innerHTML = ''
   callOverlay.classList.add('show')
@@ -2197,6 +2227,9 @@ function openCall() {
 }
 
 function closeCall() {
+  if (!callActive) return
+  const duration = Math.max(0, Math.floor((Date.now() - callStartedAt) / 1000))
+  const record = { status: callHadInteraction ? 'ended' : 'cancelled', duration }
   callActive = false
   voiceReplyUntil = 0
   clearInterval(callTimerId)
@@ -2210,6 +2243,7 @@ function closeCall() {
   if (stopActiveTts) stopActiveTts()
   callOverlay.classList.remove('show', 'speaking')
   syncMicState('idle')
+  appendCallRecord(record)
 }
 
 function appendCallLine(role, main, translation = '') {
@@ -2248,6 +2282,7 @@ function splitCallReply(text) {
 }
 
 function handleCallReply(text, msgEl) {
+  callHadInteraction = true
   const parts = splitCallReply(text)
   if (parts.main || parts.translation) appendCallLine('assistant', parts.main || '（乌鸦发来了一条消息）', parts.translation)
   setCallStatus(parts.main ? '乌鸦准备开口…' : '乌鸦发来了一条消息')
@@ -2296,6 +2331,7 @@ async function transcribeAndSend(blob, forCall) {
     if (!text) throw new Error('没有听清，再说一次吧')
     if (forCall && !callActive) return
     if (forCall) {
+      callHadInteraction = true
       appendCallLine('user', text)
       setCallStatus('已经告诉乌鸦，等他回答…')
     }
@@ -2396,6 +2432,7 @@ function sendCallText() {
   const text = input.value.trim()
   if (!text || !callActive) return
   if (stopActiveTts) stopActiveTts()
+  callHadInteraction = true
   appendCallLine('user', text)
   setCallStatus('已经告诉乌鸦，等他回答…')
   voiceReplyUntil = Date.now() + 5 * 60 * 1000
