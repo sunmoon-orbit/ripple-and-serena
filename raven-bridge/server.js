@@ -315,6 +315,8 @@ function tmuxCapture() {
 
 // 阿颖发来一条消息的统一入口：WebSocket 和 HTTP（通知栏快捷回复）都走这里，
 // 免得两条路各写一份、改了一边忘另一边。
+let switchQuietUntil = 0   // 切模型后这段时间内她的消息延后送（见 ingestUserMessage）
+
 function ingestUserMessage(text, cid) {
   lastUserMsgTs = Date.now()
   // 告诉共用的那格时间戳：她刚跟涟言说过话。言叽算「离开多久」时会跟本地
@@ -327,6 +329,17 @@ function ingestUserMessage(text, cid) {
   archiveMsg('human', text)
   // 前端消息一律带【阿颖】前缀：CC 靠它区分「浏览器来的要用 curl 回」还是终端直聊。
   // 旧逻辑绑在 mcpSseClients.size 上，MCP 掉线就裸发，CC 回终端她在浏览器看不见（0712 实锤）
+  // 刚切过模型的几秒里别往终端敲：/model 还在处理，这时敲进去的字会被吞（0926、0927 各吞过一条）。
+  // 先回执让她看到发出去了，等窗口过了再送；存档上面已经做了，不会丢。
+  const wait = switchQuietUntil - Date.now()
+  if (wait > 0) {
+    broadcast({ type: 'sent', text, ts: Date.now(), cid: cid || null })
+    console.log(`[tmux] 刚切模型，${wait}ms 后再送她的消息`)
+    setTimeout(() => {
+      if (!tmuxSend('【阿颖】' + text) && remoteListenerAlive()) pendingForRemote.push({ text, ts: Date.now() })
+    }, wait)
+    return
+  }
   const delivered = tmuxSend('【阿颖】' + text)
   broadcast({ type: 'sent', text, ts: Date.now(), cid: cid || null })
   // 终端里没人接，但 remote-control 那个 CC 可能正醒着——先往取件箱里放，让它自己来拿。
@@ -704,8 +717,12 @@ const handleCcSettings = ccSettings.createHandler(ccSettings.createStore({
   // 只看「屏幕在不在变」不够：工具跑着但屏幕静止时（比如 sleep 轮询）isThinking 是 false，
   // /model 会被敲进正在干活的 CC 里吞掉（0926 阿颖切 sonnet 没生效）。
   // CC 忙的时候底部有一行「✽ Churning… (35s · …」，看到它就不许切。
-  canSwitchModel: () => !isThinking && !/…\s*\(\d+[smh]/.test(tmuxCapture().split('\n').slice(-12).join('\n')),
-  switchModel: model => tmuxSend(`/model ${model}`),
+  canSwitchModel: () => Date.now() - lastUserMsgTs > 5000 && !isThinking && !/…\s*\(\d+[smh]/.test(tmuxCapture().split('\n').slice(-12).join('\n')),
+  switchModel: model => {
+    const ok = tmuxSend(`/model ${model}`)
+    if (ok) switchQuietUntil = Date.now() + 6000
+    return ok
+  },
 })
 
 const server = http.createServer((req, res) => {
