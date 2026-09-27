@@ -383,6 +383,7 @@
 
   /* timestamp + copy */
   .msg-meta { display: flex; justify-content: flex-end; align-items: center; gap: 8px; margin-top: 5px; }
+  .supplement-label { font-size: 10px; opacity: .72; margin-bottom: 3px; letter-spacing: .08em; }
   .msg-time { font-size: 10px; color: var(--text-dim); opacity: 0; transition: opacity .2s; }
   .msg.show-meta .msg-time { opacity: 1; }
   .copy-btn {
@@ -408,11 +409,18 @@
 
   /* thinking dots */
   #thinking { align-self: flex-start; display: none; padding: 10px 14px; }
-  #thinking.show { display: flex; gap: 5px; align-items: center; }
+  #thinking.show, #thinking.busy { display: flex; gap: 5px; align-items: center; }
   .dot-anim { width: 7px; height: 7px; border-radius: 50%; background: var(--text-dim); animation: blink 1.2s infinite; }
   .dot-anim:nth-child(2) { animation-delay: .2s; }
   .dot-anim:nth-child(3) { animation-delay: .4s; }
   @keyframes blink { 0%,80%,100% { opacity: .2 } 40% { opacity: 1 } }
+  #interrupt-btn {
+    display: none; margin-left: 7px; padding: 3px 9px; border-radius: 10px;
+    border: 1px solid rgba(210,90,90,.55); background: rgba(210,90,90,.1);
+    color: #d66; font-size: 11px; cursor: pointer;
+  }
+  #thinking.busy #interrupt-btn { display: inline-flex; }
+  #interrupt-btn:disabled { opacity: .45; cursor: default; }
 
   #chat-input-row {
     display: flex; padding: 10px 12px; gap: 8px;
@@ -426,14 +434,22 @@
   }
   #chat-input::-webkit-scrollbar { display: none; }
   #chat-input:focus { border-color: var(--accent); }
-  #attach-btn {
+  #attach-btn, #mic-btn {
     width: 38px; height: 38px; flex-shrink: 0; align-self: flex-end;
     background: none; border: 1px solid var(--border); border-radius: 50%;
     color: var(--text-dim); cursor: pointer;
     display: flex; align-items: center; justify-content: center;
     transition: border-color .2s, color .2s;
   }
-  #attach-btn:active { color: var(--accent); border-color: var(--accent); }
+  #attach-btn:active, #mic-btn:active { color: var(--accent); border-color: var(--accent); }
+  #mic-btn.recording { color: #e25b5b; border-color: #e25b5b; background: rgba(226,91,91,.12); }
+  #mic-btn.transcribing { opacity: .55; }
+  #bilingual-toggle {
+    flex-shrink: 0; align-self: center; padding: 4px 7px; border-radius: 10px;
+    border: 1px solid var(--border); background: none; color: var(--text-dim);
+    font-size: 10px; cursor: pointer;
+  }
+  #bilingual-toggle[aria-pressed="true"] { color: var(--accent); border-color: var(--accent); background: rgba(196,168,130,.1); }
   #attach-preview {
     padding: 6px 12px 0; display: none; flex-wrap: wrap; gap: 6px;
   }
@@ -924,7 +940,7 @@
   <div id="chat" class="panel active">
     <div id="compress-banner" class="compress-banner">⚡ 对话已压缩，乌鸦记忆重置了</div>
     <div id="chat-messages">
-      <div id="thinking"><div class="dot-anim"></div><div class="dot-anim"></div><div class="dot-anim"></div></div>
+      <div id="thinking"><div class="dot-anim"></div><div class="dot-anim"></div><div class="dot-anim"></div><button id="interrupt-btn" type="button">停</button></div>
     </div>
     <button id="scroll-btn" aria-label="滚到底部">↓</button>
     <div id="attach-preview"></div>
@@ -936,6 +952,12 @@
         </svg>
       </button>
       <input type="file" id="file-input" style="display:none" accept="image/*,*/*">
+      <button id="mic-btn" type="button" aria-label="开始录音" title="开始录音">
+        <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+          <rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 10a7 7 0 0014 0M12 17v5M8 22h8"/>
+        </svg>
+      </button>
+      <button id="bilingual-toggle" type="button" aria-pressed="false" title="双语回复">双语</button>
       <button id="sticker-btn" aria-label="贴图">🐦</button>
       <textarea id="chat-input" rows="1" placeholder="发消息给 Ripple…"></textarea>
       <button id="send-btn">
@@ -1322,7 +1344,7 @@ function connect() {
           shownCids.add(msg.cid)
           if (shownCids.size > 200) shownCids.delete(shownCids.values().next().value)
         }
-        for (const seg of splitUserSegments(msg.text)) appendMsg(seg, 'user')
+        for (const seg of splitUserSegments(msg.text)) appendMsg(seg, 'user', true, msg.ts || Date.now(), null, !!msg.supplemental)
       }
       else if (msg.type === 'reply') {
         // 有 id 的回复不管是不是补发，见过就不再画（兜底：万一又有两条连接同时收）
@@ -1333,6 +1355,7 @@ function connect() {
         if (!alreadyShown) {
           if (msg.id) shownMsgIds.add(msg.id)
           const msgEl = appendMsg(msg.text, 'assistant', true, msg.ts || Date.now(), msg.id || null)
+          if (!msg.replayed && Date.now() < voiceReplyUntil) autoReadReply(msgEl)
           if (msg.thinking) {
             appendThinkingBlock(msg.thinking, msgEl)
             const last = chatHistory[chatHistory.length - 1]
@@ -1344,6 +1367,7 @@ function connect() {
         }
       }
       else if (msg.type === 'thinking') setThinking(msg.active)
+      else if (msg.type === 'busy') setBusy(msg.active)
       else if (msg.type === 'thinking_block') appendThinkingBlock(msg.text)
       else if (msg.type === 'compressed') showCompressBanner()
       else if (msg.type === 'permission_prompt') showPermPrompt(msg)
@@ -1422,13 +1446,19 @@ function splitUserSegments(text) {
   return segs.length > 1 ? segs : [text]
 }
 
-function appendMsg(text, role, save = true, ts = Date.now(), msgId = null) {
+function appendMsg(text, role, save = true, ts = Date.now(), msgId = null, supplemental = false) {
   const el = document.createElement('div')
   el.className = `msg ${role}`
 
   if (role === 'system') {
     el.textContent = text
   } else {
+    if (role === 'user' && supplemental) {
+      const label = document.createElement('div')
+      label.className = 'supplement-label'
+      label.textContent = '补充'
+      el.appendChild(label)
+    }
     const body = document.createElement('div')
     body.className = 'msg-body'
     if (role === 'assistant') {
@@ -1534,6 +1564,7 @@ function appendMsg(text, role, save = true, ts = Date.now(), msgId = null) {
   if (save && role !== 'system') {
     const entry = { text, role, ts }
     if (msgId) entry.msgId = msgId
+    if (supplemental) entry.supplemental = true
     chatHistory.push(entry)
     saveHistory(chatHistory)
     fetch('/raven/activity', { method: 'POST', headers: { Authorization: 'Bearer ' + (localStorage.getItem('raven-token') || '') } }).catch(() => {})
@@ -1543,7 +1574,7 @@ function appendMsg(text, role, save = true, ts = Date.now(), msgId = null) {
 
 function restoreHistory() {
   chatHistory.forEach(m => {
-    const el = appendMsg(m.text, m.role, false, m.ts || Date.now())
+    const el = appendMsg(m.text, m.role, false, m.ts || Date.now(), m.msgId || null, !!m.supplemental)
     if (m.thinking) appendThinkingBlock(m.thinking, el)
   })
   // 图片/贴图懒加载后才撑开页面，延迟滚底确保到最新消息
@@ -1793,6 +1824,28 @@ function setThinking(active) {
   if (active) chatBox.scrollTop = chatBox.scrollHeight
 }
 
+function setBusy(active) {
+  const el = document.getElementById('thinking')
+  el.classList.toggle('busy', active)
+  const btn = document.getElementById('interrupt-btn')
+  if (active) btn.disabled = false
+}
+
+document.getElementById('interrupt-btn').addEventListener('click', async event => {
+  const btn = event.currentTarget
+  btn.disabled = true
+  try {
+    const response = await fetch('/raven/interrupt', {
+      method: 'POST',
+      headers: { Authorization: 'Bearer ' + (localStorage.getItem('raven-token') || '') },
+    })
+    const result = await response.json().catch(() => ({}))
+    if (!response.ok || !result.interrupted) btn.disabled = false
+  } catch {
+    btn.disabled = false
+  }
+})
+
 function showCompressBanner() {
   document.getElementById('compress-banner').classList.add('show')
   appendMsg('⚡ 对话已压缩，乌鸦记忆重置了', 'system', false)
@@ -1803,6 +1856,32 @@ const TTS_URL = '/raven/tts'
 const IC_SPEAKER = `<svg viewBox="0 0 24 24" width="12" height="12" fill="currentColor"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02z"/></svg>`
 const IC_PAUSE   = `<svg viewBox="0 0 24 24" width="12" height="12" fill="currentColor"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>`
 const IC_DOTS    = `<svg viewBox="0 0 24 24" width="12" height="12" fill="currentColor"><circle cx="4" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="20" cy="12" r="2"/></svg>`
+let sharedAudioCtx = null
+let stopActiveTts = null
+let voiceReplyUntil = 0
+
+function getSharedAudioContext() {
+  const AudioContextClass = window.AudioContext || window.webkitAudioContext
+  if (!AudioContextClass) return null
+  if (!sharedAudioCtx || sharedAudioCtx.state === 'closed') sharedAudioCtx = new AudioContextClass()
+  return sharedAudioCtx
+}
+
+function cleanTextForTts(text) {
+  return String(text || '')
+    .replace(/^[ \t]*>[ \t]+.*$/gm, '')
+    .replace(/!\[[^\]]*\]\([^)]*\)/g, '')
+    .replace(/\[sticker:[^\]]+\]/gi, '')
+    .replace(/[#*`_[\]~>]/g, '')
+    .replace(/\n{2,}/g, '\n')
+    .trim()
+    .slice(0, 500)
+}
+
+function autoReadReply(msgEl) {
+  const btn = msgEl && msgEl.querySelector('.tts-btn')
+  if (btn?.autoPlay) setTimeout(() => btn.autoPlay(), 0)
+}
 
 function makeTtsBtn(text, msgEl, vbar) {
   const btn = document.createElement('button')
@@ -1813,7 +1892,6 @@ function makeTtsBtn(text, msgEl, vbar) {
   let cachedBuffer = null
   let cachedDuration = 0
   let currentSource = null
-  let audioCtx = null
   let voiceMode = false
 
   const vbPlay = vbar ? vbar.querySelector('.vb-play') : null
@@ -1834,13 +1912,17 @@ function makeTtsBtn(text, msgEl, vbar) {
 
   function stopCurrent() {
     if (currentSource) { try { currentSource.stop() } catch {} currentSource = null }
+    if (stopActiveTts === stopCurrent) stopActiveTts = null
     setPlaying(false)
     if (vbTime && cachedDuration) vbTime.textContent = fmtDur(cachedDuration)
   }
 
   async function loadAndPlay() {
-    if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)()
-    if (audioCtx.state === 'suspended') audioCtx.resume()
+    const audioCtx = getSharedAudioContext()
+    const spokenText = cleanTextForTts(text)
+    if (!audioCtx || !spokenText) return
+    if (stopActiveTts && stopActiveTts !== stopCurrent) stopActiveTts()
+    if (audioCtx.state === 'suspended') await audioCtx.resume()
 
     if (!cachedBuffer) {
       btn.innerHTML = IC_DOTS
@@ -1850,7 +1932,7 @@ function makeTtsBtn(text, msgEl, vbar) {
         const res = await fetch(TTS_URL, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ text: text.replace(/[#*`_[\]~>]/g, '').slice(0, 500), token: localStorage.getItem('raven-token') || '' })
+          body: JSON.stringify({ text: spokenText, token: localStorage.getItem('raven-token') || '' })
         })
         if (!res.ok) throw new Error()
         const { audio: dataUri } = await res.json()
@@ -1877,6 +1959,7 @@ function makeTtsBtn(text, msgEl, vbar) {
     src.onended = stopCurrent
     src.start(0)
     currentSource = src
+    stopActiveTts = stopCurrent
     setPlaying(true)
   }
 
@@ -1893,6 +1976,9 @@ function makeTtsBtn(text, msgEl, vbar) {
   }
 
   btn.addEventListener('click', handleClick)
+  btn.autoPlay = () => {
+    if (!currentSource) loadAndPlay()
+  }
   if (vbPlay) vbPlay.addEventListener('click', (e) => { e.stopPropagation(); handleClick(e) })
 
   // tap waveform to exit voice mode
@@ -1916,6 +2002,124 @@ let pendingFiles = []  // [{ name, path }]
 
 document.getElementById('attach-btn').addEventListener('click', () => {
   document.getElementById('file-input').click()
+})
+
+// --- 归巢通话：按一下录音，再按一下转写并发送 ---
+const BILINGUAL_KEY = 'raven-voice-bilingual'
+const micBtn = document.getElementById('mic-btn')
+const bilingualBtn = document.getElementById('bilingual-toggle')
+let voiceBilingual = localStorage.getItem(BILINGUAL_KEY) === '1'
+let mediaRecorder = null
+let recordedChunks = []
+let voiceStarting = false
+
+function renderBilingualToggle() {
+  bilingualBtn.setAttribute('aria-pressed', voiceBilingual ? 'true' : 'false')
+}
+renderBilingualToggle()
+
+bilingualBtn.addEventListener('click', () => {
+  voiceBilingual = !voiceBilingual
+  localStorage.setItem(BILINGUAL_KEY, voiceBilingual ? '1' : '0')
+  renderBilingualToggle()
+})
+
+async function transcribeAndSend(blob) {
+  micBtn.classList.remove('recording')
+  micBtn.classList.add('transcribing')
+  micBtn.setAttribute('aria-label', '正在转文字')
+  const form = new FormData()
+  form.append('audio', blob, 'audio.webm')
+  try {
+    const response = await fetch('/raven/stt', {
+      method: 'POST',
+      headers: { Authorization: 'Bearer ' + (localStorage.getItem('raven-token') || '') },
+      body: form,
+    })
+    if (!response.ok) throw new Error(`转写失败（${response.status}）`)
+    const result = await response.json()
+    const text = String(result.text || '').trim()
+    if (!text) throw new Error('没有听清，再说一次吧')
+    voiceReplyUntil = Date.now() + 5 * 60 * 1000
+    sendMsg((voiceBilingual ? '【语音·双语】' : '【语音】') + text)
+  } catch (error) {
+    appendMsg(error.message || '语音转写失败，请再试一次', 'system', false)
+  } finally {
+    micBtn.classList.remove('transcribing')
+    micBtn.setAttribute('aria-label', '开始录音')
+    micBtn.title = '开始录音'
+  }
+}
+
+async function startRecording() {
+  if (!navigator.mediaDevices?.getUserMedia || !window.MediaRecorder) {
+    appendMsg('当前浏览器不支持录音', 'system', false)
+    return
+  }
+  const audioCtx = getSharedAudioContext()
+  if (audioCtx?.state === 'suspended') audioCtx.resume().catch(() => {})
+  if (stopActiveTts) stopActiveTts()
+  voiceStarting = true
+  let stream
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({
+      audio: { echoCancellation: true, noiseSuppression: true, channelCount: 1 },
+    })
+  } catch (error) {
+    appendMsg('麦克风打不开：' + (error.message || error.name || '请检查权限'), 'system', false)
+    voiceStarting = false
+    return
+  }
+  recordedChunks = []
+  let recorder
+  try {
+    recorder = new MediaRecorder(stream)
+  } catch (error) {
+    stream.getTracks().forEach(track => track.stop())
+    appendMsg('无法开始录音：' + (error.message || error.name || '录音格式不受支持'), 'system', false)
+    voiceStarting = false
+    return
+  }
+  mediaRecorder = recorder
+  voiceStarting = false
+  recorder.ondataavailable = event => {
+    if (event.data && event.data.size) recordedChunks.push(event.data)
+  }
+  recorder.onstop = () => {
+    stream.getTracks().forEach(track => track.stop())
+    if (mediaRecorder === recorder) mediaRecorder = null
+    const blob = new Blob(recordedChunks, { type: recorder.mimeType || 'audio/webm' })
+    if (blob.size < 1200) {
+      micBtn.classList.remove('recording')
+      micBtn.setAttribute('aria-label', '开始录音')
+      micBtn.title = '开始录音'
+      appendMsg('录音太短了，再说一次吧', 'system', false)
+      return
+    }
+    transcribeAndSend(blob)
+  }
+  try {
+    recorder.start()
+  } catch (error) {
+    stream.getTracks().forEach(track => track.stop())
+    mediaRecorder = null
+    appendMsg('无法开始录音：' + (error.message || error.name || '录音启动失败'), 'system', false)
+    return
+  }
+  micBtn.classList.add('recording')
+  micBtn.setAttribute('aria-label', '停止录音')
+  micBtn.title = '停止并发送'
+}
+
+micBtn.addEventListener('click', () => {
+  const audioCtx = getSharedAudioContext()
+  if (audioCtx?.state === 'suspended') audioCtx.resume().catch(() => {})
+  if (micBtn.classList.contains('transcribing') || voiceStarting) return
+  if (mediaRecorder?.state === 'recording') {
+    mediaRecorder.stop()
+    return
+  }
+  startRecording()
 })
 
 // ── sticker picker ────────────────────────────────────────────────────────

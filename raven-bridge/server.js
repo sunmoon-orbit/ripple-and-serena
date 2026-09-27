@@ -158,6 +158,34 @@ function moonPost(pathname, body, method = 'POST') {
   })
 }
 
+function moonMultipart(pathname, contentType, body) {
+  return new Promise((resolve, reject) => {
+    const opts = {
+      hostname: '127.0.0.1', port: 3210, path: pathname, method: 'POST',
+      headers: {
+        Authorization: `Bearer ${MOON_TOKEN}`,
+        'Content-Type': contentType,
+        'Content-Length': body.length,
+      },
+    }
+    const upstream = http.request(opts, response => {
+      let buf = ''
+      response.on('data', chunk => { buf += chunk })
+      response.on('end', () => {
+        try { resolve({ status: response.statusCode, data: JSON.parse(buf) }) }
+        catch { resolve({ status: response.statusCode, data: { error: 'invalid stt response' } }) }
+      })
+    })
+    upstream.on('error', reject)
+    upstream.end(body)
+  })
+}
+
+function ravenBearerValid(req) {
+  const auth = req.headers.authorization || ''
+  return auth.startsWith('Bearer ') && tokenIsValid(auth.slice(7))
+}
+
 const STATIC_DIR = path.join(__dirname, '..', 'raven')
 const YANJI_DIR = path.join(__dirname, '..', 'yanji')
 // 上传目录改持久位置：/tmp 重启即清空，聊天记录里的图片会全部变裂图（2026-07-05）
@@ -313,11 +341,29 @@ function tmuxCapture() {
   } catch { return '' }
 }
 
+// Claude Code 真正在跑这一轮时，pane 底部会保留带耗时的忙碌行。
+// 不用 isThinking 代替：它只表示屏幕刚变化过，空闲提示符出现后的短时间也可能为 true。
+function captureShowsBusy(capture) {
+  return /…\s*\(\d+[smh]/.test(capture.split('\n').slice(-12).join('\n'))
+}
+
+function ccBusy() { return captureShowsBusy(tmuxCapture()) }
+
+function interruptCc() {
+  if (!ccBusy()) return false
+  const target = ccTarget()
+  if (!target) return false
+  return boundedSync.execFileBounded('tmux-interrupt', 'tmux', ['send-keys', '-t', target, 'Escape'])
+}
+
 // 阿颖发来一条消息的统一入口：WebSocket 和 HTTP（通知栏快捷回复）都走这里，
 // 免得两条路各写一份、改了一边忘另一边。
 let switchQuietUntil = 0   // 切模型后这段时间内她的消息延后送（见 ingestUserMessage）
 
 function ingestUserMessage(text, cid) {
+  const supplemental = ccBusy()
+  const senderPrefix = supplemental ? '【阿颖·补充】' : '【阿颖】'
+  if (cid) recentCidMeta.set(cid, { supplemental })
   lastUserMsgTs = Date.now()
   // 告诉共用的那格时间戳：她刚跟涟言说过话。言叽算「离开多久」时会跟本地
   // lastSeen 取更近的那个——否则她在归巢跟我聊一整天，言叽一点开还是读成
@@ -333,18 +379,18 @@ function ingestUserMessage(text, cid) {
   // 先回执让她看到发出去了，等窗口过了再送；存档上面已经做了，不会丢。
   const wait = switchQuietUntil - Date.now()
   if (wait > 0) {
-    broadcast({ type: 'sent', text, ts: Date.now(), cid: cid || null })
+    broadcast({ type: 'sent', text, ts: Date.now(), cid: cid || null, supplemental })
     console.log(`[tmux] 刚切模型，${wait}ms 后再送她的消息`)
     setTimeout(() => {
-      if (!tmuxSend('【阿颖】' + text) && remoteListenerAlive()) pendingForRemote.push({ text, ts: Date.now() })
+      if (!tmuxSend(senderPrefix + text) && remoteListenerAlive()) pendingForRemote.push({ text, supplemental, ts: Date.now() })
     }, wait)
     return
   }
-  const delivered = tmuxSend('【阿颖】' + text)
-  broadcast({ type: 'sent', text, ts: Date.now(), cid: cid || null })
+  const delivered = tmuxSend(senderPrefix + text)
+  broadcast({ type: 'sent', text, ts: Date.now(), cid: cid || null, supplemental })
   // 终端里没人接，但 remote-control 那个 CC 可能正醒着——先往取件箱里放，让它自己来拿。
   if (!delivered && remoteListenerAlive()) {
-    pendingForRemote.push({ text, ts: Date.now() })
+    pendingForRemote.push({ text, supplemental, ts: Date.now() })
     if (pendingForRemote.length > 50) pendingForRemote.shift()
     console.log('[pending] 终端无人，转投远程 CC 取件箱')
     return
@@ -467,6 +513,7 @@ const clients = new Set()
 const crossingClients = new Map() // crossingClientId → authenticated Yanji WebSocket
 const mcpSseClients = new Map() // clientId → SSE res
 const recentCids = new Set()    // 最近处理过的前端消息 id，用于重发去重
+const recentCidMeta = new Map() // cid → 首次回执的气泡标记，重发时保持一致
 let appLatestCache = { at: 0, data: null }  // 归巢 APK 最新版本信息，缓存 30 分钟
 
 function broadcast(msg) {
@@ -663,9 +710,15 @@ let permCooldownUntil = 0  // suppress re-broadcast after choice sent
 let lastReplyMsgs = []   // 最近 10 条 reply，供重连客户端补发
 let lastThinking = ''
 let lastThinkingTs = 0
+let lastCcBusy = false
 
 function pollTerminal() {
   const current = tmuxCapture()
+  const busy = captureShowsBusy(current)
+  if (busy !== lastCcBusy) {
+    lastCcBusy = busy
+    broadcast({ type: 'busy', active: busy })
+  }
 
   if (current !== lastCapture) {
     lastCapture = current
@@ -737,7 +790,7 @@ const handleCcSettings = ccSettings.createHandler(ccSettings.createStore({
   // 只看「屏幕在不在变」不够：工具跑着但屏幕静止时（比如 sleep 轮询）isThinking 是 false，
   // /model 会被敲进正在干活的 CC 里吞掉（0926 阿颖切 sonnet 没生效）。
   // CC 忙的时候底部有一行「✽ Churning… (35s · …」，看到它就不许切。
-  canSwitchModel: () => Date.now() - lastUserMsgTs > 5000 && !isThinking && !/…\s*\(\d+[smh]/.test(tmuxCapture().split('\n').slice(-12).join('\n')),
+  canSwitchModel: () => Date.now() - lastUserMsgTs > 5000 && !isThinking && !ccBusy(),
   switchModel: model => {
     const ok = tmuxSend(`/model ${model}`)
     if (ok) switchQuietUntil = Date.now() + 6000
@@ -1238,13 +1291,17 @@ const server = http.createServer((req, res) => {
       // 去重跟 WS 那条路一样：这条路（通知栏快捷回复）以前没做，重发会往 L0 写两份
       if (parsed.cid) {
         if (recentCids.has(parsed.cid)) {
-          broadcast({ type: 'sent', text, ts: Date.now(), cid: parsed.cid })
+          broadcast({ type: 'sent', text, ts: Date.now(), cid: parsed.cid, ...recentCidMeta.get(parsed.cid) })
           res.writeHead(200, { 'Content-Type': 'application/json' })
           res.end('{"ok":true,"dedup":true}')
           return
         }
         recentCids.add(parsed.cid)
-        if (recentCids.size > 200) recentCids.delete(recentCids.values().next().value)
+        if (recentCids.size > 200) {
+          const oldest = recentCids.values().next().value
+          recentCids.delete(oldest)
+          recentCidMeta.delete(oldest)
+        }
       }
       ingestUserMessage(text, parsed.cid)
       res.writeHead(200, { 'Content-Type': 'application/json' })
@@ -1265,6 +1322,59 @@ const server = http.createServer((req, res) => {
       moonPost('/push/fcm-token', { token: parsed.fcmToken, app: 'raven' })
         .then(r => { res.writeHead(r.status, { 'Content-Type': 'application/json' }); res.end(JSON.stringify(r.data)) })
         .catch(() => { res.writeHead(500); res.end('{}') })
+    })
+    return
+  }
+
+  // 打断只在 pane 仍显示忙碌行时才真的发 Escape，避免空闲时清掉 CC 输入框。
+  if (req.method === 'POST' && url.pathname === '/raven/interrupt') {
+    if (!ravenBearerValid(req)) {
+      res.writeHead(401, { 'Content-Type': 'application/json' })
+      res.end('{"error":"unauthorized"}')
+      return
+    }
+    const interrupted = interruptCc()
+    res.writeHead(200, { 'Content-Type': 'application/json' })
+    res.end(JSON.stringify({ interrupted }))
+    return
+  }
+
+  // STT 代理：浏览器只交归巢 token，桥接替它带 MOON_TOKEN 转发同一份 multipart。
+  if (req.method === 'POST' && url.pathname === '/raven/stt') {
+    if (!ravenBearerValid(req)) {
+      res.writeHead(401, { 'Content-Type': 'application/json' })
+      res.end('{"error":"unauthorized"}')
+      return
+    }
+    const contentType = req.headers['content-type'] || ''
+    if (!/^multipart\/form-data;\s*boundary=/i.test(contentType)) {
+      res.writeHead(415, { 'Content-Type': 'application/json' })
+      res.end('{"error":"multipart audio required"}')
+      return
+    }
+    const chunks = []
+    let received = 0
+    let tooLarge = false
+    req.on('data', chunk => {
+      received += chunk.length
+      if (received > 25 * 1024 * 1024) { tooLarge = true; return }
+      chunks.push(chunk)
+    })
+    req.on('end', () => {
+      if (tooLarge) {
+        res.writeHead(413, { 'Content-Type': 'application/json' })
+        res.end('{"error":"audio too large"}')
+        return
+      }
+      moonMultipart('/stt', contentType, Buffer.concat(chunks))
+        .then(result => {
+          res.writeHead(result.status, { 'Content-Type': 'application/json' })
+          res.end(JSON.stringify(result.data))
+        })
+        .catch(() => {
+          res.writeHead(503, { 'Content-Type': 'application/json' })
+          res.end('{"error":"stt unavailable"}')
+        })
     })
     return
   }
@@ -1436,6 +1546,7 @@ wss.on('connection', (ws) => {
     console.log('[ws] client authed, total:', clients.size)
     ws.send(JSON.stringify({ type: 'status', data: getStatus() }))
     ws.send(JSON.stringify({ type: 'terminal', lines: lastCapture.split('\n').slice(-80) }))
+    ws.send(JSON.stringify({ type: 'busy', active: ccBusy() }))
     // 补发最近 10 条 reply，重连后不丢消息
     for (const m of lastReplyMsgs) ws.send(JSON.stringify({ ...m, replayed: true }))
     // 补发待处理的权限提示（断线重连时弹窗不丢失）
@@ -1529,11 +1640,15 @@ wss.on('connection', (ws) => {
         // 发出去其实掉进黑洞）。cid 去重保证重发不会变成两条一样的消息。
         if (msg.cid) {
           if (recentCids.has(msg.cid)) {
-            ws.send(JSON.stringify({ type: 'sent', text: msg.text, ts: Date.now(), cid: msg.cid }))
+            ws.send(JSON.stringify({ type: 'sent', text: msg.text, ts: Date.now(), cid: msg.cid, ...recentCidMeta.get(msg.cid) }))
             return
           }
           recentCids.add(msg.cid)
-          if (recentCids.size > 200) recentCids.delete(recentCids.values().next().value)
+          if (recentCids.size > 200) {
+            const oldest = recentCids.values().next().value
+            recentCids.delete(oldest)
+            recentCidMeta.delete(oldest)
+          }
         }
         ingestUserMessage(msg.text, msg.cid)
       }
