@@ -26,10 +26,12 @@ class MainActivity : AppCompatActivity() {
     private lateinit var webView: WebView
     private lateinit var splash: FrameLayout
     private var fileCallback: ValueCallback<Array<Uri>>? = null
+    private var pendingAudioPermission: PermissionRequest? = null
 
     companion object {
         private const val FILE_CHOOSER_CODE = 1001
         private const val NOTIFICATION_PERM_CODE = 1002
+        private const val AUDIO_PERM_CODE = 1003
         // 阿颖装的 PWA 入口就是 home.html（0702 确认），原生壳保持一致
         const val ROOST_URL = "https://memory.ravenlove.cc/raven/home.html"
     }
@@ -95,7 +97,23 @@ class MainActivity : AppCompatActivity() {
             }
 
             override fun onPermissionRequest(request: PermissionRequest?) {
-                request?.let { it.grant(it.resources) }
+                request?.let {
+                    if (PermissionRequest.RESOURCE_AUDIO_CAPTURE in it.resources) {
+                        if (ContextCompat.checkSelfPermission(this@MainActivity, Manifest.permission.RECORD_AUDIO)
+                            == PackageManager.PERMISSION_GRANTED) {
+                            runOnUiThread { it.grant(arrayOf(PermissionRequest.RESOURCE_AUDIO_CAPTURE)) }
+                        } else {
+                            pendingAudioPermission?.deny()
+                            pendingAudioPermission = it
+                            ActivityCompat.requestPermissions(
+                                this@MainActivity,
+                                arrayOf(Manifest.permission.RECORD_AUDIO), AUDIO_PERM_CODE
+                            )
+                        }
+                    } else {
+                        it.grant(it.resources)
+                    }
+                }
             }
         }
 
@@ -256,6 +274,20 @@ class MainActivity : AppCompatActivity() {
                 ActivityCompat.requestPermissions(
                     this, arrayOf(Manifest.permission.POST_NOTIFICATIONS), NOTIFICATION_PERM_CODE
                 )
+            }
+        }
+    }
+
+    override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        if (requestCode == AUDIO_PERM_CODE) {
+            val request = pendingAudioPermission
+            pendingAudioPermission = null
+            if (grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                request?.grant(arrayOf(PermissionRequest.RESOURCE_AUDIO_CAPTURE))
+            } else {
+                request?.deny()
+                Toast.makeText(this, "需要麦克风权限才能使用归巢通话", Toast.LENGTH_LONG).show()
             }
         }
     }
