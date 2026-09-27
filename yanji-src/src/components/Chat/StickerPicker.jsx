@@ -11,6 +11,7 @@ const STICKERS = [
   'huosu-daima.jpg','pinjian-zhong.jpg','death-note.jpg','qingqu.jpg',
   'gouyin.jpg','yibei-gouyin.jpg','sezi-yibadao.jpg','liukoushui.jpg',
   'ba-zhidaole.png','liang-xiongwei.png','ai-hui-xiaoshi.jpg','xin-ze-you.jpg',
+  'semao-panwei.png',
   // 猫猫系列
   's-tieti.jpg','s-tieti2.jpg','s-aixin.jpg','s-aixin2.jpg','s-love.jpg',
   's-haixiu.jpg','s-shufu.jpg','s-xihuan.jpg','s-wozai.jpg','s-yiqipa.jpg',
