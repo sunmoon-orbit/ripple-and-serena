@@ -372,8 +372,28 @@ function tmuxSend(text) {
   const clean = text.replace(/\n/g, ' ')
   try {
     if (!boundedSync.execFileBounded('tmux-send-text', 'tmux', ['send-keys', '-t', target, '-l', clean])) return false
-    return boundedSync.execFileBounded('tmux-send-enter', 'tmux', ['send-keys', '-t', target, 'Enter'])
+    const ok = boundedSync.execFileBounded('tmux-send-enter', 'tmux', ['send-keys', '-t', target, 'Enter'])
+    if (ok) verifySubmitted(target, clean)
+    return ok
   } catch { return false }
+}
+
+// 回车被吞的兜底（0927）：一长串带组合字符的颜文字送进去后，CC 把它当成「粘贴」，
+// 紧跟着的回车被算进粘贴里，消息就卡在输入框没提交，直到她下一条的回车才一起送进来。
+// 所以发完 1.2 秒看一眼：输入框那行还挂着这段话的开头，就补一个回车。只补一次，
+// 查不到就算了（宁可不补，也别往正在干活的 CC 里多敲回车）。
+function verifySubmitted(target, sent) {
+  const probe = sent.slice(0, 12)
+  setTimeout(() => {
+    try {
+      const pane = boundedSync.spawnBounded('tmux-verify', 'tmux', ['capture-pane', '-p', '-t', target]).stdout || ''
+      const promptLine = pane.split('\n').reverse().find(l => /^❯ /.test(l)) || ''
+      if (probe && promptLine.includes(probe)) {
+        console.log('[tmux] 回车像是被吞了，补一个')
+        boundedSync.execFileBounded('tmux-send-enter-retry', 'tmux', ['send-keys', '-t', target, 'Enter'])
+      }
+    } catch { /* 兜底失败不影响主流程 */ }
+  }, 1200)
 }
 
 // 在线 = 「这条消息有人会收到」，不是「终端里有没有 CC」。
