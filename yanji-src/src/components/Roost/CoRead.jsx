@@ -18,7 +18,54 @@ const COLORS = [
 ]
 const COLOR_HEX = Object.fromEntries(COLORS.map((c) => [c.id, c.hex]))
 
-const SOURCE_LABEL = { claude_ai: 'Claude', yanji: '言叽', raven: '归巢', claude_code: 'CC' }
+const SOURCE_LABEL = { claude_ai: 'Claude', yanji: '言叽', raven: '归巢', claude_code: 'CC', cc: '终端工作记录' }
+
+// 标题：库里存的是「raven 2026-09-28」「cc 2026-09-28」这种机器名，两本长得太像，
+// 阿颖 0928 打开 cc 那本以为对话丢了（那本按设计不存她的话，只有我干活的小结）。显示时换成人话。
+function displayTitle(c) {
+  const t = c?.title || ''
+  const m = /^(raven|cc)\s+(\d{4}-\d{2}-\d{2})$/.exec(t)
+  if (!m) return t || '（无题）'
+  return (m[1] === 'raven' ? '归巢聊天 · ' : '终端工作记录 · ') + m[2]
+}
+
+// 消息正文渲染（0928）：以前直接吐原文，贴图显示成「[sticker:xxx.jpg]」、双语翻译行露出「>」。
+// 只处理几种我们自己的标记，其余照原文；不引入 markdown 渲染，免得旧对话里的代码/符号被误解析。
+const STICKER_BASE = 'https://memory.ravenlove.cc/raven/stickers/'
+const INLINE_RE = /\[sticker:([^\]\s]+)\]|!\[[^\]]*\]\((https?:\/\/[^)\s]+)\)|\[附件:\s*([^\]]+)\]/g
+function renderInline(line, keyBase) {
+  const out = []
+  let last = 0, i = 0, m
+  INLINE_RE.lastIndex = 0
+  while ((m = INLINE_RE.exec(line))) {
+    if (m.index > last) out.push(line.slice(last, m.index))
+    if (m[1] || m[2]) {
+      const src = m[1] ? (/^https?:\/\//.test(m[1]) ? m[1] : STICKER_BASE + m[1]) : m[2]
+      out.push(<img key={keyBase + '-i' + i++} className="coread-inline-img" src={src} alt="贴图" loading="lazy" />)
+    } else {
+      // 归巢的附件存的是服务器路径，言叽读不到，只标个名字
+      out.push(<span key={keyBase + '-a' + i++} className="coread-attach">📎 {m[3].trim().split('/').pop()}</span>)
+    }
+    last = INLINE_RE.lastIndex
+  }
+  if (last < line.length) out.push(line.slice(last))
+  return out
+}
+function renderContent(text) {
+  const raw = String(text || '')
+  const voice = /\[voice\]/i.test(raw)
+  const lines = raw.replace(/\[voice\]/gi, '').replace(/^\n+/, '').split('\n')
+  return (
+    <>
+      {voice && <div className="coread-voice-tag">🔊 语音条</div>}
+      {lines.map((ln, idx) => {
+        const tr = /^[ \t]*>[ \t]?(.*)$/.exec(ln)
+        if (tr) return <div key={idx} className="coread-translation">{renderInline(tr[1], 't' + idx)}</div>
+        return <div key={idx} className="coread-line">{ln ? renderInline(ln, 'l' + idx) : '\u00a0'}</div>
+      })}
+    </>
+  )
+}
 
 // 共读视角下的称呼：human=阿颖，assistant=涟言
 function roleName(role) {
@@ -246,7 +293,7 @@ export default function CoRead({ onClose }) {
             <div className="coread-conv-list">
               {convs?.map((c) => (
                 <div key={c.id} className="coread-conv-item" onClick={() => openConv(c)}>
-                  <div className="coread-conv-title">{c.title || '（无题）'}</div>
+                  <div className="coread-conv-title">{displayTitle(c)}</div>
                   <div className="coread-conv-meta">
                     <span className="coread-conv-source">{SOURCE_LABEL[c.source] || c.source}</span>
                     <span className="coread-conv-date">{(c.created_at || '').slice(0, 10)}</span>
@@ -280,7 +327,7 @@ export default function CoRead({ onClose }) {
       <div className="roost-modal roost-modal-tall coread-modal coread-reader" onClick={(e) => e.stopPropagation()}>
         <div className="roost-modal-header">
           <button className="coread-back" onClick={() => { setActive(null); setMessages([]); setAnnos([]) }}>‹ 返回</button>
-          <span className="coread-reader-title">{active.title || '（无题）'}</span>
+          <span className="coread-reader-title">{displayTitle(active)}</span>
           <button className="roost-modal-close" onClick={onClose}>✕</button>
         </div>
         <div className="roost-modal-body coread-stream">
@@ -301,7 +348,7 @@ export default function CoRead({ onClose }) {
                   style={msgAnnos.length ? { boxShadow: `inset 4px 0 0 ${COLOR_HEX[msgAnnos[0].color] || '#f5d76e'}` } : undefined}
                   onClick={() => openAnnoComposer(m.id)}
                 >
-                  {m.content}
+                  {renderContent(m.content)}
                 </div>
                 {msgAnnos.map((a) => (
                   <div key={a.id} className="coread-anno" style={{ borderLeftColor: COLOR_HEX[a.color] || '#f5d76e' }}>
