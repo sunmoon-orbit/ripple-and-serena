@@ -127,7 +127,7 @@ test('unknown thread and cross-connection turn IDs cannot select or interrupt an
     if (method === 'turn/start') return { turn: { id: 'turn-owned' } }
     return {}
   }
-  const service = createCrossingService({ adapter, authorize: () => true })
+  const service = createCrossingService({ adapter, authorize: () => true, orphanGraceMs: 0 })
   await service.handle('a', { type: 'crossing/thread/start' })
   await assert.rejects(service.handle('b', { type: 'crossing/thread/read', threadId: 'owned' }), /unauthorized/)
   await service.handle('a', { type: 'crossing/turn/start', threadId: 'owned', text: 'fixture' })

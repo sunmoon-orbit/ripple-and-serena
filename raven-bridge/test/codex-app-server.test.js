@@ -79,7 +79,7 @@ class FakeAdapter extends EventEmitter {
 test('Crossing binds approvals to exact client/thread/turn/item and declines on disconnect', async () => {
   const adapter = new FakeAdapter()
   const sent = []
-  const service = createCrossingService({ authorize: () => true, adapter, send: (client, event) => sent.push({ client, event }), broadcast: () => {}, rateLimitFallback: () => null })
+  const service = createCrossingService({ authorize: () => true, adapter, send: (client, event) => sent.push({ client, event }), broadcast: () => {}, rateLimitFallback: () => null, orphanGraceMs: 0 })
   await service.handle('phone-a', { type: 'crossing/thread/list' })
   await service.handle('phone-a', { type: 'crossing/thread/resume', threadId: 'thread-1' })
   await service.handle('phone-a', { type: 'crossing/turn/start', threadId: 'thread-1', text: '检查一下', clientMessageId: 'm1' })
@@ -126,4 +126,57 @@ test('Crossing reserves the only active turn before turn/start resolves', async 
   adapter.resolveTurn({ turn: { id: 'turn-a' } })
   await first
   assert.deepEqual(service.getActiveTurn(), { clientId: 'phone-a', threadId: 'thread-a', turnId: 'turn-a', imageAllowed: false })
+})
+
+test('a phone reconnect within the grace period reattaches the running turn and re-offers pending approvals', async () => {
+  const adapter = new FakeAdapter()
+  adapter.request = async function (method, params) {
+    this.calls.push({ method, params })
+    if (method === 'turn/start') return { turn: { id: 'turn-1', status: 'inProgress' } }
+    if (method === 'thread/list') return { data: [{ id: 'thread-1' }] }
+    if (method === 'thread/resume' || method === 'thread/read') return { thread: { id: params.threadId, turns: [] } }
+    return {}
+  }
+  const sent = []
+  const service = createCrossingService({ authorize: () => true, adapter, send: (client, event) => sent.push({ client, event }), broadcast: () => {}, rateLimitFallback: () => null, orphanGraceMs: 60_000 })
+  await service.handle('phone-a', { type: 'crossing/thread/list' })
+  await service.handle('phone-a', { type: 'crossing/thread/resume', threadId: 'thread-1' })
+  await service.handle('phone-a', { type: 'crossing/turn/start', threadId: 'thread-1', text: '写设计稿', clientMessageId: 'm1' })
+  service.disconnect('phone-a')
+  assert.equal(adapter.calls.some(c => c.method === 'turn/interrupt'), false, 'grace period keeps the turn running')
+  assert.equal(service.canReceive('phone-a', { threadId: 'thread-1' }), false)
+  // 断线期间 Codex 申请写文件：先挂着，不弹、不计时、不自动拒绝
+  adapter.emit('serverRequest', { id: 'request-9', method: 'item/fileChange/requestApproval', params: { threadId: 'thread-1', turnId: 'turn-1', itemId: 'item-9', reason: '写入 DESIGN.md' } })
+  assert.equal(sent.filter(x => x.event.type === 'crossing/approval/request').length, 0)
+  assert.equal(adapter.resolved.length, 0)
+  // 另一个会话仍然切不过去
+  await service.handle('phone-b', { type: 'crossing/thread/list' })
+  await assert.rejects(service.handle('phone-b', { type: 'crossing/thread/resume', threadId: 'other-thread' }), /请先停止当前任务/)
+  // 点回同一个会话：接回
+  await service.handle('phone-b', { type: 'crossing/thread/resume', threadId: 'thread-1', requestId: 'r2' })
+  assert.equal(adapter.calls.filter(c => c.method === 'thread/resume').length, 1, 'reattach reads instead of re-resuming a running thread')
+  assert.equal(service.getActiveTurn().clientId, 'phone-b')
+  assert.equal(service.canReceive('phone-b', { threadId: 'thread-1' }), true)
+  const toB = sent.filter(x => x.client === 'phone-b').map(x => x.event)
+  assert.equal(toB.find(e => e.type === 'crossing/thread').reattached, true)
+  assert.deepEqual(toB.find(e => e.type === 'crossing/turn/started').turn, { id: 'turn-1', status: 'inProgress' })
+  assert.equal(toB.find(e => e.type === 'crossing/approval/request').requestId, 'request-9')
+  await service.handle('phone-b', { type: 'crossing/approval/respond', requestId: 'request-9', threadId: 'thread-1', turnId: 'turn-1', itemId: 'item-9', choice: 'allow' })
+  assert.deepEqual(adapter.resolved.at(-1), { id: 'request-9', result: { decision: 'accept' } })
+  await service.handle('phone-b', { type: 'crossing/turn/interrupt', threadId: 'thread-1', turnId: 'turn-1' })
+  assert.equal(adapter.calls.filter(c => c.method === 'turn/interrupt').length, 1)
+})
+
+test('a turn left alone past the grace period is stopped as before', async () => {
+  const adapter = new FakeAdapter()
+  const service = createCrossingService({ authorize: () => true, adapter, send: () => {}, broadcast: () => {}, rateLimitFallback: () => null, orphanGraceMs: 20 })
+  await service.handle('phone-a', { type: 'crossing/thread/list' })
+  await service.handle('phone-a', { type: 'crossing/thread/resume', threadId: 'thread-1' })
+  await service.handle('phone-a', { type: 'crossing/turn/start', threadId: 'thread-1', text: 'x' })
+  adapter.emit('serverRequest', { id: 'request-1', method: 'item/commandExecution/requestApproval', params: { threadId: 'thread-1', turnId: 'turn-1', itemId: 'item-1', command: 'ls' } })
+  service.disconnect('phone-a')
+  await new Promise(r => setTimeout(r, 60))
+  assert.deepEqual(adapter.calls.at(-1), { method: 'turn/interrupt', params: { threadId: 'thread-1', turnId: 'turn-1' } })
+  assert.deepEqual(adapter.resolved.at(-1), { id: 'request-1', result: { decision: 'decline' } })
+  assert.equal(service.getActiveTurn(), null)
 })

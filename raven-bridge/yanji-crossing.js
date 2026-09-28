@@ -88,6 +88,12 @@ function createCrossingService(options = {}) {
   const rateLimitFallback = options.rateLimitFallback || fallbackRateLimits
   let activeTurn = null
   let startingTurn = null
+  // 手机切后台、换网络都会让 WebSocket 断一下。以前一断就立刻掐掉正在跑的 turn、
+  // 把没点的授权全算成拒绝——0928 曜连着被掐了好几次（日志里是 "patch rejected by user"，
+  // 其实没人拒绝，是没人接）。现在断线先留一段宽限期：她点回同一个会话就接回去，
+  // 未决授权重新弹给新连接；宽限期过了没人回来，才按原来的规矩停掉。
+  const orphanGraceMs = Number.isFinite(options.orphanGraceMs) ? options.orphanGraceMs : 10 * 60 * 1000
+  let orphanTimer = null
   const disconnectedClients = new Set()
   const approvals = new Map()
   const sessions = new Map()
@@ -154,6 +160,7 @@ function createCrossingService(options = {}) {
 
   function clearTurn(turnId) {
     if (activeTurn?.turnId !== turnId) return
+    clearTimeout(orphanTimer); orphanTimer = null
     uploads.pin(activeTurn.attachments, false, activeTurn.attachmentOwner || activeTurn.clientId)
     activeTurn = null
     for (const [requestId, approval] of approvals) {
@@ -218,14 +225,40 @@ function createCrossingService(options = {}) {
       adapter.rejectServerRequest(request.id, '渡口不接受此类授权请求')
       return
     }
-    const timer = setTimeout(() => {
-      if (!clearApproval(view.requestId)) return
-      adapter.resolveServerRequest(view.requestId, approvalResult(request.method, 'deny'))
-      emit({ type: 'crossing/approval/resolved', requestId: view.requestId, threadId: view.threadId, turnId: view.turnId, itemId: view.itemId, outcome: 'timed_out' })
-    }, APPROVAL_TIMEOUT_MS)
-    approvals.set(view.requestId, { ...view, clientId: activeTurn.clientId, method: request.method, timer })
-    send(activeTurn.clientId, { type: 'crossing/approval/request', agent: 'codex', ...view, expiresAt: Date.now() + APPROVAL_TIMEOUT_MS })
+    const entry = { ...view, clientId: activeTurn.clientId, method: request.method, timer: null }
+    approvals.set(view.requestId, entry)
+    // 主人正处在断线宽限期：先挂着不计时，等她接回来再弹、再开始倒计时。
+    if (!activeTurn.orphaned) offerApproval(entry)
   })
+
+  function offerApproval(entry) {
+    clearTimeout(entry.timer)
+    entry.timer = setTimeout(() => {
+      if (!clearApproval(entry.requestId)) return
+      adapter.resolveServerRequest(entry.requestId, approvalResult(entry.method, 'deny'))
+      emit({ type: 'crossing/approval/resolved', requestId: entry.requestId, threadId: entry.threadId, turnId: entry.turnId, itemId: entry.itemId, outcome: 'timed_out' })
+    }, APPROVAL_TIMEOUT_MS)
+    const { clientId, method, timer, ...view } = entry
+    send(entry.clientId, { type: 'crossing/approval/request', agent: 'codex', ...view, expiresAt: Date.now() + APPROVAL_TIMEOUT_MS })
+  }
+
+  // 断线宽限期内，同一个人（已授权、列过会话）点回正在跑的那个会话：把 turn 和未决授权都转给新连接。
+  async function reattach(clientId, message) {
+    const turn = activeTurn
+    const result = await adapter.request('thread/read', { threadId: turn.threadId, includeTurns: true })
+    if (activeTurn !== turn || !turn.orphaned) throw new Error('任务状态已变化，请重新选择会话')
+    clearTimeout(orphanTimer); orphanTimer = null
+    turn.clientId = clientId
+    turn.orphaned = false
+    sessions.set(clientId, turn.threadId)
+    send(clientId, { type: 'crossing/thread', requestId: message.requestId, action: 'resumed', ready: true, reattached: true, thread: threadView(result, true), pendingModel: null })
+    send(clientId, { type: 'crossing/turn/started', threadId: turn.threadId, turn: { id: turn.turnId, status: 'inProgress' }, reattached: true })
+    for (const entry of approvals.values()) {
+      if (entry.turnId !== turn.turnId) continue
+      entry.clientId = clientId
+      offerApproval(entry)
+    }
+  }
 
   async function perform(clientId, message) {
     check(clientId)
@@ -280,6 +313,7 @@ function createCrossingService(options = {}) {
       return
     }
     if (type === 'crossing/thread/resume') {
+      if (activeTurn?.orphaned && activeTurn.threadId === message.threadId) return reattach(clientId, message)
       sessions.delete(clientId)
       const requested = message.model ? message : null
       const choice = requested ? await modelControls.validate(requested) : null
@@ -408,7 +442,12 @@ function createCrossingService(options = {}) {
     const changesSession = ['crossing/thread/start', 'crossing/thread/read', 'crossing/thread/resume'].includes(message?.type)
     if (!changesSession) return perform(clientId, message)
     if (selecting.has(clientId)) throw new Error('会话正在加载，请稍候')
-    if (activeTurn || startingTurn) throw new Error('请先停止当前任务再切换会话')
+    const sameThread = activeTurn && message.threadId === activeTurn.threadId
+    // 只读历史不影响正在跑的 turn；接回断线宽限期里的 turn 走 reattach。其余切换照旧拦住。
+    const allowed = sameThread && (message.type === 'crossing/thread/read' || (message.type === 'crossing/thread/resume' && activeTurn.orphaned))
+    if (startingTurn || (activeTurn && !allowed)) {
+      throw new Error(sameThread ? '任务还挂在另一个页面上，稍等几十秒再点回这个会话' : '请先停止当前任务再切换会话')
+    }
     selecting.add(clientId)
     try { return await perform(clientId, message) }
     finally { selecting.delete(clientId) }
@@ -419,6 +458,24 @@ function createCrossingService(options = {}) {
     allowedThreads.delete(clientId)
     if (!retainUploadsOnDisconnect) uploads.revoke?.(attachmentOwner(clientId) || clientId)
     disconnectedClients.add(clientId)
+    if (orphanGraceMs > 0 && activeTurn?.clientId === clientId && !activeTurn.orphaned) {
+      activeTurn.orphaned = true
+      for (const approval of approvals.values()) {
+        if (approval.clientId === clientId) { clearTimeout(approval.timer); approval.timer = null }
+      }
+      const turn = activeTurn
+      clearTimeout(orphanTimer)
+      orphanTimer = setTimeout(() => {
+        orphanTimer = null
+        if (activeTurn === turn && turn.orphaned) abandon(turn.clientId)
+      }, orphanGraceMs)
+      orphanTimer.unref?.()
+      return
+    }
+    abandon(clientId)
+  }
+
+  function abandon(clientId) {
     for (const [requestId, approval] of approvals) {
       if (approval.clientId !== clientId) continue
       clearApproval(requestId)
