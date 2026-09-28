@@ -437,22 +437,14 @@
   }
   #chat-input::-webkit-scrollbar { display: none; }
   #chat-input:focus { border-color: var(--accent); }
-  #attach-btn, #mic-btn {
+  #attach-btn {
     width: 38px; height: 38px; flex-shrink: 0; align-self: flex-end;
     background: none; border: 1px solid var(--border); border-radius: 50%;
     color: var(--text-dim); cursor: pointer;
     display: flex; align-items: center; justify-content: center;
     transition: border-color .2s, color .2s;
   }
-  #attach-btn:active, #mic-btn:active { color: var(--accent); border-color: var(--accent); }
-  #mic-btn.recording { color: #e25b5b; border-color: #e25b5b; background: rgba(226,91,91,.12); }
-  #mic-btn.transcribing { opacity: .55; }
-  #bilingual-toggle {
-    flex-shrink: 0; align-self: center; padding: 4px 7px; border-radius: 10px;
-    border: 1px solid var(--border); background: none; color: var(--text-dim);
-    font-size: 10px; cursor: pointer;
-  }
-  #bilingual-toggle[aria-pressed="true"] { color: var(--accent); border-color: var(--accent); background: rgba(196,168,130,.1); }
+  #attach-btn:active { color: var(--accent); border-color: var(--accent); }
   #attach-preview {
     padding: 6px 12px 0; display: none; flex-wrap: wrap; gap: 6px;
   }
@@ -1031,12 +1023,6 @@
         </svg>
       </button>
       <input type="file" id="file-input" style="display:none" accept="image/*,*/*">
-      <button id="mic-btn" type="button" aria-label="开始录音" title="开始录音">
-        <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
-          <rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 10a7 7 0 0014 0M12 17v5M8 22h8"/>
-        </svg>
-      </button>
-      <button id="bilingual-toggle" type="button" aria-pressed="false" title="双语回复">双语</button>
       <button id="sticker-btn" aria-label="贴图">🐦</button>
       <textarea id="chat-input" rows="1" placeholder="发消息给 Ripple…"></textarea>
       <button id="send-btn">
@@ -2166,10 +2152,8 @@ document.getElementById('attach-btn').addEventListener('click', () => {
   document.getElementById('file-input').click()
 })
 
-// --- 归巢通话：快捷语音 + 言叽式独立通话界面 ---
+// --- 归巢通话：言叽式独立通话界面 ---
 const BILINGUAL_KEY = 'raven-voice-bilingual'
-const micBtn = document.getElementById('mic-btn')
-const bilingualBtn = document.getElementById('bilingual-toggle')
 const callBtn = document.getElementById('call-btn')
 const callOverlay = document.getElementById('call-overlay')
 const callMicBtn = document.getElementById('call-mic')
@@ -2188,7 +2172,6 @@ let callTimerId = null
 let callHadInteraction = false
 
 function renderBilingualToggle() {
-  bilingualBtn.setAttribute('aria-pressed', voiceBilingual ? 'true' : 'false')
   callBilingualBtn.setAttribute('aria-pressed', voiceBilingual ? 'true' : 'false')
   callBilingualBtn.textContent = voiceBilingual ? '英文朗读 · 中文字幕' : '中文通话'
 }
@@ -2298,12 +2281,9 @@ function handleCallReply(text, msgEl) {
 }
 
 function syncMicState(state) {
-  for (const button of [micBtn, callMicBtn]) {
-    button.classList.toggle('recording', state === 'recording')
-    button.classList.toggle('transcribing', state === 'transcribing')
-    button.setAttribute('aria-label', state === 'recording' ? '停止录音' : state === 'transcribing' ? '正在转文字' : '开始录音')
-  }
-  micBtn.title = state === 'recording' ? '停止并发送' : state === 'transcribing' ? '正在转文字' : '开始录音'
+  callMicBtn.classList.toggle('recording', state === 'recording')
+  callMicBtn.classList.toggle('transcribing', state === 'transcribing')
+  callMicBtn.setAttribute('aria-label', state === 'recording' ? '停止录音' : state === 'transcribing' ? '正在转文字' : '开始录音')
 }
 
 function showVoiceError(message) {
@@ -2442,7 +2422,6 @@ function sendCallText() {
 }
 
 renderBilingualToggle()
-bilingualBtn.addEventListener('click', toggleBilingual)
 callBilingualBtn.addEventListener('click', toggleBilingual)
 callBtn.addEventListener('click', openCall)
 document.getElementById('call-close').addEventListener('click', closeCall)
@@ -2451,7 +2430,6 @@ document.getElementById('call-text-send').addEventListener('click', sendCallText
 document.getElementById('call-text-input').addEventListener('keydown', event => {
   if (event.key === 'Enter' && !event.isComposing) { event.preventDefault(); sendCallText() }
 })
-micBtn.addEventListener('click', () => toggleRecording(false))
 callMicBtn.addEventListener('click', () => toggleRecording(true))
 
 // ── sticker picker ────────────────────────────────────────────────────────
