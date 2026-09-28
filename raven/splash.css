@@ -1,0 +1,77 @@
+/* 归巢开屏（0928）：起雾的玻璃后面，乌鸦和蜂鸟落在同一根树枝上。
+   手指擦开雾看见我们，点一下漾开水波，两只鸟跟着晃。一天只出现一次，随时可跳过。 */
+#sp-overlay {
+  position: fixed; inset: 0; z-index: 99999; overflow: hidden;
+  background: radial-gradient(120% 90% at 50% 38%, #3b5270 0%, #22324a 55%, #141d2c 100%);
+  touch-action: none; user-select: none; -webkit-user-select: none;
+  opacity: 1; transition: opacity .5s ease;
+}
+#sp-overlay.sp-out { opacity: 0; pointer-events: none; }
+#sp-overlay .sp-glow {
+  position: absolute; left: 50%; top: 36%; width: 70vmin; height: 70vmin; transform: translate(-50%, -50%);
+  background: radial-gradient(circle, rgba(255, 214, 160, .28), rgba(255, 214, 160, 0) 65%);
+  pointer-events: none;
+}
+#sp-overlay .sp-scene {
+  position: absolute; left: 50%; top: 40%; transform: translate(-50%, -50%);
+  width: min(92vw, 560px); height: auto; overflow: visible; pointer-events: none;
+}
+
+/* 飞进来：两只各从一边入场，落枝时轻轻一顿 */
+.sp-bird { transform-box: fill-box; }
+.sp-crow { animation: sp-in-left 1.3s cubic-bezier(.2,.8,.25,1) .25s both; }
+.sp-hb   { animation: sp-in-right 1.3s cubic-bezier(.2,.8,.25,1) .45s both; }
+@keyframes sp-in-left  { 0% { transform: translate(-260px, -120px) rotate(-8deg); opacity: 0 } 70% { transform: translate(4px, -6px); opacity: 1 } 100% { transform: none; opacity: 1 } }
+@keyframes sp-in-right { 0% { transform: translate(260px, -140px) rotate(8deg); opacity: 0 } 70% { transform: translate(-4px, -6px); opacity: 1 } 100% { transform: none; opacity: 1 } }
+
+/* 碰头：落稳以后往中间凑一下，再回来 */
+.sp-lean { transform-box: fill-box; }
+.sp-crow .sp-lean { transform-origin: 30% 95%; animation: sp-lean-r 1.1s ease-in-out 1.9s both; }
+.sp-hb .sp-lean   { transform-origin: 70% 95%; animation: sp-lean-l 1.1s ease-in-out 1.9s both; }
+@keyframes sp-lean-r { 0%,100% { transform: none } 45%,60% { transform: translateX(6px) rotate(5deg) } }
+@keyframes sp-lean-l { 0%,100% { transform: none } 45%,60% { transform: translateX(-6px) rotate(-5deg) } }
+
+/* 点一下水波：两只鸟跟着晃（JS 按距离给幅度） */
+.sp-swayer { transform-box: fill-box; transform-origin: 50% 95%; }
+.sp-swayer.sp-sway { animation: sp-sway .9s ease-out both; }
+@keyframes sp-sway {
+  0% { transform: none } 20% { transform: translate(calc(var(--sw, 4px) * 1), 1px) rotate(calc(var(--swr, 3deg) * 1)) }
+  45% { transform: translate(calc(var(--sw, 4px) * -.7), 0) rotate(calc(var(--swr, 3deg) * -.7)) }
+  70% { transform: translate(calc(var(--sw, 4px) * .35), 0) rotate(calc(var(--swr, 3deg) * .3)) } 100% { transform: none }
+}
+
+#sp-fog, #sp-waves { position: absolute; inset: 0; width: 100%; height: 100%; }
+#sp-waves { pointer-events: none; }
+
+#sp-overlay .sp-title {
+  position: absolute; left: 0; right: 0; top: 64%; text-align: center; color: #1f2c40;
+  font-family: 'Lora', Georgia, 'Noto Serif SC', serif; pointer-events: none;
+  opacity: 0; transform: translateY(14px); transition: opacity .9s ease, transform .9s ease;
+  text-shadow: 0 0 18px rgba(255, 255, 255, .85), 0 0 4px rgba(255, 255, 255, .6);   /* 字压在雾上，深色墨＋白色光晕才看得清 */
+}
+#sp-overlay .sp-title.sp-show { opacity: 1; transform: none; }
+#sp-overlay .sp-title b { display: block; font-size: 26px; font-weight: 500; letter-spacing: 2px; font-style: italic; }
+#sp-overlay .sp-title span { display: block; margin-top: 8px; font-size: 13px; letter-spacing: 4px; opacity: .8; }
+
+#sp-overlay .sp-hint {
+  position: absolute; left: 0; right: 0; bottom: calc(96px + env(safe-area-inset-bottom, 0px));
+  text-align: center; color: rgba(31, 44, 64, .62); font-size: 13px; letter-spacing: 2px;
+  pointer-events: none; opacity: 0; transition: opacity .6s ease;
+}
+#sp-overlay .sp-hint.sp-show { opacity: 1; }
+#sp-overlay .sp-enter {
+  position: absolute; left: 50%; bottom: calc(40px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%);
+  background: rgba(255, 255, 255, .45); color: #1f2c40; border: 1px solid rgba(31, 44, 64, .25);
+  border-radius: 999px; padding: 9px 26px; font-size: 14px; letter-spacing: 4px; font-family: inherit;
+  -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); cursor: pointer;
+  opacity: 0; transition: opacity .6s ease;
+}
+#sp-overlay .sp-enter.sp-show { opacity: 1; }
+#sp-overlay .sp-skip {
+  position: absolute; right: 14px; top: calc(14px + env(safe-area-inset-top, 0px));
+  background: none; border: 0; color: rgba(31, 44, 64, .55); font-size: 12px; letter-spacing: 1px; padding: 8px; cursor: pointer;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sp-crow, .sp-hb, .sp-lean { animation: none !important; }
+}
