@@ -4,6 +4,7 @@ import { useStore } from '../store'
 import { showToast } from './Toast'
 import { List, RefreshCw, X, Pin, Maximize2 } from 'lucide-react'
 import { clusterNodes, nameClusters, seeded, TYPE_LABELS, TYPE_TINT } from './MemoryVeinPanel'
+import { IS_ZHAOHUA } from '../config'
 
 // 记忆之树（0929 第三版）：阿颖——散开的脉络「有点丑、没有主体物」，想要一棵竖着长的树，
 // 曜——「植物标本 × 墨线」，不要绿色圆冠的卡通树。
@@ -15,7 +16,7 @@ const MIN_K = 0.25, MAX_K = 5
 const LABEL_ZOOM = 1.6
 const MAX_LABELS = 30
 const INTRO_MS = 1600
-const INTRO_KEY = 'shiyu-tree-intro-day'
+const INTRO_KEY = IS_ZHAOHUA ? 'zhaohua-plaque-tree-intro-day' : 'shiyu-tree-intro-day'
 const DAY = 86400000
 
 function timeOf(n) { const t = Date.parse(n.created_at || ''); return Number.isFinite(t) ? t : 0 }
@@ -34,7 +35,10 @@ function bezTan(p0, c, p1, u) {
 
 function buildTree(g) {
   const idx = new Map()
-  const nodes = g.nodes.map((n, i) => { idx.set(n.id, i); return { ...n, t: timeOf(n) } })
+  const nodes = g.nodes.map((n, i) => {
+    idx.set(n.id, i)
+    return { ...n, title: n.title || String(n.content || '').split('\n')[0].slice(0, 48), t: timeOf(n) }
+  })
   const adj = nodes.map(() => [])
   for (const [a, b, s] of g.edges || []) {
     const i = idx.get(a), j = idx.get(b)
@@ -70,14 +74,18 @@ function buildTree(g) {
     by = Math.max(by, topY + 40)
     lastY[side] = by
     const bx = trunkX(by)
-    const len = 80 + 24 * Math.sqrt(members.length)
-    // 越靠上的枝越往上翘；大枝稍平展
-    const lift = 0.62 + 0.5 * ((rootY - by) / H) - Math.min(0.2, members.length / 600)
-    const ang = -Math.PI / 2 + side * (Math.PI / 2 - lift) // 从竖直往外偏
-    const tip = [bx + Math.cos(ang) * len, by + Math.sin(ang) * len]
-    // 控制点：先水平一点再上扬，像真枝
-    const ctrl = [bx + side * len * 0.55, by - len * 0.12 + (seeded(ci + 3, 5) - 0.5) * 20]
-    branches.push({ ci, side, base: [bx, by], ctrl, tip, tb, len, name: names[ci], members })
+    // 第二版（0929）：高度 = 时间，对叶子也成立。枝先往外伸，再往上长到这簇最新那条记忆的高度，
+    // 所以上半截树干旁边也有枝梢，不会只剩一根光杆。
+    const ts = members.map((i) => nodes[i].t).sort((a, b) => a - b)
+    const tl = quantile(ts, 0.98)
+    // 往上长一半路程就停（全长到最新会变成一排竖直的烛台，0929 试过）
+    const tipY = Math.min(by - 60, by - (by - yOf(tl)) * 0.5)
+    const w = 70 + 16 * Math.sqrt(members.length) + seeded(ci + 11, 3) * 24
+    const len = Math.hypot(w, by - tipY)
+    const tip = [bx + side * w, tipY]
+    // 控制点：几乎水平地伸出去，拐个弯再往上，像被光拉着长
+    const ctrl = [bx + side * w * 0.8, by - (by - tipY) * 0.18 + (seeded(ci + 3, 5) - 0.5) * 14]
+    branches.push({ ci, side, base: [bx, by], ctrl, tip, tb, tl, len, name: names[ci], members })
   }
 
   // 叶：沿枝按时间排，从枝上长出一小截细梗，梗端是叶
@@ -87,8 +95,9 @@ function buildTree(g) {
     const ms = [...b.members].sort((x, y) => nodes[x].t - nodes[y].t)
     ms.forEach((i, k) => {
       const n = nodes[i]
-      const span = Math.max(DAY, t1 - b.tb)
-      const u = 0.12 + 0.86 * Math.min(1, Math.max(0, (n.t - b.tb) / span)) * 0.55 + 0.86 * 0.45 * (k / Math.max(1, ms.length - 1))
+      const span = Math.max(DAY, b.tl - b.tb)
+      const tf = Math.min(1, Math.max(0, (n.t - b.tb) / span))
+      const u = 0.08 + 0.9 * (0.75 * tf + 0.25 * (k / Math.max(1, ms.length - 1)))
       const p = bez(b.base, b.ctrl, b.tip, Math.min(0.99, u))
       const tan = bezTan(b.base, b.ctrl, b.tip, Math.min(0.99, u))
       const alt = k % 2 ? 1 : -1
@@ -173,7 +182,7 @@ export default function MemoryTreePanel() {
       const T = buildTree(g)
       treeRef.current = T
       selRef.current = null; setSelected(null)
-      setStats({ n: T.nodes.length, b: T.branches.length })
+      setStats({ n: T.nodes.length, b: T.branches.length, p: T.nodes.filter((n) => n.pinned || (n.importance || 5) >= 8).length })
       const today = new Date().toDateString()
       let seen = ''
       try { seen = localStorage.getItem(INTRO_KEY) || '' } catch {}
@@ -212,7 +221,9 @@ export default function MemoryTreePanel() {
       const ink = cssVar('--ink', '#1C2130')
       const inkSoft = cssVar('--ink-soft', '#5A6070')
       const inkFaint = cssVar('--ink-faint', '#9AA0B0')
-      const accent = cssVar('--accent', '#A07850')
+      const accent = IS_ZHAOHUA
+        ? (theme === 'midnight' ? '#C8B387' : '#7D6748')
+        : cssVar('--accent', '#A07850')
       const dark = theme === 'midnight'
       ctx.globalAlpha = 1
       ctx.fillStyle = bg
@@ -233,7 +244,9 @@ export default function MemoryTreePanel() {
       const X = (x) => cx + x * k, Y = (y) => cy + y * k
       const sel = selRef.current
       const selSet = sel != null ? new Set([sel, ...T.nodes[sel].neighbors.map(([j]) => j)]) : null
-      const trunkInk = dark ? inkSoft : ink
+      const trunkInk = IS_ZHAOHUA
+        ? (dark ? '#778296' : '#3F4855')
+        : (dark ? inkSoft : ink)
 
       const label = (text, x, y, font, color, alpha, align = 'center') => {
         ctx.font = font; ctx.textAlign = align; ctx.globalAlpha = alpha
@@ -295,7 +308,7 @@ export default function MemoryTreePanel() {
       // 主枝：到了它出现的时间才开始长
       for (const b of T.branches) {
         if (b.tb > tc) continue
-        const grow = Math.min(1, (tc - b.tb) / Math.max(DAY, (T.t1 - b.tb) * 0.35))
+        const grow = Math.min(1, 0.08 + (tc - b.tb) / Math.max(DAY, b.tl - b.tb))
         const pts = []
         for (let s = 0; s <= 14; s++) pts.push(bez(b.base, b.ctrl, b.tip, (s / 14) * grow))
         const dim = selSet && !b.members.some((i) => selSet.has(i))
@@ -303,7 +316,9 @@ export default function MemoryTreePanel() {
       }
 
       // 细梗 + 叶
-      const leafColor = (n) => n.type === 'memory' ? accent : `hsl(${TYPE_TINT[n.type] ?? 30} 24% ${dark ? 66 : 42}%)`
+      const leafColor = (n) => IS_ZHAOHUA
+        ? (dark ? '#94A097' : '#607267')
+        : n.type === 'memory' ? accent : `hsl(${TYPE_TINT[n.type] ?? 30} 24% ${dark ? 66 : 42}%)`
       for (const tw of T.twigs) {
         if (tw.t > tc) continue
         const n = T.nodes[tw.i]
@@ -315,7 +330,42 @@ export default function MemoryTreePanel() {
         if (x < -20 || x > W + 20 || y < -20 || y > Hs + 20) continue
         const size = (2.2 + (n.importance || 5) * 0.42) * Math.sqrt(k) * (tw.i === sel ? 1.6 : 1)
         ctx.globalAlpha = dim ? 0.15 : 0.78
-        if (n.pinned) {
+        const plaque = IS_ZHAOHUA && (n.pinned || (n.importance || 5) >= 8)
+        if (plaque) {
+          // 昭华：普通记忆长成叶，只有重要记忆被郑重地挂成木牌。
+          // 木牌按世界缩放绘制，远景是树冠里的小轮廓，拉近才能读字。
+          const pw = Math.max(7, (n.pinned ? 17 : 14) * Math.sqrt(k))
+          const ph = pw * 1.25
+          const py = y + ph * 0.7
+          const tilt = (seeded(n.id, 77) - 0.5) * 0.12
+          ctx.save()
+          ctx.translate(x, py); ctx.rotate(tilt)
+          ctx.globalAlpha = dim ? 0.16 : 0.9
+          ctx.strokeStyle = dark ? '#D2C39F' : '#725B3B'
+          ctx.lineWidth = Math.max(0.7, 0.9 * Math.sqrt(k))
+          ctx.beginPath(); ctx.moveTo(0, -ph * 0.72); ctx.lineTo(0, -ph / 2); ctx.stroke()
+          ctx.fillStyle = dark ? '#615744' : '#C8AA79'
+          ctx.strokeStyle = dark ? '#B7A57D' : '#765F3F'
+          ctx.beginPath()
+          ctx.roundRect(-pw / 2, -ph / 2, pw, ph, Math.max(1.5, pw * 0.09))
+          ctx.fill(); ctx.stroke()
+          ctx.globalAlpha = dim ? 0.08 : 0.24
+          ctx.strokeStyle = dark ? '#E3D7BA' : '#5E482F'; ctx.lineWidth = 0.55
+          for (let gy = -ph * 0.3; gy < ph * 0.35; gy += Math.max(3, ph * 0.22)) {
+            ctx.beginPath(); ctx.moveTo(-pw * 0.35, gy); ctx.lineTo(pw * 0.35, gy); ctx.stroke()
+          }
+          if (k >= 1.05 || tw.i === sel) {
+            const txt = String(n.title || '').replace(/\s+/g, '').slice(0, 4)
+            ctx.globalAlpha = dim ? 0.15 : 0.9
+            ctx.fillStyle = dark ? '#F2E8D0' : '#3F3020'
+            ctx.font = `600 ${Math.max(6, Math.min(10, pw * 0.32))}px "Noto Serif SC", serif`
+            ctx.textAlign = 'center'; ctx.textBaseline = 'middle'
+            ctx.fillText(txt.slice(0, 2), 0, txt.length > 2 ? -3 : 0)
+            if (txt.length > 2) ctx.fillText(txt.slice(2), 0, 4)
+            ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic'
+          }
+          ctx.restore()
+        } else if (n.pinned) {
           // 置顶：五瓣小花
           ctx.fillStyle = dark ? '#E8C9A0' : '#B7704F'
           for (let p = 0; p < 5; p++) {
@@ -346,9 +396,16 @@ export default function MemoryTreePanel() {
       }
 
       // 枝名：写在枝梢外侧，标本注记的口气
+      const nameBoxes = []
+      ctx.font = '600 11px "Noto Serif SC", Georgia, serif'
       for (const b of T.branches) {
         if (b.tb > tc) continue
-        const x = X(b.tip[0] + b.side * 10), y = Y(b.tip[1] - 10)
+        const x = X(b.tip[0] + b.side * 8)
+        let y = Y(b.tip[1]) - 10
+        const w = ctx.measureText(b.name).width
+        // 撞上别的枝名就往下让一行
+        for (let tries = 0; tries < 4 && nameBoxes.some(([bx, by2, bw]) => Math.abs(by2 - y) < 14 && Math.abs(bx - x) < (bw + w) / 2 + 6); tries++) y += 14
+        nameBoxes.push([x, y, w])
         label(b.name, x, y, '600 11px "Noto Serif SC", Georgia, serif', inkSoft, 0.85 * Math.min(1, (tc - b.tb) / DAY / 10 + progress))
       }
 
@@ -481,16 +538,16 @@ export default function MemoryTreePanel() {
     <div className="vein-wrap">
       <canvas ref={canvasRef} className="vein-canvas" />
       <div className="vein-topbar">
-        <h1>记忆之树</h1>
-        {stats && <span className="vein-stats">{stats.n} 片叶 · {stats.b} 根枝</span>}
+        <h1>{IS_ZHAOHUA ? '记忆木牌树' : '记忆之树'}</h1>
+        {stats && <span className="vein-stats">{stats.n} 片叶 · {stats.b} 根枝{IS_ZHAOHUA ? ` · ${stats.p} 块木牌` : ''}</span>}
         <div style={{ flex: 1 }} />
         <button className="vein-btn" onClick={fitView} title="看全貌"><Maximize2 size={15} /></button>
         <button className="vein-btn" onClick={load} title="刷新"><RefreshCw size={15} /></button>
         <button className="vein-btn" onClick={() => setMemoryView('list')} title="回列表视图"><List size={15} /></button>
       </div>
-      {loading && <div className="vein-hint">正在把记忆长成一棵树…</div>}
+      {loading && <div className="vein-hint">{IS_ZHAOHUA ? '正在把重要记忆挂上枝头…' : '正在把记忆长成一棵树…'}</div>}
       {error && !loading && <div className="vein-hint">加载失败了：{error}</div>}
-      {!loading && !error && !selected && <div className="vein-tip">树干从下往上是时间，点一片叶看它牵着谁</div>}
+      {!loading && !error && !selected && <div className="vein-tip">{IS_ZHAOHUA ? '普通记忆成叶，重要记忆成牌' : '树干从下往上是时间，点一片叶看它牵着谁'}</div>}
       {selected && !detail && (
         <div className="vein-peek">
           <div className="vein-peek-head">

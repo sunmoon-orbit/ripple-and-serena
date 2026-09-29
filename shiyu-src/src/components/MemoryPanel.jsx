@@ -186,7 +186,7 @@ function Editor({ initial, onClose, onSaved }) {
         </div>
         <div style={{ display: 'flex', gap: 10, marginTop: 12, alignItems: 'center', justifyContent: 'space-between' }}>
           {IS_ZHAOHUA ? (
-            <div className="select" style={{ flex: 1, display: 'flex', alignItems: 'center' }}>记录于昭华</div>
+            <div className="select" style={{ flex: 1, display: 'flex', alignItems: 'center' }}>记录于{APP.agentDisplayName}</div>
           ) : (
             <select className="select" style={{ flex: 1 }} value={agent} onChange={(e) => setAgent(e.target.value)}>
               <option value="阿颖">阿颖写的</option>
@@ -279,7 +279,7 @@ function Card({ m, onEdit, onTrash }) {
 
       {/* 底部操作 */}
       <div className="card-footer">
-        <span className="card-agent">{m.agent || ''}</span>
+        <span className="card-agent">{IS_ZHAOHUA && m.agent === APP.agent ? APP.agentDisplayName : (m.agent || '')}</span>
         <div className="card-acts">
           <button
             className={'icon-btn related-btn' + (relOpen ? ' active' : '')}

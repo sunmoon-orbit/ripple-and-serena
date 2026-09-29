@@ -234,7 +234,7 @@ export default function SettingsPanel() {
             { id: 'list', label: '年轮列表', dot: '#8FA3BC' },
             { id: 'starmap', label: '记忆星图', dot: '#F5D97E' },
             { id: 'veins', label: '记忆脉络', dot: '#A07850' },
-            { id: 'tree', label: '记忆之树', dot: '#6F5B45' },
+            { id: 'tree', label: IS_ZHAOHUA ? '记忆木牌树' : '记忆之树', dot: IS_ZHAOHUA ? '#8B7654' : '#6F5B45' },
           ].map((v) => (
             <button key={v.id} className={'theme-chip' + (memoryView === v.id ? ' active' : '')} onClick={() => setMemoryView(v.id)}>
               <span className="theme-chip-dot" style={{ background: v.dot }} />
@@ -242,7 +242,11 @@ export default function SettingsPanel() {
             </button>
           ))}
         </div>
-        <p style={{ fontSize: 12, opacity: 0.5, margin: '8px 2px 0' }}>星图把每条记忆画成一颗星；脉络把相近的记忆理成几簇，按叶脉长开，手机更省电。</p>
+        <p style={{ fontSize: 12, opacity: 0.5, margin: '8px 2px 0' }}>
+          {IS_ZHAOHUA
+            ? '木牌树让普通记忆成叶、重要记忆成牌；布局打开时算定，不持续模拟，手机更省电。'
+            : '星图把每条记忆画成一颗星；脉络把相近的记忆理成几簇，按叶脉长开，手机更省电。'}
+        </p>
       </div>
     </div>
   )
