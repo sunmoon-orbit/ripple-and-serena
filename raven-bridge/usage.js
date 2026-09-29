@@ -18,7 +18,7 @@
 
 const fs = require('fs')
 const { normalizePromptCache } = require('./claude-cache')
-const { readCodexPromptCache } = require('./codex-cache')
+const { readCodexPromptCache, readCodexRateLimits } = require('./codex-cache')
 
 const CLAUDE_FILE = '/home/ripple/.claude/rate_limits_latest.json'
 const CODEX_FILE = '/var/lib/ai-usage/codex.json'
@@ -75,6 +75,19 @@ function claudePart() {
 function codexPart() {
   const promptCache = readCodexPromptCache()
   const d = readJson(CODEX_FILE)
+  const fileOk = d && !d._error && d.available
+  // 快照文件坏了（0929 起 codex 用户那边一直 http_401）或比 rollout 旧，就用 rollout 里的官方数字
+  const live = readCodexRateLimits()
+  if (live && (!fileOk || (Number(live.updated_at) || 0) > (Number(d.updated_at) || 0))) {
+    const age = live.updated_at ? Math.round(Date.now() / 1000 - live.updated_at) : null
+    return {
+      available: true, source: 'rollout',
+      stale: age === null || age > CODEX_STALE_SECONDS,
+      age_seconds: age, plan: live.plan, limit_reached: live.limit_reached,
+      primary: withCountdown(live.primary), secondary: withCountdown(live.secondary),
+      prompt_cache: promptCache,
+    }
+  }
   if (!d) return { available: false, error: 'snapshot_missing', prompt_cache: promptCache }
   if (d._error) return { available: false, error: d._error, prompt_cache: promptCache }
   if (!d.available) return { available: false, error: d.error || 'unknown', prompt_cache: promptCache }

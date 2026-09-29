@@ -85,4 +85,61 @@ function readCodexPromptCache(sessionsDirectory = DEFAULT_SESSIONS, nowSeconds =
   }
 }
 
-module.exports = { cacheFromEvent, readCodexPromptCache }
+// 额度兜底（0929）：/var/lib/ai-usage/codex.json 由 codex 用户的 cron 取，那边的登录过期后一直是 http_401，
+// 归巢额度卡片就显示曜「没数据」。可 ripple 下跑的 Codex（渡口/门铃）每轮都会在 rollout 的 token_count
+// 事件里带上 rate_limits——官方给的百分比和重置时间，没有凭证。拿最近写过的 rollout 里最新那条。
+function recentRollouts(directory, days = 3) {
+  const found = []
+  const walk = (dir, depth) => {
+    let entries
+    try { entries = fs.readdirSync(dir, { withFileTypes: true }) } catch { return }
+    entries.sort((a, b) => b.name.localeCompare(a.name))
+    let dirs = 0
+    for (const entry of entries) {
+      const target = path.join(dir, entry.name)
+      if (entry.isDirectory()) { if (dirs++ < days) walk(target, depth + 1) }
+      else if (entry.isFile() && /^rollout-.*\.jsonl$/.test(entry.name)) {
+        try { found.push({ file: target, mtime: fs.statSync(target).mtimeMs }) } catch {}
+      }
+    }
+  }
+  walk(directory, 0)
+  return found.sort((a, b) => b.mtime - a.mtime).map(x => x.file)
+}
+
+function rateLimitsFromEvent(event) {
+  if (event?.type !== 'event_msg' || event?.payload?.type !== 'token_count') return null
+  const r = event.payload.rate_limits
+  if (!r || (!r.primary && !r.secondary)) return null
+  const win = (w) => w ? { used_percent: Number(w.used_percent) || 0, reset_at: Number(w.resets_at) || 0, window_minutes: Number(w.window_minutes) || null } : null
+  const updatedAt = Date.parse(event.timestamp) / 1000
+  return {
+    updated_at: Number.isFinite(updatedAt) ? updatedAt : null,
+    plan: r.plan_type || '',
+    limit_reached: !!r.rate_limit_reached_type,
+    primary: win(r.primary),
+    secondary: win(r.secondary),
+  }
+}
+
+function readCodexRateLimits(sessionsDirectory = DEFAULT_SESSIONS) {
+  for (const rollout of recentRollouts(sessionsDirectory).slice(0, 3)) {
+    try {
+      const stat = fs.statSync(rollout)
+      const length = Math.min(stat.size, MAX_ROLLOUT_BYTES)
+      const start = stat.size - length
+      const fd = fs.openSync(rollout, 'r')
+      const buffer = Buffer.alloc(length)
+      try { fs.readSync(fd, buffer, 0, length, start) } finally { fs.closeSync(fd) }
+      const lines = buffer.toString('utf8').split('\n')
+      if (start > 0) lines.shift()
+      for (let i = lines.length - 1; i >= 0; i -= 1) {
+        if (!lines[i].includes('"rate_limits"')) continue
+        try { const r = rateLimitsFromEvent(JSON.parse(lines[i])); if (r) return r } catch {}
+      }
+    } catch {}
+  }
+  return null
+}
+
+module.exports = { cacheFromEvent, readCodexPromptCache, rateLimitsFromEvent, readCodexRateLimits }
