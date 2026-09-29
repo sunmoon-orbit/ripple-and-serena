@@ -162,7 +162,7 @@ function layoutTree(tree, cx, cy, outAngle, spread, step, pos, depthOf) {
   place(tree.root, outAngle - spread / 2, outAngle + spread / 2, 0)
 }
 
-function buildLayout(g) {
+function buildLayout(g, aspect = 1) {
   const idx = new Map()
   const nodes = g.nodes.map((n, i) => { idx.set(n.id, i); return { ...n } })
   const adj = nodes.map(() => [])
@@ -178,46 +178,44 @@ function buildLayout(g) {
   const pos = new Map(), depthOf = new Map()
   const treeEdges = []
   const clusterInfo = []
-  // 簇的摆放：先各自在原点长好，量出外接圆，再沿黄金角方向往外推到不和已放下的簇重叠为止。
-  // 大簇在中间，每簇都朝「离开中心」的方向长。
-  const golden = Math.PI * (3 - Math.sqrt(5))
-  const placed = []
+  // 簇的摆放（第二版，0929 阿颖说「太空旷」）：十二丛各长各的像孤岛，所以改成一棵整体——
+  // 中心一个根「我们」，每簇按大小分到一段角度，主干从中心伸到簇根，再在那段角度里分枝。
+  const total = clusters.reduce((s, m) => s + m.length, 0)
+  let acc = -Math.PI / 2
   let ring = 0
   clusters.forEach((members, ci) => {
     const isLoose = ci === looseIndex
-    const ang = ci === 0 ? -Math.PI / 2 : ci * golden
+    const share = (Math.PI * 2) * members.length / total
+    const ang = acc + share / 2
+    acc += share
     const tree = spanningTree(members, nodes, adj)
-    const spread = ci === 0 ? Math.PI * 2 : Math.min(Math.PI * 1.25, 0.8 + Math.sqrt(members.length) * 0.16)
+    const spread = Math.max(0.5, Math.min(share * 0.92, Math.PI * 0.9))
     const step = isLoose ? 20 : 24 + Math.min(10, Math.sqrt(members.length))
-    const local = new Map()
-    layoutTree(tree, 0, 0, ang, spread, step, local, depthOf)
-    let sx = 0, sy = 0, r = 0
-    for (const m of members) { const [x, y] = local.get(m); sx += x; sy += y }
-    sx /= members.length; sy /= members.length
-    for (const m of members) { const [x, y] = local.get(m); r = Math.max(r, Math.hypot(x - sx, y - sy)) }
-    r += 24
-    let d = 0
-    if (placed.length) {
-      for (d = 60; d < 6000; d += 12) {
-        const ox = Math.cos(ang) * d, oy = Math.sin(ang) * d
-        if (placed.every((c) => Math.hypot(ox + sx - c.x, oy + sy - c.y) > c.r + r + 18)) break
-      }
-    }
-    const ox = ci === 0 ? -sx : Math.cos(ang) * d, oy = ci === 0 ? -sy : Math.sin(ang) * d
-    for (const m of members) { const [x, y] = local.get(m); pos.set(m, [x + ox, y + oy]) }
-    const cxy = { x: sx + ox, y: sy + oy, r }
-    placed.push(cxy)
+    // 小簇离中心近一点、大簇远一点，主干长短不一才不像轮辐
+    const trunk = 70 + Math.sqrt(members.length) * 9 + seeded(ci + 5, 13) * 30
+    const rx = Math.cos(ang) * trunk, ry = Math.sin(ang) * trunk
+    layoutTree(tree, rx, ry, ang, spread, step, pos, depthOf)
     for (const [c, p] of tree.parent) if (p >= 0) treeEdges.push({ a: p, b: c, s: tree.sim.get(c), depth: depthOf.get(c) })
-    const [rootX, rootY] = pos.get(tree.root)
-    clusterInfo.push({ members, name: names[ci], x: cxy.x, y: cxy.y, r: r - 24, loose: isLoose, rootX, rootY })
-    ring = Math.max(ring, Math.hypot(cxy.x, cxy.y) + r)
+    let sx = 0, sy = 0, r = 0
+    for (const m of members) { const [x, y] = pos.get(m); sx += x; sy += y; nodes[m].cluster = ci }
+    sx /= members.length; sy /= members.length
+    for (const m of members) { const [x, y] = pos.get(m); r = Math.max(r, Math.hypot(x - sx, y - sy)); ring = Math.max(ring, Math.hypot(x, y)) }
+    let far = 0
+    for (const m of members) { const [x, y] = pos.get(m); far = Math.max(far, x * Math.cos(ang) + y * Math.sin(ang)) }
+    clusterInfo.push({ members, name: names[ci], x: sx, y: sy, r, loose: isLoose, rootX: rx, rootY: ry, angle: ang, trunk,
+      tipX: Math.cos(ang) * (far + 22), tipY: Math.sin(ang) * (far + 22) })
   })
+  // 竖屏把整株往上下拉开一点，别让一个圆挤在宽度里、上下留两大片白（曜：自适应收紧画幅）
+  for (const [i, [x, y]] of pos) pos.set(i, [x, y * aspect])
+  for (const c of clusterInfo) { c.y *= aspect; c.rootY *= aspect; c.tipY = c.tipY * aspect }
   nodes.forEach((n, i) => {
     const [x, y] = pos.get(i) || [0, 0]
     n.x = x; n.y = y; n.depth = depthOf.get(i) || 0; n.neighbors = adj[i]
   })
   const maxDepth = Math.max(1, ...treeEdges.map((e) => e.depth))
-  return { nodes, edges, treeEdges, clusters: clusterInfo, extent: ring, maxDepth }
+  // 串门线：跨簇的语义相近，画得很淡，给空白一点经络
+  const crossEdges = edges.filter((e) => nodes[e.a].cluster !== nodes[e.b].cluster)
+  return { nodes, edges, treeEdges, crossEdges, clusters: clusterInfo, extent: ring, maxDepth }
 }
 
 function cssVar(name, fallback) {
@@ -248,6 +246,8 @@ export default function MemoryVeinPanel() {
     // 按实际外包框居中，别按离原点最远的那条算——不然一半屏幕是空的
     let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity
     for (const n of L.nodes) { x0 = Math.min(x0, n.x); y0 = Math.min(y0, n.y); x1 = Math.max(x1, n.x); y1 = Math.max(y1, n.y) }
+    // 簇名写在梢外，也要框进来，不然贴边的名字会被切掉
+    for (const c of L.clusters) { x0 = Math.min(x0, c.tipX - 30); x1 = Math.max(x1, c.tipX + 30); y0 = Math.min(y0, c.tipY - 12); y1 = Math.max(y1, c.tipY + 18) }
     const top = 76, bottom = 110
     const k = Math.max(MIN_K, Math.min(1.2, (rect.width - 32) / (x1 - x0 + 40), (rect.height - top - bottom) / (y1 - y0 + 40)))
     viewRef.current = { tx: -((x0 + x1) / 2) * k, ty: -((y0 + y1) / 2) * k + (top - bottom) / 2, k }
@@ -258,7 +258,9 @@ export default function MemoryVeinPanel() {
     setLoading(true); setError('')
     try {
       const g = await api.graph()
-      const L = buildLayout(g)
+      const rect = canvasRef.current?.getBoundingClientRect()
+      const aspect = rect && rect.width > 0 ? Math.max(1, Math.min(1.6, (rect.height - 190) / rect.width)) : 1
+      const L = buildLayout(g, aspect)
       layoutRef.current = L
       selRef.current = null; setSelected(null)
       setStats({ n: L.nodes.length, c: L.clusters.filter((c) => !c.loose).length })
@@ -316,8 +318,48 @@ export default function MemoryVeinPanel() {
       const selSet = sel != null ? new Set([sel, ...L.nodes[sel].neighbors.map(([j]) => j)]) : null
       const off = (x, y, m = 40) => x < -m || x > W + m || y < -m || y > H + m
 
+      // 文字底下垫一圈底色描边，压在枝条上也读得清
+      const label = (text, x, y, font, color, alpha) => {
+        ctx.font = font; ctx.textAlign = 'center'
+        ctx.globalAlpha = alpha
+        ctx.lineWidth = 4; ctx.strokeStyle = bg; ctx.lineJoin = 'round'
+        ctx.strokeText(text, x, y)
+        ctx.fillStyle = color; ctx.fillText(text, x, y)
+        ctx.textAlign = 'left'
+      }
+      // 中心根「我们」+ 主干：从中心弯弯地伸到每簇的根，越往外越细
+      const drawTrunks = () => {
+        ctx.lineCap = 'round'
+        ctx.strokeStyle = vein
+        for (const c of L.clusters) {
+          const grow = Math.min(1, progress * 3)
+          const ex = X(c.rootX * grow), ey = Y(c.rootY * grow)
+          const bend = (seeded(c.members.length + 17, 21) - 0.5) * 0.4
+          const mx = (X(0) + ex) / 2 - (ey - Y(0)) * bend, my = (Y(0) + ey) / 2 + (ex - X(0)) * bend
+          ctx.globalAlpha = c.loose ? 0.18 : 0.42
+          ctx.lineWidth = Math.max(1, (c.loose ? 1.2 : 1.6 + Math.sqrt(c.members.length) * 0.22) * Math.sqrt(Math.max(k, 0.3)))
+          ctx.beginPath(); ctx.moveTo(X(0), Y(0)); ctx.quadraticCurveTo(mx, my, ex, ey); ctx.stroke()
+        }
+        ctx.globalAlpha = 0.9 * progress
+        ctx.fillStyle = vein
+        ctx.beginPath(); ctx.arc(X(0), Y(0), Math.max(3, 4 * Math.sqrt(k)), 0, Math.PI * 2); ctx.fill()
+      }
+      const drawCenterLabel = () => label('我 们', X(0), Y(0) - 12, '600 13px system-ui', ink, 0.9 * progress)
+      const drawCross = (alpha) => {
+        if (progress < 1 || sel != null) return
+        ctx.strokeStyle = vein
+        ctx.lineWidth = 0.5
+        for (const e of L.crossEdges) {
+          const a = L.nodes[e.a], b = L.nodes[e.b]
+          ctx.globalAlpha = alpha * (0.4 + e.s)
+          ctx.beginPath(); ctx.moveTo(X(a.x), Y(a.y)); ctx.lineTo(X(b.x), Y(b.y)); ctx.stroke()
+        }
+      }
+
       // 缩远：不画点、不画标题，只留每簇的主干（前三层枝）和簇名——远看是几丛叶脉，不是一堆泡泡
       if (k < CLUSTER_ZOOM) {
+        drawCross(0.05)
+        drawTrunks()
         ctx.lineCap = 'round'
         ctx.strokeStyle = vein
         for (const e of L.treeEdges) {
@@ -330,23 +372,19 @@ export default function MemoryVeinPanel() {
           ctx.lineWidth = Math.max(0.45, 1.5 - e.depth * 0.25)
           ctx.beginPath(); ctx.moveTo(ax, ay); ctx.lineTo(bx, by); ctx.stroke()
         }
-        ctx.textAlign = 'center'
         for (const c of L.clusters) {
-          const x = X(c.rootX), y = Y(c.rootY)
-          ctx.globalAlpha = (c.loose ? 0.4 : 0.85) * progress
-          ctx.fillStyle = ink
-          ctx.font = '600 12px system-ui'
-          ctx.fillText(c.name, x, y + 16)
-          ctx.globalAlpha = 0.45 * progress
-          ctx.fillStyle = inkSoft
-          ctx.font = '10px system-ui'
-          ctx.fillText(String(c.members.length), x, y + 29)
+          const x = X(c.tipX), y = Y(c.tipY) + 4
+          label(c.name, x, y, '600 12px system-ui', ink, (c.loose ? 0.4 : 0.85) * progress)
+          label(String(c.members.length), x, y + 13, '10px system-ui', inkSoft, 0.5 * progress)
         }
+        drawCenterLabel()
         ctx.textAlign = 'left'; ctx.globalAlpha = 1
         if (!intro.done) schedule()
         return
       }
 
+      drawCross(0.07)
+      drawTrunks()
       // 叶脉：只画生成树的枝；靠根的粗，末梢细；开场按深度从里往外长一次
       ctx.lineCap = 'round'
       ctx.strokeStyle = vein
@@ -392,8 +430,8 @@ export default function MemoryVeinPanel() {
         const dim = selSet && !selSet.has(i)
         const hue = TYPE_TINT[p.type] ?? 30
         const light = dark ? 72 : 34
-        ctx.globalAlpha = (dim ? 0.18 : 0.85) * reveal
-        const color = p.type === 'memory' ? ink : `hsl(${hue} 22% ${light}%)`
+        ctx.globalAlpha = (dim ? 0.15 : 0.62 + Math.min(0.3, (p.importance || 5) * 0.03)) * reveal
+        const color = p.type === 'memory' ? inkSoft : `hsl(${hue} 20% ${light + 6}%)`
         if (p.pinned) {
           ctx.strokeStyle = color; ctx.lineWidth = 1.2
           ctx.beginPath(); ctx.arc(x, y, r + 1.4, 0, Math.PI * 2); ctx.stroke()
@@ -403,17 +441,13 @@ export default function MemoryVeinPanel() {
         }
       }
 
-      // 簇名：一直在，写在簇根旁边，小字、疏排
-      ctx.font = '600 11px system-ui'
-      ctx.textAlign = 'center'
+      // 簇名：写在每丛的梢外，不和中心挤在一起
       for (const c of L.clusters) {
-        const x = X(c.rootX), y = Y(c.rootY) - 12 * Math.sqrt(k) - 6
+        const x = X(c.tipX), y = Y(c.tipY) + 4
         if (off(x, y)) continue
-        ctx.globalAlpha = (c.loose ? 0.35 : 0.72) * progress
-        ctx.fillStyle = inkSoft
-        ctx.fillText(c.name.split('').join(' '), x, y)
+        label(c.name.split('').join(' '), x, y, '600 11px system-ui', inkSoft, (c.loose ? 0.35 : 0.8) * progress)
       }
-      ctx.textAlign = 'left'
+      drawCenterLabel()
 
       // 记忆标题：只在拉近以后、只挑视口里最重要的几条
       if (k >= LABEL_ZOOM || sel != null) {
