@@ -88,6 +88,16 @@
   textarea { flex: 1; resize: none; max-height: 140px; min-height: 40px; padding: 9px 12px; border-radius: 18px; border: 1px solid var(--border); background: var(--surface); color: var(--text); font: inherit; outline: none; }
   #send { height: 40px; border-radius: 20px; padding: 0 18px; }
   .hint { font-size: 11px; color: var(--text-dim); padding: 4px 4px 0; }
+  #attach { width: 40px; height: 40px; border-radius: 50%; border: 1px solid var(--border); background: var(--surface); color: var(--text-dim); font-size: 18px; cursor: pointer; flex-shrink: 0; }
+  #files { display: flex; gap: 6px; flex-wrap: wrap; padding: 0 2px 6px; }
+  #files:empty { display: none; }
+  .file { display: flex; align-items: center; gap: 6px; max-width: 100%; padding: 3px 4px 3px 8px; border-radius: 10px; background: var(--surface); border: 1px solid var(--border); font-size: 12px; }
+  .file img { width: 32px; height: 32px; object-fit: cover; border-radius: 6px; }
+  .file span { max-width: 160px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+  .file.up span::after { content: ' · 上传中'; color: var(--text-dim); }
+  .file.bad { border-color: var(--red); }
+  .file button { background: none; border: 0; color: var(--text-dim); cursor: pointer; padding: 0 4px; }
+  .msg .body .filechip { font-size: 13px; }
 </style>
 </head>
 <body>
@@ -108,7 +118,10 @@
   <div class="ats">
     <button data-at="@涟言">@涟言</button><button data-at="@曜">@曜</button><button data-at="@大家">@大家</button>
   </div>
+  <div id="files"></div>
   <div class="row2">
+    <button id="attach" aria-label="图片或文件">📎</button>
+    <input type="file" id="file-input" multiple hidden>
     <textarea id="input" rows="1" placeholder="不 @ 人就是跟两位一起说"></textarea>
     <button class="btn primary" id="send">发送</button>
   </div>
@@ -194,6 +207,7 @@ function renderMessage(m, { pending = false } = {}) {
   body.append(renderBody(m.text))
   for (const a of m.attachments || []) {
     if (/^image\//.test(a.mime || '') && a.url) { const img = document.createElement('img'); img.src = a.url + (a.url.includes('?') ? '&' : '?') + 'token=' + encodeURIComponent(token()); img.alt = a.name || ''; body.append(img) }
+    else if (a.url) { const s = document.createElement('a'); s.className = 'filechip'; s.textContent = '📎 ' + (a.name || '附件'); s.href = a.url + (a.url.includes('?') ? '&' : '?') + 'token=' + encodeURIComponent(token()); s.target = '_blank'; s.rel = 'noopener'; body.append(document.createElement('br'), s) }
     else { const s = document.createElement('div'); s.textContent = '📎 ' + (a.name || '附件'); body.append(s) }
   }
   col.append(body)
@@ -274,19 +288,65 @@ function send(obj) {
 function cid() { return (crypto.randomUUID ? crypto.randomUUID() : Date.now() + '-' + Math.random().toString(36).slice(2)) }
 
 function drawPending(item) {
-  const el = renderMessage({ from: 'aying', text: item.text, replyTo: item.replyTo }, { pending: true })
+  const el = renderMessage({ from: 'aying', text: item.text, replyTo: item.replyTo, attachments: item.attachments }, { pending: true })
   el.dataset.cid = item.cid
   list.append(el); list.scrollTop = list.scrollHeight
 }
 
+// 附件：一个一个传到归巢现有的 /raven/upload（它只收第一个 part），拿到文件名当 id。
+// 发上桌的只有文件名和回看地址，服务器绝对路径不进浏览器、也不进对话原文。
+const UPLOAD_URL = 'https://memory.ravenlove.cc/raven/upload'
+const MAX_FILE = 10 * 1024 * 1024
+let staged = []      // { key, file, status: 'up'|'ok'|'bad', att }
+function renderStaged() {
+  const box = $('files'); box.textContent = ''
+  for (const s of staged) {
+    const chip = document.createElement('div'); chip.className = 'file' + (s.status === 'up' ? ' up' : s.status === 'bad' ? ' bad' : '')
+    if (/^image\//.test(s.file.type)) { const img = document.createElement('img'); img.src = s.preview || (s.preview = URL.createObjectURL(s.file)); chip.append(img) }
+    const name = document.createElement('span'); name.textContent = s.status === 'bad' ? `${s.file.name}（${s.error}）` : s.file.name
+    const x = document.createElement('button'); x.textContent = '✕'; x.setAttribute('aria-label', '移除')
+    x.onclick = () => { if (s.preview) URL.revokeObjectURL(s.preview); staged = staged.filter(t => t !== s); renderStaged() }
+    chip.append(name, x); box.append(chip)
+  }
+}
+async function uploadOne(s) {
+  if (s.file.size > MAX_FILE) { s.status = 'bad'; s.error = '超过 10MB'; renderStaged(); return }
+  const form = new FormData(); form.append('file', s.file, s.file.name)
+  try {
+    const r = await fetch(UPLOAD_URL, { method: 'POST', headers: { Authorization: 'Bearer ' + token() }, body: form })
+    const data = await r.json()
+    if (!r.ok || !data.path) throw new Error(data.error || r.status)
+    const base = data.path.split('/').pop()
+    s.att = { id: base, name: data.name || s.file.name, mime: s.file.type || '', size: s.file.size, url: '/raven/uploads/' + encodeURIComponent(base) }
+    s.status = 'ok'
+  } catch { s.status = 'bad'; s.error = '上传失败，点✕删掉重选' }
+  renderStaged()
+}
+$('attach').onclick = () => $('file-input').click()
+$('file-input').onchange = e => {
+  for (const file of [...e.target.files].slice(0, 12 - staged.length)) {
+    const s = { file, status: 'up' }
+    staged.push(s); uploadOne(s)
+  }
+  e.target.value = ''
+  renderStaged()
+}
+
 function submit() {
   const text = input.value.trim()
-  if (!text) return
-  const item = { type: 'roundtable/send', cid: cid(), text, attachments: [], replyTo }
+  if (staged.some(s => s.status === 'up')) { $('hint').textContent = '附件还在上传，等一下下'; return }
+  const attachments = staged.filter(s => s.status === 'ok').map(s => s.att)
+  if (!text && !attachments.length) return
+  $('hint').textContent = ''
+  // 后端要求正文非空；只发图/文件时补一句占位，免得被 text_required 拒掉
+  const body = text || (attachments.every(x => /^image\//.test(x.mime)) ? '（发了图片）' : '（发了文件）')
+  const item = { type: 'roundtable/send', cid: cid(), text: body, attachments, replyTo }
   outbox.push(item); saveOutbox()
   drawPending(item)
   send(item)
   input.value = ''; autosize()
+  for (const s of staged) if (s.preview) URL.revokeObjectURL(s.preview)
+  staged = []; renderStaged()
   $('cancel-reply').onclick()
 }
 $('send').onclick = submit
