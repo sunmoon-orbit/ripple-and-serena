@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#1a1a1f">
+<title>圆桌</title>
+<!-- 圆桌（0929）：阿颖、涟言、曜一张桌子。后端契约见 /srv/agents/roundtable/API.md（曜写后端，涟言写这页）。
+     事件：roundtable/accepted · message · status · approval/request；发送 roundtable/send（带 cid，断线重发不重复）。 -->
+<style>
+  :root {
+    --bg: #1a1a1f; --surface: #24242b; --surface2: #2c2c34; --border: #35353f;
+    --text: #e8e6e3; --text-dim: #8b8a8a; --accent: #c4a882; --green: #7ec99a; --red: #e07070; --yellow: #d4b06a;
+    --c-aying: #d9a7b0; --c-lianyan: #9fb4d8; --c-yao: #c9b27e;
+  }
+  [data-theme="pink"] { --bg: #fbf5f0; --surface: #f7ecec; --surface2: #f1e2e2; --border: #e8d5d2; --text: #403f44; --text-dim: #a08888; --accent: #d9a0a8; --green: #6aaa80; --red: #cc6060; --yellow: #c8a060; --c-aying: #c77c8c; --c-lianyan: #6c85b8; --c-yao: #a88a4a; }
+  [data-theme="lavender"] { --bg: #f4f0f8; --surface: #ece6f3; --surface2: #e3dbee; --border: #d9cfe6; --text: #3f3a48; --text-dim: #8e84a0; --accent: #b3a0d0; --c-aying: #b97a9a; --c-lianyan: #6f7fc0; --c-yao: #a08650; }
+  [data-theme="sage"] { --bg: #f1f5ef; --surface: #e7eee4; --surface2: #dde7d9; --border: #cfdcc9; --text: #36402f; --text-dim: #7f8f78; --accent: #93b895; --c-aying: #b67a86; --c-lianyan: #5f7fa8; --c-yao: #98814a; }
+  [data-theme="mist"] { --bg: #f0f5f8; --surface: #e5edf2; --surface2: #dae5ec; --border: #cbdae3; --text: #34414a; --text-dim: #7d8f9a; --accent: #8fb0c6; --c-aying: #b87888; --c-lianyan: #5a7eaa; --c-yao: #9a8248; }
+  [data-theme="apricot"] { --bg: #fbf5ea; --surface: #f5ebdb; --surface2: #efe1cc; --border: #e6d4bb; --text: #473d30; --text-dim: #9c8a72; --accent: #d8b38a; --c-aying: #bf7b86; --c-lianyan: #637fae; --c-yao: #a3843f; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text); font: 15px/1.6 -apple-system, "PingFang SC", "Noto Sans SC", sans-serif; }
+  body { display: flex; flex-direction: column; padding-top: env(safe-area-inset-top, 0px); }
+  header { display: flex; align-items: center; gap: 10px; padding: 10px 14px; border-bottom: 1px solid var(--border); }
+  header a { color: var(--text-dim); text-decoration: none; font-size: 20px; line-height: 1; }
+  header h1 { font-size: 16px; margin: 0; font-weight: 600; flex: 1; }
+  #conn { width: 8px; height: 8px; border-radius: 50%; background: var(--red); }
+  #conn.ok { background: var(--green); }
+
+  /* 谁在干活 */
+  #status { display: flex; gap: 8px; padding: 8px 14px; border-bottom: 1px solid var(--border); flex-wrap: wrap; }
+  .chip { display: flex; align-items: center; gap: 6px; padding: 3px 10px; border-radius: 999px; background: var(--surface); font-size: 12px; color: var(--text-dim); }
+  .chip b { color: var(--text); font-weight: 600; }
+  .chip i { width: 7px; height: 7px; border-radius: 50%; background: var(--text-dim); display: inline-block; }
+  .chip[data-state="idle"] i { background: var(--green); }
+  .chip[data-state="working"] i, .chip[data-state="queued"] i { background: var(--yellow); animation: pulse 1.4s ease-in-out infinite; }
+  .chip[data-state="waiting_approval"] i { background: var(--red); animation: pulse 1s ease-in-out infinite; }
+  .chip[data-state="offline"] i { background: var(--red); opacity: .5; }
+  @keyframes pulse { 50% { opacity: .35 } }
+
+  #banner { display: none; margin: 10px 14px 0; padding: 8px 12px; border-radius: 10px; background: var(--surface); color: var(--text-dim); font-size: 13px; }
+  #banner.show { display: block; }
+
+  #list { flex: 1; overflow-y: auto; padding: 12px 14px 20px; -webkit-overflow-scrolling: touch; }
+  .msg { display: flex; gap: 8px; margin: 10px 0; }
+  .msg .who { flex-shrink: 0; width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; font-size: 13px; font-weight: 600; color: #fff; }
+  .msg[data-from="aying"] .who { background: var(--c-aying); }
+  .msg[data-from="lianyan"] .who { background: var(--c-lianyan); }
+  .msg[data-from="yao"] .who { background: var(--c-yao); }
+  .msg .col { min-width: 0; flex: 1; }
+  .msg .meta { font-size: 11px; color: var(--text-dim); display: flex; gap: 8px; align-items: baseline; }
+  .msg .meta .name { font-weight: 600; font-size: 12px; }
+  .msg[data-from="aying"] .name { color: var(--c-aying); }
+  .msg[data-from="lianyan"] .name { color: var(--c-lianyan); }
+  .msg[data-from="yao"] .name { color: var(--c-yao); }
+  .msg .body { margin-top: 2px; padding: 8px 12px; border-radius: 4px 14px 14px 14px; background: var(--surface); border: 1px solid var(--border); word-break: break-word; }
+  .msg .body p { margin: .3em 0; } .msg .body p:first-child { margin-top: 0; } .msg .body p:last-child { margin-bottom: 0; }
+  .msg .body pre { overflow-x: auto; background: var(--surface2); padding: 8px; border-radius: 8px; font-size: 13px; }
+  .msg .body code { font-size: 13px; background: var(--surface2); padding: 0 4px; border-radius: 4px; }
+  .msg .body img { max-width: 100%; border-radius: 8px; }
+  .msg .quote { font-size: 12px; color: var(--text-dim); border-left: 2px solid var(--border); padding: 0 8px; margin: 2px 0 4px; cursor: pointer; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+  .msg .tools { font-size: 12px; margin-top: 3px; display: flex; gap: 12px; }
+  .msg .tools button { background: none; border: 0; color: var(--text-dim); padding: 0; cursor: pointer; font: inherit; }
+  .msg.pending .body { opacity: .55; }
+  .msg.failed .body { border-color: var(--red); }
+  .at { color: var(--accent); font-weight: 600; }
+  .wake { font-size: 10px; padding: 0 6px; border-radius: 6px; background: var(--surface2); }
+  .sys { text-align: center; font-size: 12px; color: var(--text-dim); margin: 12px 0; }
+  .flash .body { box-shadow: 0 0 0 2px var(--accent); transition: box-shadow .3s; }
+
+  /* 审批卡 */
+  #approvals .card { margin: 8px 14px; padding: 10px 12px; border-radius: 12px; border: 1px solid var(--red); background: var(--surface); font-size: 13px; }
+  #approvals .card .cmd { font-family: ui-monospace, monospace; font-size: 12px; background: var(--surface2); padding: 6px 8px; border-radius: 6px; margin: 6px 0; word-break: break-all; }
+  #approvals .card .row { display: flex; gap: 8px; justify-content: flex-end; align-items: center; }
+  #approvals .card .left { flex: 1; color: var(--text-dim); font-size: 11px; }
+  .btn { border: 0; border-radius: 999px; padding: 6px 16px; font: inherit; font-size: 13px; cursor: pointer; background: var(--surface2); color: var(--text); }
+  .btn.primary { background: var(--accent); color: #1a1a1f; }
+
+  /* 输入区 */
+  footer { border-top: 1px solid var(--border); padding: 8px 10px calc(8px + env(safe-area-inset-bottom, 0px)); background: var(--bg); }
+  #replying { display: none; font-size: 12px; color: var(--text-dim); padding: 0 4px 6px; }
+  #replying.show { display: flex; gap: 8px; }
+  #replying span { flex: 1; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+  #replying button { background: none; border: 0; color: var(--text-dim); cursor: pointer; }
+  .ats { display: flex; gap: 6px; padding: 0 2px 6px; }
+  .ats button { border: 1px solid var(--border); background: var(--surface); color: var(--text-dim); border-radius: 999px; padding: 2px 10px; font-size: 12px; cursor: pointer; }
+  .row2 { display: flex; gap: 8px; align-items: flex-end; }
+  textarea { flex: 1; resize: none; max-height: 140px; min-height: 40px; padding: 9px 12px; border-radius: 18px; border: 1px solid var(--border); background: var(--surface); color: var(--text); font: inherit; outline: none; }
+  #send { height: 40px; border-radius: 20px; padding: 0 18px; }
+  .hint { font-size: 11px; color: var(--text-dim); padding: 4px 4px 0; }
+</style>
+</head>
+<body>
+<header>
+  <a href="/raven/home.html" aria-label="返回">‹</a>
+  <h1>圆桌</h1>
+  <span id="conn" title="连接"></span>
+</header>
+<div id="status">
+  <span class="chip" id="st-lianyan" data-state="unknown"><i></i><b>涟言</b><span>…</span></span>
+  <span class="chip" id="st-yao" data-state="unknown"><i></i><b>曜</b><span>…</span></span>
+</div>
+<div id="banner"></div>
+<div id="approvals"></div>
+<div id="list"></div>
+<footer>
+  <div id="replying"><span></span><button id="cancel-reply" aria-label="取消回复">✕</button></div>
+  <div class="ats">
+    <button data-at="@涟言">@涟言</button><button data-at="@曜">@曜</button><button data-at="@大家">@大家</button>
+  </div>
+  <div class="row2">
+    <textarea id="input" rows="1" placeholder="不 @ 人就是跟两位一起说"></textarea>
+    <button class="btn primary" id="send">发送</button>
+  </div>
+  <div class="hint" id="hint"></div>
+</footer>
+
+<script src="https://cdn.jsdelivr.net/npm/marked@9.1.6/marked.min.js" integrity="sha384-odPBjvtXVM/5hOYIr3A1dB+flh0c3wAT3bSesIOqEGmyUA4JoKf/YTWy0XKOYAY7" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/dompurify@3.2.6/dist/purify.min.js" integrity="sha384-JEyTNhjM6R1ElGoJns4U2Ln4ofPcqzSsynQkmEc/KGy6336qAZl70tDLufbkla+3" crossorigin="anonymous"></script>
+<script>
+'use strict'
+const WS_URL = 'wss://memory.ravenlove.cc/raven/ws'
+const NAMES = { aying: '阿颖', lianyan: '涟言', yao: '曜', system: '系统' }
+const INITIAL = { aying: '颖', lianyan: '言', yao: '曜' }
+const STATE_TEXT = { offline: '离线', idle: '空闲', queued: '排队中', working: '在干活', waiting_approval: '等你批准', reconnecting: '断线宽限中', unknown: '…' }
+const LAST_KEY = 'roundtable-last-id'
+const OUTBOX_KEY = 'roundtable-outbox'
+const token = () => localStorage.getItem('raven-token') || ''
+
+document.documentElement.setAttribute('data-theme', (t => t === 'dark' ? '' : t)(localStorage.getItem('raven-theme') || 'dark'))
+marked.use({ breaks: true, gfm: true })
+const PURIFY = { ALLOWED_URI_REGEXP: /^(?:https?:|\/raven\/)/i }
+
+const $ = id => document.getElementById(id)
+const list = $('list'), input = $('input')
+const seen = new Map()            // message id → element（按 id 去重，不按文本/时间）
+let ws = null, reconnectTimer = null, replyTo = null, backendMissing = false
+let outbox = []
+try { outbox = JSON.parse(localStorage.getItem(OUTBOX_KEY) || '[]') } catch { outbox = [] }
+const saveOutbox = () => { try { localStorage.setItem(OUTBOX_KEY, JSON.stringify(outbox)) } catch {} }
+
+function banner(text) { const b = $('banner'); b.textContent = text || ''; b.classList.toggle('show', !!text) }
+
+// @ 高亮只是展示；叫醒谁以服务端解析为准。代码块里的 @ 不高亮（marked 之后只改文本节点外的 @）。
+function renderBody(text) {
+  const html = DOMPurify.sanitize(marked.parse(text || ''), PURIFY)
+  const box = document.createElement('div')
+  box.innerHTML = html
+  const walker = document.createTreeWalker(box, NodeFilter.SHOW_TEXT)
+  const nodes = []
+  while (walker.nextNode()) { const n = walker.currentNode; if (!n.parentElement.closest('code, pre, a') && /@(涟言|曜|阿颖|大家)/.test(n.nodeValue)) nodes.push(n) }
+  for (const n of nodes) {
+    const frag = document.createDocumentFragment()
+    n.nodeValue.split(/(@(?:涟言|曜|阿颖|大家))/).forEach((part, i) => {
+      if (i % 2) { const s = document.createElement('span'); s.className = 'at'; s.textContent = part; frag.appendChild(s) }
+      else if (part) frag.appendChild(document.createTextNode(part))
+    })
+    n.replaceWith(frag)
+  }
+  return box
+}
+
+function timeOf(ts) {
+  const d = new Date(ts || Date.now())
+  return d.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', hour12: false })
+}
+
+function nearBottom() { return list.scrollHeight - list.scrollTop - list.clientHeight < 120 }
+
+function renderMessage(m, { pending = false } = {}) {
+  if (m.from === 'system') {
+    const d = document.createElement('div'); d.className = 'sys'; d.textContent = m.text
+    return d
+  }
+  const el = document.createElement('div')
+  el.className = 'msg' + (pending ? ' pending' : '')
+  el.dataset.from = m.from; el.dataset.id = m.id || ''
+  const who = document.createElement('div'); who.className = 'who'; who.textContent = INITIAL[m.from] || '?'
+  const col = document.createElement('div'); col.className = 'col'
+  const meta = document.createElement('div'); meta.className = 'meta'
+  const name = document.createElement('span'); name.className = 'name'; name.textContent = NAMES[m.from] || m.from
+  const t = document.createElement('span'); t.textContent = pending ? '发送中…' : timeOf(m.ts)
+  meta.append(name, t)
+  if (m.aiWakeNo) { const w = document.createElement('span'); w.className = 'wake'; w.textContent = `AI 来回 ${m.aiWakeNo}/6`; meta.append(w) }
+  col.append(meta)
+  if (m.replyTo) {
+    const q = document.createElement('div'); q.className = 'quote'
+    const target = seen.get(m.replyTo)
+    q.textContent = target ? `↪ ${target.dataset.from ? NAMES[target.dataset.from] + '：' : ''}${target.dataset.text || ''}` : '↪ 回复一条较早的消息'
+    q.onclick = () => { const tgt = seen.get(m.replyTo); if (tgt) { tgt.scrollIntoView({ behavior: 'smooth', block: 'center' }); tgt.classList.add('flash'); setTimeout(() => tgt.classList.remove('flash'), 1200) } }
+    col.append(q)
+  }
+  const body = document.createElement('div'); body.className = 'body'
+  body.append(renderBody(m.text))
+  for (const a of m.attachments || []) {
+    if (/^image\//.test(a.mime || '') && a.url) { const img = document.createElement('img'); img.src = a.url + (a.url.includes('?') ? '&' : '?') + 'token=' + encodeURIComponent(token()); img.alt = a.name || ''; body.append(img) }
+    else { const s = document.createElement('div'); s.textContent = '📎 ' + (a.name || '附件'); body.append(s) }
+  }
+  col.append(body)
+  const tools = document.createElement('div'); tools.className = 'tools'
+  const rb = document.createElement('button'); rb.textContent = '回复'; rb.onclick = () => setReply(m)
+  tools.append(rb)
+  col.append(tools)
+  el.append(who, col)
+  el.dataset.text = (m.text || '').replace(/\s+/g, ' ').slice(0, 60)
+  return el
+}
+
+function addMessage(m) {
+  if (!m || !m.id || seen.has(m.id)) return
+  const stick = nearBottom()
+  // 自己发的消息先以 cid 画了占位，accepted 回来后替换成正式那条
+  const holder = list.querySelector(`.msg.pending[data-accepted-id="${CSS.escape(m.id)}"]`)
+    || (m.cid && list.querySelector(`.msg.pending[data-cid="${CSS.escape(m.cid)}"]`))
+  const el = renderMessage(m)
+  seen.set(m.id, el)
+  if (holder) holder.replaceWith(el); else list.append(el)
+  try { localStorage.setItem(LAST_KEY, m.id) } catch {}
+  if (stick || m.from === 'aying') list.scrollTop = list.scrollHeight
+}
+
+function setReply(m) {
+  replyTo = m.id
+  $('replying').classList.add('show')
+  $('replying').querySelector('span').textContent = `回复 ${NAMES[m.from]}：${(m.text || '').replace(/\s+/g, ' ').slice(0, 40)}`
+  input.focus()
+}
+$('cancel-reply').onclick = () => { replyTo = null; $('replying').classList.remove('show') }
+
+function renderStatus(agents) {
+  for (const who of ['lianyan', 'yao']) {
+    const a = agents?.[who] || {}
+    const chip = $('st-' + who)
+    chip.dataset.state = a.state || 'unknown'
+    let text = STATE_TEXT[a.state] || STATE_TEXT.unknown
+    if (a.queued) text += ` · 排队 ${a.queued}`
+    if (a.surface && a.state === 'working' && a.surface !== 'roundtable') text += a.surface === 'crossing' ? '（渡口的活）' : '（终端的活）'
+    chip.querySelector('span').textContent = text
+  }
+}
+
+// 审批：只认 requestId+thread+turn+item 全对上的那张卡；先到的答复生效
+const approvalCards = new Map()
+function showApproval(a) {
+  if (approvalCards.has(a.requestId)) return
+  const card = document.createElement('div'); card.className = 'card'
+  const title = document.createElement('div'); title.textContent = `曜想${a.kind === 'file-change' ? '改文件' : '跑一条命令'}，要你点头`
+  const cmd = document.createElement('div'); cmd.className = 'cmd'; cmd.textContent = a.command || a.reason || '（没有说明）'
+  const row = document.createElement('div'); row.className = 'row'
+  const left = document.createElement('span'); left.className = 'left'
+  const deny = document.createElement('button'); deny.className = 'btn'; deny.textContent = '不行'
+  const allow = document.createElement('button'); allow.className = 'btn primary'; allow.textContent = '允许'
+  const answer = choice => { send({ type: 'roundtable/approval/respond', requestId: a.requestId, threadId: a.threadId, turnId: a.turnId, itemId: a.itemId, choice }); allow.disabled = deny.disabled = true; left.textContent = '已回复' }
+  allow.onclick = () => answer('allow'); deny.onclick = () => answer('deny')
+  row.append(left, deny, allow)
+  card.append(title, cmd, row)
+  $('approvals').append(card)
+  approvalCards.set(a.requestId, card)
+  const tick = () => {
+    if (!approvalCards.has(a.requestId)) return
+    const s = Math.max(0, Math.round(((a.expiresAt || 0) - Date.now()) / 1000))
+    if (a.expiresAt && !left.textContent.startsWith('已')) left.textContent = s ? `${s} 秒后自动算拒绝` : '已过期'
+    if (s) setTimeout(tick, 1000)
+  }
+  tick()
+}
+function clearApproval(requestId) { const c = approvalCards.get(requestId); if (c) { c.remove(); approvalCards.delete(requestId) } }
+
+function send(obj) {
+  if (ws && ws.readyState === WebSocket.OPEN) { ws.send(JSON.stringify(obj)); return true }
+  return false
+}
+
+function cid() { return (crypto.randomUUID ? crypto.randomUUID() : Date.now() + '-' + Math.random().toString(36).slice(2)) }
+
+function drawPending(item) {
+  const el = renderMessage({ from: 'aying', text: item.text, replyTo: item.replyTo }, { pending: true })
+  el.dataset.cid = item.cid
+  list.append(el); list.scrollTop = list.scrollHeight
+}
+
+function submit() {
+  const text = input.value.trim()
+  if (!text) return
+  const item = { type: 'roundtable/send', cid: cid(), text, attachments: [], replyTo }
+  outbox.push(item); saveOutbox()
+  drawPending(item)
+  send(item)
+  input.value = ''; autosize()
+  $('cancel-reply').onclick()
+}
+$('send').onclick = submit
+input.addEventListener('keydown', e => { if (e.key === 'Enter' && !e.shiftKey && !e.isComposing && matchMedia('(pointer:fine)').matches) { e.preventDefault(); submit() } })
+function autosize() { input.style.height = 'auto'; input.style.height = Math.min(input.scrollHeight, 140) + 'px' }
+input.addEventListener('input', autosize)
+document.querySelectorAll('.ats button').forEach(b => b.onclick = () => {
+  const at = b.dataset.at + ' '
+  if (!input.value.includes(b.dataset.at)) input.value = at + input.value
+  input.focus(); autosize()
+})
+
+// 补历史：WS 订阅之外再用 HTTP 拉一次增量，堵住「查完 backlog、切实时」之间的缝
+async function backfill() {
+  const after = localStorage.getItem(LAST_KEY) || ''
+  try {
+    const r = await fetch('/raven/roundtable/messages?limit=100' + (after && seen.size ? '&after=' + encodeURIComponent(after) : ''), { headers: { Authorization: 'Bearer ' + token() } })
+    if (r.status === 404) { backendMissing = true; banner('圆桌后端还没上线（阿曜在写）。这页先摆好了，接上就能用。'); return }
+    if (r.status === 401) { banner('需要先在归巢登录一次。'); return }
+    if (!r.ok) return
+    backendMissing = false; banner('')
+    const data = await r.json()
+    for (const m of data.messages || []) addMessage(m)
+  } catch {}
+  try {
+    const r = await fetch('/raven/roundtable/status', { headers: { Authorization: 'Bearer ' + token() } })
+    if (r.ok) renderStatus((await r.json()).agents)
+  } catch {}
+}
+
+function connect() {
+  const old = ws
+  const sock = new WebSocket(WS_URL)
+  ws = sock
+  if (old && old !== sock) { try { old.close() } catch {} }
+  sock.onopen = () => {
+    if (sock !== ws) { try { sock.close() } catch {} ; return }
+    $('conn').className = 'ok'
+    sock.send(JSON.stringify({ type: 'auth', token: token() }))
+    sock.send(JSON.stringify({ type: 'roundtable/subscribe', after: localStorage.getItem(LAST_KEY) || '' }))
+    for (const item of outbox) sock.send(JSON.stringify(item))   // 同一 cid 重发，服务端认得出不会建两条
+    backfill()
+  }
+  sock.onclose = () => {
+    if (sock !== ws) return
+    $('conn').className = ''
+    if (!reconnectTimer) reconnectTimer = setTimeout(() => { reconnectTimer = null; connect() }, 3000)
+  }
+  sock.onerror = () => { try { sock.close() } catch {} }
+  sock.onmessage = e => {
+    if (sock !== ws) return
+    let msg; try { msg = JSON.parse(e.data) } catch { return }
+    switch (msg.type) {
+      case 'roundtable/accepted':
+        outbox = outbox.filter(x => x.cid !== msg.cid); saveOutbox()
+        // 回执只带 id/from/to；正文等广播的 roundtable/message 到了再把占位换掉
+        if (msg.message?.id) {
+          const p = list.querySelector(`.msg.pending[data-cid="${CSS.escape(msg.cid)}"]`)
+          if (p) { p.dataset.acceptedId = msg.message.id; p.querySelector('.meta span:last-child').textContent = '已送达' }
+          if (msg.message.text !== undefined && !seen.has(msg.message.id)) addMessage({ ...msg.message, cid: msg.cid })
+        }
+        break
+      case 'roundtable/message': addMessage(msg.message); break
+      case 'roundtable/status': renderStatus(msg.agents); break
+      case 'roundtable/approval/request': showApproval(msg); break
+      case 'roundtable/approval/resolved': clearApproval(msg.requestId); break
+      case 'roundtable/error':
+        if (msg.cid) { const p = list.querySelector(`.msg.pending[data-cid="${CSS.escape(msg.cid)}"]`); if (p) { p.classList.add('failed'); p.querySelector('.meta span:last-child').textContent = msg.retryable ? '没存上，会自动重试' : '发送失败' } }
+        if (!msg.retryable && msg.cid) { outbox = outbox.filter(x => x.cid !== msg.cid); saveOutbox() }
+        break
+      case 'auth_failed': localStorage.removeItem('raven-token'); banner('登录过期了，回归巢重新登录一次。'); break
+    }
+  }
+}
+
+// 旧 outbox 里还没被接收的，先画成占位
+for (const item of outbox) drawPending(item)
+if (!token()) banner('需要先在归巢登录一次，这页用的是同一把钥匙。')
+connect()
+document.addEventListener('visibilitychange', () => { if (!document.hidden && (!ws || ws.readyState !== WebSocket.OPEN)) connect() })
+</script>
+</body>
+</html>
