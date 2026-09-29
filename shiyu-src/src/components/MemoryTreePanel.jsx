@@ -328,7 +328,8 @@ export default function MemoryTreePanel() {
         ctx.beginPath(); ctx.moveTo(X(tw.from[0]), Y(tw.from[1])); ctx.lineTo(X(tw.to[0]), Y(tw.to[1])); ctx.stroke()
         const x = X(n.x), y = Y(n.y)
         if (x < -20 || x > W + 20 || y < -20 || y > Hs + 20) continue
-        const size = (2.2 + (n.importance || 5) * 0.42) * Math.sqrt(k) * (tw.i === sel ? 1.6 : 1)
+        // 置顶的花放大一截：原来跟叶子一样大，混在几百片叶里找不到（0929 她置顶了一条说没看到花）
+        const size = (2.2 + (n.importance || 5) * 0.42) * Math.sqrt(k) * (tw.i === sel ? 1.6 : 1) * (n.pinned ? 1.7 : 1)
         ctx.globalAlpha = dim ? 0.15 : 0.78
         const plaque = IS_ZHAOHUA && (n.pinned || (n.importance || 5) >= 7)
         if (plaque) {
