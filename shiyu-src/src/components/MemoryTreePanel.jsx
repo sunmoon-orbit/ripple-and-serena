@@ -182,7 +182,7 @@ export default function MemoryTreePanel() {
       const T = buildTree(g)
       treeRef.current = T
       selRef.current = null; setSelected(null)
-      setStats({ n: T.nodes.length, b: T.branches.length, p: T.nodes.filter((n) => n.pinned || (n.importance || 5) >= 8).length })
+      setStats({ n: T.nodes.length, b: T.branches.length, p: T.nodes.filter((n) => n.pinned || (n.importance || 5) >= 7).length })
       const today = new Date().toDateString()
       let seen = ''
       try { seen = localStorage.getItem(INTRO_KEY) || '' } catch {}
@@ -330,7 +330,7 @@ export default function MemoryTreePanel() {
         if (x < -20 || x > W + 20 || y < -20 || y > Hs + 20) continue
         const size = (2.2 + (n.importance || 5) * 0.42) * Math.sqrt(k) * (tw.i === sel ? 1.6 : 1)
         ctx.globalAlpha = dim ? 0.15 : 0.78
-        const plaque = IS_ZHAOHUA && (n.pinned || (n.importance || 5) >= 8)
+        const plaque = IS_ZHAOHUA && (n.pinned || (n.importance || 5) >= 7)
         if (plaque) {
           // 昭华：普通记忆长成叶，只有重要记忆被郑重地挂成木牌。
           // 木牌按世界缩放绘制，远景是树冠里的小轮廓，拉近才能读字。
