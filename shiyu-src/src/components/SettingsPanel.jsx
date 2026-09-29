@@ -233,6 +233,7 @@ export default function SettingsPanel() {
           {[
             { id: 'list', label: '年轮列表', dot: '#8FA3BC' },
             { id: 'starmap', label: '记忆星图', dot: '#F5D97E' },
+            { id: 'veins', label: '记忆脉络', dot: '#A07850' },
           ].map((v) => (
             <button key={v.id} className={'theme-chip' + (memoryView === v.id ? ' active' : '')} onClick={() => setMemoryView(v.id)}>
               <span className="theme-chip-dot" style={{ background: v.dot }} />
@@ -240,7 +241,7 @@ export default function SettingsPanel() {
             </button>
           ))}
         </div>
-        <p style={{ fontSize: 12, opacity: 0.5, margin: '8px 2px 0' }}>星图把每条记忆画成一颗星，语义相近的星之间有连线。PC 大屏观感更佳。</p>
+        <p style={{ fontSize: 12, opacity: 0.5, margin: '8px 2px 0' }}>星图把每条记忆画成一颗星；脉络把相近的记忆理成几簇，按叶脉长开，手机更省电。</p>
       </div>
     </div>
   )
