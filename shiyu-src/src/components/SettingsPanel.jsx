@@ -234,6 +234,7 @@ export default function SettingsPanel() {
             { id: 'list', label: '年轮列表', dot: '#8FA3BC' },
             { id: 'starmap', label: '记忆星图', dot: '#F5D97E' },
             { id: 'veins', label: '记忆脉络', dot: '#A07850' },
+            { id: 'tree', label: '记忆之树', dot: '#6F5B45' },
           ].map((v) => (
             <button key={v.id} className={'theme-chip' + (memoryView === v.id ? ' active' : '')} onClick={() => setMemoryView(v.id)}>
               <span className="theme-chip-dot" style={{ background: v.dot }} />

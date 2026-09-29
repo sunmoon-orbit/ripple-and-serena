@@ -650,4 +650,4 @@ export default function MemoryVeinPanel() {
   )
 }
 
-export { buildLayout }
+export { buildLayout, clusterNodes, nameClusters, seeded, TYPE_LABELS, TYPE_TINT }
