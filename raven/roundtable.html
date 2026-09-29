@@ -36,7 +36,8 @@
   .chip { display: flex; align-items: center; gap: 6px; padding: 3px 10px; border-radius: 999px; background: var(--surface); font-size: 12px; color: var(--text-dim); }
   .chip b { color: var(--text); font-weight: 600; }
   .chip i { width: 7px; height: 7px; border-radius: 50%; background: var(--text-dim); display: inline-block; }
-  .chip[data-state="idle"] i { background: var(--green); }
+  .chip[data-state="idle"] i, .chip[data-state="standby"] i { background: var(--green); }
+  .chip[data-state="standby"] i { opacity: .55; }
   .chip[data-state="working"] i, .chip[data-state="queued"] i { background: var(--yellow); animation: pulse 1.4s ease-in-out infinite; }
   .chip[data-state="waiting_approval"] i { background: var(--red); animation: pulse 1s ease-in-out infinite; }
   .chip[data-state="offline"] i { background: var(--red); opacity: .5; }
@@ -202,7 +203,7 @@ function clipIcon() { const i = document.createElement('span'); i.className = 'i
 const WS_URL = 'wss://memory.ravenlove.cc/raven/ws'
 const NAMES = { aying: '阿颖', lianyan: '涟言', yao: '林曜', system: '系统' }
 const INITIAL = { aying: '颖', lianyan: '言', yao: '曜' }
-const STATE_TEXT = { offline: '离线', idle: '空闲', queued: '排队中', working: '在干活', waiting_approval: '等你批准', reconnecting: '断线宽限中', unknown: '…' }
+const STATE_TEXT = { offline: '离线', idle: '空闲', queued: '排队中', working: '在干活', waiting_approval: '等你批准', reconnecting: '断线宽限中', standby: '待命', unknown: '…' }
 const LAST_KEY = 'roundtable-last-id'
 const OUTBOX_KEY = 'roundtable-outbox'
 const token = () => localStorage.getItem('raven-token') || ''

@@ -285,7 +285,8 @@ function createRoundtable(options) {
     else if (ccBusy()) lianyanState = 'working'
     else if (queued('lianyan')) lianyanState = 'queued'
     let yaoState = 'idle'
-    if (diag.childState === 'offline') yaoState = 'offline'
+    // app-server 是懒启动的（省内存）：桥重启后没人叫他之前子进程不在，但一 @ 就会拉起来，不算离线（0930 阿颖以为他掉线了）
+    if (diag.childState === 'offline') yaoState = 'standby'
     else if (diag.pendingApprovals) yaoState = 'waiting_approval'
     else if (diag.orphaned) yaoState = 'reconnecting'
     else if (diag.activeTurn) yaoState = 'working'
