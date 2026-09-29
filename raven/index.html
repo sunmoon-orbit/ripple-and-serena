@@ -101,6 +101,29 @@
     --bubble-assistant-border:#d2e0e8; --bubble-assistant-shadow:0 2px 10px rgba(48,72,88,.07);
     --bubble-assistant-link:#4d7088; --bubble-assistant-code:rgba(52,78,94,.1); --bubble-assistant-selection:rgba(177,205,221,.58);
   }
+  /* 0929 两套新主题：阿颖嫌柔粉「她的气泡太艳、跟我的没对比」。这两套靠色相分左右，不靠深浅 */
+  [data-theme="babyangel"] { /* 粉蓝 Baby Angel：她雾粉，我雾蓝 */
+    --bg:#f6f9fe; --surface:#e8eff9; --border:#d6e2f2;
+    --text:#4f4a5c; --text-dim:#7d7890; --accent:#a5bed8;
+    --terminal-bg:#eef3fa; --terminal-text:#4a5670;
+    --bubble-user-bg:linear-gradient(140deg,#efdbe5,#e6cfdb); --bubble-user-text:#4a4050;
+    --bubble-user-border:#dcc3d1; --bubble-user-shadow:0 2px 10px rgba(150,110,135,.10);
+    --bubble-user-link:#7a3f5e; --bubble-user-code:rgba(120,70,100,.10); --bubble-user-selection:rgba(255,255,255,.7);
+    --bubble-assistant-bg:rgba(226,236,248,.92); --bubble-assistant-text:var(--text);
+    --bubble-assistant-border:#d0dff1; --bubble-assistant-shadow:0 2px 10px rgba(80,105,140,.08);
+    --bubble-assistant-link:#4b6a92; --bubble-assistant-code:rgba(70,95,130,.1); --bubble-assistant-selection:rgba(165,190,216,.5);
+  }
+  [data-theme="sakura"] { /* 樱花灰 Sakura Ash：她灰樱，我白底细边 */
+    --bg:#f5f2f4; --surface:#ece6e9; --border:#e0d6db;
+    --text:#585058; --text-dim:#8b8089; --accent:#c8a0a8;
+    --terminal-bg:#efe9ec; --terminal-text:#5d4f58;
+    --bubble-user-bg:linear-gradient(140deg,#e6d1d6,#dcc3ca); --bubble-user-text:#4f444c;
+    --bubble-user-border:#d2b6be; --bubble-user-shadow:0 2px 10px rgba(130,95,105,.10);
+    --bubble-user-link:#7a4556; --bubble-user-code:rgba(110,70,85,.10); --bubble-user-selection:rgba(255,255,255,.7);
+    --bubble-assistant-bg:rgba(253,252,253,.94); --bubble-assistant-text:var(--text);
+    --bubble-assistant-border:#e4dce0; --bubble-assistant-shadow:0 2px 10px rgba(90,70,80,.07);
+    --bubble-assistant-link:#8a5a6a; --bubble-assistant-code:rgba(90,70,80,.08); --bubble-assistant-selection:rgba(200,160,168,.45);
+  }
   [data-theme="apricot"] {
     --bg:#fbf5ea; --surface:#f4e9d7; --border:#e5d3b8;
     --text:#51463a; --text-dim:#917b63; --accent:#aa8356;
@@ -307,7 +330,7 @@
     backdrop-filter: blur(8px);
     -webkit-backdrop-filter: blur(8px);
   }
-  :is([data-theme="lavender"], [data-theme="sage"], [data-theme="mist"], [data-theme="apricot"]) .msg-body pre code { color: #e1d8ef; }
+  :is([data-theme="lavender"], [data-theme="sage"], [data-theme="mist"], [data-theme="apricot"], [data-theme="babyangel"], [data-theme="sakura"]) .msg-body pre code { color: #e1d8ef; }
   /* 纯贴图消息不套气泡，两边都是（0926 阿颖：以前只管了我这边，她发的还裹着） */
   .msg.sticker-msg { background: none; border: none; padding: 2px 0; box-shadow: none; backdrop-filter: none; -webkit-backdrop-filter: none; }
   .msg.sticker-msg .msg-body img { margin: 0 !important; }
@@ -654,6 +677,9 @@
     align-self: flex-start; max-width: 85%;
     border: 1px solid var(--border); border-radius: 12px 12px 12px 4px;
     font-size: 13px;
+    /* 0929 阿颖：原来没底色，压在聊天背景图上字看不清。给一层半实的底 + 磨砂 */
+    background: color-mix(in srgb, var(--surface) 86%, transparent);
+    -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px);
   }
   .thinking-block summary {
     display: block;
@@ -667,7 +693,7 @@
   .thinking-block[open] .thinking-chevron { transform: rotate(90deg); }
   .thinking-body {
     padding: 0 12px 10px;
-    color: var(--text-dim); line-height: 1.55; white-space: pre-wrap;
+    color: color-mix(in srgb, var(--text) 72%, var(--text-dim)); line-height: 1.55; white-space: pre-wrap;
     font-size: 12px; border-top: 1px solid var(--border);
     border-radius: 0 0 12px 4px;
   }
@@ -2713,9 +2739,9 @@ document.getElementById('notes-clear').addEventListener('click', () => {
 })
 
 // --- theme ---
-const THEMES = ['dark', 'pink', 'lavender', 'sage', 'mist', 'apricot']
-const THEME_COLORS = { dark: '#1a1a1f', pink: '#fbf5f0', lavender: '#f4f0f8', sage: '#f1f5ef', mist: '#f0f5f8', apricot: '#fbf5ea' }
-const THEME_NAMES = { dark: '深夜', pink: '柔粉', lavender: '香芋紫', sage: '鼠尾草绿', mist: '雾蓝', apricot: '奶杏' }
+const THEMES = ['dark', 'pink', 'babyangel', 'sakura', 'lavender', 'sage', 'mist', 'apricot']
+const THEME_COLORS = { dark: '#1a1a1f', pink: '#fbf5f0', lavender: '#f4f0f8', sage: '#f1f5ef', mist: '#f0f5f8', apricot: '#fbf5ea', babyangel: '#f6f9fe', sakura: '#f5f2f4' }
+const THEME_NAMES = { dark: '深夜', pink: '柔粉', lavender: '香芋紫', sage: '鼠尾草绿', mist: '雾蓝', apricot: '奶杏', babyangel: '粉蓝', sakura: '樱花灰' }
 
 let currentTheme = localStorage.getItem('raven-theme') || 'dark'
 
