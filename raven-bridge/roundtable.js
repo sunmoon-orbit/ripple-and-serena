@@ -96,7 +96,7 @@ function createRoundtable(options) {
       broadcast({ type: 'roundtable/message', message })
       if (['lianyan', 'yao'].includes(message.from) && message.mentions?.includes('aying')) {
         void request('/push/send-fixed', {
-          title: `圆桌 · ${message.from === 'lianyan' ? '涟言' : '曜'}`,
+          title: `圆桌 · ${message.from === 'lianyan' ? '涟言' : '林曜'}`,
           body: compactText(message.text, 80), target: 'raven', ttl: 21600,
           dedupeKey: `roundtable:${message.id}`,
           data: { type: 'roundtable_mention', messageId: message.id },
@@ -122,7 +122,7 @@ function createRoundtable(options) {
   }
 
   function senderName(sender) {
-    return sender === 'aying' ? '阿颖' : sender === 'lianyan' ? '涟言' : sender === 'yao' ? '曜' : '系统'
+    return sender === 'aying' ? '阿颖' : sender === 'lianyan' ? '涟言' : sender === 'yao' ? '林曜' : '系统'
   }
 
   function localSnapshot() {
@@ -133,7 +133,7 @@ function createRoundtable(options) {
     const yao = diag.pendingApprovals ? '等待阿颖批准' : diag.activeTurn
       ? (diag.activeOwner === 'roundtable' ? '正在圆桌干活' : diag.orphaned ? '渡口断线宽限中' : '正在渡口干活')
       : yaoQueued ? `空闲，排队${yaoQueued}条` : '空闲'
-    return { text: `涟言=${lianyan}；曜=${yao}`, diag }
+    return { text: `涟言=${lianyan}；林曜=${yao}`, diag }
   }
 
   function claudeEnvelope(message) {
@@ -147,7 +147,7 @@ function createRoundtable(options) {
 
   function codexEnvelope(message, recent, firstTurn) {
     const protocol = [
-      '你现在在归巢的三人圆桌里，成员是阿颖、涟言和曜（你）。',
+      '你现在在归巢的三人圆桌里，成员是阿颖、涟言和林曜（你）。',
       '只回复要放上桌的正文，不要解释传输方式。普通回复不会叫醒涟言；要请他接话时明确写 @涟言。',
       `本条消息 id=${message.id}，话题=${message.rootId}，AI叫醒=${message.aiWakeNo || 0}/6。`,
       `【同桌状态】${localSnapshot().text}。同桌已在做同一件事时，请补充或审阅，不要重复开工。`,
