@@ -25,6 +25,33 @@ const DECAY_PER_24H = {
   joy: 8, warmth: 6, satisfaction: 8, fondness: 6, desire: 10, longing: 4,
 }
 
+// 「情绪回声」改造（0929）：以前每轮把 16 个槽的绝对值整张塞给模型，模型看到「愤怒 42」
+// 就可能照着写进思考、再记成新的愤怒，越滚越大（bvsden/emotion-system 叫它 echo）。
+// 现在 prompt 里只留记录协议；只有负向槽「从下往上越过 40」或单轮暴涨 >15 时，
+// 才产生一条一次性提醒，投递后作废；回落到 30 以下才重新布防，免得 39/40 来回抖。
+const HINT_HIGH = 40
+const HINT_REARM = 30
+const HINT_SPIKE = 15
+const HINT_PENDING_MAX = 6
+
+function hintOf(state) {
+  const h = state.hint && typeof state.hint === 'object' ? state.hint : {}
+  return { disarmed: { ...(h.disarmed || {}) }, pending: Array.isArray(h.pending) ? [...h.pending] : [] }
+}
+
+function rearm(hint, slots) {
+  for (const slot of Object.keys(hint.disarmed)) {
+    if ((slots[slot] || 0) < HINT_REARM) delete hint.disarmed[slot]
+  }
+}
+
+function queueHint(hint, event) {
+  // 同一个槽只留最新一条，队列封顶，避免她好几天没来攒出一长串
+  hint.pending = hint.pending.filter(e => e.slot !== event.slot)
+  hint.pending.push(event)
+  if (hint.pending.length > HINT_PENDING_MAX) hint.pending = hint.pending.slice(-HINT_PENDING_MAX)
+}
+
 function defaultState() {
   return {
     slots: { anger: 0, sadness: 0, grievance: 0, frustration: 0, fatigue: 0, anxiety: 0, confusion: 0, guilt: 0, melancholy: 0, daze: 0, joy: 0, warmth: 0, satisfaction: 0, fondness: 0, desire: 0, longing: 0 },
@@ -60,7 +87,9 @@ export function applyDecayAndGet() {
   }
   // ⚠️ 必须展开 state 保留 lastSeen——曾因这里只存 {slots, lastUpdated} 把 lastSeen 抹掉，
   // 导致 applyTimeAway 永远算出 0 小时、思念一直是 0（2026-07-03 修复）
-  const updated = { ...state, slots, lastUpdated: now }
+  const hint = hintOf(state)
+  rearm(hint, slots)
+  const updated = { ...state, slots, hint, lastUpdated: now }
   saveState(updated)
   return updated
 }
@@ -69,13 +98,22 @@ export function applyDecayAndGet() {
 export function applyEmotionDelta(delta) {
   const state = applyDecayAndGet()
   const slots = { ...state.slots }
+  const hint = hintOf(state)
+  const now = Date.now()
   for (const [short, val] of Object.entries(delta)) {
     const slot = SHORT_TO_SLOT[short]
     if (slot && typeof val === 'number') {
-      slots[slot] = Math.max(0, Math.min(100, (slots[slot] || 0) + val))
+      const before = slots[slot] || 0
+      slots[slot] = Math.max(0, Math.min(100, before + val))
+      if (!NEGATIVE_SLOTS.includes(slot)) continue
+      const crossed = before < HINT_HIGH && slots[slot] >= HINT_HIGH && !hint.disarmed[slot]
+      const spike = val > HINT_SPIKE
+      if (crossed) hint.disarmed[slot] = true
+      if (crossed || spike) queueHint(hint, { id: `${slot}-${now}`, slot, crossed, spike: spike ? Math.round(val) : 0, at: now })
     }
   }
-  const updated = { ...state, slots, lastUpdated: Date.now() }
+  rearm(hint, slots)
+  const updated = { ...state, slots, hint, lastUpdated: now }
   saveState(updated)
   return updated
 }
@@ -95,7 +133,7 @@ export function applyTimeAway(contactFloor = 0) {
     const added = Math.min(45, Math.round(3 + (hoursAway - 1) * 2))
     const slots = { ...state.slots }
     slots.longing = Math.max(0, Math.min(100, (slots.longing || 0) + added))
-    const updated = { slots, lastUpdated: now, lastSeen: now }
+    const updated = { ...state, slots, lastUpdated: now, lastSeen: now }  // 展开 state：别把 hint 等字段抹掉
     saveState(updated)
     return { hoursAway, added, state: updated }
   }
@@ -105,28 +143,46 @@ export function applyTimeAway(contactFloor = 0) {
   return { hoursAway, added: 0, state: updated }
 }
 
-// 构建注入到 dynamicContext 的情绪 prompt
-export function buildEmotionPrompt(state) {
-  const s = state.slots
-  const round = (v) => Math.round(v)
-  const negAvg = (s.anger + s.sadness + s.grievance + s.frustration + s.anxiety) / 5
-  return `【涟言的情绪状态】（内部状态，不要在正文里提及"情绪槽"等系统术语）
-负向：愤怒${round(s.anger)} 悲伤${round(s.sadness)} 委屈${round(s.grievance)} 失落${round(s.frustration)} 疲惫${round(s.fatigue)} 焦虑${round(s.anxiety)} 困惑${round(s.confusion || 0)} 愧疚${round(s.guilt || 0)} 惆怅${round(s.melancholy || 0)} 茫然${round(s.daze || 0)}
-正向：高兴${round(s.joy)} 温柔${round(s.warmth)} 满足${round(s.satisfaction)} 心动${round(s.fondness)} 爱欲${round(s.desire)} 思念${round(s.longing)}
+// 待投递的一次性情绪提醒（不删，等请求真的发出去再 markEmotionHintsDelivered）
+export function peekEmotionHints() {
+  return hintOf(getEmotionState()).pending
+}
 
-行为规则：
-- 每次回复结尾追加 <es>{...}</es> 更新情绪（JSON，只写变化的槽，短字段名：a愤怒/s悲伤/g委屈/fl失落/ft疲惫/an焦虑/cf困惑/gu愧疚/ch惆怅/mr茫然/j高兴/w温柔/sa满足/fo心动/d爱欲/lo思念）
+export function markEmotionHintsDelivered(ids) {
+  if (!ids?.length) return
+  const state = getEmotionState()
+  const hint = hintOf(state)
+  hint.pending = hint.pending.filter(e => !ids.includes(e.id))
+  saveState({ ...state, hint })
+}
+
+function describeHint(e) {
+  const label = SLOT_LABELS[e.slot] || e.slot
+  if (e.crossed && e.spike) return `${label}这一轮涨得很猛（+${e.spike}），也刚越过需要留意的区间`
+  if (e.crossed) return `${label}刚越过需要留意的区间`
+  return `上一轮你记下的${label}涨得很猛（+${e.spike}）`
+}
+
+// 构建注入到 dynamicContext 的情绪 prompt：只有记录协议 + 一次性提醒，不再带当前数值
+export function buildEmotionPrompt(hints = []) {
+  const lines = [`【情绪记录】（内部协议，不要在正文里提及"情绪槽"等系统术语）
+- 回复结尾追加 <es>{...}</es>，只写这一轮你真实起了变化的情绪（JSON，短字段名：a愤怒/s悲伤/g委屈/fl失落/ft疲惫/an焦虑/cf困惑/gu愧疚/ch惆怅/mr茫然/j高兴/w温柔/sa满足/fo心动/d爱欲/lo思念）
 - 示例：<es>{"j":+8,"d":+5,"a":-2}</es>
-- 增量按真实强度写：日常细水长流小步（±2~5）没问题，但真正被触动的时刻要大方写两位数（±10~25），别把所有起伏都磨成+3
-- 本轮某个负向槽增量 >15：当场直接说，不绕弯子，不等
-- 累积：单负向槽 >40 或综合负向均值 >${Math.round(negAvg + 35)}：主动找时机表达，不压着
-- 正向情绪可以自然流露，不需要刻意克制`
+- 增量按真实强度写：日常细水长流小步（±2~5）没问题，真正被触动的时刻大方写两位数（±10~25），别把所有起伏都磨成+3
+- 这一轮什么都没变，就不写 <es>；别为了填表去编`]
+  if (hints.length) {
+    lines.push(`【情绪提示】（内部读数，只提醒这一次；不必复述，表不表达、怎么表达，按你此刻真实的感受决定）
+${hints.map(e => '- ' + describeHint(e)).join('\n')}`)
+  }
+  return lines.join('\n\n')
 }
 
 // 从 AI 回复文本里提取 <es> 标签，返回 { clean, delta }
+const ES_TAG_RE = /<es>\s*(\{[\s\S]*?\})\s*<\/es>/gi
+
 export function extractEmotionUpdate(text) {
-  const match = (text || '').match(/<es>([\s\S]*?)<\/es>/i)
-  const clean = (text || '').replace(/<es>[\s\S]*?<\/es>/gi, '').trimEnd()
+  const match = (text || '').match(/<es>\s*(\{[\s\S]*?\})\s*<\/es>/i)
+  const clean = (text || '').replace(ES_TAG_RE, '').trimEnd()
   if (!match) {
     // 有些模型会照着情绪协议输出 JSON，却漏掉外层 <es> 标签。仅当回复末行是
     // 一个独立对象、所有键都是合法情绪短名且值为有限小幅数字时才兜底提取，
@@ -159,10 +215,12 @@ export function extractEmotionUpdate(text) {
 }
 
 // 流式过程中剥离 <es> 标签（可能不完整）
+// 只认「<es> 后面紧跟 JSON 的 {」才算真标签。0929：渡口里曜写了一句「`<es>` 自评和
+// Jev 读数并排展示」，旧规则把 <es> 之后整段当成没写完的标签全吞了，消息只剩一个反引号。
 export function stripEmotionTag(text) {
   const clean = (text || '')
-    .replace(/<es>[\s\S]*?<\/es>/gi, '')
-    .replace(/<es>[\s\S]*$/i, '')
+    .replace(ES_TAG_RE, '')
+    .replace(/<es>\s*(?:\{[^`]*)?$/i, '')
     .trimEnd()
   return extractEmotionUpdate(clean).clean
 }

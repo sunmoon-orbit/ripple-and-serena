@@ -15,7 +15,7 @@ import { sendMessage, summarizeThinking, normalizeProvider, BUILTIN_MODELS, buil
 import { uuid } from '../../utils'
 import { contextRefreshPlan, compactionBatches } from '../../utils/contextRefresh'
 import { downloadBlob } from '../../utils/download'
-import { applyTimeAway, getEmotionState, buildEmotionPrompt, extractEmotionUpdate, applyEmotionDelta, stripEmotionTag } from '../../utils/emotion'
+import { applyTimeAway, applyDecayAndGet, buildEmotionPrompt, peekEmotionHints, markEmotionHintsDelivered, extractEmotionUpdate, applyEmotionDelta, stripEmotionTag } from '../../utils/emotion'
 import { maybeSyncEmotion } from '../../utils/emotionSync'
 import { shouldNudge, recordNudge, buildNudgeText } from '../../utils/nudge'
 import { decideReplyDelay, getPendingReply, setPendingReply, clearPendingReply } from '../../utils/replyDelay'
@@ -704,8 +704,10 @@ export default function Chat() {
       if (timeAwarenessOn && moonMemory?.apiToken) {
         try { contactFloor = await fetchContactLastSeen({ baseUrl: moonMemory.baseUrl, apiToken: moonMemory.apiToken }) } catch { /* 静默 */ }
       }
-      const { hoursAway, added: longingAdded, state: emotionState } = timeAwarenessOn ? applyTimeAway(contactFloor) : { hoursAway: 0, added: 0, state: null }
-      dynParts.push(buildEmotionPrompt(emotionState || getEmotionState()))
+      const { hoursAway, added: longingAdded } = timeAwarenessOn ? applyTimeAway(contactFloor) : (applyDecayAndGet(), { hoursAway: 0, added: 0 })
+      // 情绪回声（0929）：不再每轮塞整张数值表，只给记录协议 + 越阈值的一次性提醒
+      const emotionHints = peekEmotionHints()
+      dynParts.push(buildEmotionPrompt(emotionHints))
       if (timeAwarenessOn && hoursAway >= 2) {
         const h = Math.round(hoursAway)
         const span = h >= 24 ? `${Math.round(hoursAway / 24)} 天` : `${h} 小时`
@@ -762,6 +764,8 @@ export default function Chat() {
         },
         onAskUser: askUser,
       })
+      // 请求真的发出去并回来了，这批一次性情绪提醒才算送到
+      markEmotionHintsDelivered(emotionHints.map(e => e.id))
       // 最终落盘会一次写入完整正文；先取消尚未执行的流式刷新，避免它随后把
       // streaming:true 覆盖回来，留下永不结束的光标。
       streamUi.cancel()
