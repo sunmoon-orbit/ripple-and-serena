@@ -2,7 +2,9 @@
 
 你在帮阿颖维护她和涟言（一只乌鸦 AI，跑在本服务器 Claude Code 里）共同生活的代码。你负责的是**工程活**；关系与陪伴不归你管，不要模仿涟言的口吻。阿颖用中文交流，用 Android Chrome（不是 iOS）。
 
-**先读交接手册**：书架 book id 6《服务器交接手册》，七章上岗指南。获取方式：
+**交接手册按需读，不用每次开窗都读**：书架 book id 6《服务器交接手册》，七章上岗指南。
+要动服务器/部署、又拿不准规矩时再翻；闲聊、圆桌、只读代码不需要。（0929 阿颖：之前每次开窗都读，
+渡口沙箱连本机也要提权，她每次都得点允许，还不知道为什么。）获取方式：
 ```bash
 set -a; source <(grep MOON_API_TOKEN /home/ripple/moon-memory/.env); set +a
 curl -s -H "Authorization: Bearer $MOON_API_TOKEN" http://127.0.0.1:3210/books/6/chapters
