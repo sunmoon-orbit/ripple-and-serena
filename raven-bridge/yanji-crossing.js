@@ -86,6 +86,11 @@ function createCrossingService(options = {}) {
   const broadcast = options.broadcast || (() => {})
   const send = options.send || (() => {})
   const rateLimitFallback = options.rateLimitFallback || fallbackRateLimits
+  const onInternalItem = options.onInternalItem || (() => {})
+  const onInternalDelta = options.onInternalDelta || (() => {})
+  const onInternalCompleted = options.onInternalCompleted || (() => {})
+  const onInternalApproval = options.onInternalApproval || (() => {})
+  const onInternalApprovalResolved = options.onInternalApprovalResolved || (() => {})
   let activeTurn = null
   let startingTurn = null
   // 手机切后台、换网络都会让 WebSocket 断一下。以前一断就立刻掐掉正在跑的 turn、
@@ -186,14 +191,25 @@ function createCrossingService(options = {}) {
     status('offline', { error: clip(error, 300) })
   })
   adapter.on('protocolError', (error) => status('error', { error: clip(error.message, 300) }))
-  adapter.on('agentDelta', (params) => emit({ type: 'crossing/message/delta', ...params }))
+  adapter.on('agentDelta', (params) => {
+    if (activeTurn?.owner === 'roundtable') onInternalDelta({ ...params, threadId: activeTurn.threadId, turnId: activeTurn.turnId })
+    else emit({ type: 'crossing/message/delta', ...params })
+  })
   adapter.on('item', (event) => {
+    if (activeTurn?.owner === 'roundtable' && event.threadId === activeTurn.threadId && event.turnId === activeTurn.turnId) {
+      onInternalItem(event)
+      return
+    }
     // Raw userMessage items may contain localImage filesystem paths.
     const { item, ...publicEvent } = event
     emit({ type: 'crossing/item', ...publicEvent })
     if (event.summary?.type === 'contextCompaction') emit({ type: 'crossing/context-compaction', threadId: event.threadId, turnId: event.turnId, lifecycle: event.lifecycle })
   })
   adapter.on('turnCompleted', (params) => {
+    const internal = activeTurn?.owner === 'roundtable' && activeTurn.threadId === params.threadId && activeTurn.turnId === (params.turn?.id || params.turnId)
+      ? { ...activeTurn }
+      : null
+    if (internal) void Promise.resolve(onInternalCompleted({ ...params, internal })).catch(() => {})
     emit({ type: 'crossing/turn/completed', threadId: params.threadId, turn: { id: params.turn?.id || params.turnId, status: params.turn?.status || null } })
     clearTurn(params.turn?.id || params.turnId)
   })
@@ -214,7 +230,9 @@ function createCrossingService(options = {}) {
       emit({ type: 'crossing/model/confirmed', threadId: p.threadId, ...meta })
     }
     if (message.method === 'serverRequest/resolved') {
+      const entry = approvals.get(String(message.params?.requestId || ''))
       clearApproval(message.params?.requestId)
+      if (entry?.owner === 'roundtable') onInternalApprovalResolved({ requestId: entry.requestId, outcome: message.params?.outcome || 'resolved' })
       emit({ type: 'crossing/approval/resolved', ...message.params })
     }
   })
@@ -227,6 +245,17 @@ function createCrossingService(options = {}) {
     }
     const entry = { ...view, clientId: activeTurn.clientId, method: request.method, timer: null }
     approvals.set(view.requestId, entry)
+    if (activeTurn.owner === 'roundtable') {
+      entry.owner = 'roundtable'
+      entry.timer = setTimeout(() => {
+        if (!clearApproval(entry.requestId)) return
+        adapter.resolveServerRequest(entry.requestId, approvalResult(entry.method, 'deny'))
+        onInternalApprovalResolved({ requestId: entry.requestId, outcome: 'timed_out' })
+      }, 10 * 60 * 1000)
+      entry.timer.unref?.()
+      onInternalApproval({ ...view, expiresAt: Date.now() + 10 * 60 * 1000 })
+      return
+    }
     // 主人正处在断线宽限期：先挂着不计时，等她接回来再弹、再开始倒计时。
     if (!activeTurn.orphaned) offerApproval(entry)
   })
@@ -475,6 +504,59 @@ function createCrossingService(options = {}) {
     abandon(clientId)
   }
 
+  async function startInternalTurn({ threadId = '', text, clientUserMessageId = '' } = {}) {
+    if (activeTurn || startingTurn) throw new Error('已有 Codex 任务正在运行；圆桌已排队')
+    const content = String(text || '').trim()
+    if (!content) throw new Error('圆桌消息为空')
+    startingTurn = { owner: 'roundtable', threadId: String(threadId || '') }
+    try {
+      await ensureOnline()
+      let selected = String(threadId || '')
+      if (selected) {
+        const resumed = await adapter.request('thread/resume', {
+          threadId: selected, cwd, sandbox: 'workspace-write', approvalPolicy: 'untrusted',
+          approvalsReviewer: 'user', excludeTurns: false,
+        })
+        if (!resumed.thread?.id || resumed.thread.id !== selected) throw new Error('圆桌线程恢复失败')
+      } else {
+        const started = await adapter.request('thread/start', {
+          cwd, sandbox: 'workspace-write', approvalPolicy: 'untrusted', approvalsReviewer: 'user',
+        })
+        selected = started.thread?.id || ''
+        if (!selected) throw new Error('Codex 未返回圆桌线程编号')
+      }
+      const result = await adapter.request('turn/start', {
+        threadId: selected, input: input(content), clientUserMessageId: String(clientUserMessageId || ''),
+        approvalPolicy: 'untrusted', approvalsReviewer: 'user',
+        sandboxPolicy: { type: 'workspaceWrite', writableRoots: [cwd], networkAccess: false },
+      })
+      const turnId = result.turn?.id
+      if (!turnId) throw new Error('Codex 未返回任务编号')
+      activeTurn = { clientId: null, owner: 'roundtable', threadId: selected, turnId, imageAllowed: false }
+      return { threadId: selected, turnId, turn: result.turn }
+    } finally {
+      startingTurn = null
+    }
+  }
+
+  async function readInternalThread(threadId) {
+    await ensureOnline()
+    return adapter.request('thread/read', { threadId: String(threadId || ''), includeTurns: true })
+  }
+
+  function respondInternalApproval(data = {}) {
+    const requestId = String(data.requestId || '')
+    const entry = approvals.get(requestId)
+    if (!entry || entry.owner !== 'roundtable' || entry.threadId !== data.threadId || entry.turnId !== data.turnId || entry.itemId !== data.itemId) {
+      throw new Error('授权请求已过期或不属于圆桌任务')
+    }
+    const choice = data.choice === 'allow' ? 'allow' : 'deny'
+    clearApproval(requestId)
+    adapter.resolveServerRequest(requestId, approvalResult(entry.method, choice))
+    onInternalApprovalResolved({ requestId, outcome: choice })
+    return { requestId, outcome: choice }
+  }
+
   function abandon(clientId) {
     for (const [requestId, approval] of approvals) {
       if (approval.clientId !== clientId) continue
@@ -498,9 +580,14 @@ function createCrossingService(options = {}) {
       startingTurn: !!startingTurn,
       pendingApprovals: approvals.size,
       pendingRequests: child.pendingRequests || 0,
+      activeOwner: activeTurn?.owner || (activeTurn ? 'crossing' : null),
+      orphaned: !!activeTurn?.orphaned,
     }
   }
-  return { handle, disconnect, adapter, uploads, canReceive, getActiveTurn: () => activeTurn, diagnostics, publishRateLimits }
+  return {
+    handle, disconnect, adapter, uploads, canReceive, getActiveTurn: () => activeTurn, diagnostics, publishRateLimits,
+    startInternalTurn, readInternalThread, respondInternalApproval,
+  }
 }
 
 module.exports = { createCrossingService, fallbackRateLimits, publicThread, approvalResult, diagnoseCrossingError }

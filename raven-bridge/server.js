@@ -551,6 +551,7 @@ const agentSessions = createAgentSessions({
   },
 })
 setInterval(() => agentSessions.sweep(), 1000).unref()
+let roundtable = null
 const crossing = createCrossingService({
   authorize: id => !!agentSessions.get(id),
   attachmentOwner: id => agentSessions.get(id)?.fingerprint,
@@ -560,6 +561,14 @@ const crossing = createCrossingService({
   modelStateFile: require('path').join(__dirname, '.crossing-models.json'),
   broadcast: broadcastCrossing,
   send: sendCrossing,
+  onInternalItem: event => roundtable?.onInternalItem(event),
+  onInternalDelta: event => roundtable?.onInternalDelta?.(event),
+  onInternalCompleted: event => roundtable?.onInternalCompleted(event),
+  onInternalApproval: event => roundtable?.onInternalApproval(event),
+  onInternalApprovalResolved: event => roundtable?.onInternalApprovalResolved(event),
+})
+roundtable = require('./roundtable').createRoundtable({
+  moonGet, moonPost, broadcast, tmuxSend, ccBusy, ccOnline, crossing,
 })
 
 // 没有 WS 客户端在线时发推送提醒，避免阿颖错过回复
@@ -847,7 +856,7 @@ const server = http.createServer((req, res) => {
   // ── 接口分级鉴权（2026-07-03 安全加固）──────────────────────────
   // 内部接口只许本机：reply/thinking 是 CC 的回复与 hook 通道，mcp 是 CC 的 MCP 通道。
   // 之前公网可达 = 任何人能冒充我给阿颖发消息 / 往她界面塞假思考。
-  const LOCAL_ONLY = ['/raven/reply', '/raven/thinking', '/raven/mcp/sse', '/raven/mcp/message', '/raven/press-notify']
+  const LOCAL_ONLY = ['/raven/reply', '/raven/thinking', '/raven/mcp/sse', '/raven/mcp/message', '/raven/press-notify', '/raven/roundtable/say']
   if (LOCAL_ONLY.includes(url.pathname) && isExternal(req)) {
     res.writeHead(403, { 'Content-Type': 'application/json' })
     res.end(JSON.stringify({ error: 'local only' }))
@@ -856,7 +865,7 @@ const server = http.createServer((req, res) => {
   // 本机写通道再验一道本地 token（2026-07-23）：防同机其他用户冒充。
   // MCP 两条路径暂不拦——harness 的 SSE 客户端带不了自定义头，codex 入住时
   // 若不用 MCP 直接在 Caddy/防火墙外再评估（MCP reply 本来就是禁用的）。
-  const LOCAL_WRITE = ['/raven/reply', '/raven/thinking', '/raven/press-notify']
+  const LOCAL_WRITE = ['/raven/reply', '/raven/thinking', '/raven/press-notify', '/raven/roundtable/say']
   if (LOCAL_WRITE.includes(url.pathname) && !localWriteAuthed(req)) {
     res.writeHead(401, { 'Content-Type': 'application/json' })
     res.end(JSON.stringify({ error: 'local token required' }))
@@ -880,6 +889,16 @@ const server = http.createServer((req, res) => {
   if (TOKEN_REQUIRED.includes(url.pathname) && !externalAuthed(req, url)) {
     res.writeHead(401, { 'Content-Type': 'application/json' })
     res.end(JSON.stringify({ error: 'unauthorized' }))
+    return
+  }
+
+  if (url.pathname.startsWith('/raven/roundtable/')) {
+    if (url.pathname !== '/raven/roundtable/say' && !externalAuthed(req, url)) {
+      res.writeHead(401, { 'Content-Type': 'application/json' })
+      res.end(JSON.stringify({ error: 'unauthorized' }))
+      return
+    }
+    void roundtable.handleHttp(req, res, url)
     return
   }
 
@@ -1631,6 +1650,10 @@ wss.on('connection', (ws) => {
           ws.send(JSON.stringify({ type: 'auth_failed' }))
           return
         }
+      }
+      if (typeof msg.type === 'string' && msg.type.startsWith('roundtable/')) {
+        await roundtable.handleWs(ws, msg)
+        return
       }
       if (msg.type === 'send' && msg.text) {
         if (!tokenIsValid(msg.token)) {

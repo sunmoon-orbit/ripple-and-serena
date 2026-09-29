@@ -128,6 +128,34 @@ test('Crossing reserves the only active turn before turn/start resolves', async 
   assert.deepEqual(service.getActiveTurn(), { clientId: 'phone-a', threadId: 'thread-a', turnId: 'turn-a', imageAllowed: false })
 })
 
+test('roundtable internal turn shares the crossing mutex and keeps approvals exact', async () => {
+  const adapter = new FakeAdapter()
+  const items = []; const approvals = []; const resolved = []; const completed = []
+  const service = createCrossingService({
+    authorize: () => true, adapter, send: () => {}, broadcast: () => {}, rateLimitFallback: () => null,
+    onInternalItem: event => items.push(event),
+    onInternalApproval: event => approvals.push(event),
+    onInternalApprovalResolved: event => resolved.push(event),
+    onInternalCompleted: event => completed.push(event),
+  })
+  const started = await service.startInternalTurn({ threadId: 'thread-1', text: '圆桌消息', clientUserMessageId: 'rt-1' })
+  assert.deepEqual(started, { threadId: 'thread-1', turnId: 'turn-1', turn: { id: 'turn-1', status: 'inProgress' } })
+  assert.equal(service.diagnostics().activeOwner, 'roundtable')
+  await assert.rejects(service.handle('phone-a', { type: 'crossing/turn/start', threadId: 'other', text: '撞车' }), /已有 Codex 任务/)
+  adapter.emit('item', { lifecycle: 'completed', threadId: 'thread-1', turnId: 'turn-1', item: { id: 'answer', type: 'agentMessage', text: '答复' } })
+  assert.equal(items[0].item.text, '答复')
+  adapter.emit('serverRequest', { id: 'round-approval', method: 'item/commandExecution/requestApproval', params: { threadId: 'thread-1', turnId: 'turn-1', itemId: 'cmd-1', command: 'pwd' } })
+  assert.equal(approvals[0].requestId, 'round-approval')
+  assert.throws(() => service.respondInternalApproval({ requestId: 'round-approval', threadId: 'wrong', turnId: 'turn-1', itemId: 'cmd-1', choice: 'allow' }), /不属于圆桌/)
+  service.respondInternalApproval({ requestId: 'round-approval', threadId: 'thread-1', turnId: 'turn-1', itemId: 'cmd-1', choice: 'allow' })
+  assert.deepEqual(adapter.resolved.at(-1), { id: 'round-approval', result: { decision: 'accept' } })
+  assert.deepEqual(resolved.at(-1), { requestId: 'round-approval', outcome: 'allow' })
+  adapter.emit('turnCompleted', { threadId: 'thread-1', turn: { id: 'turn-1', status: 'completed' } })
+  await new Promise(resolve => setImmediate(resolve))
+  assert.equal(completed[0].internal.owner, 'roundtable')
+  assert.equal(service.getActiveTurn(), null)
+})
+
 test('a phone reconnect within the grace period reattaches the running turn and re-offers pending approvals', async () => {
   const adapter = new FakeAdapter()
   adapter.request = async function (method, params) {
