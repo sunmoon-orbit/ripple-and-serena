@@ -303,15 +303,19 @@
     hint.classList.add('sp-show')
   }
 
-  function close() {
-    if (!alive) return
-    alive = false; cancelAnimationFrame(raf)
+  // 进门：水在淡出的过程中继续荡，最后才停（0929 阿颖：之前一点先冻住画面再淡，看着卡一下）
+  let closing = false
+  function close(e) {
+    if (!alive || closing) return
+    closing = true
     try { localStorage.setItem(KEY, today) } catch { /* 存不上就明天再看一次 */ }
-    ov.classList.add('sp-out')
-    setTimeout(() => ov.remove(), 520)
+    if (gl && e && e.clientX != null) drop(e.clientX * dpr, e.clientY * dpr, 5, 7)
+    requestAnimationFrame(() => ov.classList.add('sp-out'))
+    setTimeout(() => { alive = false; cancelAnimationFrame(raf); ov.remove() }, 760)
   }
 
-  ov.querySelector('.sp-title').addEventListener('click', () => { if (revealed) close() })
+  // pointerup 比 click 早一拍，手指一抬就开始淡
+  ov.querySelector('.sp-title').addEventListener('pointerup', e => { if (revealed) close(e) })
   // 换底图：选一张 → 存本机 → 重新画水底；「用回默认」删掉它
   const fileIn = ov.querySelector('.sp-bg-file'), resetBtn = ov.querySelector('.sp-bg-reset')
   try { resetBtn.hidden = !localStorage.getItem(BG_KEY) } catch { /* 忽略 */ }

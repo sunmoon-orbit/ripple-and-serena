@@ -4,9 +4,13 @@
   position: fixed; inset: 0; z-index: 99999; overflow: hidden;
   background: linear-gradient(#dff0f4, #8fbfd2);
   touch-action: none; user-select: none; -webkit-user-select: none;
-  opacity: 1; transition: opacity .5s ease;
+  opacity: 1; transition: opacity .7s cubic-bezier(.4, 0, .2, 1);
+  -webkit-tap-highlight-color: transparent;   /* 安卓点字会闪一个蓝框（0929 阿颖截图） */
 }
+#sp-overlay * { -webkit-tap-highlight-color: transparent; }
+#sp-overlay .sp-title:focus { outline: none; }
 #sp-overlay.sp-out { opacity: 0; pointer-events: none; }
+#sp-overlay.sp-out .sp-title, #sp-overlay.sp-out .sp-hint { opacity: 0; transition-duration: .35s; }
 #sp-overlay .sp-glow {
   position: absolute; left: 50%; top: 36%; width: 70vmin; height: 70vmin; transform: translate(-50%, -50%);
   background: radial-gradient(circle, rgba(255, 214, 160, .28), rgba(255, 214, 160, 0) 65%);
