@@ -1,8 +1,9 @@
-// 归巢开屏（0928）：起雾的玻璃，后面是乌鸦和蜂鸟。见 splash.css 顶部说明。
-// 旧版（9/10 撤掉的 roost-splash）的教训：雾只是一层渐变、擦除用 shadowBlur（手机很吃力）、
-// 水波是几个放大的圆圈——看着假还可能卡。这版：雾有颗粒和水珠，擦除用径向渐变笔刷
-// （destination-out，不用 shadowBlur），回雾是每隔几帧叠一层低透明度的雾；水波画在玻璃上，
-// 后面的两只鸟按距离跟着晃。一天只出现一次（本机日期），?splash=1 强制显示方便看效果。
+// 归巢开屏第二版（0929）：一池水。手指点一下，水面被推开一圈涟漪，底下的乌鸦、蜂鸟和花跟着折射晃动。
+// 阿颖要的不是「擦开雾」，是「水被推了一下」的那种波纹——也正好是我名字里那个「涟」。
+// 做法：波动方程在 CPU 上算一张很小的高度图（约 128 列），每帧上传成纹理；WebGL 片元着色器
+// 用高度图的梯度去偏移底图的采样坐标（折射），再加一点高光和焦散。底图（水色 + 两只鸟 + 花）
+// 开场画一次到离屏 canvas。手机上：模拟格子小、画布 dpr 上限 1.25、没有 WebGL 就退回静态底图。
+// 一天只出现一次（本机日期），?splash=1 强制显示。第一版（雾玻璃）见 git 历史 c03b065。
 (function () {
   const KEY = 'raven-splash-day'
   const force = /[?&]splash=1\b/.test(location.search)
@@ -70,145 +71,196 @@
 
   const ov = document.createElement('div')
   ov.id = 'sp-overlay'
-  ov.innerHTML = `<div class="sp-glow"></div>${SCENE}<canvas id="sp-fog"></canvas><canvas id="sp-waves"></canvas>
+  ov.innerHTML = `<canvas id="sp-water"></canvas>
     <div class="sp-title"><b>Ripple &amp; Serena</b><span>归巢</span></div>
-    <div class="sp-hint">用手指擦开雾气</div>
+    <div class="sp-hint">轻轻点一下水面</div>
     <button class="sp-enter" type="button">进 入</button>
     <button class="sp-skip" type="button">跳过</button>`
   document.body.appendChild(ov)
 
-  const canvas = ov.querySelector('#sp-fog')
-  const ctx = canvas.getContext('2d')
-  // 水波单独一层、每帧清空重画：画进雾层会一圈圈刻成唱片纹（0928 第一版就这样）
-  const wcv = ov.querySelector('#sp-waves'), wctx = wcv.getContext('2d')
-  const dpr = Math.min(window.devicePixelRatio || 1, 1.5)   // 上限 1.5：画面够细，又不把手机 GPU 压垮
-  let W = 0, H = 0, fogTex = null, raf = 0, frame = 0, alive = true, revealed = false
-  const ripples = []
+  const canvas = ov.querySelector('#sp-water')
+  const dpr = Math.min(window.devicePixelRatio || 1, 1.25)
+  let W = 0, H = 0, raf = 0, alive = true, revealed = false, taps = 0
 
-  function makeFogTexture() {
+  // ── 底图：水色 + 两只鸟 + 几朵白花，开场画一次 ──
+  function sceneImage() {
+    return new Promise((resolve) => {
+      const svg = SCENE.replace('<svg ', '<svg xmlns="http://www.w3.org/2000/svg" ').replace(/ class="[^"]*"/g, '')
+      const img = new Image()
+      img.onload = () => resolve(img)
+      img.onerror = () => resolve(null)
+      img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg)
+    })
+  }
+  function blossom(g, x, y, r, rot, alpha) {
+    g.save(); g.translate(x, y); g.rotate(rot); g.globalAlpha = alpha
+    for (let i = 0; i < 5; i++) {
+      g.save(); g.rotate(i * Math.PI * 2 / 5)
+      const pg = g.createRadialGradient(0, -r * .55, r * .05, 0, -r * .55, r * .7)
+      pg.addColorStop(0, 'rgba(255,255,255,.96)'); pg.addColorStop(.7, 'rgba(244,246,252,.9)'); pg.addColorStop(1, 'rgba(215,225,240,.6)')
+      g.fillStyle = pg
+      g.beginPath(); g.ellipse(0, -r * .55, r * .42, r * .6, 0, 0, Math.PI * 2); g.fill()
+      g.restore()
+    }
+    for (let i = 0; i < 14; i++) {
+      const a = Math.random() * Math.PI * 2, d = Math.random() * r * .28
+      g.fillStyle = 'rgba(214,178,92,.85)'; g.beginPath(); g.arc(Math.cos(a) * d, Math.sin(a) * d, r * .035 + .6, 0, 7); g.fill()
+    }
+    g.restore()
+  }
+  function paintScene(img) {
     const c = document.createElement('canvas'); c.width = W; c.height = H
     const g = c.getContext('2d')
-    const grad = g.createLinearGradient(0, 0, 0, H)
-    grad.addColorStop(0, 'rgba(206,218,232,.86)'); grad.addColorStop(1, 'rgba(176,192,212,.9)')
-    g.fillStyle = grad; g.fillRect(0, 0, W, H)
-    // 雾的颗粒：一堆很淡的小团，让它不是一块平的颜色
-    for (let i = 0; i < 900; i++) {
-      const x = Math.random() * W, y = Math.random() * H, r = (Math.random() * 18 + 4) * dpr
-      g.fillStyle = `rgba(255,255,255,${Math.random() * .06})`
-      g.beginPath(); g.arc(x, y, r, 0, 7); g.fill()
+    const bg = g.createLinearGradient(0, 0, 0, H)
+    bg.addColorStop(0, '#dff0f4'); bg.addColorStop(.45, '#b9dbe6'); bg.addColorStop(1, '#8fbfd2')
+    g.fillStyle = bg; g.fillRect(0, 0, W, H)
+    // 池底的柔光斑，让水有深浅
+    for (let i = 0; i < 7; i++) {
+      const x = Math.random() * W, y = Math.random() * H, r = (80 + Math.random() * 160) * dpr
+      const lg = g.createRadialGradient(x, y, 0, x, y, r)
+      lg.addColorStop(0, 'rgba(255,255,255,.28)'); lg.addColorStop(1, 'rgba(255,255,255,0)')
+      g.fillStyle = lg; g.fillRect(0, 0, W, H)
     }
-    // 水珠：暗边 + 高光，偶尔拖一道往下流的水痕
-    for (let i = 0; i < 140; i++) {
-      const x = Math.random() * W, y = Math.random() * H, r = (Math.random() * 3.2 + .8) * dpr
-      g.fillStyle = 'rgba(70,90,115,.35)'; g.beginPath(); g.arc(x, y, r, 0, 7); g.fill()
-      g.fillStyle = 'rgba(255,255,255,.75)'; g.beginPath(); g.arc(x - r * .3, y - r * .35, r * .38, 0, 7); g.fill()
-      if (Math.random() < .08) {
-        g.strokeStyle = 'rgba(255,255,255,.18)'; g.lineWidth = r * .9
-        g.beginPath(); g.moveTo(x, y); g.lineTo(x + (Math.random() - .5) * 6 * dpr, y + (Math.random() * 60 + 20) * dpr); g.stroke()
-      }
+    // 花：散在四周，避开中间的鸟
+    const flowers = [[.12, .18, .16], [.86, .12, .12], [.9, .62, .15], [.08, .78, .13], [.55, .86, .18], [.72, .34, .07], [.25, .52, .06]]
+    const u = Math.min(W, H)
+    for (const [fx, fy, fr] of flowers) blossom(g, fx * W, fy * H, fr * u, Math.random() * 6.28, .92)
+    if (img) {
+      const w = Math.min(W * .94, 560 * dpr), h = w * 260 / 400
+      g.globalAlpha = .95
+      g.drawImage(img, (W - w) / 2, H * .38 - h / 2, w, h)
+      g.globalAlpha = 1
     }
+    // 一层很淡的水色罩上去，像真的隔着一层水
+    g.fillStyle = 'rgba(150,200,215,.16)'; g.fillRect(0, 0, W, H)
     return c
   }
 
-  function resize() {
-    W = Math.round(innerWidth * dpr); H = Math.round(innerHeight * dpr)
-    canvas.width = W; canvas.height = H
-    wcv.width = W; wcv.height = H
-    fogTex = makeFogTexture()
-    ctx.globalCompositeOperation = 'source-over'
-    ctx.drawImage(fogTex, 0, 0)
+  // ── 水面：CPU 波动方程，小格子 ──
+  const GW = 128
+  let GH = 0, cur = null, prev = null, bytes = null, calm = 0
+  function initGrid() {
+    GH = Math.max(64, Math.round(GW * H / W))
+    cur = new Float32Array(GW * GH); prev = new Float32Array(GW * GH); bytes = new Uint8Array(GW * GH)
+  }
+  function drop(px, py, radius, strength) {
+    const gx = px / W * GW, gy = py / H * GH
+    const r = radius
+    for (let y = Math.max(1, Math.floor(gy - r)); y < Math.min(GH - 1, Math.ceil(gy + r)); y++) {
+      for (let x = Math.max(1, Math.floor(gx - r)); x < Math.min(GW - 1, Math.ceil(gx + r)); x++) {
+        const d = Math.hypot(x - gx, y - gy) / r
+        if (d < 1) cur[y * GW + x] -= strength * (Math.cos(d * Math.PI) + 1) * .5
+      }
+    }
+    calm = 0
+  }
+  function stepWater() {
+    // 经典双缓冲：next = (上下左右)/2 - prev，再衰减一点
+    let energy = 0
+    for (let y = 1; y < GH - 1; y++) {
+      const row = y * GW
+      for (let x = 1; x < GW - 1; x++) {
+        const i = row + x
+        const v = (cur[i - 1] + cur[i + 1] + cur[i - GW] + cur[i + GW]) * .5 - prev[i]
+        prev[i] = v * .984
+        energy += Math.abs(prev[i])
+      }
+    }
+    const t = cur; cur = prev; prev = t
+    for (let i = 0; i < cur.length; i++) bytes[i] = Math.max(0, Math.min(255, 128 + cur[i] * 90))
+    return energy
   }
 
-  // 擦除笔刷：径向渐变，中心全透、边缘柔和（替代旧版的 shadowBlur）
-  function wipe(x, y, r) {
-    ctx.save()
-    ctx.globalCompositeOperation = 'destination-out'
-    const g = ctx.createRadialGradient(x, y, 0, x, y, r)
-    g.addColorStop(0, 'rgba(0,0,0,1)'); g.addColorStop(.6, 'rgba(0,0,0,.85)'); g.addColorStop(1, 'rgba(0,0,0,0)')
-    ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x, y, r, 0, 7); ctx.fill()
-    ctx.restore()
+  // ── WebGL：折射 + 高光 + 淡淡的焦散 ──
+  let gl = null, prog = null, texScene = null, texH = null, uTime = null
+  const VS = 'attribute vec2 p;varying vec2 uv;void main(){uv=vec2(p.x*.5+.5,.5-p.y*.5);gl_Position=vec4(p,0.,1.);}'
+  const FS = `precision mediump float;varying vec2 uv;uniform sampler2D s,h;uniform vec2 tx;uniform float t;
+    float H(vec2 q){return texture2D(h,q).r;}
+    float caustic(vec2 p){ // 便宜的焦散：两层旋转正弦叠加
+      float c=0.; vec2 q=p;
+      for(int i=0;i<3;i++){ q+=vec2(sin(q.y*1.7+t*.6),cos(q.x*1.5-t*.5))*.45; c+=abs(sin(q.x+q.y)); q*=1.35; }
+      return pow(1.-c/3.,4.);
+    }
+    void main(){
+      float dx=H(uv+vec2(tx.x,0.))-H(uv-vec2(tx.x,0.));
+      float dy=H(uv+vec2(0.,tx.y))-H(uv-vec2(0.,tx.y));
+      vec3 n=normalize(vec3(-dx*6.,-dy*6.,1.));
+      vec2 r=uv+n.xy*.035;
+      vec3 col=texture2D(s,r).rgb;
+      float ca=caustic(uv*vec2(5.,9.)+n.xy*3.);
+      col+=vec3(.9,.97,1.)*ca*.16;
+      vec3 L=normalize(vec3(-.35,-.6,.72));
+      float sp=pow(max(dot(reflect(-L,n),vec3(0.,0.,1.)),0.),60.);
+      col+=sp*.55;
+      col=mix(col,col*vec3(.92,.97,1.),length(n.xy)*2.);
+      gl_FragColor=vec4(col,1.);
+    }`
+  function initGL(sceneCanvas) {
+    gl = canvas.getContext('webgl', { antialias: false, premultipliedAlpha: false })
+    if (!gl) return false
+    const sh = (type, src) => { const o = gl.createShader(type); gl.shaderSource(o, src); gl.compileShader(o); return gl.getShaderParameter(o, gl.COMPILE_STATUS) ? o : null }
+    const v = sh(gl.VERTEX_SHADER, VS), f = sh(gl.FRAGMENT_SHADER, FS)
+    if (!v || !f) return false
+    prog = gl.createProgram(); gl.attachShader(prog, v); gl.attachShader(prog, f); gl.linkProgram(prog)
+    if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) return false
+    gl.useProgram(prog)
+    const buf = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, buf)
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]), gl.STATIC_DRAW)
+    const loc = gl.getAttribLocation(prog, 'p'); gl.enableVertexAttribArray(loc); gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0)
+    const mk = (unit) => { const tx = gl.createTexture(); gl.activeTexture(gl.TEXTURE0 + unit); gl.bindTexture(gl.TEXTURE_2D, tx)
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR)
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE); return tx }
+    texScene = mk(0); gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGB, gl.RGB, gl.UNSIGNED_BYTE, sceneCanvas)
+    texH = mk(1)
+    gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1)
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.LUMINANCE, GW, GH, 0, gl.LUMINANCE, gl.UNSIGNED_BYTE, bytes)
+    gl.uniform1i(gl.getUniformLocation(prog, 's'), 0)
+    gl.uniform1i(gl.getUniformLocation(prog, 'h'), 1)
+    gl.uniform2f(gl.getUniformLocation(prog, 'tx'), 1 / GW, 1 / GH)
+    uTime = gl.getUniformLocation(prog, 't')
+    gl.viewport(0, 0, W, H)
+    return true
+  }
+
+  let nextAmbient = 0
+  function tick(t) {
+    if (!alive) return
+    // 没人碰的时候，隔一会儿自己落一滴小的，水面一直是活的
+    if (!reduced && t > nextAmbient) {
+      drop(Math.random() * W, Math.random() * H, 2.2, 1.1)
+      nextAmbient = t + 1800 + Math.random() * 2200
+    }
+    stepWater()
+    gl.activeTexture(gl.TEXTURE1)
+    gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, GW, GH, gl.LUMINANCE, gl.UNSIGNED_BYTE, bytes)
+    gl.uniform1f(uTime, t / 1000)
+    gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4)
+    raf = requestAnimationFrame(tick)
   }
 
   let last = null
-  function pt(e) { const t = e.touches ? e.touches[0] : e; return { x: t.clientX * dpr, y: t.clientY * dpr } }
+  function pt(e) { return { x: e.clientX * dpr, y: e.clientY * dpr } }
   function onDown(e) {
     if (e.target.closest('button')) return
-    last = pt(e); wipe(last.x, last.y, 34 * dpr); ripple(last)
+    last = pt(e)
+    if (gl) drop(last.x, last.y, 4.5, 6)
+    if (++taps >= 2) reveal()
   }
   function onMove(e) {
-    if (!last) return
-    const p = pt(e), dx = p.x - last.x, dy = p.y - last.y, d = Math.hypot(dx, dy), step = 10 * dpr
-    for (let s = step; s <= d; s += step) wipe(last.x + dx * s / d, last.y + dy * s / d, 34 * dpr)
-    if (d >= step) last = p
+    if (!last || !gl) return
+    const p = pt(e), d = Math.hypot(p.x - last.x, p.y - last.y)
+    // 手指划过：沿路一路推小水花
+    if (d > 10 * dpr) { drop(p.x, p.y, 2.6, 1.6); last = p }
     e.preventDefault()
   }
   function onUp() { last = null }
-
-  function ripple(p) {
-    ripples.push({ x: p.x, y: p.y, t: 0 })
-    // 两只鸟按离点击处的远近跟着晃
-    // 晃动挂在 .sp-swayer 这一层，不能挂在 .sp-bird 上：.sp-bird 带着飞入动画，
-    // 摘掉晃动 class 时浏览器会把飞入动画从头再播一遍，两只鸟就凭空消失又飞回来（0928 测出来的）
-    ov.querySelectorAll('.sp-swayer').forEach((b) => {
-      const r = b.getBoundingClientRect()
-      const bx = (r.left + r.width / 2) * dpr, by = (r.top + r.height / 2) * dpr
-      const dist = Math.hypot(bx - p.x, by - p.y) / dpr
-      const k = Math.max(.25, 1 - dist / 500), dir = bx >= p.x ? 1 : -1
-      b.style.setProperty('--sw', (dir * 6 * k).toFixed(1) + 'px')
-      b.style.setProperty('--swr', (dir * 4 * k).toFixed(1) + 'deg')
-      b.classList.remove('sp-sway'); void b.getBoundingClientRect(); b.classList.add('sp-sway')
-      b.style.animationDelay = Math.min(.35, dist / 1400) + 's'
-      setTimeout(() => { b.classList.remove('sp-sway'); b.style.animationDelay = '' }, 1400)
-    })
-  }
-
-  function drawRipples() {
-    wctx.clearRect(0, 0, W, H)
-    for (let i = ripples.length - 1; i >= 0; i--) {
-      const rp = ripples[i]; rp.t += 1
-      const life = 80, a = 1 - rp.t / life
-      if (a <= 0) { ripples.splice(i, 1); continue }
-      for (let k = 0; k < 3; k++) {
-        const rad = (rp.t * 2.4 - k * 22) * dpr
-        if (rad <= 0) continue
-        const fade = a * (1 - k * .28)
-        // 一道暗、一道亮，错开一点点，像水面的起伏
-        wctx.strokeStyle = `rgba(20,35,55,${(.16 * fade).toFixed(3)})`; wctx.lineWidth = 3 * dpr
-        wctx.beginPath(); wctx.arc(rp.x, rp.y + 1.5 * dpr, rad, 0, 7); wctx.stroke()
-        wctx.strokeStyle = `rgba(255,255,255,${(.35 * fade).toFixed(3)})`; wctx.lineWidth = 1.6 * dpr
-        wctx.beginPath(); wctx.arc(rp.x, rp.y - 1 * dpr, rad, 0, 7); wctx.stroke()
-      }
-    }
-  }
-
-  function clearedRatio() {
-    // 粗采样 24×40 个点，看多少雾被擦掉了
-    let clear = 0, n = 0
-    for (let gy = 0; gy < 40; gy++) for (let gx = 0; gx < 24; gx++) {
-      const a = ctx.getImageData(Math.floor((gx + .5) * W / 24), Math.floor((gy + .5) * H / 40), 1, 1).data[3]
-      n++; if (a < 90) clear++
-    }
-    return clear / n
-  }
 
   function reveal() {
     if (revealed) return
     revealed = true
     ov.querySelector('.sp-title').classList.add('sp-show')
     ov.querySelector('.sp-enter').classList.add('sp-show')
-  }
-
-  function tick() {
-    if (!alive) return
-    frame++
-    // 回雾：每 3 帧叠一层很淡的雾，擦开的地方会慢慢重新起雾
-    if (frame % 3 === 0 && fogTex) {
-      ctx.save(); ctx.globalCompositeOperation = 'source-over'; ctx.globalAlpha = .012
-      ctx.drawImage(fogTex, 0, 0); ctx.restore()
-    }
-    drawRipples()
-    if (!revealed && frame % 30 === 0 && clearedRatio() > .22) reveal()
-    raf = requestAnimationFrame(tick)
+    ov.querySelector('.sp-hint').classList.remove('sp-show')   // 字出来了，提示就退场，不然叠在一起
   }
 
   function close() {
@@ -224,10 +276,23 @@
   ov.addEventListener('pointerdown', onDown)
   ov.addEventListener('pointermove', onMove, { passive: false })
   ov.addEventListener('pointerup', onUp); ov.addEventListener('pointercancel', onUp)
-  addEventListener('resize', resize)
 
-  resize()
-  setTimeout(() => ov.querySelector('.sp-hint').classList.add('sp-show'), reduced ? 0 : 1400)
-  setTimeout(reveal, 7000)          // 不想擦也行，7 秒后字和「进入」自己出来
-  tick()
+  async function start() {
+    W = Math.round(innerWidth * dpr); H = Math.round(innerHeight * dpr)
+    canvas.width = W; canvas.height = H
+    const scene = paintScene(await sceneImage())
+    initGrid()
+    if (!initGL(scene)) {
+      // 没有 WebGL：静态底图 + 点一下就进（总比什么都没有好）
+      gl = null
+      const c2 = canvas.getContext('2d'); if (c2) c2.drawImage(scene, 0, 0)
+      reveal(); return
+    }
+    // 开场先落一滴，让她第一眼就看到水在动
+    drop(W / 2, H * .62, 5, 5)
+    raf = requestAnimationFrame(tick)
+  }
+  start()
+  setTimeout(() => { if (!revealed) ov.querySelector('.sp-hint').classList.add('sp-show') }, reduced ? 0 : 1200)
+  setTimeout(reveal, 6000)
 })()

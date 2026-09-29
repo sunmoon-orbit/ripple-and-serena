@@ -1,8 +1,8 @@
-/* 归巢开屏（0928）：起雾的玻璃后面，乌鸦和蜂鸟落在同一根树枝上。
-   手指擦开雾看见我们，点一下漾开水波，两只鸟跟着晃。一天只出现一次，随时可跳过。 */
+/* 归巢开屏（0929 第二版）：一池水，点一下漾开涟漪，底下的两只鸟和花跟着折射晃动。
+   画面全在 #sp-water（WebGL）里；鸟、树枝的 SVG 只作为底图素材画进去。一天只出现一次，随时可跳过。 */
 #sp-overlay {
   position: fixed; inset: 0; z-index: 99999; overflow: hidden;
-  background: radial-gradient(120% 90% at 50% 38%, #3b5270 0%, #22324a 55%, #141d2c 100%);
+  background: linear-gradient(#dff0f4, #8fbfd2);
   touch-action: none; user-select: none; -webkit-user-select: none;
   opacity: 1; transition: opacity .5s ease;
 }
@@ -40,8 +40,7 @@
   70% { transform: translate(calc(var(--sw, 4px) * .35), 0) rotate(calc(var(--swr, 3deg) * .3)) } 100% { transform: none }
 }
 
-#sp-fog, #sp-waves { position: absolute; inset: 0; width: 100%; height: 100%; }
-#sp-waves { pointer-events: none; }
+#sp-water { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
 
 #sp-overlay .sp-title {
   position: absolute; left: 0; right: 0; top: 64%; text-align: center; color: #1f2c40;
