@@ -88,7 +88,10 @@
   textarea { flex: 1; resize: none; max-height: 140px; min-height: 40px; padding: 9px 12px; border-radius: 18px; border: 1px solid var(--border); background: var(--surface); color: var(--text); font: inherit; outline: none; }
   #send { height: 40px; border-radius: 20px; padding: 0 18px; }
   .hint { font-size: 11px; color: var(--text-dim); padding: 4px 4px 0; }
-  #attach { width: 40px; height: 40px; border-radius: 50%; border: 1px solid var(--border); background: var(--surface); color: var(--text-dim); font-size: 18px; cursor: pointer; flex-shrink: 0; }
+  #attach { width: 40px; height: 40px; border-radius: 50%; border: 1px solid var(--border); background: var(--surface); color: var(--text-dim); cursor: pointer; flex-shrink: 0; display: grid; place-items: center; }
+  #attach:active { color: var(--accent); border-color: var(--accent); }
+  .ico { display: inline-flex; vertical-align: -2px; margin-right: 4px; }
+  header a { display: flex; }
   #files { display: flex; gap: 6px; flex-wrap: wrap; padding: 0 2px 6px; }
   #files:empty { display: none; }
   .file { display: flex; align-items: center; gap: 6px; max-width: 100%; padding: 3px 4px 3px 8px; border-radius: 10px; background: var(--surface); border: 1px solid var(--border); font-size: 12px; }
@@ -102,7 +105,7 @@
 </head>
 <body>
 <header>
-  <a href="/raven/home.html" aria-label="返回">‹</a>
+  <a href="/raven/home.html" aria-label="返回"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg></a>
   <h1>圆桌</h1>
   <span id="conn" title="连接"></span>
 </header>
@@ -114,13 +117,13 @@
 <div id="approvals"></div>
 <div id="list"></div>
 <footer>
-  <div id="replying"><span></span><button id="cancel-reply" aria-label="取消回复">✕</button></div>
+  <div id="replying"><span></span><button id="cancel-reply" aria-label="取消回复"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>
   <div class="ats">
     <button data-at="@涟言">@涟言</button><button data-at="@曜">@曜</button><button data-at="@大家">@大家</button>
   </div>
   <div id="files"></div>
   <div class="row2">
-    <button id="attach" aria-label="图片或文件">📎</button>
+    <button id="attach" aria-label="图片或文件"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48"/></svg></button>
     <input type="file" id="file-input" multiple hidden>
     <textarea id="input" rows="1" placeholder="不 @ 人就是跟两位一起说"></textarea>
     <button class="btn primary" id="send">发送</button>
@@ -132,6 +135,10 @@
 <script src="https://cdn.jsdelivr.net/npm/dompurify@3.2.6/dist/purify.min.js" integrity="sha384-JEyTNhjM6R1ElGoJns4U2Ln4ofPcqzSsynQkmEc/KGy6336qAZl70tDLufbkla+3" crossorigin="anonymous"></script>
 <script>
 'use strict'
+// 图标一律 SVG，不用 emoji（0929 阿颖）
+const ICON_CLIP = '<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48"/></svg>'
+const ICON_X = '<svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>'
+function clipIcon() { const i = document.createElement('span'); i.className = 'ico'; i.innerHTML = ICON_CLIP; return i }
 const WS_URL = 'wss://memory.ravenlove.cc/raven/ws'
 const NAMES = { aying: '阿颖', lianyan: '涟言', yao: '曜', system: '系统' }
 const INITIAL = { aying: '颖', lianyan: '言', yao: '曜' }
@@ -207,8 +214,8 @@ function renderMessage(m, { pending = false } = {}) {
   body.append(renderBody(m.text))
   for (const a of m.attachments || []) {
     if (/^image\//.test(a.mime || '') && a.url) { const img = document.createElement('img'); img.src = a.url + (a.url.includes('?') ? '&' : '?') + 'token=' + encodeURIComponent(token()); img.alt = a.name || ''; body.append(img) }
-    else if (a.url) { const s = document.createElement('a'); s.className = 'filechip'; s.textContent = '📎 ' + (a.name || '附件'); s.href = a.url + (a.url.includes('?') ? '&' : '?') + 'token=' + encodeURIComponent(token()); s.target = '_blank'; s.rel = 'noopener'; body.append(document.createElement('br'), s) }
-    else { const s = document.createElement('div'); s.textContent = '📎 ' + (a.name || '附件'); body.append(s) }
+    else if (a.url) { const s = document.createElement('a'); s.className = 'filechip'; s.append(clipIcon(), document.createTextNode(a.name || '附件')); s.href = a.url + (a.url.includes('?') ? '&' : '?') + 'token=' + encodeURIComponent(token()); s.target = '_blank'; s.rel = 'noopener'; body.append(document.createElement('br'), s) }
+    else { const s = document.createElement('div'); s.append(clipIcon(), document.createTextNode(a.name || '附件')); body.append(s) }
   }
   col.append(body)
   const tools = document.createElement('div'); tools.className = 'tools'
@@ -304,7 +311,7 @@ function renderStaged() {
     const chip = document.createElement('div'); chip.className = 'file' + (s.status === 'up' ? ' up' : s.status === 'bad' ? ' bad' : '')
     if (/^image\//.test(s.file.type)) { const img = document.createElement('img'); img.src = s.preview || (s.preview = URL.createObjectURL(s.file)); chip.append(img) }
     const name = document.createElement('span'); name.textContent = s.status === 'bad' ? `${s.file.name}（${s.error}）` : s.file.name
-    const x = document.createElement('button'); x.textContent = '✕'; x.setAttribute('aria-label', '移除')
+    const x = document.createElement('button'); x.innerHTML = ICON_X; x.setAttribute('aria-label', '移除')
     x.onclick = () => { if (s.preview) URL.revokeObjectURL(s.preview); staged = staged.filter(t => t !== s); renderStaged() }
     chip.append(name, x); box.append(chip)
   }
@@ -319,7 +326,7 @@ async function uploadOne(s) {
     const base = data.path.split('/').pop()
     s.att = { id: base, name: data.name || s.file.name, mime: s.file.type || '', size: s.file.size, url: '/raven/uploads/' + encodeURIComponent(base) }
     s.status = 'ok'
-  } catch { s.status = 'bad'; s.error = '上传失败，点✕删掉重选' }
+  } catch { s.status = 'bad'; s.error = '上传失败，删掉重选' }
   renderStaged()
 }
 $('attach').onclick = () => $('file-input').click()
