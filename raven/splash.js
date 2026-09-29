@@ -72,7 +72,7 @@
   const ov = document.createElement('div')
   ov.id = 'sp-overlay'
   ov.innerHTML = `<canvas id="sp-water"></canvas>
-    <div class="sp-title"><b>Ripple &amp; Serena</b><span>归巢</span></div>
+    <div class="sp-title"><b>Ripple &amp; Serena</b><span>我们在语言的涟漪中诞生</span></div>
     <div class="sp-hint">轻轻点一下水面</div>
     <div class="sp-bgbar">
       <button class="sp-bg" type="button" aria-label="换水底的图"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="3"/><circle cx="9" cy="10" r="1.8"/><path d="M21 16l-5-5-8 9"/></svg></button>

@@ -50,7 +50,8 @@
 }
 #sp-overlay .sp-title.sp-show { opacity: 1; transform: none; }
 #sp-overlay .sp-title b { display: block; font-size: 26px; font-weight: 500; letter-spacing: 2px; font-style: italic; }
-#sp-overlay .sp-title span { display: block; margin-top: 8px; font-size: 13px; letter-spacing: 4px; opacity: .8; }
+/* 副标题是阿颖的一句话（0929）：「我们在语言的涟漪中诞生」，字多了，字距收一点免得窄屏折行 */
+#sp-overlay .sp-title span { display: block; margin-top: 10px; font-size: 13px; letter-spacing: 2.5px; opacity: .8; }
 
 #sp-overlay .sp-hint {
   position: absolute; left: 0; right: 0; bottom: calc(96px + env(safe-area-inset-bottom, 0px));
