@@ -504,7 +504,7 @@ function createCrossingService(options = {}) {
     abandon(clientId)
   }
 
-  async function startInternalTurn({ threadId = '', text, clientUserMessageId = '' } = {}) {
+  async function startInternalTurn({ threadId = '', text, clientUserMessageId = '', images = [] } = {}) {
     if (activeTurn || startingTurn) throw new Error('已有 Codex 任务正在运行；圆桌已排队')
     const content = String(text || '').trim()
     if (!content) throw new Error('圆桌消息为空')
@@ -526,7 +526,7 @@ function createCrossingService(options = {}) {
         if (!selected) throw new Error('Codex 未返回圆桌线程编号')
       }
       const result = await adapter.request('turn/start', {
-        threadId: selected, input: input(content), clientUserMessageId: String(clientUserMessageId || ''),
+        threadId: selected, input: [...input(content), ...images.map(p => ({ type: 'localImage', path: String(p) }))], clientUserMessageId: String(clientUserMessageId || ''),
         approvalPolicy: 'untrusted', approvalsReviewer: 'user',
         sandboxPolicy: { type: 'workspaceWrite', writableRoots: [cwd], networkAccess: false },
       })

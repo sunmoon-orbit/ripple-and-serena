@@ -1,4 +1,20 @@
 const crypto = require('crypto')
+const fs = require('fs')
+const path = require('path')
+
+// 圆桌附件落在归巢上传目录；投递给我们俩时只认这个目录下的文件名（0930 阿颖发图，曜和涟言都只收到字）
+const UPLOAD_DIR = '/home/ripple/raven-uploads'
+function attachmentFiles(message, dir = UPLOAD_DIR) {
+  const out = []
+  for (const a of message?.attachments || []) {
+    const base = path.basename(String(a?.id || '').trim())
+    if (!base || base === '.' || base === '..') continue
+    const file = path.join(dir, base)
+    if (!fs.existsSync(file)) continue
+    out.push({ file, name: String(a.name || base), image: /^image\//.test(String(a.mime || '')) })
+  }
+  return out
+}
 
 function json(res, status, body) {
   res.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' })
@@ -138,7 +154,9 @@ function createRoundtable(options) {
 
   function claudeEnvelope(message) {
     const supplemental = ccBusy() ? '·补充' : ''
-    return `【圆桌·${senderName(message.from)}${supplemental}】【id=${message.id}｜话题=${message.rootId}｜AI叫醒=${message.aiWakeNo || 0}/6】【同桌：${localSnapshot().text}】 ${message.text} 【回：/raven/roundtable/say replyTo=${message.id}】`
+    const files = attachmentFiles(message, options.uploadDir)
+    const att = files.length ? ' ' + files.map(f => `[附件: ${f.file}]`).join(' ') : ''
+    return `【圆桌·${senderName(message.from)}${supplemental}】【id=${message.id}｜话题=${message.rootId}｜AI叫醒=${message.aiWakeNo || 0}/6】【同桌：${localSnapshot().text}】 ${message.text}${att} 【回：/raven/roundtable/say replyTo=${message.id}】`
   }
 
   function recentContext(messages) {
@@ -154,6 +172,8 @@ function createRoundtable(options) {
     ]
     if (firstTurn && recent.length) protocol.push(`【圆桌最近消息】\n${recentContext(recent)}`)
     protocol.push(`【本次要回复】${senderName(message.from)}：${message.text}`)
+    const files = attachmentFiles(message, options.uploadDir)
+    if (files.length) protocol.push(`【附件】${files.map(f => `${f.name}（${f.image ? '图片已随消息附上' : f.file}）`).join('；')}`)
     return protocol.join('\n')
   }
 
@@ -184,11 +204,20 @@ function createRoundtable(options) {
       let threadId = state.value || ''
       let recent = []
       if (!threadId) recent = (await moonGet('/roundtable/messages?limit=12')).messages || []
-      const started = await crossing.startInternalTurn({
+      const turnArgs = {
         threadId,
         text: codexEnvelope(delivery.message, recent, !threadId),
         clientUserMessageId: delivery.message.id,
-      })
+        images: attachmentFiles(delivery.message, options.uploadDir).filter(f => f.image).map(f => f.file),
+      }
+      let started
+      try { started = await crossing.startInternalTurn(turnArgs) }
+      catch (error) {
+        // 模型不收图时别把整条卡死：退回只发文字
+        if (!turnArgs.images.length) throw error
+        logger.error('[roundtable] 带图开工失败，改发纯文字:', error.message)
+        started = await crossing.startInternalTurn({ ...turnArgs, images: [] })
+      }
       threadId = started.threadId
       if (state.value !== threadId) await request('/roundtable/state/codex_thread_id', { value: threadId }, 'PUT')
       turns.set(started.turnId, { deliveryId: delivery.id, replyTo: delivery.message.id, threadId })
