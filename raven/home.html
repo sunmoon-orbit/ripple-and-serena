@@ -599,7 +599,10 @@ const stored = localStorage.getItem(AUTH_KEY)
 if (!localStorage.getItem(PIN_KEY)) {
   startSetup()
 } else if (stored && Date.now() - parseInt(stored) < AUTH_TTL) {
-  showApp()
+  // 记住登录时会在脚本首次执行期间直接走到这里。
+  // 等本段脚本的 const/let 都初始化完再加载，否则首次 loadAll 会被 TDZ 打断，
+  // 表现就是「用量和记忆碎片必须手动点第二次」。
+  queueMicrotask(showApp)
 } // else: show lock
 
 // ── data loading ──────────────────────────────────
@@ -610,17 +613,19 @@ function greet() {
   document.getElementById('home-domain').textContent = g + ' · ravenlove.cc'
 }
 
+let lastHomeRefreshAt = 0
 function loadAll() {
+  lastHomeRefreshAt = Date.now()
   greet()
   loadStatus()
-  loadMemory()
+  loadMemory({ cycle: false })
   buildHeatmap()
   loadStats()
   loadUsage()
 }
 
 // 这些接口 2026-07-03 起外网访问要带 token（防偷看记忆/状态）
-const authHeaders = () => ({ Authorization: 'Bearer ' + (localStorage.getItem('raven-token') || '') })
+function authHeaders() { return { Authorization: 'Bearer ' + (localStorage.getItem('raven-token') || '') } }
 
 // status + CC badge
 async function loadStatus() {
@@ -691,13 +696,13 @@ async function loadRandomMemory() {
 }
 
 // 先翻往年今日；空日子占绝大多数，安静退回随机碎片才是正常路径。
-async function loadMemory() {
+async function loadMemory({ cycle = true } = {}) {
   const btn = document.getElementById('mem-refresh')
   btn.style.opacity = '0.3'
   btn.classList.remove('spinning'); void btn.offsetWidth; btn.classList.add('spinning')
   try {
     if (todayMemories?.length) {
-      if (todayMemories.length > 1) todayMemoryIndex = (todayMemoryIndex + 1) % todayMemories.length
+      if (cycle && todayMemories.length > 1) todayMemoryIndex = (todayMemoryIndex + 1) % todayMemories.length
       const item = todayMemories[todayMemoryIndex]
       renderMemory(item, item.years_ago)
       return
@@ -1041,6 +1046,14 @@ document.addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'visible' && document.getElementById('app').classList.contains('shown')) {
     greet()
     loadStatus()
+    // 从聊天或手机后台回来时，数据超过一分钟才静默更新。
+    // 记忆不自动跳到下一条；只有手动点换一条才轮换。
+    if (Date.now() - lastHomeRefreshAt > 60000) {
+      lastHomeRefreshAt = Date.now()
+      loadMemory({ cycle: false })
+      loadUsage()
+      loadStats()
+    }
   }
 })
 </script>
