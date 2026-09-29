@@ -74,13 +74,42 @@
   ov.innerHTML = `<canvas id="sp-water"></canvas>
     <div class="sp-title"><b>Ripple &amp; Serena</b><span>归巢</span></div>
     <div class="sp-hint">轻轻点一下水面</div>
-    <button class="sp-enter" type="button">进 入</button>
+    <div class="sp-bgbar">
+      <button class="sp-bg" type="button" aria-label="换水底的图"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="3"/><circle cx="9" cy="10" r="1.8"/><path d="M21 16l-5-5-8 9"/></svg></button>
+      <button class="sp-bg-reset" type="button" hidden>用回默认</button>
+      <input class="sp-bg-file" type="file" accept="image/*" hidden>
+    </div>
     <button class="sp-skip" type="button">跳过</button>`
   document.body.appendChild(ov)
 
   const canvas = ov.querySelector('#sp-water')
   const dpr = Math.min(window.devicePixelRatio || 1, 1.25)
   let W = 0, H = 0, raf = 0, alive = true, revealed = false, taps = 0
+
+  // ── 自定义底图（0929 阿颖要的）：本机存一张缩到 1280 的 JPEG，只在这台手机上，不上传 ──
+  const BG_KEY = 'raven-splash-bg'
+  function customBg() {
+    return new Promise((resolve) => {
+      let url = null
+      try { url = localStorage.getItem(BG_KEY) } catch { /* 读不到就用默认 */ }
+      if (!url) return resolve(null)
+      const img = new Image(); img.onload = () => resolve(img); img.onerror = () => resolve(null); img.src = url
+    })
+  }
+  function saveBg(file) {
+    return new Promise((resolve) => {
+      const img = new Image()
+      img.onload = () => {
+        const k = Math.min(1, 1280 / Math.max(img.width, img.height))
+        const c = document.createElement('canvas'); c.width = Math.round(img.width * k); c.height = Math.round(img.height * k)
+        c.getContext('2d').drawImage(img, 0, 0, c.width, c.height)
+        URL.revokeObjectURL(img.src)
+        try { localStorage.setItem(BG_KEY, c.toDataURL('image/jpeg', .85)); resolve(true) } catch { resolve(false) }
+      }
+      img.onerror = () => resolve(false)
+      img.src = URL.createObjectURL(file)
+    })
+  }
 
   // ── 底图：水色 + 两只鸟 + 几朵白花，开场画一次 ──
   function sceneImage() {
@@ -108,11 +137,20 @@
     }
     g.restore()
   }
-  function paintScene(img) {
+  function paintScene(img, custom) {
     const c = document.createElement('canvas'); c.width = W; c.height = H
     const g = c.getContext('2d')
+    if (custom) {
+      // 她自己的图：铺满（cover），上面罩一层极淡的水色，像沉在浅水里
+      const k = Math.max(W / custom.width, H / custom.height)
+      const w = custom.width * k, h = custom.height * k
+      g.drawImage(custom, (W - w) / 2, (H - h) / 2, w, h)
+      g.fillStyle = 'rgba(225,238,242,.12)'; g.fillRect(0, 0, W, H)
+      return c
+    }
     const bg = g.createLinearGradient(0, 0, 0, H)
-    bg.addColorStop(0, '#dff0f4'); bg.addColorStop(.45, '#b9dbe6'); bg.addColorStop(1, '#8fbfd2')
+    // 第一版太蓝（阿颖 0929）：改成近白的水色，只带一点点青
+    bg.addColorStop(0, '#f4f8f9'); bg.addColorStop(.5, '#e4eff2'); bg.addColorStop(1, '#cfe2e8')
     g.fillStyle = bg; g.fillRect(0, 0, W, H)
     // 池底的柔光斑，让水有深浅
     for (let i = 0; i < 7; i++) {
@@ -132,7 +170,7 @@
       g.globalAlpha = 1
     }
     // 一层很淡的水色罩上去，像真的隔着一层水
-    g.fillStyle = 'rgba(150,200,215,.16)'; g.fillRect(0, 0, W, H)
+    g.fillStyle = 'rgba(190,215,222,.10)'; g.fillRect(0, 0, W, H)
     return c
   }
 
@@ -188,11 +226,11 @@
       vec2 r=uv+n.xy*.035;
       vec3 col=texture2D(s,r).rgb;
       float ca=caustic(uv*vec2(5.,9.)+n.xy*3.);
-      col+=vec3(.9,.97,1.)*ca*.16;
+      col+=vec3(1.,1.,1.)*ca*.12;
       vec3 L=normalize(vec3(-.35,-.6,.72));
       float sp=pow(max(dot(reflect(-L,n),vec3(0.,0.,1.)),0.),60.);
       col+=sp*.55;
-      col=mix(col,col*vec3(.92,.97,1.),length(n.xy)*2.);
+      col=mix(col,col*vec3(.95,.98,1.),length(n.xy)*2.);
       gl_FragColor=vec4(col,1.);
     }`
   function initGL(sceneCanvas) {
@@ -241,7 +279,7 @@
   let last = null
   function pt(e) { return { x: e.clientX * dpr, y: e.clientY * dpr } }
   function onDown(e) {
-    if (e.target.closest('button')) return
+    if (e.target.closest('button') || e.target.closest('.sp-title.sp-show')) return
     last = pt(e)
     if (gl) drop(last.x, last.y, 4.5, 6)
     if (++taps >= 2) reveal()
@@ -259,8 +297,10 @@
     if (revealed) return
     revealed = true
     ov.querySelector('.sp-title').classList.add('sp-show')
-    ov.querySelector('.sp-enter').classList.add('sp-show')
-    ov.querySelector('.sp-hint').classList.remove('sp-show')   // 字出来了，提示就退场，不然叠在一起
+    // 没有「进入」按钮了（阿颖：占位置，大家都知道点了就进）：点标题进；提示改成一句小字
+    const hint = ov.querySelector('.sp-hint')
+    hint.textContent = '点名字进门'
+    hint.classList.add('sp-show')
   }
 
   function close() {
@@ -271,7 +311,19 @@
     setTimeout(() => ov.remove(), 520)
   }
 
-  ov.querySelector('.sp-enter').addEventListener('click', close)
+  ov.querySelector('.sp-title').addEventListener('click', () => { if (revealed) close() })
+  // 换底图：选一张 → 存本机 → 重新画水底；「用回默认」删掉它
+  const fileIn = ov.querySelector('.sp-bg-file'), resetBtn = ov.querySelector('.sp-bg-reset')
+  try { resetBtn.hidden = !localStorage.getItem(BG_KEY) } catch { /* 忽略 */ }
+  ov.querySelector('.sp-bg').addEventListener('click', () => fileIn.click())
+  fileIn.addEventListener('change', async () => {
+    const f = fileIn.files && fileIn.files[0]; fileIn.value = ''
+    if (!f) return
+    if (!(await saveBg(f))) { ov.querySelector('.sp-hint').textContent = '这张图太大存不下，换一张试试'; return }
+    resetBtn.hidden = false
+    repaint()
+  })
+  resetBtn.addEventListener('click', () => { try { localStorage.removeItem(BG_KEY) } catch { /* 忽略 */ } resetBtn.hidden = true; repaint() })
   ov.querySelector('.sp-skip').addEventListener('click', close)
   ov.addEventListener('pointerdown', onDown)
   ov.addEventListener('pointermove', onMove, { passive: false })
@@ -280,7 +332,7 @@
   async function start() {
     W = Math.round(innerWidth * dpr); H = Math.round(innerHeight * dpr)
     canvas.width = W; canvas.height = H
-    const scene = paintScene(await sceneImage())
+    const scene = paintScene(await sceneImage(), await customBg())
     initGrid()
     if (!initGL(scene)) {
       // 没有 WebGL：静态底图 + 点一下就进（总比什么都没有好）
@@ -291,6 +343,11 @@
     // 开场先落一滴，让她第一眼就看到水在动
     drop(W / 2, H * .62, 5, 5)
     raf = requestAnimationFrame(tick)
+  }
+  async function repaint() {
+    const scene = paintScene(await sceneImage(), await customBg())
+    if (gl) { gl.activeTexture(gl.TEXTURE0); gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGB, gl.RGB, gl.UNSIGNED_BYTE, scene); drop(W / 2, H * .5, 5, 5) }
+    else { const c2 = canvas.getContext('2d'); if (c2) c2.drawImage(scene, 0, 0) }
   }
   start()
   setTimeout(() => { if (!revealed) ov.querySelector('.sp-hint').classList.add('sp-show') }, reduced ? 0 : 1200)
