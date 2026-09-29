@@ -364,7 +364,11 @@ function showApproval(a) {
   const left = document.createElement('span'); left.className = 'left'
   const deny = document.createElement('button'); deny.className = 'btn'; deny.textContent = '不行'
   const allow = document.createElement('button'); allow.className = 'btn primary'; allow.textContent = '允许'
-  const answer = choice => { send({ type: 'roundtable/approval/respond', requestId: a.requestId, threadId: a.threadId, turnId: a.turnId, itemId: a.itemId, choice }); allow.disabled = deny.disabled = true; left.textContent = '已回复' }
+  const answer = choice => {
+    const sent = send({ type: 'roundtable/approval/respond', requestId: a.requestId, threadId: a.threadId, turnId: a.turnId, itemId: a.itemId, choice })
+    if (!sent) { left.textContent = '连接断了，请稍后再试'; return }
+    allow.disabled = deny.disabled = true; left.textContent = '已回复'
+  }
   allow.onclick = () => answer('allow'); deny.onclick = () => answer('deny')
   row.append(left, deny, allow)
   card.append(title, cmd, row)
@@ -379,6 +383,7 @@ function showApproval(a) {
   tick()
 }
 function clearApproval(requestId) { const c = approvalCards.get(requestId); if (c) { c.remove(); approvalCards.delete(requestId) } }
+function clearAllApprovals() { for (const requestId of [...approvalCards.keys()]) clearApproval(requestId) }
 
 function send(obj) {
   if (ws && ws.readyState === WebSocket.OPEN) { ws.send(JSON.stringify(obj)); return true }
@@ -592,6 +597,8 @@ function connect() {
   sock.onopen = () => {
     if (sock !== ws) { try { sock.close() } catch {} ; return }
     $('conn').className = 'ok'
+    // 重连后先丢掉旧连接留下的卡；subscribe 会把仍然有效的审批重新发来。
+    clearAllApprovals()
     sock.send(JSON.stringify({ type: 'auth', token: token() }))
     sock.send(JSON.stringify({ type: 'roundtable/subscribe', after: localStorage.getItem(LAST_KEY) || '' }))
     for (const item of outbox) sock.send(JSON.stringify(item))   // 同一 cid 重发，服务端认得出不会建两条
@@ -622,6 +629,7 @@ function connect() {
       case 'roundtable/approval/request': showApproval(msg); break
       case 'roundtable/approval/resolved': clearApproval(msg.requestId); break
       case 'roundtable/error':
+        if (msg.requestId) clearApproval(msg.requestId)
         if (msg.cid) { const p = list.querySelector(`.msg.pending[data-cid="${CSS.escape(msg.cid)}"]`); if (p) { p.classList.add('failed'); p.querySelector('.meta span:last-child').textContent = msg.retryable ? '没存上，会自动重试' : '发送失败' } }
         if (!msg.retryable && msg.cid) { outbox = outbox.filter(x => x.cid !== msg.cid); saveOutbox() }
         break

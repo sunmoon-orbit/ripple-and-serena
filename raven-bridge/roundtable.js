@@ -299,6 +299,7 @@ function createRoundtable(options) {
     } catch (error) {
       ws.send(JSON.stringify({
         type: 'roundtable/error', cid: message?.cid || null,
+        requestId: type === 'roundtable/approval/respond' ? compactText(message?.requestId, 160) : null,
         error: error.message, retryable: error.retryable === true || (Number(error.status) || 500) >= 500,
       }))
     }
