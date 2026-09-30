@@ -122,6 +122,16 @@
   .file.bad { border-color: var(--red); }
   .file button { background: none; border: 0; color: var(--text-dim); cursor: pointer; padding: 0 4px; }
   .msg .body .filechip { font-size: 13px; }
+  /* 长按贴表情（0930，跟归巢私聊同一套） */
+  .msg .body { position: relative; -webkit-touch-callout: none; }
+  .msg.has-react .body { margin-bottom: 12px; }
+  .msg-reacts { position: absolute; bottom: -13px; left: 8px; display: flex; gap: 2px; pointer-events: none; }
+  .msg[data-from="aying"] .msg-reacts { left: auto; right: 8px; }
+  .msg-react { font-size: 13px; line-height: 1; padding: 3px 5px; border-radius: 99px; background: var(--surface); border: 1px solid var(--border); box-shadow: 0 1px 4px rgba(0,0,0,.18); }
+  #react-pop { position: fixed; z-index: 200; display: none; gap: 2px; padding: 5px 6px; border-radius: 99px; background: var(--surface); border: 1px solid var(--border); box-shadow: 0 6px 20px rgba(0,0,0,.28); }
+  #react-pop.open { display: flex; }
+  #react-pop button { border: 0; background: none; font-size: 22px; line-height: 1; padding: 5px 6px; border-radius: 99px; cursor: pointer; }
+  #react-pop button.on { background: color-mix(in srgb, var(--accent) 35%, transparent); }
   .msg.sticker-only .body { padding: 2px 0; border: 0; background: transparent; }
   .roundtable-sticker { display: inline-block; width: auto; max-width: min(180px, 58vw) !important; max-height: 180px; object-fit: contain; vertical-align: middle; }
   #composer-picker { position: fixed; z-index: 13; left: 10px; right: 10px; bottom: calc(62px + env(safe-area-inset-bottom, 0px)); max-height: min(310px, 48dvh); overflow: hidden; border: 1px solid var(--border); border-radius: 15px; background: var(--bg); box-shadow: 0 8px 28px rgba(0,0,0,.28); }
@@ -403,6 +413,7 @@ function addMessage(m) {
   const el = renderMessage(m)
   seen.set(m.id, el)
   if (holder) holder.replaceWith(el); else list.append(el)
+  if (reactionsCache['rt:' + m.id]) paintReaction('rt:' + m.id, reactionsCache['rt:' + m.id])
   try { localStorage.setItem(LAST_KEY, m.id) } catch {}
   if (stick || m.from === 'aying') list.scrollTop = list.scrollHeight
 }
@@ -750,6 +761,7 @@ async function backfill() {
     backendMissing = false; banner('')
     const data = await r.json()
     for (const m of data.messages || []) addMessage(m)
+    loadReactions()
   } catch {}
   try {
     const r = await fetch('/raven/roundtable/status', { headers: { Authorization: 'Bearer ' + token() } })
@@ -792,6 +804,7 @@ function connect() {
         }
         break
       case 'roundtable/message': addMessage(msg.message); break
+      case 'reaction': if (String(msg.key || '').startsWith('rt:')) paintReaction(msg.key, msg.reactions); break
       case 'roundtable/status': renderStatus(msg.agents); break
       case 'roundtable/avatars': applyAvatars(msg.avatars || {}); break
       case 'roundtable/approval/request': showApproval(msg); break
@@ -805,6 +818,78 @@ function connect() {
     }
   }
 }
+
+// ── 长按贴表情（0930）：跟归巢私聊同一个服务器存储，key 是 rt:消息id ──
+const REACT_EMOJIS = ['❤️', '🥺', '😂', '🫣', '😡', '👍', '🫶']
+let reactionsCache = {}, lastLongPressAt = 0
+const reactPop = document.createElement('div'); reactPop.id = 'react-pop'; document.body.appendChild(reactPop)
+function paintReaction(key, reactions) {
+  reactionsCache[key] = reactions || {}
+  const el = seen.get(key.slice(3)); if (!el) return
+  const body = el.querySelector('.body'); if (!body) return
+  body.querySelector('.msg-reacts')?.remove()
+  const entries = Object.entries(reactions || {})
+  el.classList.toggle('has-react', entries.length > 0)
+  if (!entries.length) return
+  const box = document.createElement('div'); box.className = 'msg-reacts'
+  for (const [who, emoji] of entries) {
+    const chip = document.createElement('span'); chip.className = 'msg-react'; chip.textContent = emoji
+    chip.title = (NAMES[who] || who) + ' 贴的'; box.appendChild(chip)
+  }
+  body.appendChild(box)
+}
+async function loadReactions() {
+  try {
+    const r = await fetch('/raven/reactions', { headers: { Authorization: 'Bearer ' + token() } })
+    if (!r.ok) return
+    reactionsCache = await r.json()
+    for (const [k, v] of Object.entries(reactionsCache)) if (k.startsWith('rt:')) paintReaction(k, v)
+  } catch {}
+}
+function closeReactPop() { reactPop.classList.remove('open') }
+function openReactPop(msgEl) {
+  const id = msgEl.dataset.id; if (!id) return
+  const key = 'rt:' + id
+  lastLongPressAt = Date.now()
+  const mine = (reactionsCache[key] || {}).aying
+  reactPop.textContent = ''
+  for (const e of REACT_EMOJIS) {
+    const b = document.createElement('button'); b.type = 'button'; b.textContent = e
+    if (e === mine) b.classList.add('on')
+    b.onclick = async ev => {
+      ev.stopPropagation(); closeReactPop()
+      const next = { ...(reactionsCache[key] || {}) }
+      if (next.aying === e) delete next.aying; else next.aying = e
+      paintReaction(key, next)
+      try {
+        const r = await fetch('/raven/react', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token() }, body: JSON.stringify({ key, emoji: e }) })
+        if (r.ok) paintReaction(key, (await r.json()).reactions)
+      } catch {}
+    }
+    reactPop.appendChild(b)
+  }
+  reactPop.classList.add('open')
+  const rect = msgEl.querySelector('.body').getBoundingClientRect(), pw = reactPop.offsetWidth, ph = reactPop.offsetHeight
+  reactPop.style.left = Math.min(innerWidth - pw - 8, Math.max(8, rect.left + rect.width / 2 - pw / 2)) + 'px'
+  reactPop.style.top = (rect.top - ph - 8 > 60 ? rect.top - ph - 8 : Math.min(innerHeight - ph - 8, rect.bottom + 8)) + 'px'
+  if (navigator.vibrate) try { navigator.vibrate(12) } catch {}
+}
+;(() => {
+  let timer = null, sx = 0, sy = 0
+  const cancel = () => { clearTimeout(timer); timer = null }
+  const target = e => { const m = e.target.closest('.msg'); return m && m.dataset.id && e.target.closest('.body') && !e.target.closest('a, button') ? m : null }
+  list.addEventListener('touchstart', e => {
+    const m = target(e); if (!m || e.touches.length > 1) return
+    sx = e.touches[0].clientX; sy = e.touches[0].clientY
+    cancel(); timer = setTimeout(() => { timer = null; openReactPop(m) }, 480)
+  }, { passive: true })
+  list.addEventListener('touchmove', e => { if (timer && Math.hypot(e.touches[0].clientX - sx, e.touches[0].clientY - sy) > 8) cancel() }, { passive: true })
+  list.addEventListener('touchend', cancel, { passive: true })
+  list.addEventListener('touchcancel', cancel, { passive: true })
+  list.addEventListener('scroll', () => { cancel(); closeReactPop() }, { passive: true })
+  list.addEventListener('contextmenu', e => { const m = target(e); if (!m || e.target.closest('img')) return; e.preventDefault(); openReactPop(m) })
+  document.addEventListener('click', e => { if (!reactPop.contains(e.target) && Date.now() - lastLongPressAt > 600) closeReactPop() })
+})()
 
 // 旧 outbox 里还没被接收的，先画成占位
 for (const item of outbox) drawPending(item)

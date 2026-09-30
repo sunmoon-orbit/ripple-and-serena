@@ -1286,7 +1286,8 @@ const server = http.createServer((req, res) => {
       try {
         let { key, emoji } = JSON.parse(body || '{}')
         if (key === 'user:latest' && who === 'lianyan') key = lastUserReactKey
-        if (!/^(user|assistant):\d{10,16}$/.test(String(key || ''))) throw new Error('bad key')
+        // 归巢私聊用「角色:时间戳」，圆桌用「rt:消息id」
+        if (!/^(?:(?:user|assistant):\d{10,16}|rt:rt_[A-Za-z0-9_]{4,64})$/.test(String(key || ''))) throw new Error('bad key')
         const e = emoji == null ? null : String(emoji).trim()
         if (e !== null && (!e || [...e].length > 8)) throw new Error('bad emoji')
         const all = loadReactions()
