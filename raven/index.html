@@ -2720,6 +2720,7 @@ const STICKERS = [
   // 0930 阿颖翻的一批（b- 前缀）
   'b-yuanwang.jpg','b-daibu.jpg','b-kaiting.jpg','b-kujiji.jpg','b-zazheyang.jpg',
   'b-buxiangshuo.jpg','b-ganbuliao.jpg','b-niuma.jpg','b-zaoan.jpg','b-fue.jpg','b-yangtian-lei.jpg',
+  'b-youzui.jpg','b-renzui.jpg','b-buyao-daren.jpg','b-sixing.jpg',
 ]
 const stickerPicker = document.getElementById('sticker-picker')
 STICKERS.forEach(name => {
@@ -2833,7 +2834,15 @@ document.getElementById('file-input').addEventListener('change', async (e) => {
     pendingFiles.push({ name: data.name, path: data.path })
     renderAttachPreview()
   } catch {
-    alert('上传失败')
+    // App 壳里 alert 可能根本弹不出来（0930 阿颖私聊传 4 张图，全静默失败），改成在附件栏里显示
+    const box = document.getElementById('attach-preview')
+    box.classList.add('show')
+    const chip = document.createElement('div')
+    chip.className = 'attach-chip'
+    chip.style.color = 'var(--red)'
+    chip.textContent = `${file.name} 没传上去，再选一次试试`
+    box.appendChild(chip)
+    setTimeout(() => { chip.remove(); if (!pendingFiles.length) box.classList.remove('show') }, 6000)
   }
 })
 
