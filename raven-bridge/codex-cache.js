@@ -72,12 +72,29 @@ function readCodexPromptCache(sessionsDirectory = DEFAULT_SESSIONS, nowSeconds =
 
     const lines = buffer.toString('utf8').split('\n')
     if (start > 0) lines.shift() // the first line may be a partial JSON record
-    for (let i = lines.length - 1; i >= 0; i -= 1) {
-      if (!lines[i].includes('"token_count"')) continue
-      try {
-        const cache = cacheFromEvent(JSON.parse(lines[i]), nowSeconds)
-        if (cache) return cache
-      } catch {}
+    // 0930：跟涟言那张卡一样给「命中率 · 几次请求 · 几次未命中」，不用她自己拿 token 数去算。
+    // 统计范围是曜最近这一个会话（最新 rollout 的末尾 8MB）；命中率按 token 算，
+    // 未命中＝这次请求读到的缓存不到输入的一半。
+    let last = null, requests = 0, misses = 0, cachedSum = 0, inputSum = 0
+    for (const line of lines) {
+      if (!line.includes('"token_count"')) continue
+      let cache
+      try { cache = cacheFromEvent(JSON.parse(line), nowSeconds) } catch { continue }
+      if (!cache) continue
+      if (last && cache.updated_at === last.updated_at && cache.input_tokens === last.input_tokens) continue // 同一轮重复上报
+      last = cache
+      requests += 1
+      cachedSum += cache.cached_input_tokens || 0
+      inputSum += cache.input_tokens || 0
+      if ((cache.input_tokens || 0) > 0 && (cache.cached_input_tokens || 0) < cache.input_tokens / 2) misses += 1
+    }
+    if (last) {
+      return {
+        ...last,
+        requests,
+        misses,
+        hit_percent: inputSum > 0 ? Math.round((cachedSum / inputSum) * 100) : null,
+      }
     }
     return { available: false, error: 'cache_fields_not_reported' }
   } catch {

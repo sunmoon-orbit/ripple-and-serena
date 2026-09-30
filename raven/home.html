@@ -772,19 +772,17 @@ function ugCache(cache) {
 
 function ugCodexCache(cache) {
   if (!cache?.available) return '<div class="ug-cache">曜 · Codex · 缓存暂未提供</div>'
-  const cached = Number(cache.cached_input_tokens).toLocaleString('zh-CN')
+  // 0930：跟涟言那张一个格式——命中率、几次请求、几次未命中，不用她拿 token 数自己算
   const state = cache.cached_input_tokens > 0
     ? '<strong class="warm">本次命中</strong>'
-    : '<strong>本次未命中</strong>'
-  const parts = [`读取 ${cached} token`]
-  if (cache.cache_write_input_tokens != null) {
-    parts.push(`写入 ${Number(cache.cache_write_input_tokens).toLocaleString('zh-CN')} token`)
-  }
-  if (cache.input_tokens != null) {
-    parts.push(`输入 ${Number(cache.input_tokens).toLocaleString('zh-CN')} token`)
-  }
+    : '<strong class="cold">本次未命中</strong>'
+  const parts = []
+  if (cache.hit_percent != null) parts.push(`命中 ${cache.hit_percent}%`)
+  if (cache.requests != null) parts.push(`${cache.requests} 次请求`)
+  if (cache.misses != null) parts.push(`${cache.misses} 次未命中`)
+  if (cache.age_seconds != null) parts.push(cache.age_seconds < 60 ? '刚刚用过' : `${Math.round(cache.age_seconds / 60)} 分钟前用过`)
   if (cache.stale) parts.push('数据已旧')
-  return `<div class="ug-cache">曜 · Codex · 缓存 ${state} · ${parts.join(' · ')}</div>`
+  return `<div class="ug-cache">曜 · Codex · 缓存 ${state} · ${parts.join(' · ')}<div class="ug-note">统计的是曜最近这一个会话</div></div>`
 }
 
 async function loadUsage() {

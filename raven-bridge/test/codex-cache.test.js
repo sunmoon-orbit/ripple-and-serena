@@ -33,6 +33,9 @@ test('reads the real cache fields from the newest Codex token_count event', t =>
     cached_input_tokens: 57600,
     cache_write_input_tokens: 0,
     input_tokens: 65394,
+    requests: 1,
+    misses: 0,
+    hit_percent: 88,
   })
 })
 
