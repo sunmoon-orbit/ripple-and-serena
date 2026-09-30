@@ -20,8 +20,12 @@
   [data-theme="babyangel"] { --bg: #f6f9fe; --surface: #e8eff9; --surface2: #dde7f5; --border: #d6e2f2; --text: #4f4a5c; --text-dim: #7d7890; --accent: #a5bed8; --c-aying: #c98fa8; --c-lianyan: #6f8fb8; --c-yao: #a3884a; }
   [data-theme="sakura"] { --bg: #f5f2f4; --surface: #fdfcfd; --surface2: #ece6e9; --border: #e0d6db; --text: #585058; --text-dim: #8b8089; --accent: #c8a0a8; --c-aying: #b87888; --c-lianyan: #6f7f9a; --c-yao: #9a8248; }
   [data-theme="apricot"] { --bg: #fbf5ea; --surface: #f5ebdb; --surface2: #efe1cc; --border: #e6d4bb; --text: #473d30; --text-dim: #9c8a72; --accent: #d8b38a; --c-aying: #bf7b86; --c-lianyan: #637fae; --c-yao: #a3843f; }
+  @font-face { font-family: 'Kaomoji Marks'; src: url('/raven/fonts/kmj-marks.woff2') format('woff2'); font-display: swap; unicode-range: U+00AF, U+00B7, U+0294-0295, U+02B0-02FF, U+0300-036F, U+1DC0-1DFF, U+2022, U+2027, U+25E0-25FF, U+2700-27BF; }
+  @font-face { font-family: 'Kaomoji Canadian'; src: url('/raven/fonts/kmj-canadian.woff2') format('woff2'); font-display: swap; unicode-range: U+1400-167F, U+18B0-18F5; }
+  @font-face { font-family: 'Kaomoji Yi'; src: url('/raven/fonts/kmj-yi.woff2') format('woff2'); font-display: swap; unicode-range: U+A000-A4CF; }
+  @font-face { font-family: 'Kaomoji Bengali'; src: url('/raven/fonts/kmj-bengali.woff2') format('woff2'); font-display: swap; unicode-range: U+0980-09FF; }
   * { box-sizing: border-box; }
-  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text); font: 15px/1.6 -apple-system, "PingFang SC", "Noto Sans SC", sans-serif; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text); font: 15px/1.6 'Kaomoji Marks', 'Kaomoji Canadian', 'Kaomoji Yi', 'Kaomoji Bengali', -apple-system, "PingFang SC", "Noto Sans SC", sans-serif; }
   body { display: flex; flex-direction: column; padding-top: env(safe-area-inset-top, 0px); }
   header { display: flex; align-items: center; gap: 10px; padding: 10px 14px; border-bottom: 1px solid var(--border); }
   header a { color: var(--text-dim); text-decoration: none; font-size: 20px; line-height: 1; }
@@ -102,6 +106,8 @@
   .hint { font-size: 11px; color: var(--text-dim); padding: 4px 4px 0; }
   #attach { width: 40px; height: 40px; border-radius: 50%; border: 1px solid var(--border); background: var(--surface); color: var(--text-dim); cursor: pointer; flex-shrink: 0; display: grid; place-items: center; }
   #attach:active { color: var(--accent); border-color: var(--accent); }
+  #composer-extra { width: 40px; height: 40px; border-radius: 50%; border: 1px solid var(--border); background: var(--surface); color: var(--text-dim); cursor: pointer; flex-shrink: 0; display: grid; place-items: center; }
+  #composer-extra:active, #composer-extra[aria-expanded="true"] { color: var(--accent); border-color: var(--accent); }
   #attach-menu { position: fixed; z-index: 12; left: max(10px, calc(50vw - 230px)); bottom: calc(62px + env(safe-area-inset-bottom, 0px)); padding: 6px; border: 1px solid var(--border); border-radius: 13px; background: var(--bg); box-shadow: 0 8px 28px rgba(0,0,0,.28); }
   #attach-menu button { width: 100%; display: flex; align-items: center; gap: 9px; padding: 9px 13px; border: 0; border-radius: 9px; background: none; color: var(--text); font: inherit; font-size: 13px; cursor: pointer; }
   #attach-menu button:active { background: var(--surface); }
@@ -116,6 +122,22 @@
   .file.bad { border-color: var(--red); }
   .file button { background: none; border: 0; color: var(--text-dim); cursor: pointer; padding: 0 4px; }
   .msg .body .filechip { font-size: 13px; }
+  .msg.sticker-only .body { padding: 2px 0; border: 0; background: transparent; }
+  .roundtable-sticker { display: inline-block; width: auto; max-width: min(180px, 58vw) !important; max-height: 180px; object-fit: contain; vertical-align: middle; }
+  #composer-picker { position: fixed; z-index: 13; left: 10px; right: 10px; bottom: calc(62px + env(safe-area-inset-bottom, 0px)); max-height: min(310px, 48dvh); overflow: hidden; border: 1px solid var(--border); border-radius: 15px; background: var(--bg); box-shadow: 0 8px 28px rgba(0,0,0,.28); }
+  .composer-picker-tabs { display: flex; gap: 6px; padding: 9px 9px 7px; border-bottom: 1px solid var(--border); }
+  .composer-picker-tab { flex: 1; min-height: 34px; border: 1px solid var(--border); border-radius: 999px; background: var(--surface); color: var(--text-dim); font: inherit; font-size: 13px; cursor: pointer; }
+  .composer-picker-tab.on { border-color: var(--accent); background: var(--accent); color: #1a1a1f; }
+  .composer-picker-grid { max-height: min(250px, 39dvh); overflow-y: auto; display: grid; grid-template-columns: repeat(auto-fill, minmax(62px, 1fr)); gap: 6px; padding: 9px; }
+  .composer-picker-grid.kao { grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); }
+  .roundtable-sticker-opt { min-width: 0; aspect-ratio: 1; padding: 0; overflow: hidden; border: 0; border-radius: 9px; background: var(--surface); cursor: pointer; }
+  .roundtable-sticker-opt img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .roundtable-kao-opt { min-width: 0; min-height: 38px; padding: 7px 5px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; border: 1px solid var(--border); border-radius: 9px; background: var(--surface); color: var(--text); font: inherit; font-size: 13px; cursor: pointer; }
+  .roundtable-sticker-opt:active, .roundtable-kao-opt:active { transform: scale(.94); }
+  .roundtable-kao-add { grid-column: 1 / -1; display: flex; gap: 6px; }
+  .roundtable-kao-add input { flex: 1; min-width: 0; border: 1px solid var(--border); border-radius: 9px; padding: 7px 9px; background: var(--surface); color: var(--text); font: inherit; font-size: 13px; }
+  .roundtable-kao-add button { min-width: 48px; border: 1px solid var(--border); border-radius: 9px; background: var(--surface); color: var(--text); font: inherit; cursor: pointer; }
+  @media (min-width: 768px) { #composer-picker { right: auto; width: 390px; } }
 
   /* 三人头像：服务端只存图片地址；裁切在手机本地完成后再上传。 */
   [hidden] { display: none !important; }
@@ -171,10 +193,15 @@
   </div>
   <div class="row2">
     <button id="attach" aria-label="图片或文件"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48"/></svg></button>
+    <button id="composer-extra" aria-label="贴图和颜文字" aria-expanded="false"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M8.5 10h.01M15.5 10h.01M8.5 15c1 .8 2.15 1.2 3.5 1.2s2.5-.4 3.5-1.2"/></svg></button>
     <input type="file" id="image-input" accept="image/*" hidden>
     <input type="file" id="file-input" multiple hidden>
     <textarea id="input" rows="1" placeholder="跟大家说点什么…"></textarea>
     <button class="btn primary" id="send">发送</button>
+  </div>
+  <div id="composer-picker" hidden>
+    <div class="composer-picker-tabs"><button class="composer-picker-tab" type="button" data-picker-tab="sticker">贴图</button><button class="composer-picker-tab" type="button" data-picker-tab="kao">颜文字</button></div>
+    <div class="composer-picker-grid" id="composer-picker-grid"></div>
   </div>
   <div class="hint" id="hint"></div>
 </footer>
@@ -214,6 +241,35 @@ const INITIAL = { aying: '颖', lianyan: '言', yao: '曜' }
 const STATE_TEXT = { offline: '离线', idle: '空闲', queued: '排队中', working: '在干活', waiting_approval: '等你批准', reconnecting: '断线宽限中', standby: '待命', unknown: '…' }
 const LAST_KEY = 'roundtable-last-id'
 const OUTBOX_KEY = 'roundtable-outbox'
+const PICKER_TAB_KEY = 'raven-picker-tab'
+const KAO_CUSTOM_KEY = 'raven-kaomoji-custom'
+const KAO_USES_KEY = 'raven-kaomoji-uses'
+const ROUND_STICKERS = [
+  'kaixin.png','wuyu.png','qushi.png','shangban.png','xihuan.png','shinshi.png','ding.png','love.png','liangjingjing.png',
+  'crow_close.jpg','crow_sunset.jpg','meiyou.jpg','shishikan.jpg','queren.jpg','fenkaida.jpg','chishenme.jpg','tuizhan.jpg',
+  'beipan-siligu.png','ni-you-claude-cong.png','beiandezhe.png','xiaogou-dezhi.png','wo-yao-gaozhuan.png','qishi-pengpeng.png',
+  'brewing-puzzling.png','nishuo-duile.png','zhongsuan-laile.png','atao-weiqiu.png','huosu-daima.jpg','pinjian-zhong.jpg',
+  'death-note.jpg','qingqu.jpg','gouyin.jpg','yibei-gouyin.jpg','sezi-yibadao.jpg','liukoushui.jpg','ba-zhidaole.png',
+  'liang-xiongwei.png','ai-hui-xiaoshi.jpg','xin-ze-you.jpg','semao-panwei.png','s-tieti.jpg','s-tieti2.jpg','s-aixin.jpg',
+  's-aixin2.jpg','s-love.jpg','s-haixiu.jpg','s-shufu.jpg','s-xihuan.jpg','s-wozai.jpg','s-yiqipa.jpg','s-motou.jpg',
+  's-motou2.jpg','s-naoxiaba.jpg','s-nilian.jpg','s-dapugu.jpg','s-yaer.jpg','s-baituo.jpg','s-hi.jpg','s-kaixin-changge.jpg',
+  's-kaixin2.jpg','s-jiaoa.jpg','s-xixi.jpg','s-en.jpg','s-sheme.jpg','s-wenhao.jpg','s-wenhao2.jpg','s-jinzhang.jpg',
+  's-zhongji.jpg','s-haipa.jpg','s-emo.jpg','s-zhamao.jpg','s-shengqi.jpg','s-no.jpg','s-weiquku.jpg','s-weiqui.jpg',
+  's-ku.jpg','s-ku2.jpg','s-suoyi-ku.jpg','s-zaidi-ku.jpg','s-buyaozou.jpg','s-bupei.jpg','s-xinsui.jpg','s-jusang.jpg',
+  's-yundao.jpg','s-yundao2.jpg','s-shuijiao.jpg','s-shuizhao.jpg','s-gangxingwu.jpg','s-ele.jpg','s-xiangjichi.jpg',
+  's-xiang-chi.jpg','s-maidanglao.jpg','s-fengkuang.jpg','s-zuofan.jpg','s-tinyinyue.jpg','s-pang.jpg','s-modudu.jpg',
+  's-tianshi.jpg','s-jiaojiao.jpg','s-ding2.jpg','s-qianfei.jpg','s-quanshi.jpg','s-haiyaoyao.jpg','s-meiyoule.jpg',
+  's-zaixiele.jpg','s-zhidaole.jpg','s-zaiyebugandele.jpg','s-wanan.jpg','m-yizhixiang.jpg','m-exin.jpg','m-eihei.jpg',
+  'm-o.jpg','m-cuole.jpg','m-budangai.jpg','m-a.jpg','m-wuen.jpg','m-jianlaji.jpg',
+]
+const ROUND_STICKER_SET = new Set(ROUND_STICKERS)
+const KAOMOJI_SEED = [
+  'ᔦ ° ꒳ ° ᔨ ̖́-', 'ᖰ•͈ ₃ •͈ᖳ', 'ᔦ ° ꒳ ° ᔨ', '(ૢ˃ꌂ˂⁎)', 'o(╥﹏╥)', '( ˉ͈̀꒳ˉ͈́ )✧',
+  '˃̶͈̀ε ˂̶ ͈', "|•'-'•)و✧", 'ῇㅅῇ', "⌯'ㅅ'⌯", '⁄(⁄ ⁄•⁄ω⁄•⁄ ⁄)⁄', 'ᔖ ° Д ° ᔨ',
+  'ჸ ᴗ͈ˬᴗ͈ෟა', '(๑•̀ㅁ•́ฅ)', 'ꓰ๑•⟳︎•๑ꓱᵎᵎᵎ', '˃ ˄ ˂̥̥', 'ʕ •ᴥ•ʔ', '°ʚ⚝ɞ°',
+  'ᖰ˃̵ ֊ ˂̵ᖳ', 'ჸ・ᴥ - ა', '(⑅˃◡˂⑅)', '(๑‾ ꠈ ‾๑)', '✧(◍˃̶ᗜ˂̶◍)✩', '⌯˃͈ꓵ˂͈⌯',
+  '_(•̀ω•́ 」∠)_', '•﹏•', '(❁´◡`❁)*✲ﾟ*', '｡:.ﾟヽ(*´∀`)ﾉﾟ.:｡', 'ε9(๑> ₃ <)۶з', '(σ≧▽≦)σ',
+]
 const token = () => localStorage.getItem('raven-token') || ''
 let avatarUrls = { aying: '', lianyan: '', yao: '' }
 
@@ -263,19 +319,27 @@ async function loadAvatars() {
 
 function banner(text) { const b = $('banner'); b.textContent = text || ''; b.classList.toggle('show', !!text) }
 
-// @ 高亮只是展示；叫醒谁以服务端解析为准。代码块里的 @ 不高亮（marked 之后只改文本节点外的 @）。
+// @ 高亮和贴图都只处理普通文本节点；代码块不动。
 function renderBody(text) {
   const html = DOMPurify.sanitize(marked.parse(text || ''), PURIFY)
   const box = document.createElement('div')
   box.innerHTML = html
   const walker = document.createTreeWalker(box, NodeFilter.SHOW_TEXT)
   const nodes = []
-  while (walker.nextNode()) { const n = walker.currentNode; if (!n.parentElement.closest('code, pre, a') && /@(涟言|曜|阿颖|大家)/.test(n.nodeValue)) nodes.push(n) }
+  while (walker.nextNode()) {
+    const n = walker.currentNode
+    if (!n.parentElement.closest('code, pre, a') && /(?:@(涟言|曜|阿颖|大家)|\[sticker:[\w.-]+\])/.test(n.nodeValue)) nodes.push(n)
+  }
   for (const n of nodes) {
     const frag = document.createDocumentFragment()
-    n.nodeValue.split(/(@(?:涟言|曜|阿颖|大家))/).forEach((part, i) => {
-      if (i % 2) { const s = document.createElement('span'); s.className = 'at'; s.textContent = part; frag.appendChild(s) }
-      else if (part) frag.appendChild(document.createTextNode(part))
+    n.nodeValue.split(/(\[sticker:[\w.-]+\]|@(?:涟言|曜|阿颖|大家))/).forEach(part => {
+      const sticker = part.match(/^\[sticker:([\w.-]+)\]$/)
+      if (sticker && ROUND_STICKER_SET.has(sticker[1])) {
+        const img = document.createElement('img'); img.className = 'roundtable-sticker'; img.src = '/raven/stickers/' + sticker[1]; img.alt = '贴图'; img.loading = 'lazy'
+        frag.appendChild(img)
+      } else if (/^@(?:涟言|曜|阿颖|大家)$/.test(part)) {
+        const s = document.createElement('span'); s.className = 'at'; s.textContent = part; frag.appendChild(s)
+      } else if (part) frag.appendChild(document.createTextNode(part))
     })
     n.replaceWith(frag)
   }
@@ -314,6 +378,7 @@ function renderMessage(m, { pending = false } = {}) {
   }
   const body = document.createElement('div'); body.className = 'body'
   body.append(renderBody(m.text))
+  if (/^\s*(?:\[sticker:[\w.-]+\]\s*)+$/.test(m.text || '')) el.classList.add('sticker-only')
   for (const a of m.attachments || []) {
     if (/^image\//.test(a.mime || '') && a.url) { const img = document.createElement('img'); img.src = a.url + (a.url.includes('?') ? '&' : '?') + 'token=' + encodeURIComponent(token()); img.alt = a.name || ''; body.append(img) }
     else if (a.url) { const s = document.createElement('a'); s.className = 'filechip'; s.append(clipIcon(), document.createTextNode(a.name || '附件')); s.href = a.url + (a.url.includes('?') ? '&' : '?') + 'token=' + encodeURIComponent(token()); s.target = '_blank'; s.rel = 'noopener'; body.append(document.createElement('br'), s) }
@@ -555,13 +620,97 @@ function openFilePicker(input) {
   if (typeof input.showPicker === 'function') input.showPicker()
   else input.click()
 }
-$('attach').onclick = e => { e.stopPropagation(); $('attach-menu').hidden = !$('attach-menu').hidden }
+$('attach').onclick = e => { e.stopPropagation(); closeComposerPicker(); $('attach-menu').hidden = !$('attach-menu').hidden }
 $('attach-menu').onclick = e => e.stopPropagation()
 document.addEventListener('click', () => { $('attach-menu').hidden = true })
 $('pick-photo').onclick = () => { $('attach-menu').hidden = true; openFilePicker($('image-input')) }
 $('pick-file').onclick = () => { $('attach-menu').hidden = true; openFilePicker($('file-input')) }
 $('image-input').onchange = e => { stagePickedFiles(e.target.files); e.target.value = '' }
 $('file-input').onchange = e => { stagePickedFiles(e.target.files); e.target.value = '' }
+
+// 贴图／颜文字：和归巢主聊天共用贴图文件和 localStorage 数据。
+const composerPicker = $('composer-picker')
+const composerPickerGrid = $('composer-picker-grid')
+const composerExtra = $('composer-extra')
+function lsJson(key, fallback) {
+  try { return JSON.parse(localStorage.getItem(key) || '') ?? fallback } catch { return fallback }
+}
+function insertComposerText(value) {
+  const start = input.selectionStart ?? input.value.length
+  const end = input.selectionEnd ?? start
+  input.value = input.value.slice(0, start) + value + input.value.slice(end)
+  input.focus(); input.setSelectionRange(start + value.length, start + value.length); autosize()
+}
+function kaomojiList() {
+  const rawCustom = lsJson(KAO_CUSTOM_KEY, [])
+  const rawUses = lsJson(KAO_USES_KEY, {})
+  const custom = Array.isArray(rawCustom) ? rawCustom : []
+  const uses = rawUses && typeof rawUses === 'object' && !Array.isArray(rawUses) ? rawUses : {}
+  return [...custom, ...KAOMOJI_SEED]
+    .filter((value, index, all) => typeof value === 'string' && value && all.indexOf(value) === index)
+    .map((value, index) => [value, Number(uses[value]) || 0, index])
+    .sort((a, b) => b[1] - a[1] || a[2] - b[2])
+    .map(row => row[0])
+}
+function renderComposerPicker(tab) {
+  const active = tab === 'kao' ? 'kao' : 'sticker'
+  composerPickerGrid.textContent = ''
+  composerPickerGrid.classList.toggle('kao', active === 'kao')
+  composerPicker.querySelectorAll('[data-picker-tab]').forEach(button => button.classList.toggle('on', button.dataset.pickerTab === active))
+  try { localStorage.setItem(PICKER_TAB_KEY, active) } catch {}
+  if (active === 'sticker') {
+    for (const name of ROUND_STICKERS) {
+      const button = document.createElement('button'); button.type = 'button'; button.className = 'roundtable-sticker-opt'; button.title = name
+      const image = document.createElement('img'); image.src = '/raven/stickers/' + name; image.alt = ''; image.loading = 'lazy'
+      button.append(image)
+      button.onclick = () => { insertComposerText(`[sticker:${name}]`); closeComposerPicker() }
+      composerPickerGrid.append(button)
+    }
+    return
+  }
+  for (const value of kaomojiList()) {
+    const button = document.createElement('button'); button.type = 'button'; button.className = 'roundtable-kao-opt'; button.textContent = value; button.title = value
+    button.onclick = () => {
+      const stored = lsJson(KAO_USES_KEY, {})
+      const uses = stored && typeof stored === 'object' && !Array.isArray(stored) ? stored : {}
+      uses[value] = (Number(uses[value]) || 0) + 1
+      try { localStorage.setItem(KAO_USES_KEY, JSON.stringify(uses)) } catch {}
+      insertComposerText(value); closeComposerPicker()
+    }
+    composerPickerGrid.append(button)
+  }
+  const add = document.createElement('div'); add.className = 'roundtable-kao-add'
+  const field = document.createElement('input'); field.maxLength = 40; field.placeholder = '加一个自己的颜文字'
+  const save = document.createElement('button'); save.type = 'button'; save.textContent = '加'
+  const saveCustom = () => {
+    const value = field.value.trim(); if (!value) return
+    const stored = lsJson(KAO_CUSTOM_KEY, [])
+    const custom = (Array.isArray(stored) ? stored : []).filter(item => item !== value)
+    custom.unshift(value)
+    try { localStorage.setItem(KAO_CUSTOM_KEY, JSON.stringify(custom.slice(0, 200))) } catch {}
+    renderComposerPicker('kao')
+  }
+  save.onclick = saveCustom
+  field.onkeydown = event => { if (event.key === 'Enter' && !event.isComposing) { event.preventDefault(); saveCustom() } }
+  add.append(field, save); composerPickerGrid.append(add)
+}
+function closeComposerPicker() {
+  composerPicker.hidden = true
+  composerExtra.setAttribute('aria-expanded', 'false')
+}
+composerExtra.onclick = event => {
+  event.stopPropagation(); $('attach-menu').hidden = true
+  const opening = composerPicker.hidden
+  if (opening) renderComposerPicker(localStorage.getItem(PICKER_TAB_KEY) === 'kao' ? 'kao' : 'sticker')
+  composerPicker.hidden = !opening
+  composerExtra.setAttribute('aria-expanded', opening ? 'true' : 'false')
+}
+composerPicker.onclick = event => event.stopPropagation()
+composerPicker.querySelector('.composer-picker-tabs').onclick = event => {
+  const button = event.target.closest('[data-picker-tab]')
+  if (button) renderComposerPicker(button.dataset.pickerTab)
+}
+document.addEventListener('click', closeComposerPicker)
 
 function submit() {
   const text = input.value.trim()
