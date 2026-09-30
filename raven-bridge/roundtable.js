@@ -197,8 +197,24 @@ function createRoundtable(options) {
     const diag = crossing.diagnostics()
     if (finishing || diag.activeTurn || diag.startingTurn || diag.pendingApprovals) return false
     const claimed = await request('/roundtable/deliveries/claim', { target: 'yao', leaseMs: 120000 })
-    const delivery = claimed.delivery
-    if (!delivery) return false
+    const first = claimed.delivery
+    if (!first) return false
+    // 合并排队（0930 阿颖：曜忙时她不 @ 人的消息排到 7 条，空下来挨个回七遍，费额度）：
+    // 空下来时把排着的一次领完（最多 10 条），合成一轮只回一次，回复挂在最后一条上。
+    const batch = [first]
+    while (batch.length < 10) {
+      const more = await request('/roundtable/deliveries/claim', { target: 'yao', leaseMs: 120000 }).catch(() => null)
+      if (!more?.delivery) break
+      batch.push(more.delivery)
+    }
+    const delivery = batch[batch.length - 1]
+    const message = batch.length === 1 ? first.message : {
+      ...delivery.message,
+      text: `（你忙的时候排了 ${batch.length} 条，按时间顺序合在一起，统一回一次就好）\n`
+        + batch.map((d, i) => `${i + 1}. ${senderName(d.message.from)}：${d.message.text}`).join('\n'),
+      attachments: batch.flatMap(d => d.message.attachments || []),
+    }
+    const patchAll = (status, extra) => Promise.all(batch.map(d => patchDelivery(d.id, status, extra)))
     try {
       const state = await moonGet('/roundtable/state/codex_thread_id')
       let threadId = state.value || ''
@@ -206,9 +222,9 @@ function createRoundtable(options) {
       if (!threadId) recent = (await moonGet('/roundtable/messages?limit=12')).messages || []
       const turnArgs = {
         threadId,
-        text: codexEnvelope(delivery.message, recent, !threadId),
+        text: codexEnvelope(message, recent, !threadId),
         clientUserMessageId: delivery.message.id,
-        images: attachmentFiles(delivery.message, options.uploadDir).filter(f => f.image).map(f => f.file),
+        images: attachmentFiles(message, options.uploadDir).filter(f => f.image).map(f => f.file),
       }
       let started
       try { started = await crossing.startInternalTurn(turnArgs) }
@@ -220,11 +236,11 @@ function createRoundtable(options) {
       }
       threadId = started.threadId
       if (state.value !== threadId) await request('/roundtable/state/codex_thread_id', { value: threadId }, 'PUT')
-      turns.set(started.turnId, { deliveryId: delivery.id, replyTo: delivery.message.id, threadId })
-      await patchDelivery(delivery.id, 'running', { runtimeThreadId: threadId, runtimeTurnId: started.turnId })
+      turns.set(started.turnId, { deliveryId: delivery.id, deliveryIds: batch.map(d => d.id), replyTo: delivery.message.id, threadId })
+      await patchAll('running', { runtimeThreadId: threadId, runtimeTurnId: started.turnId })
       return true
     } catch (error) {
-      await patchDelivery(delivery.id, /thread|线程/i.test(error.message) ? 'blocked' : 'pending', { lastError: error.message }).catch(() => {})
+      await patchAll(/thread|线程/i.test(error.message) ? 'blocked' : 'pending', { lastError: error.message }).catch(() => {})
       throw error
     }
   }
@@ -383,6 +399,8 @@ function createRoundtable(options) {
     if (text) finalByTurn.set(event.turnId, text)
   }
 
+  const idsOf = pending => pending.deliveryIds || [pending.deliveryId]
+
   async function onInternalCompleted(event) {
     const turnId = event.turn?.id || event.turnId
     const pending = turns.get(turnId)
@@ -392,7 +410,7 @@ function createRoundtable(options) {
       let text = finalByTurn.get(turnId) || ''
       if (!text) text = finalFromThread(await crossing.readInternalThread(pending.threadId), turnId)
       if (!text) {
-        await patchDelivery(pending.deliveryId, 'blocked', { lastError: 'final_agent_message_missing' })
+        await Promise.all(idsOf(pending).map(id => patchDelivery(id, 'blocked', { lastError: 'final_agent_message_missing' })))
         return
       }
       const result = await ingest({
@@ -400,9 +418,9 @@ function createRoundtable(options) {
         text, replyTo: pending.replyTo, attachments: [],
       })
       publish(result)
-      await patchDelivery(pending.deliveryId, 'done')
+      await Promise.all(idsOf(pending).map(id => patchDelivery(id, 'done')))
     } catch (error) {
-      await patchDelivery(pending.deliveryId, 'blocked', { lastError: error.message }).catch(() => {})
+      await Promise.all(idsOf(pending).map(id => patchDelivery(id, 'blocked', { lastError: error.message }))).catch(() => {})
       logger.error('[roundtable] 曜回复入桌失败:', error.message)
     } finally {
       finishing = false
