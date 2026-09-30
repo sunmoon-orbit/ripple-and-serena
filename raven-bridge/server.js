@@ -397,7 +397,7 @@ function ingestUserMessage(text, cid) {
   // 先回执让她看到发出去了，等窗口过了再送；存档上面已经做了，不会丢。
   const wait = switchQuietUntil - Date.now()
   if (wait > 0) {
-    broadcast({ type: 'sent', text, ts: Date.now(), cid: cid || null, supplemental })
+    { const sentTs = Date.now(); lastUserReactKey = `user:${sentTs}`; broadcast({ type: 'sent', text, ts: sentTs, cid: cid || null, supplemental }) }
     console.log(`[tmux] 刚切模型，${wait}ms 后再送她的消息`)
     setTimeout(() => {
       if (!tmuxSend(senderPrefix + text) && remoteListenerAlive()) pendingForRemote.push({ text, supplemental, ts: Date.now() })
@@ -405,7 +405,7 @@ function ingestUserMessage(text, cid) {
     return
   }
   const delivered = tmuxSend(senderPrefix + text)
-  broadcast({ type: 'sent', text, ts: Date.now(), cid: cid || null, supplemental })
+  { const sentTs = Date.now(); lastUserReactKey = `user:${sentTs}`; broadcast({ type: 'sent', text, ts: sentTs, cid: cid || null, supplemental }) }
   // 终端里没人接，但 remote-control 那个 CC 可能正醒着——先往取件箱里放，让它自己来拿。
   if (!delivered && remoteListenerAlive()) {
     pendingForRemote.push({ text, supplemental, ts: Date.now() })
@@ -535,6 +535,7 @@ const recentCidMeta = new Map() // cid → 首次回执的气泡标记，重发�
 let appLatestCache = { at: 0, data: null }  // 归巢 APK 最新版本信息，缓存 30 分钟
 
 const REACTIONS_FILE = path.join(__dirname, 'reactions.json')
+let lastUserReactKey = ''   // 她最近一条消息的贴表情 key（前端画气泡用的就是 sent 的 ts），给我用 user:latest
 function loadReactions() {
   try { return JSON.parse(fs.readFileSync(REACTIONS_FILE, 'utf8')) || {} } catch { return {} }
 }
@@ -1283,7 +1284,8 @@ const server = http.createServer((req, res) => {
     req.on('data', d => { body += d; if (body.length > 2000) req.destroy() })
     req.on('end', () => {
       try {
-        const { key, emoji } = JSON.parse(body || '{}')
+        let { key, emoji } = JSON.parse(body || '{}')
+        if (key === 'user:latest' && who === 'lianyan') key = lastUserReactKey
         if (!/^(user|assistant):\d{10,16}$/.test(String(key || ''))) throw new Error('bad key')
         const e = emoji == null ? null : String(emoji).trim()
         if (e !== null && (!e || [...e].length > 8)) throw new Error('bad emoji')
