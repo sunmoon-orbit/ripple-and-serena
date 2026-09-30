@@ -160,6 +160,12 @@ export async function fetchArchiveConversation(config, id) {
   return request(baseUrl, `/archive/conversations/${id}`, { headers: headers(apiToken) })
 }
 
+// L0 预览：只取命中那条前后各 n 条（附窗口名、日期），不拉整个窗口
+export async function fetchArchiveContext(config, conversationId, messageId, n = 4) {
+  const { baseUrl, apiToken } = config
+  return request(baseUrl, `/archive/conversations/${conversationId}/context?message_id=${encodeURIComponent(messageId)}&n=${n}`, { headers: headers(apiToken) })
+}
+
 export async function removeArchiveConversation(config, id) {
   const { baseUrl, apiToken } = config
   return request(baseUrl, `/archive/conversations/${id}/remove`, {

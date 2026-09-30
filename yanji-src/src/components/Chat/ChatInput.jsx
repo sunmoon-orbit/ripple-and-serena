@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { useStore } from '../../store'
 import { showToast } from '../Toast'
-import { transcribeAudio, fetchArchiveConversation, removeArchiveConversation, restoreArchiveConversation } from '../../api/moonMemory'
+import { transcribeAudio, fetchArchiveContext, removeArchiveConversation, restoreArchiveConversation } from '../../api/moonMemory'
 import { useThemedConfirm } from '../ThemedConfirmDialog'
 import PinyinKeyboard from './PinyinKeyboard'
 import { isRunnableHtmlMessage } from '../../utils/runnableCode'
@@ -171,17 +171,13 @@ export default function ChatInput({ onSend, disabled, onImageAdd, images, onImag
     if (!Number.isSafeInteger(conversationId) || conversationId <= 0) return
     setHistoryPreviewLoading(true)
     try {
-      const full = await fetchArchiveConversation(moonMemory, conversationId)
-      if (requestId !== historyPreviewRequestRef.current) return
-      const all = Array.isArray(full?.messages) ? full.messages : []
       const hitId = item.message_id ?? item.id
-      let index = all.findIndex((message) => String(message.id) === String(hitId))
-      if (index < 0) index = all.findIndex((message) => message.role === item.role && message.content === item.content)
-      if (index < 0) index = 0
+      const ctx = await fetchArchiveContext(moonMemory, conversationId, hitId, 4)
+      if (requestId !== historyPreviewRequestRef.current) return
       setHistoryPreview({
-        item: { ...item, title: item.title || full?.title },
-        messages: all.slice(Math.max(0, index - 4), Math.min(all.length, index + 5)),
-        hitId: all[index]?.id ?? hitId,
+        item: { ...item, title: item.title || ctx?.conversation?.title },
+        messages: Array.isArray(ctx?.messages) && ctx.messages.length ? ctx.messages : [item],
+        hitId: ctx?.hit_id ?? hitId,
         partial: false,
       })
     } catch {
