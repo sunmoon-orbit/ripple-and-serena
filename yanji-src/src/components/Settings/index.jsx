@@ -375,7 +375,7 @@ function ConnectionCard({ conn, onSave, onDelete, onActivate, isActive }) {
           <div className="conn-card-header">
             <div className="conn-card-info">
               <div className="conn-card-name">{conn.name || '未命名'}</div>
-              <div className="conn-card-meta">{conn.provider} · {conn.defaultModel || '—'}</div>
+              <div className="conn-card-meta">{conn.provider} · {conn.defaultModel || '—'} · {conn.billingMode === 'token' ? '按 token' : '按次'}</div>
             </div>
             <div className="conn-card-actions">
               {!isActive && (
@@ -445,6 +445,22 @@ function ConnectionCard({ conn, onSave, onDelete, onActivate, isActive }) {
               <input className="form-input" value={form.customModel || ''} onChange={(e) => setForm({ ...form, customModel: e.target.value, defaultModel: e.target.value })} placeholder="自定义模型名..." />
             </div>
           )}
+          <div className="form-row">
+            <label className="form-label">计费方式</label>
+            <select className="filter-select" value={form.billingMode || 'request'} onChange={(e) => setForm({ ...form, billingMode: e.target.value })}>
+              <option value="request">按次计费</option>
+              <option value="token">按 Token 计费</option>
+            </select>
+          </div>
+          <div className="form-row">
+            <label className="form-label">自动分章</label>
+            <input className="form-input form-input-sm" type="number" min="10" max="200" value={form.compactRounds || ''} onChange={(e) => setForm({ ...form, compactRounds: e.target.value ? Number(e.target.value) : '' })} placeholder={form.billingMode === 'token' ? '24 轮' : '40 轮'} />
+            <input className="form-input form-input-sm" type="number" min="5000" max="200000" step="1000" value={form.compactTokens || ''} onChange={(e) => setForm({ ...form, compactTokens: e.target.value ? Number(e.target.value) : '' })} placeholder={form.billingMode === 'token' ? '20000 tokens' : '30000 tokens'} />
+          </div>
+          <div className="form-row">
+            <label className="form-label"></label>
+            <p className="card-hint" style={{ margin: 0 }}>留空使用推荐值：按次 40 轮／3 万 token，按 Token 24 轮／2 万 token。达到任一阈值后固定翻一页，保留最近 12 轮和接续笔记；完整聊天不会删除。</p>
+          </div>
           {/* 轻任务模型：自动发圈/朋友圈评论/思考总结等一次性小任务用便宜模型省钱；
               留空则跟默认模型走。带图的识图评论仍走默认模型（便宜模型多半没 vision） */}
           <div className="form-row">
@@ -515,7 +531,7 @@ export default function Settings() {
   } = store
 
   const [addingConn, setAddingConn] = useState(false)
-  const [newConn, setNewConn] = useState({ name: '', provider: 'openai', apiKey: '', baseUrl: '', defaultModel: '' })
+  const [newConn, setNewConn] = useState({ name: '', provider: 'openai', apiKey: '', baseUrl: '', defaultModel: '', billingMode: 'request' })
   const [fetchedModels, setFetchedModels] = useState([])
   const [fetchingModels, setFetchingModels] = useState(false)
   const [moonHealthStatus, setMoonHealthStatus] = useState('')
@@ -766,7 +782,7 @@ export default function Settings() {
   function handleAddConn() {
     if (!newConn.apiKey.trim()) { showToast('请填写 API Key', 'error'); return }
     addConnection({ ...newConn, id: uuid() })
-    setNewConn({ name: '', provider: 'openai', apiKey: '', baseUrl: '', defaultModel: '' })
+    setNewConn({ name: '', provider: 'openai', apiKey: '', baseUrl: '', defaultModel: '', billingMode: 'request' })
     setFetchedModels([])
     setAddingConn(false)
     showToast('连接已添加', 'success')
@@ -905,6 +921,13 @@ export default function Settings() {
                     ) : (
                       <input className="form-input" value={newConn.defaultModel} onChange={(e) => setNewConn({ ...newConn, defaultModel: e.target.value })} placeholder="模型名称（或点「拉取模型」）" />
                   )}
+                  </div>
+                  <div className="form-row">
+                    <label className="form-label">计费方式</label>
+                    <select className="filter-select" value={newConn.billingMode || 'request'} onChange={(e) => setNewConn({ ...newConn, billingMode: e.target.value })}>
+                      <option value="request">按次计费</option>
+                      <option value="token">按 Token 计费</option>
+                    </select>
                   </div>
                   <div className="form-row form-actions">
                     <button className="btn-sm btn-ghost" onClick={() => { setAddingConn(false); setFetchedModels([]); }}>取消</button>
@@ -1221,10 +1244,10 @@ export default function Settings() {
                 </div>
               </div>
             </Section>
-            <Section title="上下文限制">
+            <Section title="上下文安全上限">
               <div className="settings-card">
                 <div className="card-row">
-                  <span className="card-row-label">发送时截断历史</span>
+                  <span className="card-row-label">超长时兜底</span>
                   <label className="dream-resolve-toggle">
                     <input type="checkbox" checked={contextLimit.mode !== 'none'} onChange={(e) => setContextLimit({ mode: e.target.checked ? 'rounds' : 'none' })} />
                     <span>{contextLimit.mode !== 'none' ? '已开启' : '不限制'}</span>
@@ -1253,7 +1276,7 @@ export default function Settings() {
                     )}
                   </>
                 )}
-                <p className="card-hint">超出的旧消息不会直接丢掉，会先压缩成一份接续笔记再注入。<b>按次计费</b>的渠道下输入长度不影响价钱，这个数字调大是划算的（压缩有损，还要多花一次轻模型调用）。<b>按量计费</b>下相反：轮数越大每发的输入越贵，而且体量太大时中转站常常整发重写缓存，越大越亏——按量建议 40 轮上下。另外按轮数比按 Token 数更省缓存（截断点跳得少，前缀更稳）。</p>
+                <p className="card-hint">这是防止异常长上下文撑爆请求的第二道保险；平时优先按每个连接里的「自动分章」设置整页翻页。超出的旧消息会先压缩成接续笔记，完整聊天仍保留在窗口中。建议保持默认的 150 轮。</p>
               </div>
             </Section>
             <Section title="延迟回复">

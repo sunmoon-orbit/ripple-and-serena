@@ -1838,6 +1838,19 @@ textarea.form-input { display: block; margin: 8px 16px 12px; }
   font-size: 11px; color: var(--text-faint);
 }
 .history-item-content { font-size: 12px; color: var(--text-mid); line-height: 1.5; }
+.history-preview { border: 1px solid var(--border-sm); border-radius: var(--r-sm); padding: 9px; background: var(--bg-soft); }
+.history-preview-head { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+.history-preview-back { width: 28px; height: 28px; flex-shrink: 0; border: 1px solid var(--border-sm); border-radius: 50%; background: var(--card); color: var(--text-mid); cursor: pointer; }
+.history-preview-back svg { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.history-preview-title { font-size: 12px; font-weight: 600; color: var(--text); }
+.history-preview-date, .history-preview-loading, .history-preview-error { font-size: 11px; color: var(--text-faint); }
+.history-preview-error { color: var(--danger, #b65f5f); margin-bottom: 6px; }
+.history-preview-messages { max-height: 260px; overflow-y: auto; display: flex; flex-direction: column; gap: 6px; padding-right: 2px; }
+.history-preview-message { padding: 7px 8px; border-left: 2px solid transparent; border-radius: 6px; background: var(--card); color: var(--text-mid); font-size: 12px; line-height: 1.55; white-space: pre-wrap; overflow-wrap: anywhere; }
+.history-preview-message.hit { border-left-color: var(--accent); background: color-mix(in srgb, var(--accent) 10%, var(--card)); color: var(--text); }
+.history-preview-message-meta { display: flex; justify-content: space-between; gap: 8px; margin-bottom: 3px; color: var(--text-faint); font-size: 10px; }
+.history-preview-message.hit .history-preview-message-meta span:first-child { color: var(--accent); font-weight: 600; }
+.history-preview-actions { display: flex; justify-content: flex-end; gap: 7px; margin-top: 9px; }
 .history-remove-btn,
 .history-restore-btn {
   display: inline-flex; align-items: center; justify-content: center; gap: 4px;

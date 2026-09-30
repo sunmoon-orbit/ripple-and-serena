@@ -505,18 +505,22 @@ export default function Chat() {
         }
       })
       const refreshChat = useStore.getState().chats.find(c => c.id === chat.id)
-      const plan = contextRefreshPlan(allMsgs.map((m, i) => ({ ...prepared[i], id: m.id })), refreshChat, Boolean(getSummary(chat.id)))
-      let requestedEnd = plan.start
-      if (!proactive && !hidden && plan.due) {
-        const accepted = await confirmAction({
-          title: '整理一下上下文，接着聊？',
-          description: '这段聊天有点长了。整理后会保留接续笔记和最近对话，减少后续发送的历史。标题和完整聊天记录都留在这里。',
-          note: '整理会概括较早的细节；旧消息仍可翻看和引用。',
-          confirmLabel: '整理后继续', cancelLabel: '暂时不要',
-        })
-        useStore.getState().snoozeContextRefresh(chat.id, { rounds: plan.rounds, tokens: plan.tokens })
-        if (accepted) requestedEnd = plan.end
+      // 按次渠道少做几次摘要，按 token 渠道更早翻页；阈值可在连接设置里改。
+      // 翻页边界只在达到阈值时整体前进，平时不做每轮滑动的窗口，避免打碎提示缓存。
+      const tokenBilled = conn.billingMode === 'token'
+      const compactOptions = {
+        maxRounds: Number(conn.compactRounds) || (tokenBilled ? 24 : 40),
+        maxTokens: Number(conn.compactTokens) || (tokenBilled ? 20000 : 30000),
+        keepRounds: Number(conn.compactKeepRounds) || 12,
+        ignoreSnooze: true,
       }
+      const plan = contextRefreshPlan(
+        allMsgs.map((m, i) => ({ ...prepared[i], id: m.id })),
+        refreshChat,
+        Boolean(getSummary(chat.id)),
+        compactOptions,
+      )
+      const requestedEnd = !proactive && !hidden && plan.due ? plan.end : plan.start
       const livePrepared = prepared.slice(plan.start)
       const autoLimited = applyContextLimit(livePrepared)
       const targetEnd = Math.max(requestedEnd, prepared.length - autoLimited.length)
@@ -579,7 +583,7 @@ export default function Chat() {
       limited = prepared.slice(settledCursor + 1)
       if (requestedEnd > plan.start && settledCursor >= requestedEnd - 1) {
         useStore.getState().snoozeContextRefresh(chat.id, null)
-        showToast('上下文已整理，继续在这里聊')
+        showToast(`上下文已翻到新一页，保留最近 ${compactOptions.keepRounds} 轮`)
       }
 
       const merged = []

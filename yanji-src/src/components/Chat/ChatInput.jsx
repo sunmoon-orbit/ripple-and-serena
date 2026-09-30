@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { useStore } from '../../store'
 import { showToast } from '../Toast'
-import { transcribeAudio, removeArchiveConversation, restoreArchiveConversation } from '../../api/moonMemory'
+import { transcribeAudio, fetchArchiveConversation, removeArchiveConversation, restoreArchiveConversation } from '../../api/moonMemory'
 import { useThemedConfirm } from '../ThemedConfirmDialog'
 import PinyinKeyboard from './PinyinKeyboard'
 import { isRunnableHtmlMessage } from '../../utils/runnableCode'
@@ -25,6 +25,9 @@ export default function ChatInput({ onSend, disabled, onImageAdd, images, onImag
   const [historyTotal, setHistoryTotal] = useState(null)
   const [historySort, setHistorySort] = useState('recent')
   const [historyLoading, setHistoryLoading] = useState(false)
+  const [historyPreview, setHistoryPreview] = useState(null)
+  const [historyPreviewLoading, setHistoryPreviewLoading] = useState(false)
+  const historyPreviewRequestRef = useRef(0)
   const [historyRemovingId, setHistoryRemovingId] = useState(null)
   const [lastRemovedConversation, setLastRemovedConversation] = useState(null)
   const [attachedTexts, setAttachedTexts] = useState([])
@@ -90,6 +93,7 @@ export default function ChatInput({ onSend, disabled, onImageAdd, images, onImag
     setHistoryLoading(true)
     setHistoryResults([])
     setHistoryTotal(null)
+    setHistoryPreview(null)
     try {
       const base = (moonMemory.baseUrl || 'https://memory.ravenlove.cc').replace(/\/$/, '')
       const resp = await fetch(`${base}/archive/search?q=${encodeURIComponent(q)}&limit=100`, {
@@ -158,6 +162,40 @@ export default function ChatInput({ onSend, disabled, onImageAdd, images, onImag
     const content = `[${item.role === 'human' ? '阿颖' : '阿言'}] ${item.content}`
     setAttachedTexts((prev) => [...prev, { name: label, content }])
     setHistoryOpen(false)
+  }
+
+  async function previewHistory(item) {
+    const requestId = ++historyPreviewRequestRef.current
+    const conversationId = Number(item.conversation_id)
+    setHistoryPreview({ item, messages: [item], hitId: item.message_id ?? item.id, partial: true })
+    if (!Number.isSafeInteger(conversationId) || conversationId <= 0) return
+    setHistoryPreviewLoading(true)
+    try {
+      const full = await fetchArchiveConversation(moonMemory, conversationId)
+      if (requestId !== historyPreviewRequestRef.current) return
+      const all = Array.isArray(full?.messages) ? full.messages : []
+      const hitId = item.message_id ?? item.id
+      let index = all.findIndex((message) => String(message.id) === String(hitId))
+      if (index < 0) index = all.findIndex((message) => message.role === item.role && message.content === item.content)
+      if (index < 0) index = 0
+      setHistoryPreview({
+        item: { ...item, title: item.title || full?.title },
+        messages: all.slice(Math.max(0, index - 4), Math.min(all.length, index + 5)),
+        hitId: all[index]?.id ?? hitId,
+        partial: false,
+      })
+    } catch {
+      if (requestId !== historyPreviewRequestRef.current) return
+      setHistoryPreview((current) => current ? { ...current, error: '前后文没有加载出来，先显示命中的这一条。' } : current)
+    } finally {
+      if (requestId === historyPreviewRequestRef.current) setHistoryPreviewLoading(false)
+    }
+  }
+
+  function historyDate(value) {
+    const date = new Date(value || '')
+    if (!Number.isFinite(date.getTime())) return '日期不详'
+    return date.toLocaleString('zh-CN', { year: 'numeric', month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })
   }
 
   function handleKeyDown(e) {
@@ -383,7 +421,40 @@ export default function ChatInput({ onSend, disabled, onImageAdd, images, onImag
               )}
             </div>
           )}
-          <div className="history-results">
+          {historyPreview ? (
+            <div className="history-preview">
+              <div className="history-preview-head">
+                <button type="button" className="history-preview-back" onClick={() => { historyPreviewRequestRef.current++; setHistoryPreview(null) }} aria-label="返回搜索结果">
+                  <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 18l-6-6 6-6" /></svg>
+                </button>
+                <div>
+                  <div className="history-preview-title">{historyPreview.item.title || '未命名窗口'}</div>
+                  <div className="history-preview-date">{historyDate(historyPreview.item.created_at || historyPreview.item.conv_date)}</div>
+                </div>
+              </div>
+              {historyPreviewLoading && <div className="history-preview-loading">正在找这句话前后的内容…</div>}
+              {historyPreview.error && <div className="history-preview-error">{historyPreview.error}</div>}
+              <div className="history-preview-messages">
+                {historyPreview.messages.map((message, index) => {
+                  const highlighted = String(message.id) === String(historyPreview.hitId)
+                    || (historyPreview.partial && index === 0)
+                  return (
+                    <div key={message.id || index} className={'history-preview-message' + (highlighted ? ' hit' : '')}>
+                      <div className="history-preview-message-meta">
+                        <span>{message.role === 'human' || message.role === 'user' ? '阿颖' : '阿言'}</span>
+                        <span>{historyDate(message.created_at || message.timestamp || message.ts)}</span>
+                      </div>
+                      <div>{message.content || ''}</div>
+                    </div>
+                  )
+                })}
+              </div>
+              <div className="history-preview-actions">
+                <button type="button" className="btn-sm btn-ghost" onClick={() => setHistoryPreview(null)}>返回结果</button>
+                <button type="button" className="btn-sm btn-primary" onClick={() => attachHistory(historyPreview.item)}>带入对话</button>
+              </div>
+            </div>
+          ) : <div className="history-results">
             {historyResults.length === 0 && !historyLoading && (
               <div className="history-empty">{historyTotal === 0 ? '没有找到相关对话' : '输入关键词后按搜索'}</div>
             )}
@@ -391,7 +462,7 @@ export default function ChatInput({ onSend, disabled, onImageAdd, images, onImag
               const conversationId = Number(item.conversation_id)
               const canRemove = Number.isSafeInteger(conversationId) && conversationId > 0
               return (
-                <div key={item.id} className="history-item" onClick={() => attachHistory(item)}>
+                <div key={item.id} className="history-item" onClick={() => previewHistory(item)}>
                   <div className="history-item-meta">
                     <span className="history-item-role">{item.role === 'human' ? '阿颖' : '阿言'}</span>
                     <span className="history-item-title">{item.title || '存档'}</span>
@@ -414,7 +485,7 @@ export default function ChatInput({ onSend, disabled, onImageAdd, images, onImag
                 </div>
               )
             })}
-          </div>
+          </div>}
         </div>
       )}
       {images?.length > 0 && (
