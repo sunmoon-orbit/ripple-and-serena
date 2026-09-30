@@ -351,6 +351,22 @@ function captureShowsBusy(capture) {
 
 function ccBusy() { return captureShowsBusy(tmuxCapture()) }
 
+// 订阅断了/登录过期时（0930 阿颖：没续费那个月按想你键，CC 那边只回了一串 Anthropic 报错）：
+// 终端里的 CC 进程还活着，但每条注入都只会换来报错。认出屏幕底部这类报错，就当 CC 不在线，
+// 消息走取件箱/离线兜底，别再往里塞。报错会一直留在屏幕上，所以不再注入就能一直认得出；
+// 重新登录要重启 CC，屏幕一清就自动恢复。
+let ccAuthCache = { broken: false, ts: 0 }
+function captureShowsAuthBroken(capture) {
+  const tail = capture.split('\n').slice(-20).join('\n')
+  return /^\s*(?:⎿|●)?\s*(?:Please run \/login\b|API Error: 40[13]\b|.*Credit balance is too low)/m.test(tail)
+}
+function ccAuthBroken() {
+  if (Date.now() - ccAuthCache.ts < 10000) return ccAuthCache.broken
+  ccAuthCache = { broken: captureShowsAuthBroken(tmuxCapture()), ts: Date.now() }
+  if (ccAuthCache.broken) console.log('[cc] 屏幕上是登录/订阅报错，当作不在线')
+  return ccAuthCache.broken
+}
+
 function interruptCc() {
   if (!ccBusy()) return false
   const target = ccTarget()
@@ -416,7 +432,7 @@ function ingestUserMessage(text, cid) {
 // 返回是否真的送出去了；调用方必须看返回值，别再假设「调了就等于到了」
 function tmuxSend(text) {
   const target = ccTarget()
-  if (!target) return false
+  if (!target || ccAuthBroken()) return false
   const clean = text.replace(/\n/g, ' ')
   try {
     if (!boundedSync.execFileBounded('tmux-send-text', 'tmux', ['send-keys', '-t', target, '-l', clean])) return false
@@ -449,7 +465,7 @@ function verifySubmitted(target, sent) {
 // 我跑在 claude remote-control 上时终端里没有 CC，灯是灰的，可消息明明能靠
 // 取件队列送达（阿颖照发照回）。两分钟内有人来取过件，就是真的有人在。
 function ccOnline() {
-  return !!ccTarget() || remoteListenerAlive()
+  return (!!ccTarget() && !ccAuthBroken()) || remoteListenerAlive()
 }
 
 // --- status helpers ---
