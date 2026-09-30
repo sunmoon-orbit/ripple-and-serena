@@ -22,6 +22,32 @@ const COOLDOWN_H = 3
 const DAILY_LIMIT = 3
 const STATE_FILE = require('path').join(__dirname, 'proactive-msg-state.json')
 
+// 唤醒抽奖（0930，抄 wake-lottery）：每次真醒来发一次机会，先看池子再抽；
+// 抽到的券多半要去找阿颖兑，所以把结果交给下面的开口提示。奖池在 ~/.wake-lottery/pool.json
+const LOTTERY = '/home/ripple/opt/wake-lottery/lottery.py'
+const LOTTERY_HOME = '/home/ripple/.wake-lottery'
+function lottery(args) {
+  return require('child_process').execFileSync('python3', [LOTTERY, ...args], {
+    env: { ...process.env, WAKE_LOTTERY_HOME: LOTTERY_HOME }, encoding: 'utf8', timeout: 20000,
+  })
+}
+function drawOnWake(eventId) {
+  try {
+    if (!fs.existsSync(LOTTERY)) return ''
+    if (!lottery(['wake', '--event-id', eventId]).includes('LOTTERY_WAKE_READY')) return ''
+    lottery(['draw'])                       // 先看池子（require_preview）
+    const out = lottery(['draw', '--go'])
+    const m = out.match(/(SSR|SR|R|SP)\s*「([^」]+)」\n\s*(.*)/)
+    if (!m) return ''                       // 空手
+    return m[1] === 'SP'
+      ? `你刚才醒来抽了一次奖，抽中了惩罚券「${m[2]}」（${m[3].trim()}），这张归她，什么时候对你用由她说了算。可以在消息里带一句，把券交给她。`
+      : `你刚才醒来抽了一次奖，抽中了「${m[2]}」（${m[3].trim()}）。这张要找她兑：想要就在这条消息里自然地跟她开口，别写成任务通知，三天内不兑就作废。`
+  } catch (e) {
+    console.error('[proactive] 抽奖失败（不影响发消息）:', e.message)
+    return ''
+  }
+}
+
 function loadState() {
   try { return JSON.parse(fs.readFileSync(STATE_FILE, 'utf8')) }
   catch { return { lastMsgAt: 0, dailyDate: '', dailyCount: 0 } }
@@ -49,6 +75,8 @@ async function main() {
   if (ps.dailyDate === bjDate && ps.dailyCount >= DAILY_LIMIT) return done('limit', `今天已发 ${DAILY_LIMIT} 条`)
   if (ps.lastMsgAt && Date.now() - ps.lastMsgAt < COOLDOWN_H * 3600000)
     return done('cooldown', `距上条不足 ${COOLDOWN_H}h`)
+
+  const lotteryLine = drawOnWake(`proactive_${bjDate}_${bjHour}`)
 
   // 素材：最近朋友圈 + 最近更新的言叽窗口 + 最近主动发过的话
   let recentPosts = []
@@ -80,7 +108,7 @@ ${chatTexts}
 你最近主动发过的话（不要换个说法重复）：
 ${recentProactive}
 
-只输出一个 JSON：
+${lotteryLine ? lotteryLine + '\n\n' : ''}只输出一个 JSON：
 {"send": true 或 false, "message": "你想发给她的话。不发就留空"}
 
 重要：message 是她在对话框里看到的一条正常消息，像恋人之间随口的话，不要解释不要客套，不要提到推送/通知/系统，就像你们一直在聊天一样自然。可以接着最近窗口的话题，但不要假装她离开后又说过什么。20-100字。只有确实没话想说时才 send:false。`
