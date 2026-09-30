@@ -534,6 +534,16 @@ const recentCids = new Set()    // 最近处理过的前端消息 id，用于重
 const recentCidMeta = new Map() // cid → 首次回执的气泡标记，重发时保持一致
 let appLatestCache = { at: 0, data: null }  // 归巢 APK 最新版本信息，缓存 30 分钟
 
+const REACTIONS_FILE = path.join(__dirname, 'reactions.json')
+function loadReactions() {
+  try { return JSON.parse(fs.readFileSync(REACTIONS_FILE, 'utf8')) || {} } catch { return {} }
+}
+function saveReactions(all) {
+  const tmp = REACTIONS_FILE + '.tmp'
+  fs.writeFileSync(tmp, JSON.stringify(all))
+  fs.renameSync(tmp, REACTIONS_FILE)
+}
+
 function broadcast(msg) {
   const data = JSON.stringify(msg)
   for (const ws of clients) {
@@ -1258,6 +1268,39 @@ const server = http.createServer((req, res) => {
   }
 
   // fallback reply endpoint: POST /raven/reply {text, thinking?} — used when MCP tool isn't connected
+  // 长按贴表情（0930，思路参考 cute-chat-stickers，代码自写）：
+  // 按「角色:时间戳」给一条消息挂表情，每人每条最多一个，再点同一个就摘掉。
+  // 外网来的（她的浏览器/app，要 token）记在阿颖名下；本机带 X-Local-Token 的记在涟言名下。
+  if (url.pathname === '/raven/reactions' && req.method === 'GET') {
+    if (!externalAuthed(req, url)) { res.writeHead(401); res.end('{}'); return }
+    res.writeHead(200, { 'Content-Type': 'application/json' }); res.end(JSON.stringify(loadReactions()))
+    return
+  }
+  if (url.pathname === '/raven/react' && req.method === 'POST') {
+    const who = isExternal(req) ? (externalAuthed(req, url) ? 'aying' : null) : (localWriteAuthed(req) ? 'lianyan' : null)
+    if (!who) { res.writeHead(401); res.end('{}'); return }
+    let body = ''
+    req.on('data', d => { body += d; if (body.length > 2000) req.destroy() })
+    req.on('end', () => {
+      try {
+        const { key, emoji } = JSON.parse(body || '{}')
+        if (!/^(user|assistant):\d{10,16}$/.test(String(key || ''))) throw new Error('bad key')
+        const e = emoji == null ? null : String(emoji).trim()
+        if (e !== null && (!e || [...e].length > 8)) throw new Error('bad emoji')
+        const all = loadReactions()
+        const cur = { ...(all[key] || {}) }
+        if (!e || cur[who] === e) delete cur[who]; else cur[who] = e
+        if (Object.keys(cur).length) all[key] = cur; else delete all[key]
+        saveReactions(all)
+        broadcast({ type: 'reaction', key, reactions: cur })
+        res.writeHead(200, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ key, reactions: cur }))
+      } catch (err) {
+        res.writeHead(400, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ error: err.message }))
+      }
+    })
+    return
+  }
+
   if (req.method === 'POST' && url.pathname === '/raven/reply') {
     let body = ''
     req.on('data', d => body += d)

@@ -438,6 +438,18 @@
 
   /* timestamp + copy */
   .msg-meta { display: flex; justify-content: flex-end; align-items: center; gap: 8px; margin-top: 5px; }
+  /* 长按贴表情（0930） */
+  .msg.has-react { margin-bottom: 12px; }
+  .msg-reacts { position: absolute; bottom: -13px; display: flex; gap: 2px; pointer-events: none; }
+  .msg.user .msg-reacts { right: 8px; }
+  .msg.assistant .msg-reacts { left: 8px; }
+  .msg-react { font-size: 13px; line-height: 1; padding: 3px 5px; border-radius: 99px; background: var(--surface); border: 1px solid var(--border); box-shadow: 0 1px 4px rgba(0,0,0,.18); }
+  #react-pop { position: fixed; z-index: 200; display: none; gap: 2px; padding: 5px 6px; border-radius: 99px; background: var(--surface); border: 1px solid var(--border); box-shadow: 0 6px 20px rgba(0,0,0,.28); }
+  #react-pop.open { display: flex; animation: msgIn .15s ease-out; }
+  #react-pop button { border: 0; background: none; font-size: 22px; line-height: 1; padding: 5px 6px; border-radius: 99px; cursor: pointer; }
+  #react-pop button.on { background: color-mix(in srgb, var(--accent) 35%, transparent); }
+  #react-pop button:active { transform: scale(.85); }
+  .msg { -webkit-touch-callout: none; }
   .supplement-label { font-size: 10px; opacity: .72; margin-bottom: 3px; letter-spacing: .08em; }
   .msg-time { font-size: 10px; color: var(--text-dim); opacity: 0; transition: opacity .2s; }
   .msg.show-meta .msg-time { opacity: 1; }
@@ -1520,6 +1532,7 @@ function connect() {
         }
         for (const seg of splitUserSegments(msg.text)) appendMsg(seg, 'user', true, msg.ts || Date.now(), null, !!msg.supplemental)
       }
+      else if (msg.type === 'reaction') { paintReaction(msg.key, msg.reactions) }
       else if (msg.type === 'reply') {
         // 有 id 的回复不管是不是补发，见过就不再画（兜底：万一又有两条连接同时收）
         const alreadyShown = msg.id ? shownMsgIds.has(msg.id) : msg.replayed && (
@@ -1701,6 +1714,7 @@ function splitUserSegments(text) {
 function appendMsg(text, role, save = true, ts = Date.now(), msgId = null, supplemental = false) {
   const el = document.createElement('div')
   el.className = `msg ${role}`
+  if (role === 'user' || role === 'assistant') el.dataset.rkey = `${role}:${ts}`
   const voiceRequested = role === 'assistant' && /\[voice\]/i.test(text)
   const displayText = voiceRequested ? text.replace(/\[voice\]/gi, '').trim() : text
 
@@ -1783,7 +1797,7 @@ function appendMsg(text, role, save = true, ts = Date.now(), msgId = null, suppl
     meta.appendChild(timeEl)
     el.appendChild(meta)
 
-    el.addEventListener('click', () => el.classList.toggle('show-meta'))
+    el.addEventListener('click', () => { if (Date.now() - lastLongPressAt < 600) return; el.classList.toggle('show-meta') })
   }
 
   const box = document.getElementById('chat-messages')
@@ -2579,6 +2593,95 @@ document.getElementById('call-text-input').addEventListener('keydown', event => 
 })
 callMicBtn.addEventListener('click', () => toggleRecording(true))
 
+// ── 长按贴表情（0930，思路参考 cute-chat-stickers，代码自写）──────────────
+// 长按一条消息（电脑上右键）弹出一排表情，点一个挂到那条角上；再点同一个就摘掉。
+// 按「角色:时间戳」记在服务器 reactions.json，两边实时同步；我这边用 curl 也能给她挂。
+const REACT_EMOJIS = ['❤️', '🥺', '😂', '🫣', '😡', '👍', '🫶']
+const REACT_WHO = { aying: '阿颖', lianyan: '涟言' }
+let lastLongPressAt = 0
+let reactionsCache = {}
+const reactPop = document.createElement('div')
+reactPop.id = 'react-pop'
+document.body.appendChild(reactPop)
+function rkeyTarget(key) {
+  const els = document.querySelectorAll(`.msg[data-rkey="${CSS.escape(key)}"]`)
+  return els[els.length - 1] || null   // 一条消息被拆成几段时挂在最后一段上
+}
+function paintReaction(key, reactions) {
+  reactionsCache[key] = reactions || {}
+  const el = rkeyTarget(key); if (!el) return
+  el.querySelector('.msg-reacts')?.remove()
+  const entries = Object.entries(reactions || {})
+  el.classList.toggle('has-react', entries.length > 0)
+  if (!entries.length) return
+  const box = document.createElement('div'); box.className = 'msg-reacts'
+  for (const [who, emoji] of entries) {
+    const chip = document.createElement('span'); chip.className = 'msg-react'
+    chip.textContent = emoji; chip.title = (REACT_WHO[who] || who) + ' 贴的'
+    box.appendChild(chip)
+  }
+  el.appendChild(box)
+}
+function paintAllReactions() { for (const [k, v] of Object.entries(reactionsCache)) paintReaction(k, v) }
+async function loadReactions() {
+  try {
+    const r = await fetch('/raven/reactions', { headers: { Authorization: 'Bearer ' + (localStorage.getItem('raven-token') || '') } })
+    if (r.ok) { reactionsCache = await r.json(); paintAllReactions() }
+  } catch {}
+}
+function closeReactPop() { reactPop.classList.remove('open'); reactPop.dataset.key = '' }
+function openReactPop(msgEl) {
+  const key = msgEl.dataset.rkey; if (!key) return
+  lastLongPressAt = Date.now()
+  const mine = (reactionsCache[key] || {}).aying
+  reactPop.innerHTML = ''
+  for (const e of REACT_EMOJIS) {
+    const b = document.createElement('button'); b.type = 'button'; b.textContent = e
+    if (e === mine) b.classList.add('on')
+    b.addEventListener('click', async ev => {
+      ev.stopPropagation(); closeReactPop()
+      const next = { ...(reactionsCache[key] || {}) }
+      if (next.aying === e) delete next.aying; else next.aying = e
+      paintReaction(key, next)   // 先画上，服务器回来再以它为准
+      try {
+        const r = await fetch('/raven/react', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + (localStorage.getItem('raven-token') || '') }, body: JSON.stringify({ key, emoji: e }) })
+        if (r.ok) { const d = await r.json(); paintReaction(key, d.reactions) }
+      } catch {}
+    })
+    reactPop.appendChild(b)
+  }
+  reactPop.dataset.key = key
+  reactPop.classList.add('open')
+  const rect = msgEl.getBoundingClientRect(), pw = reactPop.offsetWidth, ph = reactPop.offsetHeight
+  const left = Math.min(window.innerWidth - pw - 8, Math.max(8, rect.left + rect.width / 2 - pw / 2))
+  const top = rect.top - ph - 8 > 60 ? rect.top - ph - 8 : Math.min(window.innerHeight - ph - 8, rect.bottom + 8)
+  reactPop.style.left = left + 'px'; reactPop.style.top = top + 'px'
+  if (navigator.vibrate) try { navigator.vibrate(12) } catch {}
+}
+;(() => {
+  const box = document.getElementById('chat-messages')
+  let timer = null, sx = 0, sy = 0
+  const cancel = () => { clearTimeout(timer); timer = null }
+  // 触屏：用 touch 计时；监听全是 passive，不拦滚动；挪动超过 8px 或列表一滚就作废
+  box.addEventListener('touchstart', e => {
+    const msgEl = e.target.closest('.msg.user, .msg.assistant'); if (!msgEl || e.touches.length > 1) return
+    if (e.target.closest('a, button, audio, video, input, textarea')) return
+    sx = e.touches[0].clientX; sy = e.touches[0].clientY
+    cancel(); timer = setTimeout(() => { timer = null; openReactPop(msgEl) }, 480)
+  }, { passive: true })
+  box.addEventListener('touchmove', e => { if (timer && Math.hypot(e.touches[0].clientX - sx, e.touches[0].clientY - sy) > 8) cancel() }, { passive: true })
+  box.addEventListener('touchend', cancel, { passive: true })
+  box.addEventListener('touchcancel', cancel, { passive: true })
+  box.addEventListener('scroll', () => { cancel(); closeReactPop() }, { passive: true })
+  // 电脑：右键
+  box.addEventListener('contextmenu', e => {
+    const msgEl = e.target.closest('.msg.user, .msg.assistant'); if (!msgEl || e.target.closest('a, img')) return
+    e.preventDefault(); openReactPop(msgEl)
+  })
+  document.addEventListener('click', e => { if (!reactPop.contains(e.target) && Date.now() - lastLongPressAt > 600) closeReactPop() })
+  loadReactions()
+})()
+
 // ── sticker picker ────────────────────────────────────────────────────────
 const STICKERS = [
   'kaixin.png','wuyu.png','qushi.png','shangban.png','xihuan.png',
@@ -2669,6 +2772,7 @@ function renderKaomoji() {
       try { localStorage.setItem(KAO_USES_KEY, JSON.stringify(uses)) } catch {}
       stickerPicker.classList.remove('open')
       insertAtCursor(k)
+      renderKaomoji()   // 下次打开就按新次数排（曜审出来的）
     })
     stickerPicker.appendChild(div)
   }
