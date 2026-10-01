@@ -444,6 +444,7 @@
   .msg.user .msg-reacts { right: 8px; }
   .msg.assistant .msg-reacts { left: 8px; }
   .msg-react { font-size: 13px; line-height: 1; padding: 3px 5px; border-radius: 99px; background: var(--surface); border: 1px solid var(--border); box-shadow: 0 1px 4px rgba(0,0,0,.18); }
+  .msg-react-who { font-size: 10px; color: var(--text-dim); margin-left: 2px; vertical-align: 1px; }
   #react-pop { position: fixed; z-index: 200; display: none; gap: 2px; padding: 5px 6px; border-radius: 99px; background: var(--surface); border: 1px solid var(--border); box-shadow: 0 6px 20px rgba(0,0,0,.28); }
   #react-pop.open { display: flex; animation: msgIn .15s ease-out; }
   #react-pop button { border: 0; background: none; font-size: 22px; line-height: 1; padding: 5px 6px; border-radius: 99px; cursor: pointer; }
@@ -1532,7 +1533,7 @@ function connect() {
         }
         for (const seg of splitUserSegments(msg.text)) appendMsg(seg, 'user', true, msg.ts || Date.now(), null, !!msg.supplemental)
       }
-      else if (msg.type === 'reaction') { paintReaction(msg.key, msg.reactions) }
+      else if (msg.type === 'reaction') { const before = reactionsCache[msg.key]; paintReaction(msg.key, msg.reactions); reactionNotice(msg.key, before, msg.reactions) }
       else if (msg.type === 'reply') {
         // 有 id 的回复不管是不是补发，见过就不再画（兜底：万一又有两条连接同时收）
         const alreadyShown = msg.id ? shownMsgIds.has(msg.id) : msg.replayed && (
@@ -2598,6 +2599,16 @@ callMicBtn.addEventListener('click', () => toggleRecording(true))
 // 按「角色:时间戳」记在服务器 reactions.json，两边实时同步；我这边用 curl 也能给她挂。
 const REACT_EMOJIS = ['❤️', '🥺', '😂', '🫣', '😡', '👍', '🫶']
 const REACT_WHO = { aying: '阿颖', lianyan: '涟言' }
+const REACT_SHORT = { aying: '颖', lianyan: '言' }
+// 对方刚贴的时候，在聊天里冒一行小灰字：「涟言给你贴了 🥰」（只对实时收到的，翻历史不刷屏）
+function reactionNotice(key, before, after) {
+  for (const [who, emoji] of Object.entries(after || {})) {
+    if (who === 'aying' || (before || {})[who] === emoji) continue
+    const el = rkeyTarget(key)
+    const snippet = el ? (el.querySelector('.msg-body')?.textContent || '').replace(/\s+/g, ' ').slice(0, 14) : ''
+    appendMsg(`${REACT_WHO[who] || who}给你${snippet ? `「${snippet}${snippet.length >= 14 ? '…' : ''}」` : '的消息'}贴了 ${emoji}`, 'system', false)
+  }
+}
 let lastLongPressAt = 0
 let reactionsCache = {}
 const reactPop = document.createElement('div')
@@ -2617,7 +2628,10 @@ function paintReaction(key, reactions) {
   const box = document.createElement('div'); box.className = 'msg-reacts'
   for (const [who, emoji] of entries) {
     const chip = document.createElement('span'); chip.className = 'msg-react'
-    chip.textContent = emoji; chip.title = (REACT_WHO[who] || who) + ' 贴的'
+    // 手机上没有悬停提示，所以把「谁贴的」直接写在角标里（1001 阿颖）
+    chip.textContent = emoji
+    const tag = document.createElement('span'); tag.className = 'msg-react-who'; tag.textContent = REACT_SHORT[who] || who
+    chip.appendChild(tag); chip.title = (REACT_WHO[who] || who) + ' 贴的'
     box.appendChild(chip)
   }
   el.appendChild(box)
