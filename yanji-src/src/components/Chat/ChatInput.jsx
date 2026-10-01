@@ -9,6 +9,16 @@ import { isRunnableHtmlMessage } from '../../utils/runnableCode'
 import { StickerPicker } from './StickerPicker'
 import { AttachmentPicker } from './AttachmentPicker'
 
+// 「点到面板外就收起」：别用 contains(e.target)。点 L0 搜索结果时面板内容会整块换掉，
+// 被点的那个节点在冒泡到 document 之前就已经脱离页面，contains 返回 false，
+// 面板被误判成点在外面而收起（1001 阿颖：点详情、点返回结果都会弹回输入栏）。
+// composedPath() 记的是点下那一刻的祖先链，节点后来被移除也不影响。
+function clickedInside(e, el) {
+  if (!el) return false
+  const path = typeof e.composedPath === 'function' ? e.composedPath() : []
+  return path.length ? path.includes(el) : el.contains(e.target)
+}
+
 export default function ChatInput({ onSend, disabled, onImageAdd, images, onImageRemove, moonMemory, quoted, onClearQuote }) {
   const customStickers = useStore((s) => s.customStickers) || []
   const activeChatId = useStore((s) => s.activeChatId)
@@ -64,14 +74,14 @@ export default function ChatInput({ onSend, disabled, onImageAdd, images, onImag
 
   useEffect(() => {
     if (!stickerOpen) return
-    const close = (e) => { if (!pickerRef.current?.contains(e.target)) setStickerOpen(false) }
+    const close = (e) => { if (!clickedInside(e, pickerRef.current)) setStickerOpen(false) }
     document.addEventListener('click', close)
     return () => document.removeEventListener('click', close)
   }, [stickerOpen])
 
   useEffect(() => {
     if (!historyOpen) return
-    const close = (e) => { if (!historyRef.current?.contains(e.target)) setHistoryOpen(false) }
+    const close = (e) => { if (!clickedInside(e, historyRef.current)) setHistoryOpen(false) }
     document.addEventListener('click', close)
     return () => document.removeEventListener('click', close)
   }, [historyOpen])
