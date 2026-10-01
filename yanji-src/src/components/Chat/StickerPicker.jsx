@@ -33,6 +33,9 @@ const STICKERS = [
   // 简笔猫系列（0710 阿颖投喂）
   'm-yizhixiang.jpg','m-exin.jpg','m-eihei.jpg','m-o.jpg',
   'm-cuole.jpg','m-budangai.jpg','m-a.jpg','m-wuen.jpg','m-jianlaji.jpg',
+  // 0930 阿颖翻的一批（b- 前缀，归巢同款）
+  'b-kaiting.jpg','b-youzui.jpg','b-yuanwang.jpg','b-renzui.jpg','b-buyao-daren.jpg','b-daibu.jpg','b-sixing.jpg',
+  'b-kujiji.jpg','b-zazheyang.jpg','b-buxiangshuo.jpg','b-ganbuliao.jpg','b-niuma.jpg','b-zaoan.jpg','b-fue.jpg','b-yangtian-lei.jpg',
 ]
 const STICKER_BASE = 'https://memory.ravenlove.cc/raven/stickers/'
 
