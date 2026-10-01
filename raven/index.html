@@ -1558,6 +1558,13 @@ function connect() {
       else if (msg.type === 'thinking') setThinking(msg.active)
       else if (msg.type === 'busy') setBusy(msg.active)
       else if (msg.type === 'thinking_block') appendThinkingBlock(msg.text)
+      else if (msg.type === 'thinking_attach') {
+        // 整轮结束时桥把思考挂回本轮最后一条回复（按 id，不按时间猜）
+        const el = document.querySelector(`.msg[data-msg-id="${CSS.escape(msg.id)}"]`)
+        if (el) appendThinkingBlock(msg.thinking, el)
+        const entry = chatHistory.find(m => m.msgId === msg.id)
+        if (entry && !entry.thinking) { entry.thinking = msg.thinking; saveHistory(chatHistory) }
+      }
       else if (msg.type === 'compressed') showCompressBanner()
       else if (msg.type === 'permission_prompt') showPermPrompt(msg)
       else if (msg.type === 'auth_failed') { localStorage.removeItem('raven-token'); showAuthOverlay() }
@@ -1716,6 +1723,7 @@ function appendMsg(text, role, save = true, ts = Date.now(), msgId = null, suppl
   const el = document.createElement('div')
   el.className = `msg ${role}`
   if (role === 'user' || role === 'assistant') el.dataset.rkey = `${role}:${ts}`
+  if (msgId) el.dataset.msgId = msgId
   const voiceRequested = role === 'assistant' && /\[voice\]/i.test(text)
   const displayText = voiceRequested ? text.replace(/\[voice\]/gi, '').trim() : text
 
@@ -2071,7 +2079,8 @@ function fetchAndShowThinking(msgEl, replyTs) {
   fetch('/raven/last-thinking', { headers: { Authorization: 'Bearer ' + (localStorage.getItem('raven-token') || '') } })
     .then(r => r.json())
     .then(data => {
-      if (data.thinking) {
+      // 只认比这条回复更新的思考；更旧的那份是上一轮的，挂上去就错位了（1001）
+      if (data.thinking && (!replyTs || (data.ts || 0) > replyTs)) {
         appendThinkingBlock(data.thinking, msgEl)
         const last = chatHistory[chatHistory.length - 1]
         if (last && last.role === 'assistant' && !last.thinking) {

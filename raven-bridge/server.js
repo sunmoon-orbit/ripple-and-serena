@@ -379,6 +379,7 @@ function interruptCc() {
 let switchQuietUntil = 0   // 切模型后这段时间内她的消息延后送（见 ingestUserMessage）
 
 function ingestUserMessage(text, cid) {
+  turnReplyIds = []
   const supplemental = ccBusy()
   const senderPrefix = supplemental ? '【阿颖·补充】' : '【阿颖】'
   if (cid) recentCidMeta.set(cid, { supplemental })
@@ -735,6 +736,10 @@ let lastPermData = null   // 最近一次权限提示数据，重连时补发
 let permCooldownUntil = 0  // suppress re-broadcast after choice sent
 let lastReplyMsgs = []   // 最近 10 条 reply，供重连客户端补发
 let lastThinking = ''
+// 本轮（她上一条消息之后）我发过的回复 id。思考是 Stop hook 在整轮结束时才送来的，
+// 那时前端早就画完了回复；拿这个把思考挂回本轮最后一条回复上（1001：之前前端 3 秒后去拉
+// last-thinking，我那会儿多半还没说完，拉到的是上一轮的，于是整体错后一位）。
+let turnReplyIds = []
 let lastThinkingTs = 0
 let lastCcBusy = false
 
@@ -1136,6 +1141,13 @@ const server = http.createServer((req, res) => {
         // 同一个 POST 进来的东西天然属于同一轮，不需要任何关联算法，也就没有配错的可能。
         lastThinking = thinking || ''
         lastThinkingTs = Date.now()
+        if (thinking && turnReplyIds.length) {
+          const id = turnReplyIds[turnReplyIds.length - 1]
+          const replayed = lastReplyMsgs.find(m => m.id === id)
+          if (replayed) replayed.thinking = thinking   // 重连回放时也带上
+          broadcast({ type: 'thinking_attach', id, thinking })
+        }
+        turnReplyIds = []
       } catch (e) { console.log('[thinking] error:', e.message) }
       res.writeHead(200); res.end()
     })
@@ -1302,6 +1314,7 @@ const server = http.createServer((req, res) => {
           replyExtractionEnabled = false
           lastMcpReplyTs = Date.now()
           const msg = { type: 'reply', text, ts: Date.now(), id: `r${Date.now()}${Math.random().toString(36).slice(2,6)}` }
+          turnReplyIds.push(msg.id)
           if (thinking) msg.thinking = thinking
           lastReplyMsgs.push(msg); if (lastReplyMsgs.length > 50) lastReplyMsgs.shift()
           broadcast(msg)
