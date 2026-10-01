@@ -642,7 +642,6 @@ async function loadStatus() {
     const known = [
       { name: 'moon-memory', label: '记忆库', detail: 'memory.ravenlove.cc:3210' },
       { name: 'raven-bridge', label: '乌鸦桥接', detail: 'port 3400' },
-      { name: 'uptime-kuma', label: '监控', detail: 'status.ravenlove.cc' },
     ]
     known.forEach(k => {
       const s = svcs.find(x => x.name === k.name)

@@ -499,22 +499,10 @@ function sessionUsage() {
   return contextSnapshot(path.join(os.homedir(), '.claude', 'rate_limits_latest.json'))
 }
 
-// uptime-kuma runs outside pm2 (root instance on :3001) — probe it directly
-let kumaOnline = false
-function checkKuma() {
-  const req = http.get({ hostname: '127.0.0.1', port: 3001, path: '/', timeout: 3000 }, res => {
-    kumaOnline = res.statusCode < 500
-    res.resume()
-  })
-  req.on('error', () => { kumaOnline = false })
-  req.on('timeout', () => { req.destroy(); kumaOnline = false })
-}
-checkKuma()
-setInterval(checkKuma, 30000)
+// uptime-kuma 0705 已删（功能被拾羽巡检和看门狗覆盖），不再探测它；状态面板不再显示这一行（1001）
 
 function getStatus() {
-  const services = pm2Services().filter(s => s.name !== 'uptime-kuma')
-  services.push({ name: 'uptime-kuma', status: kumaOnline ? 'online' : 'offline', mem: 0 })
+  const services = pm2Services()
   return {
     cc: { online: ccOnline() },
     session: sessionUsage(),
