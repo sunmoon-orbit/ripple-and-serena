@@ -1616,8 +1616,11 @@ function attachToHtml(p) {
 }
 
 // [sticker:名字] 容错：没写扩展名先试 .jpg，onerror 再退 .png（乌鸦忘写 .jpg 的三连裂图教训，2026-07-12）
+// 贴图按 immutable 缓存 7 天；同名重切过的（1001 c- 系列）加版本号，不然手机一直显示旧图
+const STICKER_RECUT = /^c-/
 function stickerFile(name) {
-  return /\.[a-z0-9]+$/i.test(name) ? name : name + '.jpg'
+  const file = /\.[a-z0-9]+$/i.test(name) ? name : name + '.jpg'
+  return STICKER_RECUT.test(file) ? file + '?v=1001b' : file
 }
 function stickerFallback(img) {
   const n = img.dataset.tries = (parseInt(img.dataset.tries) || 0) + 1
@@ -2753,7 +2756,7 @@ const stickerPicker = document.getElementById('sticker-picker')
 STICKERS.forEach(name => {
   const div = document.createElement('div')
   div.className = 'sticker-opt'
-  div.innerHTML = `<img src="/raven/stickers/${name}" alt="${name}" loading="lazy">`
+  div.innerHTML = `<img src="/raven/stickers/${stickerFile(name)}" alt="${name}" loading="lazy">`
   div.addEventListener('click', () => {
     stickerPicker.classList.remove('open')
     const inp = document.getElementById('chat-input')

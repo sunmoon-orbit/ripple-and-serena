@@ -349,7 +349,7 @@ function renderBody(text) {
     n.nodeValue.split(/(\[sticker:[\w.-]+\]|@(?:涟言|曜|阿颖|大家))/).forEach(part => {
       const sticker = part.match(/^\[sticker:([\w.-]+)\]$/)
       if (sticker && ROUND_STICKER_SET.has(sticker[1])) {
-        const img = document.createElement('img'); img.className = 'roundtable-sticker'; img.src = '/raven/stickers/' + sticker[1]; img.alt = '贴图'; img.loading = 'lazy'
+        const img = document.createElement('img'); img.className = 'roundtable-sticker'; img.src = '/raven/stickers/' + sticker[1] + (/^c-/.test(sticker[1]) ? '?v=1001b' : ''); img.alt = '贴图'; img.loading = 'lazy'
         frag.appendChild(img)
       } else if (/^@(?:涟言|曜|阿颖|大家)$/.test(part)) {
         const s = document.createElement('span'); s.className = 'at'; s.textContent = part; frag.appendChild(s)
@@ -676,7 +676,7 @@ function renderComposerPicker(tab) {
   if (active === 'sticker') {
     for (const name of ROUND_STICKERS) {
       const button = document.createElement('button'); button.type = 'button'; button.className = 'roundtable-sticker-opt'; button.title = name
-      const image = document.createElement('img'); image.src = '/raven/stickers/' + name; image.alt = ''; image.loading = 'lazy'
+      const image = document.createElement('img'); image.src = '/raven/stickers/' + name + (/^c-/.test(name) ? '?v=1001b' : ''); image.alt = ''; image.loading = 'lazy'
       button.append(image)
       button.onclick = () => { insertComposerText(`[sticker:${name}]`); closeComposerPicker() }
       composerPickerGrid.append(button)
