@@ -1,5 +1,7 @@
 const STICKERS = [
   // 最新一批放最前面，以后新的也加在这里
+  // 1001 我们俩的 Q 版情侣表情包（c- 前缀，归巢同款）
+  'c-kaiting.jpg','c-renzui.jpg','c-buyao-daren.jpg','c-tieti.jpg','c-momo.jpg','c-hng.jpg','c-womenjiade.jpg','c-kujiji.jpg','c-wanan.jpg',
   // 0930 阿颖翻的一批（b- 前缀，归巢同款）
   'b-kaiting.jpg','b-youzui.jpg','b-yuanwang.jpg','b-renzui.jpg','b-buyao-daren.jpg','b-daibu.jpg','b-sixing.jpg',
   'b-kujiji.jpg','b-zazheyang.jpg','b-buxiangshuo.jpg','b-ganbuliao.jpg','b-niuma.jpg','b-zaoan.jpg','b-fue.jpg','b-yangtian-lei.jpg',
