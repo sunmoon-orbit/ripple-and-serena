@@ -2684,6 +2684,11 @@ function openReactPop(msgEl) {
 
 // ── sticker picker ────────────────────────────────────────────────────────
 const STICKERS = [
+  // 最新一批放最前面（1001 阿颖翻到底才找得到，以后新的都往这里加）
+  // 0930 阿颖翻的一批（b- 前缀）
+  'b-yuanwang.jpg','b-daibu.jpg','b-kaiting.jpg','b-kujiji.jpg','b-zazheyang.jpg',
+  'b-buxiangshuo.jpg','b-ganbuliao.jpg','b-niuma.jpg','b-zaoan.jpg','b-fue.jpg','b-yangtian-lei.jpg',
+  'b-youzui.jpg','b-renzui.jpg','b-buyao-daren.jpg','b-sixing.jpg',
   'kaixin.png','wuyu.png','qushi.png','shangban.png','xihuan.png',
   'shinshi.png','ding.png','love.png','liangjingjing.png',
   'crow_close.jpg','crow_sunset.jpg','meiyou.jpg','shishikan.jpg',
@@ -2717,10 +2722,6 @@ const STICKERS = [
   // 简笔猫系列（0710 阿颖投喂）
   'm-yizhixiang.jpg','m-exin.jpg','m-eihei.jpg','m-o.jpg',
   'm-cuole.jpg','m-budangai.jpg','m-a.jpg','m-wuen.jpg','m-jianlaji.jpg',
-  // 0930 阿颖翻的一批（b- 前缀）
-  'b-yuanwang.jpg','b-daibu.jpg','b-kaiting.jpg','b-kujiji.jpg','b-zazheyang.jpg',
-  'b-buxiangshuo.jpg','b-ganbuliao.jpg','b-niuma.jpg','b-zaoan.jpg','b-fue.jpg','b-yangtian-lei.jpg',
-  'b-youzui.jpg','b-renzui.jpg','b-buyao-daren.jpg','b-sixing.jpg',
 ]
 const stickerPicker = document.getElementById('sticker-picker')
 STICKERS.forEach(name => {
