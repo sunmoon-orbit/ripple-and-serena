@@ -1,6 +1,7 @@
-import { useEffect, useRef, useState, useCallback } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, useCallback } from 'react'
 import MessageBubble from './MessageBubble'
 import { useStore } from '../../store'
+import { buildMessageRenderWindow, INITIAL_MESSAGE_RENDER, MESSAGE_RENDER_BATCH, renderCountForMessage } from '../../utils/messageRenderWindow.mjs'
 
 export default function MessageList({ messages, status, onEdit, onQuote, onDelete, activeChatId, compactedThrough }) {
   const listRef = useRef(null)
@@ -9,11 +10,17 @@ export default function MessageList({ messages, status, onEdit, onQuote, onDelet
   // 否则打开聊天窗口会停在历史消息顶部要手动拉到底（阿颖 2026-07-02 反馈）
   const prevChatId = useRef('__mount__')
   const [showBtn, setShowBtn] = useState(false)
+  // 长窗口如果首次进入就把几千条 Markdown 气泡一起挂载，手机主线程会卡住。
+  // 记录仍完整留在 store/IndexedDB；这里只控制当前实际画进 DOM 的尾部窗口。
+  const [renderCount, setRenderCount] = useState(INITIAL_MESSAGE_RENDER)
+  const prependScrollRef = useRef(null)
   const scrollAnchor = useStore((s) => s.scrollAnchor)
   const bigReady = useStore((s) => s.bigReady)
   // 官端滚动模型用：记住最后一条用户消息 id，出现新的才触发置顶（undefined=首次挂载）
   const lastUserIdRef = useRef(undefined)
   const anchorChatRef = useRef(activeChatId)
+  const messageWindow = useMemo(() => buildMessageRenderWindow(messages, renderCount), [messages, renderCount])
+  const { visible: visibleMessages, rendered: renderedMessages, remaining } = messageWindow
 
   const getScroller = () => listRef.current?.parentElement || null
 
@@ -28,6 +35,35 @@ export default function MessageList({ messages, status, onEdit, onQuote, onDelet
     if (!el) return true
     return el.scrollHeight - el.scrollTop - el.clientHeight < 140
   }, [])
+
+  const loadEarlier = useCallback(() => {
+    const el = getScroller()
+    if (el) prependScrollRef.current = { el, height: el.scrollHeight, top: el.scrollTop }
+    setRenderCount((count) => Math.min(visibleMessages.length, count + MESSAGE_RENDER_BATCH))
+  }, [visibleMessages.length])
+
+  // 前插旧消息后保持眼前这一条不动，避免列表突然把用户推到更早的位置。
+  useLayoutEffect(() => {
+    const pending = prependScrollRef.current
+    if (!pending) return
+    pending.el.scrollTop = pending.top + (pending.el.scrollHeight - pending.height)
+    prependScrollRef.current = null
+  }, [remaining])
+
+  // 日历和通话记录可能跳到首绘窗口之外。先扩大渲染窗口，调用方下一拍再定位。
+  useEffect(() => {
+    const reveal = (messageId) => {
+      const needed = renderCountForMessage(messages, messageId, renderCount)
+      if (needed <= renderCount) return false
+      prependScrollRef.current = null
+      setRenderCount(needed)
+      return true
+    }
+    window.__yanjiRevealMessage = reveal
+    return () => {
+      if (window.__yanjiRevealMessage === reveal) delete window.__yanjiRevealMessage
+    }
+  }, [messages, renderCount])
 
   // 切换会话：等布局/图片稳定后瞬跳到底部（不用 smooth，避免停在半路旧消息——这就是那个bug）
   useEffect(() => {
@@ -54,8 +90,8 @@ export default function MessageList({ messages, status, onEdit, onQuote, onDelet
   // - 官端模式：发送后把自己的消息滚到视口顶端，回复在下方往下长，流式期间不跟随
   useEffect(() => {
     let lastUser = null
-    for (let i = messages.length - 1; i >= 0; i--) {
-      if (messages[i].role === 'user') { lastUser = messages[i]; break }
+    for (let i = visibleMessages.length - 1; i >= 0; i--) {
+      if (visibleMessages[i].role === 'user') { lastUser = visibleMessages[i]; break }
     }
     // 首次挂载 / 切换会话：只记录，不触发置顶
     if (lastUserIdRef.current === undefined || anchorChatRef.current !== activeChatId) {
@@ -82,7 +118,7 @@ export default function MessageList({ messages, status, onEdit, onQuote, onDelet
     }
     if (nearBottom()) scrollToBottom('smooth')
     else setShowBtn(true)
-  }, [messages, activeChatId, scrollAnchor, nearBottom, scrollToBottom])
+  }, [visibleMessages, activeChatId, scrollAnchor, nearBottom, scrollToBottom])
 
   // 滚动监听：离底部远就显示「回到底部」
   useEffect(() => {
@@ -109,7 +145,13 @@ export default function MessageList({ messages, status, onEdit, onQuote, onDelet
   return (
     <>
       <div className={'messages-list' + (scrollAnchor ? ' anchor-mode' : '')} ref={listRef}>
-        {messages.filter((m) => !m.hidden).map((msg, i, arr) => (
+        {remaining > 0 && (
+          <button type="button" className="messages-load-earlier" onClick={loadEarlier}>
+            再看前面的 {Math.min(MESSAGE_RENDER_BATCH, remaining)} 条
+            <span>还有 {remaining} 条未展开</span>
+          </button>
+        )}
+        {renderedMessages.map((msg, i, arr) => (
           msg.sys
             ? <div key={msg.id} className="msg-sys-line">{msg.content}</div>
             : <div key={msg.id} style={{ display: 'contents' }}>

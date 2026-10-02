@@ -68,6 +68,19 @@ const EMPTY_MESSAGES = []
 
 const IMAGE_DESC_PROMPT = '用中文客观描述这张图，80 字以内。保留界面文字和数字、人物动作、物品、场景。只输出描述。'
 
+function locateChatMessage(messageId, block = 'center', tries = 0) {
+  const row = document.querySelector(`[data-mid="${messageId}"]`)
+  if (row) {
+    row.scrollIntoView({ behavior: 'auto', block })
+    row.classList.add('msg-jump-flash')
+    setTimeout(() => row.classList.remove('msg-jump-flash'), 1800)
+    return
+  }
+  // 长窗口只首绘尾部。目标在更早处时，先让 MessageList 展开到它，再等 React 落 DOM。
+  window.__yanjiRevealMessage?.(messageId)
+  if (tries < 10) setTimeout(() => locateChatMessage(messageId, block, tries + 1), 80)
+}
+
 async function describeImages(chatId, messageId, images, conn, updateMessage, recordTokenUsage) {
   try {
     const result = await sendMessage({
@@ -1914,6 +1927,7 @@ export default function Chat() {
             </div>
           ) : (
             <MessageList
+              key={activeChatId || 'empty'}
               messages={messages}
               compactedThrough={getSummary(activeChatId) ? activeChat?.compactedThrough : null}
               status={status}
@@ -1954,13 +1968,7 @@ export default function Chat() {
           onClose={() => setCalendarOpen(false)}
           onJump={(mid) => {
             // 等日历关掉再滚，避免 portal 卸载抢帧
-            requestAnimationFrame(() => {
-              const row = document.querySelector(`[data-mid="${mid}"]`)
-              if (!row) return
-              row.scrollIntoView({ behavior: 'auto', block: 'start' })
-              row.classList.add('msg-jump-flash')
-              setTimeout(() => row.classList.remove('msg-jump-flash'), 1800)
-            })
+            requestAnimationFrame(() => locateChatMessage(mid, 'start'))
           }}
         />
       )}
@@ -1979,15 +1987,7 @@ export default function Chat() {
           onJump={(chatId, mid) => {
             // 可能跨对话：先切过去，等挂载滚底（0702 哨兵）落定后再定位，找不到就多试几拍
             if (chatId !== activeChatId) setActiveChat(chatId)
-            let tries = 0
-            const locate = () => {
-              const row = document.querySelector(`[data-mid="${mid}"]`)
-              if (!row) { if (++tries < 8) setTimeout(locate, 120); return }
-              row.scrollIntoView({ behavior: 'auto', block: 'center' })
-              row.classList.add('msg-jump-flash')
-              setTimeout(() => row.classList.remove('msg-jump-flash'), 1800)
-            }
-            setTimeout(locate, 180)
+            setTimeout(() => locateChatMessage(mid, 'center'), 180)
           }}
         />
       )}
