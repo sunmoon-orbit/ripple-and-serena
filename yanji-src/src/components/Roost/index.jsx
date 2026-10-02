@@ -7,7 +7,6 @@ import CoRead from './CoRead'
 import BookRead from './BookRead'
 import MemoryPeek from './MemoryPeek'
 import EventScrolls from './EventScrolls'
-import { CrowEmoji, CrowText } from '../CrowEmoji'
 
 const ANNO_COLORS = [
   { id: 'yellow', hex: '#f5d76e' },
@@ -284,7 +283,7 @@ export default function Roost() {
     >
       {/* 顶部标题 */}
       <div className="roost-header">
-        <div className="roost-birds"><CrowEmoji /> <span className="roost-heart">♡</span> 🐦</div>
+        <div className="roost-birds">🐦‍⬛ <span className="roost-heart">♡</span> 🐦</div>
         <h1 className="roost-title">Roost</h1>
         <button
           className={'roost-music' + (musicOn ? ' playing' : '')}
@@ -505,7 +504,7 @@ export default function Roost() {
                     <div className="roost-letter-deco" aria-hidden="true"><WingedHeart size={56} /></div>
                   )}
                   <div className="roost-letter-paper-head">
-                    <span><CrowText>{selectedLetter.direction === 'out' ? `致 ${selectedLetter.recipient || ''}` : `${selectedLetter.sender || ''} 寄`}</CrowText></span>
+                    <span>{selectedLetter.direction === 'out' ? `致 ${selectedLetter.recipient || ''}` : `${selectedLetter.sender || ''} 寄`}</span>
                     <span>{(selectedLetter.sent_at || selectedLetter.created_at || '').slice(0, 10)}</span>
                   </div>
                   <div className="roost-letter-paper-body" ref={letterTextRef}>
@@ -515,9 +514,9 @@ export default function Roost() {
                           key={s.start}
                           className="bookread-mark"
                           style={{ backgroundColor: (ANNO_HEX[s.annos[0].color] || '#f5d76e') + '66', borderBottom: `2px solid ${ANNO_HEX[s.annos[0].color] || '#f5d76e'}` }}
-                        ><CrowText>{s.text}</CrowText></mark>
+                        >{s.text}</mark>
                       ) : (
-                        <span key={s.start}><CrowText>{s.text}</CrowText></span>
+                        <span key={s.start}>{s.text}</span>
                       )
                     )}
                   </div>
@@ -534,7 +533,7 @@ export default function Roost() {
                         className="bookread-anno-card"
                         style={{ borderLeftColor: ANNO_HEX[a.color] || '#f5d76e' }}
                       >
-                        <div className="bookread-anno-quote"><CrowText>{a.quote}</CrowText></div>
+                        <div className="bookread-anno-quote">{a.quote}</div>
                         <div className="bookread-anno-row">
                           <span className="coread-anno-author">{a.author}</span>
                           <span className="coread-anno-note">{a.note || '（划线）'}</span>

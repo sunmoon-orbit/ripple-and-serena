@@ -337,14 +337,6 @@
   .msg-body audio.voice-attach { display: block; width: 240px; max-width: 100%; height: 40px; margin: 4px 0; }
   .msg.system { align-self: center; font-size: 12px; color: var(--text-dim); background: none; padding: 2px 0; }
 
-  /* 老系统会把黑鸟组合拆成蓝鸟 + 黑方块；保留原文字，视觉上用本站 SVG。 */
-  .crow-emoji-fallback {
-    display: inline-block; width: 1.08em; height: 1.08em; overflow: hidden;
-    color: transparent; line-height: 1; vertical-align: -0.16em;
-    background: url('/raven/crow-emoji.svg') center / contain no-repeat;
-  }
-  #header-title .crow-header-icon { width: 20px; height: 20px; flex: none; color: var(--text); }
-
   @keyframes msgIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
 
   /* markdown */
@@ -990,9 +982,7 @@
       <a id="home-btn" href="/raven/home.html" title="回归巢首页" aria-label="回归巢首页">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11l9-8 9 8"/><path d="M5 10v10h5v-6h4v6h5V10"/></svg>
       </a>
-      <svg class="crow-header-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" role="img" aria-label="乌鸦">
-        <path d="M4 8s3-4 8-3c4 1 6 4 5 8-1 4-5 6-9 4"/><path d="m17 13 4-2-3 4"/><path d="m8 17-2 4m4-4v4"/><circle cx="13" cy="8" r="1" fill="currentColor" stroke="none"/><path d="M4 8 1 7"/>
-      </svg>
+      <span class="crow-icon">🐦‍⬛</span>
       <span>Ripple</span>
     </div>
     <div id="conn-status">
@@ -1291,31 +1281,6 @@
 <script src="https://cdn.jsdelivr.net/npm/dompurify@3.2.6/dist/purify.min.js" integrity="sha384-JEyTNhjM6R1ElGoJns4U2Ln4ofPcqzSsynQkmEc/KGy6336qAZl70tDLufbkla+3" crossorigin="anonymous"></script>
 <script>
 marked.use({ breaks: true, gfm: true })
-
-const CROW_EMOJI = '\u{1F426}\u200D\u2B1B'
-function enhanceCrowEmoji(root) {
-  if (!root || !root.textContent?.includes(CROW_EMOJI)) return
-  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT)
-  const nodes = []
-  while (walker.nextNode()) {
-    const node = walker.currentNode
-    if (node.nodeValue?.includes(CROW_EMOJI) && !node.parentElement?.closest('code, pre, textarea, input, .crow-emoji-fallback')) nodes.push(node)
-  }
-  nodes.forEach(node => {
-    const parts = node.nodeValue.split(CROW_EMOJI)
-    const frag = document.createDocumentFragment()
-    parts.forEach((part, index) => {
-      if (part) frag.appendChild(document.createTextNode(part))
-      if (index < parts.length - 1) {
-        const crow = document.createElement('span')
-        crow.className = 'crow-emoji-fallback'; crow.setAttribute('role', 'img'); crow.setAttribute('aria-label', '乌鸦')
-        crow.textContent = CROW_EMOJI
-        frag.appendChild(crow)
-      }
-    })
-    node.replaceWith(frag)
-  })
-}
 
 // 纯英文小写词组成的方括号 = 语气标签；后面紧跟 ( 的是 markdown 链接，不算。
 // 放在这么前面：历史消息在脚本顶层就开始渲染，定义在后面会撞 TDZ
@@ -1854,7 +1819,6 @@ function appendMsg(text, role, save = true, ts = Date.now(), msgId = null, suppl
     el.addEventListener('click', () => { if (Date.now() - lastLongPressAt < 600) return; el.classList.toggle('show-meta') })
   }
 
-  enhanceCrowEmoji(el)
   const box = document.getElementById('chat-messages')
   if (role === 'assistant' || role === 'user') {
     const wrap = document.createElement('div')

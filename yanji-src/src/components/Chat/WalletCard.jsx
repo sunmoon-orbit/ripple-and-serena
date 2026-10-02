@@ -1,6 +1,5 @@
 import { useState } from 'react'
 import { createPortal } from 'react-dom'
-import { CrowEmoji } from '../CrowEmoji'
 
 // 乌鸦钱包（2026-07-13 从 Roost 搬进侧边栏工具区，阿颖的装修提议）
 // 数据仍在 localStorage 'roost_wallet'，搬家不搬账本，历史记录原样保留。
@@ -35,7 +34,7 @@ export default function WalletCard({ onClose }) {
           <button className="health-close" onClick={onClose} aria-label="关闭">✕</button>
         </div>
 
-        <div style={{ textAlign: 'center', padding: '4px 0 0', fontSize: 26 }}><CrowEmoji /></div>
+        <div style={{ textAlign: 'center', padding: '4px 0 0', fontSize: 26 }}>🐦‍⬛</div>
         <div style={{ textAlign: 'center', padding: '4px 0 16px', fontSize: 30, fontWeight: 700, color: balance >= 0 ? 'var(--accent)' : 'var(--danger)' }}>
           ¥ {balance.toFixed(2)}
         </div>

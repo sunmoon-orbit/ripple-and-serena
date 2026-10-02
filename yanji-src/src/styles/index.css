@@ -3699,6 +3699,11 @@ textarea.form-input { display: block; margin: 8px 16px 12px; }
 .roost-letter-paper-body {
   font-size: 14.5px; color: var(--text); line-height: 28px;
   white-space: pre-wrap; word-break: break-word;
+  /* 信纸继承的颜文字补字字体会拆开 emoji ZWJ；这里让系统彩色 emoji 先接管。 */
+  font-family: "Noto Color Emoji", "Apple Color Emoji", "Segoe UI Emoji",
+    'Yanji Kaomoji Marks', 'Yanji Kaomoji Canadian', 'Yanji Kaomoji Yi',
+    'Yanji Kaomoji Tibetan', 'Yanji Kaomoji Bengali', 'Yanji Kaomoji Batak',
+    system-ui, -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", sans-serif;
 }
 
 /* ── 游戏室 GamesRoom ── */
@@ -6006,18 +6011,4 @@ body.mp-active .scroll-bottom-btn { bottom: 139px; }
   .crossing-session { min-height: 48px; border-bottom: 1px solid var(--border); }
   .crossing-session small { display: block; }
   .crossing-chat { min-height: 0; }
-}
-/* Android 的部分系统 emoji 字体不认识「黑鸟」组合，会画成蓝鸟 + 黑方块。
-   保留原文本用于复制/搜索，视觉上换成言叽自带的小乌鸦。 */
-.crow-emoji {
-  display: inline-block;
-  width: 1.08em;
-  height: 1.08em;
-  overflow: hidden;
-  color: transparent;
-  line-height: 1;
-  vertical-align: -0.16em;
-  background-repeat: no-repeat;
-  background-position: center;
-  background-size: contain;
 }

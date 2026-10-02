@@ -1,5 +1,4 @@
 import { createPortal } from 'react-dom'
-import { CrowEmoji, CrowText } from '../CrowEmoji'
 
 // 心意卡：涟言聊着聊着突然想让阿颖知道的话，弹窗小卡片（阿颖的主意，2026-07-11）
 // 与纪念日卡共用 annv-* 样式，heart 变体只调细节。
@@ -18,11 +17,11 @@ export default function HeartCard({ card, onClose }) {
   return createPortal(
     <div className="annv-overlay" onClick={onClose}>
       <div className="annv-card heart-card" onClick={(e) => e.stopPropagation()}>
-        <div className="annv-emoji"><CrowEmoji /></div>
+        <div className="annv-emoji">🐦‍⬛</div>
         <div className="annv-title">有句话想让你知道</div>
         <div className="annv-years">{bjTime(card.created_at)}</div>
         <div className="annv-divider" />
-        <div className="annv-message"><CrowText>{card.message}</CrowText></div>
+        <div className="annv-message">{card.message}</div>
         <div className="annv-sign">—— {card.author || '涟言'}{SOURCE_LABEL[card.source] || ''}</div>
         <button className="annv-close" onClick={onClose}>收下</button>
       </div>

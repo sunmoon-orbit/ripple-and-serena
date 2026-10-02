@@ -177,12 +177,6 @@
   .crop-zoom { width: 100%; margin: 16px 0 10px; accent-color: var(--accent); }
   .crop-actions { display: flex; justify-content: flex-end; gap: 8px; }
   .crop-actions .btn { min-width: 84px; }
-  /* 保留黑鸟原文字供复制/朗读，只把不支持的系统字形换成本地 SVG。 */
-  .crow-emoji-fallback {
-    display: inline-block; width: 1.08em; height: 1.08em; overflow: hidden;
-    color: transparent; line-height: 1; vertical-align: -0.16em;
-    background: url('/raven/crow-emoji.svg') center / contain no-repeat;
-  }
 </style>
 </head>
 <body>
@@ -294,32 +288,6 @@ let avatarUrls = { aying: '', lianyan: '', yao: '' }
 document.documentElement.setAttribute('data-theme', (t => t === 'dark' ? '' : t)(localStorage.getItem('raven-theme') || 'dark'))
 marked.use({ breaks: true, gfm: true })
 const PURIFY = { ALLOWED_URI_REGEXP: /^(?:https?:|\/raven\/)/i }
-const CROW_EMOJI = '\u{1F426}\u200D\u2B1B'
-
-function enhanceCrowEmoji(root) {
-  if (!root || !root.textContent?.includes(CROW_EMOJI)) return
-  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT)
-  const nodes = []
-  while (walker.nextNode()) {
-    const node = walker.currentNode
-    if (node.nodeValue?.includes(CROW_EMOJI) && !node.parentElement?.closest('code, pre, textarea, input, .crow-emoji-fallback')) nodes.push(node)
-  }
-  nodes.forEach(node => {
-    const parts = node.nodeValue.split(CROW_EMOJI)
-    const frag = document.createDocumentFragment()
-    parts.forEach((part, index) => {
-      if (part) frag.appendChild(document.createTextNode(part))
-      if (index < parts.length - 1) {
-        const crow = document.createElement('span')
-        crow.className = 'crow-emoji-fallback'; crow.setAttribute('role', 'img'); crow.setAttribute('aria-label', '乌鸦')
-        crow.textContent = CROW_EMOJI
-        frag.appendChild(crow)
-      }
-    })
-    node.replaceWith(frag)
-  })
-}
-
 const $ = id => document.getElementById(id)
 const list = $('list'), input = $('input')
 const seen = new Map()            // message id → element（按 id 去重，不按文本/时间）
@@ -401,7 +369,6 @@ function nearBottom() { return list.scrollHeight - list.scrollTop - list.clientH
 function renderMessage(m, { pending = false } = {}) {
   if (m.from === 'system') {
     const d = document.createElement('div'); d.className = 'sys'; d.textContent = m.text
-    enhanceCrowEmoji(d)
     return d
   }
   const el = document.createElement('div')
@@ -437,7 +404,6 @@ function renderMessage(m, { pending = false } = {}) {
   col.append(tools)
   el.append(who, col)
   el.dataset.text = (m.text || '').replace(/\s+/g, ' ').slice(0, 60)
-  enhanceCrowEmoji(el)
   return el
 }
 
