@@ -908,7 +908,7 @@ const server = http.createServer((req, res) => {
     })
     return
   }
-  const TOKEN_REQUIRED = ['/raven/status', '/raven/last-thinking', '/raven/memory-random', '/raven/on-this-day', '/raven/memory-count', '/raven/activity', '/raven/upload', '/raven/push/subscribe', '/raven/push/unsubscribe', '/raven/usage']
+  const TOKEN_REQUIRED = ['/raven/status', '/raven/last-thinking', '/raven/memory-random', '/raven/journal', '/raven/on-this-day', '/raven/memory-count', '/raven/activity', '/raven/upload', '/raven/push/subscribe', '/raven/push/unsubscribe', '/raven/usage']
   if (TOKEN_REQUIRED.includes(url.pathname) && !externalAuthed(req, url)) {
     res.writeHead(401, { 'Content-Type': 'application/json' })
     res.end(JSON.stringify({ error: 'unauthorized' }))
@@ -1160,6 +1160,22 @@ const server = http.createServer((req, res) => {
   }
 
   // random memory proxy
+  // 涟言的日记本（1002）。记忆库那边已经把封存页正文剥掉了，这里再剥一遍：两道锁，任何一道漏了都不出门
+  if (req.method === 'GET' && url.pathname === '/raven/journal') {
+    moonGet('/journal?limit=100')
+      .then(data => {
+        const entries = (data.entries || []).map(e => ({
+          id: e.id, author: e.author, title: e.title, sealed: e.visibility === 'sealed',
+          content: e.visibility === 'sealed' ? null : e.content,
+          created_at: e.created_at, revealed_at: e.revealed_at || null,
+        }))
+        res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' })
+        res.end(JSON.stringify({ entries }))
+      })
+      .catch(() => { res.writeHead(500); res.end('{}') })
+    return
+  }
+
   if (req.method === 'GET' && url.pathname === '/raven/memory-random') {
     moonGet('/memories?limit=80&scope=shared&deleted=false')
       .then(data => {

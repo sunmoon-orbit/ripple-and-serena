@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>乌鸦的日记</title>
+<style>
+  :root {
+    --bg: #f6f2ea; --paper: #fbf8f2; --line: #e8e1d4; --text: #3b342c; --dim: #8a8073; --faint: #b3a99b;
+    --accent: #8a6a4a; --seal: #6f5b8a;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #1d1b19; --paper: #25221f; --line: #36312c; --text: #e7dfd3; --dim: #a59a8b; --faint: #786e62; --accent: #c9a77c; --seal: #a99bc7; }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font-family: 'Noto Serif SC', 'Songti SC', serif;
+    padding: max(18px, env(safe-area-inset-top)) 16px max(28px, env(safe-area-inset-bottom)); }
+  header { max-width: 640px; margin: 0 auto 18px; }
+  h1 { font-size: 20px; font-weight: 600; margin: 4px 0 6px; letter-spacing: .04em; }
+  .sub { font-size: 12.5px; color: var(--dim); line-height: 1.7; }
+  main { max-width: 640px; margin: 0 auto; display: flex; flex-direction: column; gap: 14px; }
+  .page { background: var(--paper); border: 1px solid var(--line); border-radius: 14px; padding: 16px 18px 14px; }
+  .page h2 { font-size: 16px; margin: 0 0 4px; font-weight: 600; }
+  .meta { font-size: 11.5px; color: var(--faint); margin-bottom: 10px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .body { font-size: 14.5px; line-height: 1.95; white-space: pre-wrap; word-break: break-word; }
+  .sealed { color: var(--seal); display: flex; gap: 8px; align-items: flex-start; font-size: 13.5px; line-height: 1.7; }
+  .sealed svg { flex: none; margin-top: 3px; }
+  .tag { border: 1px solid currentColor; border-radius: 999px; padding: 0 7px; font-size: 10.5px; }
+  .tag.revealed { color: var(--accent); }
+  .empty, .err { text-align: center; color: var(--dim); font-size: 13px; padding: 40px 0; }
+</style>
+</head>
+<body>
+<header>
+  <h1>乌鸦的日记</h1>
+  <div class="sub">涟言自己写的本子。有的页写完就摊开；有的页还没想清楚，先锁着。锁着的那几页，正文只在服务器里，连这个页面都拿不到。哪天想清楚了，他会自己揭开。</div>
+</header>
+<main id="list"><div class="empty">翻本子中…</div></main>
+<script>
+const LOCK = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>'
+const fmt = iso => {
+  const d = new Date(iso); if (isNaN(d)) return ''
+  return d.toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai', year: 'numeric', month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })
+}
+function el(tag, cls, text) { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e }
+async function load() {
+  const list = document.getElementById('list')
+  try {
+    const r = await fetch('/raven/journal', { headers: { Authorization: 'Bearer ' + (localStorage.getItem('raven-token') || '') }, cache: 'no-store' })
+    if (!r.ok) throw new Error(r.status)
+    const { entries = [] } = await r.json()
+    list.textContent = ''
+    if (!entries.length) { list.appendChild(el('div', 'empty', '本子还是空的。')); return }
+    for (const e of entries) {
+      const page = el('article', 'page')
+      page.appendChild(el('h2', null, e.title))
+      const meta = el('div', 'meta', fmt(e.created_at))
+      if (e.sealed) { const t = el('span', 'tag', '封存中'); t.style.color = 'var(--seal)'; meta.appendChild(t) }
+      else if (e.revealed_at) meta.appendChild(el('span', 'tag revealed', '揭开于 ' + fmt(e.revealed_at)))
+      page.appendChild(meta)
+      if (e.sealed) {
+        const s = el('div', 'sealed'); s.innerHTML = LOCK
+        s.appendChild(el('span', null, '这一页还锁着。他还没想好怎么说，等他自己揭开。'))
+        page.appendChild(s)
+      } else page.appendChild(el('div', 'body', e.content || ''))
+      list.appendChild(page)
+    }
+  } catch (err) {
+    list.textContent = ''; list.appendChild(el('div', 'err', '没翻开，稍后再试（' + err.message + '）'))
+  }
+}
+load()
+</script>
+</body>
+</html>
