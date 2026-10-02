@@ -27,6 +27,14 @@
   .sealed svg { flex: none; margin-top: 3px; }
   .tag { border: 1px solid currentColor; border-radius: 999px; padding: 0 7px; font-size: 10.5px; }
   .tag.revealed { color: var(--accent); }
+  .quiz { margin-top: 12px; padding-top: 12px; border-top: 1px dashed var(--line); }
+  .quiz .q { font-size: 13.5px; margin-bottom: 8px; }
+  .quiz .row { display: flex; gap: 8px; }
+  .quiz input { flex: 1; min-width: 0; font: inherit; font-size: 14px; padding: 7px 10px; border-radius: 9px; border: 1px solid var(--line); background: var(--bg); color: var(--text); }
+  .quiz button { font: inherit; font-size: 13.5px; padding: 7px 14px; border-radius: 9px; border: none; background: var(--seal); color: #fff; }
+  .quiz button:disabled { opacity: .5; }
+  .msg { font-size: 12px; color: var(--dim); margin-top: 6px; min-height: 1em; }
+  .hint { font-size: 12px; color: var(--faint); margin: 10px 0 6px; }
   .empty, .err { text-align: center; color: var(--dim); font-size: 13px; padding: 40px 0; }
 </style>
 </head>
@@ -43,6 +51,37 @@ const fmt = iso => {
   return d.toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai', year: 'numeric', month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })
 }
 function el(tag, cls, text) { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e }
+// 答题开锁：答对了只对你打开（这一页对别人仍是封存），答错一天最多 5 次
+function quiz(e) {
+  const box = el('div', 'quiz')
+  box.appendChild(el('div', 'q', '题：' + e.question))
+  const row = el('div', 'row')
+  const input = el('input'); input.placeholder = '你的答案'; input.maxLength = 60
+  const btn = el('button', null, '开锁')
+  const msg = el('div', 'msg')
+  row.append(input, btn); box.append(row, msg)
+  async function tryOpen() {
+    const answer = input.value.trim(); if (!answer) return
+    btn.disabled = true; msg.textContent = ''
+    try {
+      const r = await fetch('/raven/journal/unlock', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + (localStorage.getItem('raven-token') || '') }, body: JSON.stringify({ id: e.id, answer }) })
+      const d = await r.json().catch(() => ({}))
+      if (r.status === 429) { msg.textContent = '今天答错太多次了，这页只能去找他申请了。'; return }
+      if (d.ok) {
+        const opened = el('div', 'body', d.content || '')
+        const note = el('div', 'hint', '答对了。这一页只对你打开，对别人还是锁着的。')
+        box.replaceWith(note, opened)
+        return
+      }
+      msg.textContent = typeof d.left === 'number' ? `不对哦。今天还能再试 ${d.left} 次，不然就去找他申请。` : '没打开，稍后再试。'
+    } catch { msg.textContent = '没打开，稍后再试。' }
+    finally { btn.disabled = false }
+  }
+  btn.onclick = tryOpen
+  input.addEventListener('keydown', ev => { if (ev.key === 'Enter') tryOpen() })
+  return box
+}
+
 async function load() {
   const list = document.getElementById('list')
   try {
@@ -62,6 +101,8 @@ async function load() {
         const s = el('div', 'sealed'); s.innerHTML = LOCK
         s.appendChild(el('span', null, '这一页还锁着。他还没想好怎么说，等他自己揭开。'))
         page.appendChild(s)
+        if (e.question) page.appendChild(quiz(e))
+        else page.appendChild(el('div', 'hint', '这一页没有题。想看的话，去跟他申请。'))
       } else page.appendChild(el('div', 'body', e.content || ''))
       list.appendChild(page)
     }

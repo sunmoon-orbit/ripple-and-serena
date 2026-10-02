@@ -908,7 +908,7 @@ const server = http.createServer((req, res) => {
     })
     return
   }
-  const TOKEN_REQUIRED = ['/raven/status', '/raven/last-thinking', '/raven/memory-random', '/raven/journal', '/raven/on-this-day', '/raven/memory-count', '/raven/activity', '/raven/upload', '/raven/push/subscribe', '/raven/push/unsubscribe', '/raven/usage']
+  const TOKEN_REQUIRED = ['/raven/status', '/raven/last-thinking', '/raven/memory-random', '/raven/journal', '/raven/journal/unlock', '/raven/on-this-day', '/raven/memory-count', '/raven/activity', '/raven/upload', '/raven/push/subscribe', '/raven/push/unsubscribe', '/raven/usage']
   if (TOKEN_REQUIRED.includes(url.pathname) && !externalAuthed(req, url)) {
     res.writeHead(401, { 'Content-Type': 'application/json' })
     res.end(JSON.stringify({ error: 'unauthorized' }))
@@ -1168,11 +1168,28 @@ const server = http.createServer((req, res) => {
           id: e.id, author: e.author, title: e.title, sealed: e.visibility === 'sealed',
           content: e.visibility === 'sealed' ? null : e.content,
           created_at: e.created_at, revealed_at: e.revealed_at || null,
+          question: e.visibility === 'sealed' ? e.question || null : null, unlocked_at: e.unlocked_at || null,
         }))
         res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' })
         res.end(JSON.stringify({ entries }))
       })
       .catch(() => { res.writeHead(500); res.end('{}') })
+    return
+  }
+
+  // 答题开锁（1002 她的主意）：答对只把正文回给这一次请求，页面本身仍是封存
+  if (req.method === 'POST' && url.pathname === '/raven/journal/unlock') {
+    let body = ''
+    req.on('data', d => { body += d; if (body.length > 2000) req.destroy() })
+    req.on('end', () => {
+      let id, answer
+      try { ({ id, answer } = JSON.parse(body || '{}')) } catch {}
+      id = Number(id)
+      if (!Number.isInteger(id) || id <= 0) { res.writeHead(400); res.end('{"error":"bad id"}'); return }
+      moonPost(`/journal/${id}/unlock`, { answer: String(answer || '').slice(0, 200) })
+        .then(r => { res.writeHead(r.status, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' }); res.end(JSON.stringify(r.data)) })
+        .catch(() => { res.writeHead(500); res.end('{}') })
+    })
     return
   }
 
