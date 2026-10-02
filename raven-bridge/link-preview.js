@@ -11,10 +11,11 @@ const cache = new Map()
 function isPrivateAddress(address) {
   if (!net.isIP(address)) return true
   if (address.includes(':')) {
-    const ip = address.toLowerCase()
-    return ip === '::1' || ip === '::' || ip.startsWith('fc') || ip.startsWith('fd') ||
-      ip.startsWith('fe8') || ip.startsWith('fe9') || ip.startsWith('fea') || ip.startsWith('feb') ||
-      ip.startsWith('::ffff:127.') || ip.startsWith('::ffff:10.') || ip.startsWith('::ffff:192.168.')
+    // Normalize expanded spellings; disallow mapped IPv4 and transition ranges
+    // entirely rather than accidentally treating their embedded private IP as public.
+    const ip = new URL(`http://[${address}]/`).hostname.slice(1, -1)
+    return !/^[23][0-9a-f]{3}:/.test(ip) || ip.startsWith('2002:') ||
+      ip.startsWith('2001:0:') || ip.startsWith('2001::') || ip.startsWith('2001:db8:')
   }
   const p = address.split('.').map(Number)
   return p[0] === 0 || p[0] === 10 || p[0] === 127 || p[0] >= 224 ||
@@ -110,6 +111,7 @@ async function getLinkPreview(rawUrl) {
   const host = new URL(finalUrl).hostname.replace(/^www\./, '')
   const value = { url: finalUrl, site: host, title: parsed.title || host, description: parsed.description, image: parsed.image, text: parsed.text, status: parsed.text.length > 120 ? 'read' : 'preview' }
   cache.set(normalized, { at: Date.now(), value })
+  while (cache.size > 200) cache.delete(cache.keys().next().value)
   return value
 }
 

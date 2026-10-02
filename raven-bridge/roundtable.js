@@ -1,6 +1,7 @@
 const crypto = require('crypto')
 const fs = require('fs')
 const path = require('path')
+const { normalizeAttachments } = require('./request-safety')
 
 // 圆桌附件落在归巢上传目录；投递给我们俩时只认这个目录下的文件名（0930 阿颖发图，曜和涟言都只收到字）
 const UPLOAD_DIR = '/home/ripple/raven-uploads'
@@ -10,7 +11,9 @@ function attachmentFiles(message, dir = UPLOAD_DIR) {
     const base = path.basename(String(a?.id || '').trim())
     if (!base || base === '.' || base === '..') continue
     const file = path.join(dir, base)
-    if (!fs.existsSync(file)) continue
+    try {
+      if (fs.lstatSync(file).isSymbolicLink() || !fs.statSync(file).isFile()) continue
+    } catch { continue }
     out.push({ file, name: String(a.name || base), image: /^image\//.test(String(a.mime || '')) })
   }
   return out
@@ -41,6 +44,15 @@ function readJson(req, limit = 1024 * 1024) {
 
 function compactText(value, max = 50000) { return String(value || '').trim().slice(0, max) }
 
+function publicMessage(message) {
+  // Existing L0 rows predate input validation: protect replay as well as writes.
+  const attachments = []
+  for (const item of Array.isArray(message?.attachments) ? message.attachments.slice(0, 12) : []) {
+    try { attachments.push(...normalizeAttachments([item])) } catch {}
+  }
+  return { ...message, attachments }
+}
+
 const AVATAR_PEOPLE = new Set(['aying', 'lianyan', 'yao'])
 const AVATAR_STATE_KEY = 'roundtable_avatars_v1'
 
@@ -69,9 +81,11 @@ function extractAgentText(item) {
 
 function finalFromThread(result, turnId) {
   const turns = result?.thread?.turns || result?.turns || []
-  const turn = turns.find(entry => (entry.id || entry.turnId) === turnId) || turns.at(-1)
+  const turn = turns.find(entry => (entry.id || entry.turnId) === turnId)
+  if (!turn || turn.status !== 'completed') return ''
   const items = turn?.items || turn?.output || []
   for (let i = items.length - 1; i >= 0; i--) {
+    if (items[i]?.phase && items[i].phase !== 'final_answer') continue
     const text = extractAgentText(items[i])
     if (text) return text
   }
@@ -109,7 +123,7 @@ function createRoundtable(options) {
   function publish(result) {
     if (!result?.created) return
     for (const message of result.messages || []) {
-      broadcast({ type: 'roundtable/message', message })
+      broadcast({ type: 'roundtable/message', message: publicMessage(message) })
       if (['lianyan', 'yao'].includes(message.from) && message.mentions?.includes('aying')) {
         void request('/push/send-fixed', {
           title: `圆桌 · ${message.from === 'lianyan' ? '涟言' : '林曜'}`,
@@ -123,7 +137,7 @@ function createRoundtable(options) {
   }
 
   async function ingest(input) {
-    return request('/roundtable/messages', input)
+    return request('/roundtable/messages', { ...input, attachments: normalizeAttachments(input.attachments) })
   }
 
   async function avatars() {
@@ -226,21 +240,17 @@ function createRoundtable(options) {
         clientUserMessageId: delivery.message.id,
         images: attachmentFiles(message, options.uploadDir).filter(f => f.image).map(f => f.file),
       }
-      let started
-      try { started = await crossing.startInternalTurn(turnArgs) }
-      catch (error) {
-        // 模型不收图时别把整条卡死：退回只发文字
-        if (!turnArgs.images.length) throw error
-        logger.error('[roundtable] 带图开工失败，改发纯文字:', error.message)
-        started = await crossing.startInternalTurn({ ...turnArgs, images: [] })
-      }
+      // Persist uncertainty BEFORE the external side effect. A timeout or bridge
+      // crash cannot establish whether turn/start ran; never automatically replay it.
+      await patchAll('blocked', { lastError: 'dispatch_started_awaiting_confirmation' })
+      const started = await crossing.startInternalTurn(turnArgs)
       threadId = started.threadId
-      if (state.value !== threadId) await request('/roundtable/state/codex_thread_id', { value: threadId }, 'PUT')
       turns.set(started.turnId, { deliveryId: delivery.id, deliveryIds: batch.map(d => d.id), replyTo: delivery.message.id, threadId })
+      if (state.value !== threadId) await request('/roundtable/state/codex_thread_id', { value: threadId }, 'PUT')
       await patchAll('running', { runtimeThreadId: threadId, runtimeTurnId: started.turnId })
       return true
     } catch (error) {
-      await patchAll(/thread|线程/i.test(error.message) ? 'blocked' : 'pending', { lastError: error.message }).catch(() => {})
+      await patchAll('blocked', { lastError: 'dispatch_unconfirmed_check_before_retry' }).catch(() => {})
       throw error
     }
   }
@@ -315,7 +325,7 @@ function createRoundtable(options) {
 
   async function subscribe(ws, after) {
     const data = await moonGet(`/roundtable/messages?limit=100${after ? `&after=${encodeURIComponent(after)}` : ''}`)
-    for (const message of data.messages || []) ws.send(JSON.stringify({ type: 'roundtable/message', message }))
+    for (const message of data.messages || []) ws.send(JSON.stringify({ type: 'roundtable/message', message: publicMessage(message) }))
     for (const approval of approvals.values()) ws.send(JSON.stringify({ type: 'roundtable/approval/request', ...approval }))
     ws.send(JSON.stringify({ type: 'roundtable/status', agents: await status() }))
     ws.send(JSON.stringify({ type: 'roundtable/ready', nextAfter: data.nextAfter || after || null }))
@@ -324,7 +334,7 @@ function createRoundtable(options) {
   async function handleWs(ws, message) {
     const type = message?.type
     try {
-      if (type === 'roundtable/subscribe') return subscribe(ws, compactText(message.after, 160))
+      if (type === 'roundtable/subscribe') return await subscribe(ws, compactText(message.after, 160))
       if (type === 'roundtable/send') {
         const cid = compactText(message.cid, 300)
         if (!cid) throw Object.assign(new Error('cid_required'), { status: 400 })
@@ -332,7 +342,7 @@ function createRoundtable(options) {
           from: 'aying', idempotencyKey: cid, text: message.text,
           attachments: message.attachments, replyTo: message.replyTo,
         })
-        const primary = result.messages?.[0]
+        const primary = publicMessage(result.messages?.[0])
         ws.send(JSON.stringify({ type: 'roundtable/accepted', cid, message: primary }))
         publish(result)
         return
@@ -355,7 +365,8 @@ function createRoundtable(options) {
     try {
       if (req.method === 'GET' && url.pathname === '/raven/roundtable/messages') {
         const suffix = `${url.searchParams.get('after') ? `&after=${encodeURIComponent(url.searchParams.get('after'))}` : ''}`
-        return json(res, 200, await moonGet(`/roundtable/messages?limit=${Math.min(Number(url.searchParams.get('limit')) || 100, 200)}${suffix}`))
+        const data = await moonGet(`/roundtable/messages?limit=${Math.min(Number(url.searchParams.get('limit')) || 100, 200)}${suffix}`)
+        return json(res, 200, { ...data, messages: (data.messages || []).map(publicMessage) })
       }
       if (req.method === 'GET' && url.pathname === '/raven/roundtable/status') return json(res, 200, { agents: await status() })
       if (req.method === 'GET' && url.pathname === '/raven/roundtable/avatars') return json(res, 200, { avatars: await avatars() })
@@ -395,6 +406,7 @@ function createRoundtable(options) {
 
   function onInternalItem(event) {
     if (event.lifecycle !== 'completed') return
+    if (event.item?.phase && event.item.phase !== 'final_answer') return
     const text = extractAgentText(event.item)
     if (text) finalByTurn.set(event.turnId, text)
   }
@@ -407,6 +419,10 @@ function createRoundtable(options) {
     if (!pending) return
     finishing = true
     try {
+      if (event.turn?.status !== 'completed') {
+        await Promise.all(idsOf(pending).map(id => patchDelivery(id, 'blocked', { lastError: 'turn_not_completed' })))
+        return
+      }
       let text = finalByTurn.get(turnId) || ''
       if (!text) text = finalFromThread(await crossing.readInternalThread(pending.threadId), turnId)
       if (!text) {
@@ -447,4 +463,4 @@ function createRoundtable(options) {
   return { handleWs, handleHttp, status, tick, ingest, publish, onInternalItem, onInternalCompleted, onInternalApproval, onInternalApprovalResolved, close: () => clearInterval(interval) }
 }
 
-module.exports = { createRoundtable, extractAgentText, finalFromThread }
+module.exports = { createRoundtable, extractAgentText, finalFromThread, publicMessage }

@@ -159,6 +159,7 @@ function createCrossingService(options = {}) {
     if (!entry) return false
     clearTimeout(entry.timer)
     approvals.delete(String(requestId))
+    if (reject && entry.owner === 'roundtable') onInternalApprovalResolved({ requestId: entry.requestId, outcome: 'cancelled' })
     if (reject) adapter.rejectServerRequest(requestId)
     return true
   }
@@ -185,14 +186,19 @@ function createCrossingService(options = {}) {
     uploads.pin(activeTurn?.attachments, false, activeTurn?.attachmentOwner || activeTurn?.clientId)
     metadata.clear()
     sessions.clear()
-    for (const requestId of pendingRequestIds || []) clearApproval(requestId)
+    for (const [requestId, entry] of approvals) {
+      if (entry.owner === 'roundtable') onInternalApprovalResolved({ requestId: entry.requestId, outcome: 'offline' })
+      clearApproval(requestId)
+    }
     activeTurn = null
     startingTurn = null
     status('offline', { error: clip(error, 300) })
   })
   adapter.on('protocolError', (error) => status('error', { error: clip(error.message, 300) }))
   adapter.on('agentDelta', (params) => {
-    if (activeTurn?.owner === 'roundtable') onInternalDelta({ ...params, threadId: activeTurn.threadId, turnId: activeTurn.turnId })
+    if (activeTurn?.owner === 'roundtable') {
+      if (params.threadId === activeTurn.threadId && params.turnId === activeTurn.turnId) onInternalDelta(params)
+    }
     else emit({ type: 'crossing/message/delta', ...params })
   })
   adapter.on('item', (event) => {

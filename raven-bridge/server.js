@@ -1,5 +1,6 @@
 const http = require('http')
 const { WebSocketServer } = require('ws')
+const { validPathname, validSocketSession, regularFile, streamFile } = require('./request-safety')
 const os = require('os')
 const fs = require('fs')
 const path = require('path')
@@ -836,7 +837,9 @@ const server = http.createServer((req, res) => {
 
   if (req.method === 'OPTIONS') { res.writeHead(204); res.end(); return }
 
-  const url = new URL(req.url, `http://localhost`)
+  let url
+  try { url = new URL(req.url, 'http://localhost') } catch { res.writeHead(400); res.end(); return }
+  if (!validPathname(url.pathname)) { res.writeHead(400); res.end(); return }
 
   // 言叽远程 MCP：浏览器只持有言叽原本就需要的 moon-memory 会话凭据；
   // MCP 的手动凭据、OAuth verifier/client secret/access/refresh token 全留在后端 600 文件。
@@ -1112,13 +1115,15 @@ const server = http.createServer((req, res) => {
     let file = path.join(UPLOAD_DIR, name)
     if (!name) { res.writeHead(404); res.end(); return }
     if (!fs.existsSync(file)) file = path.join(LEGACY_UPLOAD_DIR, name)  // 老 /tmp 附件兜底
-    if (!fs.existsSync(file)) { res.writeHead(404); res.end(); return }
+    if (!regularFile(file)) { res.writeHead(404); res.end(); return }
     const ext = path.extname(name).toLowerCase()
     res.writeHead(200, {
       'Content-Type': MIME[ext] || 'application/octet-stream',
       'Cache-Control': 'private, max-age=31536000, immutable',  // 文件名带时间戳，内容不会变
+      'X-Content-Type-Options': 'nosniff',
+      'Content-Security-Policy': "sandbox; default-src 'none'; style-src 'unsafe-inline'",
     })
-    fs.createReadStream(file).pipe(res)
+    streamFile(file, res)
     return
   }
 
@@ -1369,7 +1374,7 @@ const server = http.createServer((req, res) => {
     req.on('end', () => {
       let parsed
       try { parsed = JSON.parse(body) } catch { res.writeHead(400); res.end('{"error":"bad json"}'); return }
-      const text = (parsed.text || '').trim()
+      const text = typeof parsed?.text === 'string' ? parsed.text.trim() : ''
       if (!text) { res.writeHead(400); res.end('{"error":"empty"}'); return }
       if (!tokenIsValid(parsed.token)) { res.writeHead(401); res.end('{"error":"unauthorized"}'); return }
       // 去重跟 WS 那条路一样：这条路（通知栏快捷回复）以前没做，重发会往 L0 写两份
@@ -1553,7 +1558,7 @@ const server = http.createServer((req, res) => {
   if ((req.method === 'GET' || req.method === 'HEAD') && url.pathname.startsWith('/raven/download/')) {
     const name = path.basename(decodeURIComponent(url.pathname.slice('/raven/download/'.length)))
     const abs = path.join(DOWNLOAD_DIR, name)
-    if (!name || !abs.startsWith(DOWNLOAD_DIR) || !fs.existsSync(abs)) { res.writeHead(404); res.end(); return }
+    if (!name || !abs.startsWith(DOWNLOAD_DIR + path.sep) || !regularFile(abs)) { res.writeHead(404); res.end(); return }
     const stat = fs.statSync(abs)
     const base = {
       'Content-Type': name.endsWith('.apk')
@@ -1617,7 +1622,7 @@ const server = http.createServer((req, res) => {
   res.writeHead(404); res.end()
 })
 
-const wss = new WebSocketServer({ server, path: '/raven/ws' })
+const wss = new WebSocketServer({ server, path: '/raven/ws', maxPayload: 1024 * 1024 })
 
 wss.on('connection', (ws) => {
   // ── WS 先认证后广播（2026-07-03 安全加固）──────────────────────
@@ -1715,6 +1720,7 @@ wss.on('connection', (ws) => {
         }
       }
       if (typeof msg.type === 'string' && msg.type.startsWith('roundtable/')) {
+        if (!validSocketSession(ws, tokenIsValid)) return
         await roundtable.handleWs(ws, msg)
         return
       }
@@ -1741,6 +1747,7 @@ wss.on('connection', (ws) => {
         ingestUserMessage(msg.text, msg.cid)
       }
       if (msg.type === 'permission' && msg.choice) {
+        if (!validSocketSession(ws, tokenIsValid)) return
         tmuxSend(msg.choice)
         lastPermCapture = ''
         lastPermData = null

@@ -76,6 +76,20 @@ class FakeAdapter extends EventEmitter {
   rejectServerRequest(id) { this.resolved.push({ id: String(id), rejected: true }) }
 }
 
+test('roundtable approval cards are invalidated when the runtime goes offline', async () => {
+  const adapter = new FakeAdapter()
+  const resolved = []
+  const service = createCrossingService({ adapter, rateLimitFallback: () => null,
+    onInternalApprovalResolved: event => resolved.push(event) })
+  await service.startInternalTurn({ threadId: 'thread-1', text: 'fixture' })
+  adapter.emit('serverRequest', { id: 'stale', method: 'item/commandExecution/requestApproval',
+    params: { threadId: 'thread-1', turnId: 'turn-1', itemId: 'item-1', command: 'pwd' } })
+  adapter.emit('offline', { error: 'test disconnect', pendingRequestIds: [] })
+  assert.equal(service.diagnostics().pendingApprovals, 0)
+  assert.deepEqual(resolved, [{ requestId: 'stale', outcome: 'offline' }])
+  assert.throws(() => service.respondInternalApproval({ requestId: 'stale', threadId: 'thread-1', turnId: 'turn-1', itemId: 'item-1', choice: 'allow' }), /过期/)
+})
+
 test('Crossing binds approvals to exact client/thread/turn/item and declines on disconnect', async () => {
   const adapter = new FakeAdapter()
   const sent = []

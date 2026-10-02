@@ -93,3 +93,38 @@ test('roundtable avatars persist safe upload URLs and broadcast updates', async 
   assert.equal(rejected.status, 400)
   assert.equal(rejected.body.error, 'invalid_avatar_url')
 })
+
+test('ambiguous turn startup is durably blocked and never retried as text-only', async () => {
+  let calls = 0
+  const patches = []
+  let claimed = false
+  const service = createRoundtable({
+    disableTimer: true, logger: { error() {} },
+    crossing: {
+      diagnostics: () => ({ childState: 'online' }),
+      startInternalTurn: async () => { calls++; throw new Error('turn/start timeout') },
+    },
+    moonGet: async route => route.includes('/state/') ? { value: 'thread-1' } : {},
+    moonPost: async (route, body) => {
+      if (route.endsWith('/claim')) {
+        if (body.target !== 'yao' || claimed) return { status: 200, data: {} }
+        claimed = true
+        return { status: 200, data: { delivery: { id: 8, message: { id: 'm8', text: 'work', attachments: [] } } } }
+      }
+      patches.push(body)
+      return { status: 200, data: {} }
+    },
+  })
+  await service.tick()
+  assert.equal(calls, 1)
+  assert.equal(patches[0].status, 'blocked')
+  assert.equal(patches.at(-1).status, 'blocked')
+  assert.equal(patches.some(patch => patch.status === 'pending'), false)
+})
+
+test('a failed history subscription returns an error instead of escaping the handler', async () => {
+  const service = createRoundtable({ disableTimer: true, moonGet: async () => { throw new Error('offline') } })
+  const sent = []
+  await service.handleWs({ send: data => sent.push(JSON.parse(data)) }, { type: 'roundtable/subscribe' })
+  assert.equal(sent[0].type, 'roundtable/error')
+})
