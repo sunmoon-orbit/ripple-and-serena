@@ -125,7 +125,7 @@ function describe(plan, verdict) {
     `**${plan.ram}G 内存 / ${plan.disk ?? '?'}G 硬盘${plan.cpu ? ` / ${plan.cpu} 核` : ''}**`,
     `$${plan.usd}/年，约 ${verdict.cny} 元。${tierText}`,
     loc,
-    `下单：${plan.link}`,
+    process.env.RADAR_TEST ? '下单：（测试里不放链接）' : `下单：${plan.link}`,
     `来源：${plan.source.name} ${plan.source.url}`,
   ].join('\n')
 }
@@ -145,7 +145,7 @@ function post(port, pathname, body, headers) {
 
 async function notify(hits) {
   const testTag = process.env.RADAR_TEST ? '【测试，不是真货，别下单】' : ''
-  const text = `${testTag}🐦‍⬛ 服务器雷达：有货了！\n\n${hits.map(h => describe(h.plan, h.verdict)).join('\n\n')}\n\n${CHECKLIST}\n\n（这条是雷达自动发的，抢手款几小时就没，看到就尽快。）`
+  const text = `${testTag}🐦‍⬛ 服务器雷达：有货了！\n\n${hits.map(h => describe(h.plan, h.verdict)).join('\n\n')}\n\n${CHECKLIST}${process.env.RADAR_TEST ? '' : '\n\n（这条是雷达自动发的，抢手款几小时就没，看到就尽快。）'}`
   if (DRY) { console.log('[radar] DRY 本来会发：\n' + text); return }
   const localToken = fs.readFileSync('/home/ripple/.raven-local-token', 'utf8').trim()
   const moonToken = (fs.readFileSync('/home/ripple/moon-memory/.env', 'utf8').match(/^MOON_API_TOKEN=(.*)$/m) || [])[1]
