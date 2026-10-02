@@ -166,6 +166,13 @@ html, body { min-height: 100%; background: var(--bg); color: var(--text); font-f
   font-size: 12px; color: var(--text-dim); line-height: 1.7;
   display: -webkit-box; -webkit-line-clamp: 5; -webkit-box-orient: vertical; overflow: hidden;
 }
+#mem-content.expanded { display: block; }
+#mem-expand {
+  display: none; background: none; border: none; color: var(--text-faint); cursor: pointer;
+  font-size: 10px; padding: 3px 0 0; -webkit-tap-highlight-color: transparent;
+}
+#mem-expand.visible { display: block; }
+#mem-expand:active { color: var(--accent); }
 #mem-tags { margin-top: 8px; display: flex; flex-wrap: wrap; gap: 4px; }
 .mem-tag {
   font-size: 10px; color: var(--text-faint); background: var(--surface2);
@@ -417,6 +424,7 @@ html, body { min-height: 100%; background: var(--bg); color: var(--text); font-f
       </div>
       <div id="mem-date">—</div>
       <div id="mem-content">加载中…</div>
+      <button id="mem-expand" type="button" onclick="toggleMemory()">展开</button>
       <div id="mem-tags"></div>
     </div>
 
@@ -676,7 +684,16 @@ function renderMemory(d, yearsAgo = 0) {
     const raw = d.content || ''
     text = raw.replace(/【[^】]*】/g, '').trim()
   }
-  document.getElementById('mem-content').textContent = text.slice(0, 200) + (text.length > 200 ? '…' : '')
+  const contentEl = document.getElementById('mem-content')
+  const expandBtn = document.getElementById('mem-expand')
+  contentEl.classList.remove('expanded')
+  contentEl.textContent = text
+  expandBtn.classList.remove('visible')
+  expandBtn.textContent = '展开'
+  // 是否需要展开按钮应由真实排版决定。固定字数无法覆盖不同屏宽、字号和中英文混排。
+  requestAnimationFrame(() => {
+    if (contentEl.scrollHeight > contentEl.clientHeight + 1) expandBtn.classList.add('visible')
+  })
 
   const tags = (d.tags || '').split(',').map(t => t.trim()).filter(Boolean).slice(0, 5)
   const tagsEl = document.getElementById('mem-tags')
@@ -686,6 +703,13 @@ function renderMemory(d, yearsAgo = 0) {
     el.textContent = t
     return el
   }))
+}
+
+function toggleMemory() {
+  const contentEl = document.getElementById('mem-content')
+  const expandBtn = document.getElementById('mem-expand')
+  const expanded = contentEl.classList.toggle('expanded')
+  expandBtn.textContent = expanded ? '收起' : '展开'
 }
 
 async function loadRandomMemory() {
@@ -722,6 +746,7 @@ async function loadMemory({ cycle = true } = {}) {
     await loadRandomMemory()
   } catch {
     document.getElementById('mem-content').textContent = '加载失败，稍后再试'
+    document.getElementById('mem-expand').classList.remove('visible')
   } finally {
     btn.style.opacity = '1'
   }

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useLayoutEffect, useRef } from 'react'
 
 const pickRandom = (list) => list[Math.floor(Math.random() * list.length)]
 
@@ -17,6 +17,8 @@ export default function MemoryPeek({ moonMemory }) {
   const [onThisDay, setOnThisDay] = useState(false)
   const [spinning, setSpinning] = useState(false)
   const [expanded, setExpanded] = useState(false)
+  const [overflowing, setOverflowing] = useState(false)
+  const contentRef = useRef(null)
 
   const loadPool = useCallback(async () => {
     if (!token) return
@@ -56,7 +58,32 @@ export default function MemoryPeek({ moonMemory }) {
   }, [base, token])
 
   useEffect(() => { loadPool() }, [loadPool])
-  useEffect(() => { setExpanded(false) }, [mem?.id])
+  useEffect(() => {
+    setExpanded(false)
+    setOverflowing(false)
+  }, [mem?.id])
+
+  const rawContent = mem?.kind === 'conversation'
+    ? `${mem.title || '一段旧日对话'}${mem.message_count != null ? ` · ${mem.message_count} 条消息` : ''}`
+    : (mem?.content || '').replace(/【[^】]*】/g, '').trim()
+
+  // 三行能放多少字取决于屏宽、字号和中英文混排，不能再拿 200 字当展开门槛。
+  // 收起状态下直接量真实溢出；展开后保留结果，让「收起」按钮继续存在。
+  useLayoutEffect(() => {
+    if (expanded || !rawContent) return undefined
+    const el = contentRef.current
+    if (!el) return undefined
+    let frame = requestAnimationFrame(() => setOverflowing(el.scrollHeight > el.clientHeight + 1))
+    const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(() => {
+      cancelAnimationFrame(frame)
+      frame = requestAnimationFrame(() => setOverflowing(el.scrollHeight > el.clientHeight + 1))
+    })
+    observer?.observe(el)
+    return () => {
+      cancelAnimationFrame(frame)
+      observer?.disconnect()
+    }
+  }, [rawContent, expanded])
 
   function refresh() {
     if (!pool?.length) { loadPool(); return }
@@ -88,11 +115,6 @@ export default function MemoryPeek({ moonMemory }) {
   }
 
   // ── 有钥匙：随机记忆碎片 ──
-  const rawContent = mem?.kind === 'conversation'
-    ? `${mem.title || '一段旧日对话'}${mem.message_count != null ? ` · ${mem.message_count} 条消息` : ''}`
-    : (mem?.content || '').replace(/【[^】]*】/g, '').trim()
-  const isLong = rawContent.length > 200
-  const content = expanded ? rawContent : rawContent.slice(0, 200)
   const tags = mem?.tags ? String(mem.tags).split(',').map(t => t.trim()).filter(Boolean).slice(0, 5) : []
 
   return (
@@ -112,8 +134,8 @@ export default function MemoryPeek({ moonMemory }) {
       {pool !== null && !mem && <div className="roost-msg-empty">还没捡到合适的碎片</div>}
       {mem && (
         <div key={mem.id} className="roost-msg-rotate">
-          <div className={`mempeek-content${expanded ? ' expanded' : ''}`}>{content}{isLong && !expanded ? '……' : ''}</div>
-          {isLong && (
+          <div ref={contentRef} className={`mempeek-content${expanded ? ' expanded' : ''}`}>{rawContent}</div>
+          {overflowing && (
             <button className="mem-expand-btn" onClick={() => setExpanded(value => !value)}>
               {expanded ? '收起' : '展开'}
             </button>
