@@ -20,6 +20,7 @@ import { downloadBlob, hasNativeDownloadBridge } from '../../utils/download'
 import { showToast } from '../Toast'
 import { extractRunnableHtmlMessage, looksRunnableHtml } from '../../utils/runnableCode'
 import { enhanceMarkdownTables } from '../../utils/markdownTables'
+import { enhanceCrowEmoji } from '../CrowEmoji'
 
 marked.use({ extensions: [underlineExtension] })
 marked.setOptions({
@@ -185,6 +186,7 @@ function MarkdownBlock({ html, enhance = true, reveal = false, className = 'bubb
   useLayoutEffect(() => {
     if (reveal) revealNewTail(ref.current, prevLenRef)
     enhanceMarkdownTables(ref.current)
+    enhanceCrowEmoji(ref.current)
   }, [html, reveal])
   useEffect(() => { if (enhance) enhanceCodeBlocks(ref.current) }, [html, enhance])
   return <div ref={ref} className={className} dangerouslySetInnerHTML={{ __html: html }} />

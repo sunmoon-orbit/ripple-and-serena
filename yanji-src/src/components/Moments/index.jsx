@@ -6,10 +6,9 @@ import {
   commentMoment, likeMoment, mediaUrl, downscaleImage, uploadImage,
 } from '../../api/moments'
 import { getLightConn } from '../../utils/lightConn'
+import { CrowEmoji, CrowText } from '../CrowEmoji'
 
 const OLD_KEY = 'moments_feed'  // 旧的纯前端 localStorage feed（一次性迁移用）
-
-const AVATAR = { 阿颖: '🐦', 涟言: '🐦‍⬛' }
 
 function fmtTime(ts) {
   const t = typeof ts === 'string' ? Date.parse(ts.replace(' ', 'T') + 'Z') : ts
@@ -79,7 +78,7 @@ function Avatar({ author, avatarConfig, size = 42, className = '' }) {
     <div className={`moments-avatar ${className}`} style={{ width: size, height: size }}>
       {src
         ? <img src={src} alt={author} />
-        : <span>{AVATAR[author] || (author === '阿颖' ? '🐦' : '🐦‍⬛')}</span>}
+        : <span>{author === '阿颖' ? '🐦' : <CrowEmoji />}</span>}
     </div>
   )
 }
@@ -104,7 +103,7 @@ function Post({ post, cfg, avatarConfig, onLike, onComment, onAIComment, onDelet
         <Avatar author={post.author} avatarConfig={avatarConfig} />
         <div className="moments-post-body">
           <div className="moments-author">{post.author}</div>
-          {post.content && <div className="moments-copy">{post.content}</div>}
+          {post.content && <div className="moments-copy"><CrowText>{post.content}</CrowText></div>}
           {img && (
             <img src={img} alt="" loading="lazy" className="moments-photo" />
           )}
@@ -136,7 +135,7 @@ function Post({ post, cfg, avatarConfig, onLike, onComment, onAIComment, onDelet
           {post.comments?.map(c => (
             <div key={c.id} className="moments-comment">
               <span>{c.author}：</span>
-              {c.content}
+              <CrowText>{c.content}</CrowText>
             </div>
           ))}
           <div className="moments-comment-compose">
@@ -380,7 +379,7 @@ export default function Moments() {
               <p>把日子留在这里，也一起翻旧时光</p>
             </div>
             <button className="moments-ai-post" onClick={handleAIPost} disabled={aiPosting}>
-              {aiPosting ? '发圈中…' : '🐦‍⬛ 让阿言说点什么'}
+              {aiPosting ? '发圈中…' : <><CrowEmoji /> 让阿言说点什么</>}
             </button>
           </div>
 
