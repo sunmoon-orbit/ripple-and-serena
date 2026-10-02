@@ -340,9 +340,10 @@
   /* 老系统会把黑鸟组合拆成蓝鸟 + 黑方块；保留原文字，视觉上用本站 SVG。 */
   .crow-emoji-fallback {
     display: inline-block; width: 1.08em; height: 1.08em; overflow: hidden;
-    color: transparent; font-size: 0; line-height: 1; vertical-align: -0.16em;
+    color: transparent; line-height: 1; vertical-align: -0.16em;
     background: url('/raven/crow-emoji.svg') center / contain no-repeat;
   }
+  #header-title .crow-header-icon { width: 20px; height: 20px; flex: none; color: var(--text); }
 
   @keyframes msgIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
 
@@ -989,7 +990,9 @@
       <a id="home-btn" href="/raven/home.html" title="回归巢首页" aria-label="回归巢首页">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11l9-8 9 8"/><path d="M5 10v10h5v-6h4v6h5V10"/></svg>
       </a>
-      <span class="crow-icon crow-emoji-fallback" role="img" aria-label="乌鸦">🐦‍⬛</span>
+      <svg class="crow-header-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" role="img" aria-label="乌鸦">
+        <path d="M4 8s3-4 8-3c4 1 6 4 5 8-1 4-5 6-9 4"/><path d="m17 13 4-2-3 4"/><path d="m8 17-2 4m4-4v4"/><circle cx="13" cy="8" r="1" fill="currentColor" stroke="none"/><path d="M4 8 1 7"/>
+      </svg>
       <span>Ripple</span>
     </div>
     <div id="conn-status">
