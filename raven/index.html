@@ -470,7 +470,8 @@
   .copy-btn.copied { color: var(--green); border-color: var(--green); }
 
   /* tts */
-  .tts-btn {
+  .vtag { color: var(--text-faint, #999); font-style: italic; font-size: .85em; }
+.tts-btn {
     display: flex; align-items: center; justify-content: center;
     width: 22px; height: 22px; padding: 0; flex-shrink: 0;
     color: var(--text-dim); opacity: 0; cursor: pointer;
@@ -1313,6 +1314,10 @@ function enhanceCrowEmoji(root) {
   })
 }
 
+// 纯英文小写词组成的方括号 = 语气标签；后面紧跟 ( 的是 markdown 链接，不算。
+// 放在这么前面：历史消息在脚本顶层就开始渲染，定义在后面会撞 TDZ
+const VOICE_TAG_RE = /\[([a-z][a-z ,]{1,58})\](?!\()/g
+
 const PURIFY_OPTS = {
   ALLOWED_TAGS: [
     'p', 'br', 'hr', 'span', 'div', 'img', 'a', 'em', 'strong', 'del', 'code', 'pre',
@@ -1781,7 +1786,9 @@ function appendMsg(text, role, save = true, ts = Date.now(), msgId = null, suppl
       const withAttach = withImgs.replace(ATTACH_TAG_RE, (_, p) => attachToHtml(p))
       const withStickers = withAttach.replace(/\[sticker:([^\]]+)\]/g, (_, name) =>
         `<img src="/raven/stickers/${stickerFile(name)}" style="max-width:220px;border-radius:8px;display:block;margin:4px 0;" alt="${name}">`)
-      const rendered = renderMusicCards(marked.parse(withStickers))
+      // 语气标签（[whispers]、[soft breath close to your ear]）给朗读用，气泡里画成淡色小字（1002）
+      const withTags = withStickers.replace(VOICE_TAG_RE, (_, t) => `<span class="vtag">${t}</span>`)
+      const rendered = renderMusicCards(marked.parse(withTags))
       body.innerHTML = DOMPurify.sanitize(rendered, PURIFY_OPTS)
       attachStickerFallback(body)
       enhanceCodeBlocks(body)
@@ -2209,7 +2216,9 @@ function cleanTextForTts(text) {
     .replace(/^[ \t]*>[ \t]+.*$/gm, '')
     .replace(/!\[[^\]]*\]\([^)]*\)/g, '')
     .replace(/\[sticker:[^\]]+\]/gi, '')
+    .replace(VOICE_TAG_RE, '\u0001$1\u0002') // 语气标签留给服务端（ElevenLabs 认，MiniMax 剥）
     .replace(/[#*`_[\]~>]/g, '')
+    .replace(/\u0001/g, '[').replace(/\u0002/g, ']')
     .replace(/\n{2,}/g, '\n')
     .trim()
     .slice(0, 500)
