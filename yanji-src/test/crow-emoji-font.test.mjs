@@ -21,5 +21,12 @@ test('归巢与圆桌保留手机原生黑乌鸦 emoji', () => {
   assert.doesNotMatch(raven, /crow-emoji-fallback|enhanceCrowEmoji|crow-emoji\.svg/)
   assert.doesNotMatch(roundtable, /crow-emoji-fallback|enhanceCrowEmoji|crow-emoji\.svg/)
   assert.equal(existsSync(new URL('../../raven/crow-emoji.svg', import.meta.url)), false)
-  assert.equal(existsSync(new URL('../public/crow-emoji.svg', import.meta.url)), false)
+})
+
+test('信纸里的黑鸟单独画成本地图，文字原样保留给划线偏移', () => {
+  // 1002：换字体栈后她手机上信纸里仍拆成蓝鸟 + 黑方块，只在信纸正文兜底
+  assert.match(letters, /withCrow\(s\.text\)/)
+  assert.match(letters, /className="crow-inline"[^>]*>\{CROW_SEQ\}<\/span>/)
+  assert.match(styles, /\.crow-inline\s*\{[^}]*color:\s*transparent/s)
+  assert.equal(existsSync(new URL('../public/crow-emoji.svg', import.meta.url)), true)
 })

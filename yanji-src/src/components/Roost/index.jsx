@@ -8,6 +8,18 @@ import BookRead from './BookRead'
 import MemoryPeek from './MemoryPeek'
 import EventScrolls from './EventScrolls'
 
+// 信纸正文的衬线字体自带「⬛」字形，会把黑鸟 🐦‍⬛ 拆成蓝鸟 + 黑方块（1002，换字体栈在她手机上没救回来）。
+// 这里只把这一串画成本地小图：文字原样留在 DOM 里（透明），划线批注按字符偏移算，不受影响。
+const CROW_SEQ = '\u{1F426}\u200D\u2B1B'
+function withCrow(text) {
+  if (!text || !text.includes(CROW_SEQ)) return text
+  return text.split(CROW_SEQ).flatMap((part, i, all) => (
+    i < all.length - 1
+      ? [part, <span key={i} className="crow-inline" role="img" aria-label="乌鸦">{CROW_SEQ}</span>]
+      : [part]
+  ))
+}
+
 const ANNO_COLORS = [
   { id: 'yellow', hex: '#f5d76e' },
   { id: 'pink', hex: '#f0a6c0' },
@@ -514,9 +526,9 @@ export default function Roost() {
                           key={s.start}
                           className="bookread-mark"
                           style={{ backgroundColor: (ANNO_HEX[s.annos[0].color] || '#f5d76e') + '66', borderBottom: `2px solid ${ANNO_HEX[s.annos[0].color] || '#f5d76e'}` }}
-                        >{s.text}</mark>
+                        >{withCrow(s.text)}</mark>
                       ) : (
-                        <span key={s.start}>{s.text}</span>
+                        <span key={s.start}>{withCrow(s.text)}</span>
                       )
                     )}
                   </div>
