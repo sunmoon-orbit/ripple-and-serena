@@ -691,9 +691,7 @@ function renderMemory(d, yearsAgo = 0) {
   expandBtn.classList.remove('visible')
   expandBtn.textContent = '展开'
   // 是否需要展开按钮应由真实排版决定。固定字数无法覆盖不同屏宽、字号和中英文混排。
-  requestAnimationFrame(() => {
-    if (contentEl.scrollHeight > contentEl.clientHeight + 1) expandBtn.classList.add('visible')
-  })
+  scheduleMemoryOverflowMeasure()
 
   const tags = (d.tags || '').split(',').map(t => t.trim()).filter(Boolean).slice(0, 5)
   const tagsEl = document.getElementById('mem-tags')
@@ -705,11 +703,26 @@ function renderMemory(d, yearsAgo = 0) {
   }))
 }
 
+let memoryMeasureFrame = 0
+function scheduleMemoryOverflowMeasure() {
+  cancelAnimationFrame(memoryMeasureFrame)
+  memoryMeasureFrame = requestAnimationFrame(() => {
+    const contentEl = document.getElementById('mem-content')
+    const expandBtn = document.getElementById('mem-expand')
+    if (!contentEl || !expandBtn || contentEl.classList.contains('expanded')) return
+    expandBtn.classList.toggle('visible', contentEl.scrollHeight > contentEl.clientHeight + 1)
+  })
+}
+
+window.addEventListener('resize', scheduleMemoryOverflowMeasure)
+if (document.fonts?.ready) document.fonts.ready.then(scheduleMemoryOverflowMeasure)
+
 function toggleMemory() {
   const contentEl = document.getElementById('mem-content')
   const expandBtn = document.getElementById('mem-expand')
   const expanded = contentEl.classList.toggle('expanded')
   expandBtn.textContent = expanded ? '收起' : '展开'
+  if (!expanded) scheduleMemoryOverflowMeasure()
 }
 
 async function loadRandomMemory() {

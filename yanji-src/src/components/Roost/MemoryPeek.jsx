@@ -73,17 +73,26 @@ export default function MemoryPeek({ moonMemory }) {
     if (expanded || !rawContent) return undefined
     const el = contentRef.current
     if (!el) return undefined
-    let frame = requestAnimationFrame(() => setOverflowing(el.scrollHeight > el.clientHeight + 1))
-    const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(() => {
+    let disposed = false
+    let frame
+    const measure = () => {
+      if (!disposed) setOverflowing(el.scrollHeight > el.clientHeight + 1)
+    }
+    const scheduleMeasure = () => {
       cancelAnimationFrame(frame)
-      frame = requestAnimationFrame(() => setOverflowing(el.scrollHeight > el.clientHeight + 1))
-    })
+      frame = requestAnimationFrame(measure)
+    }
+    scheduleMeasure()
+    const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(scheduleMeasure)
     observer?.observe(el)
+    // Webfont 换掉兜底字体时，line-clamp 盒子本身未必变高，ResizeObserver 不一定会响。
+    document.fonts?.ready.then(scheduleMeasure)
     return () => {
+      disposed = true
       cancelAnimationFrame(frame)
       observer?.disconnect()
     }
-  }, [rawContent, expanded])
+  }, [rawContent, expanded, mem?.id])
 
   function refresh() {
     if (!pool?.length) { loadPool(); return }
