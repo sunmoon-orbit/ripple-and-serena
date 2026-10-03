@@ -930,7 +930,7 @@ const server = http.createServer((req, res) => {
     })
     return
   }
-  const TOKEN_REQUIRED = ['/raven/status', '/raven/last-thinking', '/raven/memory-random', '/raven/journal', '/raven/journal/unlock', '/raven/cards/unseen', '/raven/cards/seen', '/raven/on-this-day', '/raven/memory-count', '/raven/activity', '/raven/upload', '/raven/push/subscribe', '/raven/push/unsubscribe', '/raven/usage']
+  const TOKEN_REQUIRED = ['/raven/status', '/raven/last-thinking', '/raven/memory-random', '/raven/journal', '/raven/journal/unlock', '/raven/cards/unseen', '/raven/cards/seen', '/raven/archive/days', '/raven/archive/day', '/raven/on-this-day', '/raven/memory-count', '/raven/activity', '/raven/upload', '/raven/push/subscribe', '/raven/push/unsubscribe', '/raven/usage']
   if (TOKEN_REQUIRED.includes(url.pathname) && !externalAuthed(req, url)) {
     res.writeHead(401, { 'Content-Type': 'application/json' })
     res.end(JSON.stringify({ error: 'unauthorized' }))
@@ -1195,6 +1195,30 @@ const server = http.createServer((req, res) => {
         }))
         res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' })
         res.end(JSON.stringify({ entries }))
+      })
+      .catch(() => { res.writeHead(500); res.end('{}') })
+    return
+  }
+
+  // 聊天日历（1003）：归巢本地只留最近的聊天，更早的日子从 L0 的 raven 存档里翻（每天一个对话，external_id=raven-YYYY-MM-DD）
+  if (req.method === 'GET' && url.pathname === '/raven/archive/days') {
+    moonGet('/archive/conversations?source=raven&limit=500')
+      .then(list => {
+        const days = (Array.isArray(list) ? list : []).map(c => ({ id: c.id, date: String(c.external_id || '').replace(/^raven-/, '') }))
+          .filter(d => /^\d{4}-\d{2}-\d{2}$/.test(d.date))
+        res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' }); res.end(JSON.stringify({ days }))
+      })
+      .catch(() => { res.writeHead(500); res.end('{}') })
+    return
+  }
+  if (req.method === 'GET' && url.pathname === '/raven/archive/day') {
+    const id = Number(url.searchParams.get('id'))
+    if (!Number.isInteger(id) || id <= 0) { res.writeHead(400); res.end('{}'); return }
+    moonGet(`/archive/conversations/${id}`)
+      .then(c => {
+        if (!c || c.source !== 'raven') { res.writeHead(404); res.end('{}'); return }
+        const messages = (c.messages || []).map(m => ({ role: m.role === 'human' ? 'user' : 'assistant', content: m.content, created_at: m.created_at }))
+        res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' }); res.end(JSON.stringify({ title: c.title, messages }))
       })
       .catch(() => { res.writeHead(500); res.end('{}') })
     return
