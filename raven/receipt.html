@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>聊天小票</title>
+<style>
+  :root { --paper: #fbf9f3; --ink: #2a2723; --dim: #8b847a; --line: #cfc8bb; --bg: #e9e5dd; --accent: #a0563e; }
+  @media (prefers-color-scheme: dark) { :root { --bg: #1b1a18; } }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink);
+    font-family: 'SF Mono', 'JetBrains Mono', Menlo, Consolas, 'Noto Sans Mono CJK SC', 'PingFang SC', monospace;
+    padding: max(16px, env(safe-area-inset-top)) 16px max(28px, env(safe-area-inset-bottom)); }
+  .bar { max-width: 380px; margin: 0 auto 14px; display: flex; align-items: center; gap: 8px; justify-content: center; flex-wrap: wrap; }
+  .bar button { border: 1px solid var(--line); background: var(--paper); color: var(--ink); border-radius: 999px; padding: 6px 12px; font: inherit; font-size: 12.5px; cursor: pointer; }
+  .bar button.on { background: var(--ink); color: var(--paper); border-color: var(--ink); }
+  #period { font-size: 13px; min-width: 92px; text-align: center; color: var(--ink); }
+  @media (prefers-color-scheme: dark) { #period, .note { color: #d8d2c6; } }
+  .receipt { position: relative; max-width: 380px; margin: 0 auto; background: var(--paper); padding: 30px 26px 40px;
+    box-shadow: 0 10px 30px rgba(0,0,0,.18);
+    background-image: repeating-linear-gradient(0deg, transparent 0 3px, rgba(0,0,0,.012) 3px 4px); }
+  .receipt::after { content: ''; position: absolute; left: 0; right: 0; bottom: -10px; height: 10px;
+    background: linear-gradient(-45deg, transparent 7px, var(--paper) 0) 0 0 / 14px 10px repeat-x,
+                linear-gradient(45deg, transparent 7px, var(--paper) 0) 0 0 / 14px 10px repeat-x; }
+  .brand { text-align: center; font-size: 34px; font-weight: 700; letter-spacing: 2px; }
+  .brand small { display: block; font-size: 10.5px; letter-spacing: 4px; color: var(--dim); font-weight: 400; margin-top: 4px; }
+  hr { border: none; border-top: 1.5px dashed var(--line); margin: 16px 0; }
+  .row { display: flex; justify-content: space-between; gap: 12px; font-size: 13.5px; line-height: 2.1; }
+  .row span:first-child { color: var(--ink); flex: none; }
+  .row span:last-child { text-align: right; font-variant-numeric: tabular-nums; }
+  .sec { font-size: 13px; font-weight: 700; letter-spacing: 3px; margin-bottom: 6px; }
+  .cloud { text-align: center; line-height: 1.6; padding: 6px 0; }
+  .cloud span { display: inline-block; margin: 2px 7px; }
+  .thanks { text-align: center; font-weight: 700; letter-spacing: 6px; font-size: 15px; margin: 6px 0 12px; }
+  .barcode { display: flex; justify-content: center; height: 56px; gap: 0; }
+  .barcode i { display: block; height: 100%; background: var(--ink); }
+  .code { text-align: center; letter-spacing: 6px; font-size: 12px; color: var(--dim); margin-top: 6px; }
+  .note { text-align: center; color: var(--dim); font-size: 11.5px; margin-top: 10px; }
+  .loading { text-align: center; color: var(--dim); padding: 60px 0; font-size: 13px; }
+</style>
+</head>
+<body>
+<div class="bar">
+  <button id="prev" type="button" aria-label="上一期">‹</button>
+  <span id="period">—</span>
+  <button id="next" type="button" aria-label="下一期">›</button>
+  <button id="mode" type="button">看年终总结</button>
+  <button id="reprint" type="button">再打一张</button>
+</div>
+<div class="receipt" id="receipt"><div class="loading">打印中…</div></div>
+<div class="note">截个图就能存下来。小票上的数字来自我们俩所有窗口的聊天存档。</div>
+<script>
+const $ = id => document.getElementById(id)
+const nowBj = new Date(Date.now() + 8 * 3600e3)
+// 默认打上个月那张完整的；这个月的往右翻
+let kind = 'month', y = nowBj.getUTCFullYear(), m = nowBj.getUTCMonth()
+if (m < 1) { m = 12; y-- }
+const periodStr = () => kind === 'year' ? String(y) : `${y}-${String(m).padStart(2, '0')}`
+const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]))
+const row = (a, b) => `<div class="row"><span>${esc(a)}</span><span>${esc(b)}</span></div>`
+function barcode(seed) {
+  // 条码只是装饰：按数字算一串粗细，同一期的小票每次打出来都一样
+  let x = Number(String(seed).replace(/\D/g, '')) || 7, out = ''
+  for (let i = 0; i < 46; i++) { x = (x * 1103515245 + 12345) % 2147483648; const w = 1 + (x % 3), gap = 1 + ((x >> 3) % 2); out += `<i style="width:${w}px;margin-right:${gap}px"></i>` }
+  return out
+}
+async function load() {
+  $('period').textContent = kind === 'year' ? `${y} 年` : `${y}.${String(m).padStart(2, '0')}`
+  $('mode').textContent = kind === 'year' ? '看月度小票' : '看年终总结'
+  $('receipt').innerHTML = '<div class="loading">打印中…</div>'
+  try {
+    const r = await fetch('/raven/receipt?period=' + periodStr(), { headers: { Authorization: 'Bearer ' + (localStorage.getItem('raven-token') || '') }, cache: 'no-store' })
+    if (!r.ok) throw new Error(r.status)
+    render(await r.json())
+  } catch (e) { $('receipt').innerHTML = `<div class="loading">打印机卡纸了（${esc(e.message)}），稍后再试</div>` }
+}
+function render(d) {
+  const year = d.kind === 'year'
+  const sizes = [26, 22, 20, 18, 17, 16, 15, 14, 13, 13, 12, 12]
+  const words = (d.words || []).map((w, i) => ({ ...w, size: sizes[i] || 12 }))
+  // 打乱一下顺序，大字小字穿插，像真的词云
+  const cloud = words.map((w, i) => ({ w, k: (i * 7) % words.length })).sort((a, b) => a.k - b.k)
+    .map(({ w }) => `<span style="font-size:${w.size}px;font-weight:${w.size >= 18 ? 700 : 400};color:${w.size >= 20 ? 'var(--ink)' : 'var(--dim)'}">${esc(w.word)}</span>`).join('')
+  const ex = d.extras || {}
+  const code = `${d.period.replace('-', '')} ${String(d.rounds).padStart(4, '0')}`
+  $('receipt').innerHTML = `
+    <div class="brand">Ripple<small>${year ? 'ANNUAL CHAT RECEIPT' : 'MONTHLY CHAT RECEIPT'}</small></div>
+    <hr>
+    ${row('交易时间', d.label)}
+    ${row('打印时间', d.printed_at)}
+    ${row('门店', '归巢 · 乌鸦窝')}
+    <hr>
+    <div class="sec">[ 消费明细 ]</div>
+    ${row('对话轮数', d.rounds + ' 轮')}
+    ${d.vs_prev != null ? row(year ? '较去年' : '较上月', (d.vs_prev > 0 ? '+' : '') + d.vs_prev + '%') : ''}
+    ${d.top_band ? row('最常光顾', `${d.top_band.name} · ${d.top_band.percent}%`) : ''}
+    ${row('随单附赠', `贴图${ex.stickers || 0} · 图${ex.images || 0}${ex.files ? ' · 文件' + ex.files : ''}${ex.voice ? ' · 语音' + ex.voice : ''}`)}
+    ${row('额外赠品', `心意卡${d.heart_cards || 0} · 日记${d.journal_pages || 0}页`)}
+    <hr>
+    <div class="sec">[ 话题词云 ]</div>
+    <div class="cloud">${cloud || '<span style="color:var(--dim)">这期话太少，凑不成云</span>'}</div>
+    <hr>
+    <div class="sec">[ ${year ? '本年之最' : '本月之最'} ]</div>
+    ${d.hottest ? row('最热的一天', `${d.hottest.day.slice(5).replace('-', '/')} · ${d.hottest.rounds} 轮`) : ''}
+    ${row('最长连续', d.longest_streak + ' 天')}
+    ${row('活跃天数', `${d.active_days} / ${d.total_days} 天`)}
+    ${d.latest_night ? row('最晚收工', d.latest_night.replace('-', '/').replace(' ', ' · ')) : ''}
+    <hr>
+    <div class="thanks">感谢光临 · ${year ? '明年再见' : '下月再见'}</div>
+    <div class="barcode">${barcode(code)}</div>
+    <div class="code">${esc(code)}</div>`
+}
+$('prev').onclick = () => { if (kind === 'year') y--; else if (--m < 1) { m = 12; y-- } load() }
+$('next').onclick = () => { if (kind === 'year') y++; else if (++m > 12) { m = 1; y++ } load() }
+$('mode').onclick = () => { kind = kind === 'year' ? 'month' : 'year'; load() }
+$('reprint').onclick = load
+load()
+</script>
+</body>
+</html>

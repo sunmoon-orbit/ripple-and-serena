@@ -930,7 +930,7 @@ const server = http.createServer((req, res) => {
     })
     return
   }
-  const TOKEN_REQUIRED = ['/raven/status', '/raven/last-thinking', '/raven/memory-random', '/raven/journal', '/raven/journal/unlock', '/raven/cards/unseen', '/raven/cards/seen', '/raven/archive/days', '/raven/archive/day', '/raven/on-this-day', '/raven/memory-count', '/raven/activity', '/raven/upload', '/raven/push/subscribe', '/raven/push/unsubscribe', '/raven/usage']
+  const TOKEN_REQUIRED = ['/raven/status', '/raven/last-thinking', '/raven/memory-random', '/raven/journal', '/raven/journal/unlock', '/raven/cards/unseen', '/raven/cards/seen', '/raven/archive/days', '/raven/archive/day', '/raven/receipt', '/raven/on-this-day', '/raven/memory-count', '/raven/activity', '/raven/upload', '/raven/push/subscribe', '/raven/push/unsubscribe', '/raven/usage']
   if (TOKEN_REQUIRED.includes(url.pathname) && !externalAuthed(req, url)) {
     res.writeHead(401, { 'Content-Type': 'application/json' })
     res.end(JSON.stringify({ error: 'unauthorized' }))
@@ -1196,6 +1196,16 @@ const server = http.createServer((req, res) => {
         res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' })
         res.end(JSON.stringify({ entries }))
       })
+      .catch(() => { res.writeHead(500); res.end('{}') })
+    return
+  }
+
+  // 聊天小票（1003）：月度 / 年终，统计在 moon-memory 里算
+  if (req.method === 'GET' && url.pathname === '/raven/receipt') {
+    const period = String(url.searchParams.get('period') || '')
+    if (period && !/^\d{4}(-\d{2})?$/.test(period)) { res.writeHead(400); res.end('{}'); return }
+    moonGet('/receipt' + (period ? '?period=' + period : ''))
+      .then(d => { res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' }); res.end(JSON.stringify(d)) })
       .catch(() => { res.writeHead(500); res.end('{}') })
     return
   }
