@@ -567,6 +567,14 @@
   #heart-card .hc-btn:disabled { opacity: .6; }
   @keyframes hcIn { from { opacity: 0; } to { opacity: 1; } }
   @keyframes hcPop { from { transform: translateY(14px) scale(.96); opacity: 0; } to { transform: none; opacity: 1; } }
+  #quote-bar { display: flex; align-items: center; gap: 8px; margin: 0 14px 6px; padding: 6px 10px; border-radius: 12px;
+    background: color-mix(in srgb, var(--surface) 85%, transparent); border-left: 3px solid var(--accent); font-size: 12.5px; color: var(--text-dim); }
+  #quote-bar[hidden] { display: none; }
+  #quote-text { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  #quote-x { border: none; background: none; color: var(--text-dim); font-size: 18px; line-height: 1; cursor: pointer; padding: 0 2px; }
+  .quote-ref { font-size: 12px; opacity: .75; border-left: 2px solid currentColor; padding: 1px 0 1px 8px; margin-bottom: 6px;
+    overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+  .react-quote { display: inline-flex; align-items: center; justify-content: center; }
   #attach-menu { position: fixed; z-index: 30; left: 14px; bottom: calc(78px + env(safe-area-inset-bottom, 0px)); padding: 6px; border: 1px solid var(--border); border-radius: 13px; background: var(--bg); box-shadow: 0 8px 28px rgba(0,0,0,.25); }
   #attach-menu button { width: 100%; display: flex; align-items: center; gap: 9px; padding: 9px 13px; border: 0; border-radius: 9px; background: none; color: var(--text); font: inherit; font-size: 13px; cursor: pointer; -webkit-tap-highlight-color: transparent; }
   #attach-menu button:active { background: var(--surface, rgba(128,128,128,.12)); }
@@ -1154,6 +1162,7 @@
       <div id="thinking"><div class="dot-anim"></div><div class="dot-anim"></div><div class="dot-anim"></div><button id="interrupt-btn" type="button">停</button></div>
     </div>
     <button id="scroll-btn" aria-label="滚到底部">↓</button>
+    <div id="quote-bar" hidden><span id="quote-text"></span><button id="quote-x" type="button" aria-label="取消引用">×</button></div>
     <div id="attach-preview"></div>
     <div id="attach-menu" hidden>
       <button id="pick-photo" type="button"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="3"/><circle cx="9" cy="10" r="2"/><path d="M21 15l-4.5-4.5L8 19"/></svg>从相册选照片</button>
@@ -1827,9 +1836,12 @@ function appendMsg(text, role, save = true, ts = Date.now(), msgId = null, suppl
       attachStickerFallback(body)
       enhanceCodeBlocks(body)
     } else {
-      if (/\[sticker:[^\]]+\]/.test(text) || ATTACH_TEST_RE.test(text)) {
-        if (STICKER_ONLY_RE.test(text)) el.classList.add('sticker-msg')
-        body.innerHTML = text
+      // 1003 引用回复：第一行「> 引用：…」画成一小块引用，正文照常
+      const qm = /^> 引用：([^\n]{1,200})\n?/.exec(text)
+      const utext = qm ? text.slice(qm[0].length) : text   // 别改 text 本身，后面存历史还要用原文
+      if (/\[sticker:[^\]]+\]/.test(utext) || ATTACH_TEST_RE.test(utext)) {
+        if (STICKER_ONLY_RE.test(utext)) el.classList.add('sticker-msg')
+        body.innerHTML = utext
           .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
           .replace(/\[sticker:([^\]]+)\]/g, (_, name) =>
             `<img src="/raven/stickers/${stickerFile(name)}" style="max-width:180px;border-radius:8px;display:block;margin:4px 0;" alt="${name}">`)
@@ -1838,8 +1850,9 @@ function appendMsg(text, role, save = true, ts = Date.now(), msgId = null, suppl
         body.innerHTML = DOMPurify.sanitize(body.innerHTML, PURIFY_OPTS)
         attachStickerFallback(body)
       } else {
-        body.textContent = text
+        body.textContent = utext
       }
+      if (qm) { const q = document.createElement('div'); q.className = 'quote-ref'; q.textContent = qm[1]; body.prepend(q) }
     }
     el.appendChild(body)
 
@@ -1959,6 +1972,10 @@ function restoreHistory() {
 function sendMsg(overrideText) {
   const inp = document.getElementById('chat-input')
   let text = overrideText || inp.value.trim()
+  if (!overrideText && pendingQuote && text) {
+    text = `> 引用：${pendingQuote}\n${text}`
+    clearQuote()
+  }
   if (!overrideText && pendingFiles && pendingFiles.length) {
     const paths = pendingFiles.map(f => `[附件: ${f.path}]`).join(' ')
     text = text ? `${text}\n${paths}` : paths
@@ -2777,6 +2794,16 @@ async function loadReactions() {
   } catch {}
 }
 function closeReactPop() { reactPop.classList.remove('open'); reactPop.dataset.key = '' }
+let pendingQuote = null
+function setQuote(t) {
+  pendingQuote = t
+  document.getElementById('quote-text').textContent = '引用：' + t
+  document.getElementById('quote-bar').hidden = false
+  document.getElementById('chat-input').focus()
+}
+function clearQuote() { pendingQuote = null; document.getElementById('quote-bar').hidden = true }
+document.getElementById('quote-x').addEventListener('click', clearQuote)
+
 function openReactPop(msgEl) {
   const key = msgEl.dataset.rkey; if (!key) return
   lastLongPressAt = Date.now()
@@ -2797,6 +2824,16 @@ function openReactPop(msgEl) {
     })
     reactPop.appendChild(b)
   }
+  // 引用（1003）：长按一条消息，除了贴表情，还能引用它来回
+  const qb = document.createElement('button'); qb.type = 'button'; qb.className = 'react-quote'; qb.title = '引用'
+  qb.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 7H5v6h4l-2 4"/><path d="M19 7h-4v6h4l-2 4"/></svg>'
+  qb.addEventListener('click', ev => {
+    ev.stopPropagation(); closeReactPop()
+    const bodyEl = msgEl.querySelector('.msg-body')
+    const raw = (bodyEl ? bodyEl.innerText : msgEl.innerText) || ''
+    setQuote(raw.replace(/\s+/g, ' ').trim().slice(0, 60) || '[贴图或附件]')
+  })
+  reactPop.appendChild(qb)
   reactPop.dataset.key = key
   reactPop.classList.add('open')
   const rect = msgEl.getBoundingClientRect(), pw = reactPop.offsetWidth, ph = reactPop.offsetHeight
