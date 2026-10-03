@@ -511,6 +511,9 @@
     transition: border-color .2s, color .2s;
   }
   #attach-btn:active { color: var(--accent); border-color: var(--accent); }
+  #attach-menu { position: fixed; z-index: 30; left: 12px; bottom: calc(66px + env(safe-area-inset-bottom, 0px)); padding: 6px; border: 1px solid var(--border); border-radius: 13px; background: var(--bg); box-shadow: 0 8px 28px rgba(0,0,0,.25); }
+  #attach-menu button { width: 100%; display: flex; align-items: center; gap: 9px; padding: 9px 13px; border: 0; border-radius: 9px; background: none; color: var(--text); font: inherit; font-size: 13px; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+  #attach-menu button:active { background: var(--surface, rgba(128,128,128,.12)); }
   #attach-preview {
     padding: 6px 12px 0; display: none; flex-wrap: wrap; gap: 6px;
   }
@@ -1096,6 +1099,10 @@
     </div>
     <button id="scroll-btn" aria-label="滚到底部">↓</button>
     <div id="attach-preview"></div>
+    <div id="attach-menu" hidden>
+      <button id="pick-photo" type="button"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="3"/><circle cx="9" cy="10" r="2"/><path d="M21 15l-4.5-4.5L8 19"/></svg>从相册选照片</button>
+      <button id="pick-file" type="button"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6"/></svg>从文件中选择</button>
+    </div>
     <div id="sticker-picker"></div>
     <div id="chat-input-row">
       <button id="attach-btn" aria-label="附件">
@@ -1103,7 +1110,10 @@
           <path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48"/>
         </svg>
       </button>
-      <input type="file" id="file-input" style="display:none" accept="image/*,*/*">
+      <!-- 1003：原来一个 input 写 accept="image/*,*/*"，安卓（尤其 app 壳）看到 image/* 就只开相册，PDF 之类选不了。
+           照圆桌拆成两个入口：照片走相册，文件走文件管理器 -->
+      <input type="file" id="image-input" style="display:none" accept="image/*">
+      <input type="file" id="file-input" style="display:none">
       <button id="sticker-btn" aria-label="贴图">🐦</button>
       <textarea id="chat-input" rows="1" placeholder="发消息给 Ripple…"></textarea>
       <button id="send-btn">
@@ -2331,9 +2341,20 @@ function makeTtsBtn(text, msgEl, vbar, initialVoiceMode = false) {
 const UPLOAD_URL = 'https://memory.ravenlove.cc/raven/upload'
 let pendingFiles = []  // [{ name, path }]
 
-document.getElementById('attach-btn').addEventListener('click', () => {
-  document.getElementById('file-input').click()
+function openFilePicker(input) {
+  input.value = ''
+  if (typeof input.showPicker === 'function') { try { input.showPicker(); return } catch {} }
+  input.click()
+}
+document.getElementById('attach-btn').addEventListener('click', e => {
+  e.stopPropagation()
+  const menu = document.getElementById('attach-menu')
+  menu.hidden = !menu.hidden
 })
+document.getElementById('attach-menu').addEventListener('click', e => e.stopPropagation())
+document.addEventListener('click', () => { document.getElementById('attach-menu').hidden = true })
+document.getElementById('pick-photo').addEventListener('click', () => { document.getElementById('attach-menu').hidden = true; openFilePicker(document.getElementById('image-input')) })
+document.getElementById('pick-file').addEventListener('click', () => { document.getElementById('attach-menu').hidden = true; openFilePicker(document.getElementById('file-input')) })
 
 // --- 归巢通话：言叽式独立通话界面 ---
 const BILINGUAL_KEY = 'raven-voice-bilingual'
@@ -2858,7 +2879,7 @@ document.getElementById('sticker-btn').addEventListener('click', (e) => {
 stickerPicker.addEventListener('click', e => e.stopPropagation())
 document.addEventListener('click', () => stickerPicker.classList.remove('open'))
 
-document.getElementById('file-input').addEventListener('change', async (e) => {
+async function onAttachPicked(e) {
   const file = e.target.files[0]
   if (!file) return
   e.target.value = ''
@@ -2883,7 +2904,9 @@ document.getElementById('file-input').addEventListener('change', async (e) => {
     box.appendChild(chip)
     setTimeout(() => { chip.remove(); if (!pendingFiles.length) box.classList.remove('show') }, 6000)
   }
-})
+}
+document.getElementById('image-input').addEventListener('change', onAttachPicked)
+document.getElementById('file-input').addEventListener('change', onAttachPicked)
 
 function renderAttachPreview() {
   const box = document.getElementById('attach-preview')
