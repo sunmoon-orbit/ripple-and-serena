@@ -499,7 +499,7 @@
   .msg-react { font-size: 13px; line-height: 1; padding: 3px 5px; border-radius: 99px; background: var(--surface); border: 1px solid var(--border); box-shadow: 0 1px 4px rgba(0,0,0,.18); }
   .msg-react-who { font-size: 10px; color: var(--text-dim); margin-left: 2px; vertical-align: 1px; }
   #react-pop { position: fixed; z-index: 200; display: none; gap: 2px; padding: 5px 6px; border-radius: 99px; background: var(--surface); border: 1px solid var(--border); box-shadow: 0 6px 20px rgba(0,0,0,.28); }
-  #react-pop.open { display: flex; animation: msgIn .15s ease-out; }
+  #react-pop.open { display: flex; flex-wrap: wrap; justify-content: center; max-width: min(256px, calc(100vw - 16px)); border-radius: 22px; animation: msgIn .15s ease-out; }  /* 十一个表情加引用键，一排放不下手机屏，折成两排 */
   #react-pop button { border: 0; background: none; font-size: 22px; line-height: 1; padding: 5px 6px; border-radius: 99px; cursor: pointer; }
   #react-pop button.on { background: color-mix(in srgb, var(--accent) 35%, transparent); }
   #react-pop button:active { transform: scale(.85); }
@@ -2805,7 +2805,7 @@ callMicBtn.addEventListener('click', () => toggleRecording(true))
 // ── 长按贴表情（0930，思路参考 cute-chat-stickers，代码自写）──────────────
 // 长按一条消息（电脑上右键）弹出一排表情，点一个挂到那条角上；再点同一个就摘掉。
 // 按「角色:时间戳」记在服务器 reactions.json，两边实时同步；我这边用 curl 也能给她挂。
-const REACT_EMOJIS = ['❤️', '🥺', '😂', '🫣', '😡', '👍', '🫶']
+const REACT_EMOJIS = ['❤️', '🥺', '😂', '🫣', '😡', '👍', '🫶', '🥰', '💗', '💞', '💕']  // 后四个是她 1003 要的
 const REACT_WHO = { aying: '阿颖', lianyan: '涟言' }
 const REACT_SHORT = { aying: '颖', lianyan: '言' }
 // 对方刚贴的时候，在聊天里冒一行小灰字：「涟言给你贴了 🥰」（只对实时收到的，翻历史不刷屏）
