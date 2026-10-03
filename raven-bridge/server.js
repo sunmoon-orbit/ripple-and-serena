@@ -930,7 +930,7 @@ const server = http.createServer((req, res) => {
     })
     return
   }
-  const TOKEN_REQUIRED = ['/raven/status', '/raven/last-thinking', '/raven/memory-random', '/raven/journal', '/raven/journal/unlock', '/raven/on-this-day', '/raven/memory-count', '/raven/activity', '/raven/upload', '/raven/push/subscribe', '/raven/push/unsubscribe', '/raven/usage']
+  const TOKEN_REQUIRED = ['/raven/status', '/raven/last-thinking', '/raven/memory-random', '/raven/journal', '/raven/journal/unlock', '/raven/cards/unseen', '/raven/cards/seen', '/raven/on-this-day', '/raven/memory-count', '/raven/activity', '/raven/upload', '/raven/push/subscribe', '/raven/push/unsubscribe', '/raven/usage']
   if (TOKEN_REQUIRED.includes(url.pathname) && !externalAuthed(req, url)) {
     res.writeHead(401, { 'Content-Type': 'application/json' })
     res.end(JSON.stringify({ error: 'unauthorized' }))
@@ -1197,6 +1197,27 @@ const server = http.createServer((req, res) => {
         res.end(JSON.stringify({ entries }))
       })
       .catch(() => { res.writeHead(500); res.end('{}') })
+    return
+  }
+
+  // 心意卡（1003 从言叽搬来）：「非说不可」的话单独弹一张卡，不被下一条消息冲走。
+  // 卡存在 moon /cards，言叽和归巢共用：哪边收下了，另一边就不再弹
+  if (req.method === 'GET' && url.pathname === '/raven/cards/unseen') {
+    moonGet('/cards?unseen=1&limit=5')
+      .then(d => { res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' }); res.end(JSON.stringify({ cards: (d.cards || []).filter(c => c.author === '涟言') })) })
+      .catch(() => { res.writeHead(500); res.end('{}') })
+    return
+  }
+  if (req.method === 'POST' && url.pathname === '/raven/cards/seen') {
+    let body = ''
+    req.on('data', d => { body += d; if (body.length > 200) req.destroy() })
+    req.on('end', () => {
+      let id; try { id = Number(JSON.parse(body || '{}').id) } catch {}
+      if (!Number.isInteger(id) || id <= 0) { res.writeHead(400); res.end('{}'); return }
+      moonPost(`/cards/${id}/seen`, {}, 'PATCH')
+        .then(r => { res.writeHead(r.status, { 'Content-Type': 'application/json' }); res.end(JSON.stringify(r.data)) })
+        .catch(() => { res.writeHead(500); res.end('{}') })
+    })
     return
   }
 

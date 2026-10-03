@@ -554,6 +554,19 @@
     transition: border-color .2s, color .2s;
   }
   #attach-btn:active { color: var(--accent); border-color: var(--accent); }
+  #heart-mask { position: fixed; inset: 0; z-index: 1000; display: flex; align-items: center; justify-content: center; padding: 24px;
+    background: rgba(20,18,24,.38); -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); animation: hcIn .3s ease; }
+  #heart-mask.out { opacity: 0; transition: opacity .25s; }
+  #heart-card { width: min(340px, 100%); padding: 26px 24px 20px; border-radius: 22px; text-align: center; color: var(--text);
+    background: var(--surface); background: linear-gradient(180deg, color-mix(in srgb, var(--surface) 96%, transparent), color-mix(in srgb, var(--surface) 86%, transparent));
+    box-shadow: 0 18px 50px rgba(0,0,0,.28), inset 0 1px 0 rgba(255,255,255,.5), inset 0 0 0 1px rgba(255,255,255,.25); animation: hcPop .35s cubic-bezier(.2,.9,.3,1.2); }
+  #heart-card .hc-icon { color: var(--accent); display: flex; justify-content: center; margin-bottom: 12px; }
+  #heart-card .hc-msg { font-size: 16px; line-height: 1.9; white-space: pre-wrap; word-break: break-word; font-family: 'Lora', 'Noto Serif SC', serif; }
+  #heart-card .hc-meta { font-size: 11.5px; color: var(--text-dim); margin: 14px 0 16px; }
+  #heart-card .hc-btn { border: none; border-radius: 999px; padding: 8px 26px; font: inherit; font-size: 14px; background: var(--accent); color: #fff; cursor: pointer; }
+  #heart-card .hc-btn:disabled { opacity: .6; }
+  @keyframes hcIn { from { opacity: 0; } to { opacity: 1; } }
+  @keyframes hcPop { from { transform: translateY(14px) scale(.96); opacity: 0; } to { transform: none; opacity: 1; } }
   #attach-menu { position: fixed; z-index: 30; left: 14px; bottom: calc(78px + env(safe-area-inset-bottom, 0px)); padding: 6px; border: 1px solid var(--border); border-radius: 13px; background: var(--bg); box-shadow: 0 8px 28px rgba(0,0,0,.25); }
   #attach-menu button { width: 100%; display: flex; align-items: center; gap: 9px; padding: 9px 13px; border: 0; border-radius: 9px; background: none; color: var(--text); font: inherit; font-size: 13px; cursor: pointer; -webkit-tap-highlight-color: transparent; }
   #attach-menu button:active { background: var(--surface, rgba(128,128,128,.12)); }
@@ -2127,6 +2140,41 @@ function renderStatus(data) {
       </div>`).join('')
   }
 }
+
+// --- 心意卡（1003 从言叽搬来）：我「非说不可」的话单独弹一张卡，收下了才消失 ---
+const HEART_SVG = '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1-1.1a5.5 5.5 0 0 0-7.8 7.8l1 1.1L12 21l7.8-7.5 1-1.1a5.5 5.5 0 0 0 0-7.8z"/></svg>'
+let heartQueue = [], heartShowing = false
+async function checkHeartCards() {
+  if (heartShowing) return
+  try {
+    const r = await fetch('/raven/cards/unseen', { headers: { Authorization: 'Bearer ' + (localStorage.getItem('raven-token') || '') }, cache: 'no-store' })
+    if (!r.ok) return
+    const { cards = [] } = await r.json()
+    heartQueue = cards.slice().reverse()   // 先弹最早的那张
+    showNextHeartCard()
+  } catch {}
+}
+function showNextHeartCard() {
+  const card = heartQueue.shift()
+  if (!card) { heartShowing = false; return }
+  heartShowing = true
+  const mask = document.createElement('div'); mask.id = 'heart-mask'
+  const box = document.createElement('div'); box.id = 'heart-card'
+  const icon = document.createElement('div'); icon.className = 'hc-icon'; icon.innerHTML = HEART_SVG
+  const msg = document.createElement('div'); msg.className = 'hc-msg'; msg.textContent = card.message
+  const meta = document.createElement('div'); meta.className = 'hc-meta'
+  const t = new Date(String(card.created_at || '').replace(' ', 'T') + (String(card.created_at || '').includes('Z') ? '' : 'Z'))
+  meta.textContent = '— 涟言' + (isNaN(t) ? '' : ' · ' + t.toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai', month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' }))
+  const btn = document.createElement('button'); btn.className = 'hc-btn'; btn.textContent = '收下'
+  btn.onclick = async () => {
+    btn.disabled = true
+    try { await fetch('/raven/cards/seen', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + (localStorage.getItem('raven-token') || '') }, body: JSON.stringify({ id: card.id }) }) } catch {}
+    mask.classList.add('out'); setTimeout(() => { mask.remove(); showNextHeartCard() }, 260)
+  }
+  box.append(icon, msg, meta, btn); mask.appendChild(box); document.body.appendChild(mask)
+}
+setTimeout(checkHeartCards, 1500)
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') checkHeartCards() })
 
 // --- tabs ---
 document.querySelectorAll('.tab').forEach(tab => {
