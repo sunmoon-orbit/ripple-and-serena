@@ -198,6 +198,16 @@
   #header { border-bottom-color: transparent !important; box-shadow: inset 0 1px 0 rgba(255,255,255,.06), 0 4px 18px rgba(0,0,0,.16); }
   #tabs { border-bottom-color: transparent !important; box-shadow: 0 6px 16px rgba(0,0,0,.10); }
   #chat-input-row { border-top-color: transparent !important; box-shadow: 0 -6px 20px rgba(0,0,0,.14), inset 0 1px 0 rgba(255,255,255,.06); }
+  /* 1003 她点头的「浮起来」：输入栏变成离底边和两侧都留空的圆角胶囊（还在文档流里，贴图面板、附件栏照旧在它上面） */
+  #chat-input-row {
+    margin: 0 10px calc(10px + env(safe-area-inset-bottom, 0px));
+    border-radius: 26px; padding: 7px 8px !important; align-items: flex-end;
+    box-shadow: 0 10px 28px rgba(0,0,0,.30), 0 1px 3px rgba(0,0,0,.18), inset 0 1px 0 rgba(255,255,255,.08), inset 0 0 0 1px rgba(255,255,255,.06) !important;
+  }
+  :is([data-theme="pink"], [data-theme="lavender"], [data-theme="sage"], [data-theme="mist"], [data-theme="babyangel"], [data-theme="sakura"], [data-theme="apricot"]) #chat-input-row {
+    box-shadow: 0 10px 30px rgba(60,70,110,.16), 0 1px 3px rgba(60,70,110,.08), inset 0 1px 0 rgba(255,255,255,.9), inset 0 0 0 1px rgba(255,255,255,.6) !important;
+  }
+  #attach-btn { border-color: transparent !important; background: color-mix(in srgb, var(--bg) 55%, transparent) !important; }
   #chat-input {
     background: color-mix(in srgb, var(--bg) 70%, transparent) !important;
     border-color: transparent !important;
@@ -544,7 +554,7 @@
     transition: border-color .2s, color .2s;
   }
   #attach-btn:active { color: var(--accent); border-color: var(--accent); }
-  #attach-menu { position: fixed; z-index: 30; left: 12px; bottom: calc(66px + env(safe-area-inset-bottom, 0px)); padding: 6px; border: 1px solid var(--border); border-radius: 13px; background: var(--bg); box-shadow: 0 8px 28px rgba(0,0,0,.25); }
+  #attach-menu { position: fixed; z-index: 30; left: 14px; bottom: calc(78px + env(safe-area-inset-bottom, 0px)); padding: 6px; border: 1px solid var(--border); border-radius: 13px; background: var(--bg); box-shadow: 0 8px 28px rgba(0,0,0,.25); }
   #attach-menu button { width: 100%; display: flex; align-items: center; gap: 9px; padding: 9px 13px; border: 0; border-radius: 9px; background: none; color: var(--text); font: inherit; font-size: 13px; cursor: pointer; -webkit-tap-highlight-color: transparent; }
   #attach-menu button:active { background: var(--surface, rgba(128,128,128,.12)); }
   #attach-preview {
