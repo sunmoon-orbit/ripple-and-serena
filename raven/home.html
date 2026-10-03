@@ -879,6 +879,16 @@ function ugCodexCache(cache) {
   return `<div class="ug-cache">曜 · Codex · 缓存 ${state} · ${parts.join(' · ')}<div class="ug-note">统计的是曜最近这一个会话</div></div>`
 }
 
+// DeepSeek 余额（言叽、独处、做梦这些轻任务在用，充值制）
+function ugDeepseek(ds) {
+  if (!ds || !ds.available) return ds && ds.error ? `<div class="ug-cache">DeepSeek · 余额读不到：${ds.error}</div>` : ''
+  const sym = ds.currency === 'USD' ? '$' : '¥'
+  const low = ds.total < 10 || ds.is_available === false
+  const tip = ds.is_available === false ? '，已用不了，该充值了' : low ? '，快见底了' : ''
+  const amount = `${sym}${ds.total.toFixed(2)}`
+  return `<div class="ug-cache">DeepSeek · 余额 <span style="${low ? 'color:#d17a52;font-weight:600' : ''}">${amount}${tip}</span>${ds.stale ? '（旧数字）' : ''}</div>`
+}
+
 async function loadUsage() {
   const btn = document.getElementById('usage-refresh')
   btn.classList.remove('spinning'); void btn.offsetWidth; btn.classList.add('spinning')
@@ -907,6 +917,7 @@ async function loadUsage() {
       if (x.secondary) rows.push(ugBar('曜 · Codex · 7 天', x.secondary.used_percent, x.secondary.reset_after_seconds))
     }
     rows.push(ugCodexCache(x.prompt_cache))
+    rows.push(ugDeepseek(d.deepseek))
 
     const notes = []
     if (!c.available) notes.push('涟言那边还没数据（要等他下次启动后状态栏刷新一次）')
