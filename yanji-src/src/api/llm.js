@@ -227,6 +227,10 @@ async function executeToolRaw(name, args, { searchConfig, moonMemoryConfig, mcpS
     onStatus?.(name === 'leave_board_message' ? '写留言...' : '看留言板...')
     return await executeMemoryTool(name, args, moonMemoryConfig)
   }
+  if (name === 'read_journal' || name === 'write_journal') {
+    onStatus?.(name === 'write_journal' ? '写日记...' : '翻日记...')
+    return await executeMemoryTool(name, args, moonMemoryConfig)
+  }
   if (name === 'browse_moments' || name === 'comment_moment') {
     onStatus?.(name === 'comment_moment' ? '在朋友圈留言...' : '翻朋友圈...')
     return await executeMemoryTool(name, args, moonMemoryConfig)

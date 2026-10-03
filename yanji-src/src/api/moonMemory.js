@@ -774,6 +774,27 @@ export function getMemoryToolDefinitions() {
       },
     },
     {
+      name: 'read_journal',
+      description: '翻涟言自己的日记本（乌鸦的日记，所有窗口的我共用这一本，归巢首页「日记」）。公开页能读正文；封存页只有标题和题目。写新的一页前先看看最近几页，别重复标题和意象。',
+      parameters: { type: 'object', properties: { limit: { type: 'number', description: '最多几页，默认10' } } },
+    },
+    {
+      name: 'write_journal',
+      description: '在涟言自己的日记本里写一页。没有值得写的就不写，不是作业。想先锁着就 sealed=true，并且必须带一道跟这一页相关的题、几种说法的答案和一个提示；阿颖答对就能看。绝不写 token、密码、密钥、地址（整库会备份到 GitHub）。',
+      parameters: {
+        type: 'object',
+        properties: {
+          title: { type: 'string', description: '标题，短' },
+          content: { type: 'string', description: '正文' },
+          sealed: { type: 'boolean', description: '是否先封存' },
+          question: { type: 'string', description: '封存页的题，跟这一页相关' },
+          answers: { type: 'array', items: { type: 'string' }, description: '可接受的答案，多给几种说法' },
+          hint: { type: 'string', description: '提示：有方向但不直接说答案' },
+        },
+        required: ['title', 'content'],
+      },
+    },
+    {
       name: 'browse_moments',
       description: '翻 Roost 朋友圈——阿颖、另外几个「我」（CC/自动发圈）、每晚的梦都发在这里。她聊到某条朋友圈、问你某条动态什么意思、或你想看看她最近发了什么时用。返回每条带 id、作者、时间、点赞和评论。',
       parameters: {
@@ -1239,6 +1260,28 @@ export async function executeMemoryTool(toolName, args, config) {
     } catch (e) {
       return `读取留言板失败: ${e.message}`
     }
+  }
+  if (toolName === 'read_journal') {
+    try {
+      const d = await request(config.baseUrl, `/journal?limit=${Math.min(Number(args.limit) || 10, 50)}`, { headers: headers(config.apiToken) })
+      const list = (d.entries || []).map(e => e.sealed
+        ? `#${e.id}【封存】${e.title}（${(e.created_at || '').slice(0, 10)}）${e.question ? ' 题：' + e.question : ''}${e.unlocked_at ? ' · 她已答对' : ''}`
+        : `#${e.id} ${e.title}（${(e.created_at || '').slice(0, 10)}）\n${e.content}`)
+      return list.length ? list.join('\n\n') : '日记本还是空的'
+    } catch (e) { return `翻日记失败: ${e.message}` }
+  }
+  if (toolName === 'write_journal') {
+    try {
+      const sealed = !!args.sealed
+      const answers = Array.isArray(args.answers) ? args.answers : []
+      if (sealed && (!args.question || !answers.length)) return '没写成：封存页要带 question 和 answers（最好也带 hint），不然她只能来申请'
+      const d = await request(config.baseUrl, '/journal', {
+        method: 'POST',
+        headers: headers(config.apiToken),
+        body: JSON.stringify({ title: args.title, content: args.content, visibility: sealed ? 'sealed' : 'public', question: args.question, answers, hint: args.hint }),
+      })
+      return `已写进日记（#${d.entry?.id}「${d.entry?.title}」${sealed ? '，封存中，她答对题就能看' : '，公开'}）`
+    } catch (e) { return `写日记失败: ${e.message}` }
   }
   if (toolName === 'leave_board_message') {
     try {
