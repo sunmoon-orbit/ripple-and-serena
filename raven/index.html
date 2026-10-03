@@ -184,6 +184,39 @@
     .msg { max-width: 65%; }
   }
 
+  /* --- 1003 液态玻璃：顶栏、标签栏、输入栏原来都是平的色块贴在背景上，她说「缺点啥」。
+     加上下渐变和内高光，让它们有厚度、浮起来（配方参考 dwell-on-something 第 19 篇）。
+     深色默认主题高光压低；浅色主题（pink/lavender/…）用亮高光 --- */
+  #header, #tabs, #chat-input-row {
+    background: var(--surface) !important;
+    background: linear-gradient(180deg,
+      color-mix(in srgb, var(--surface) 92%, transparent),
+      color-mix(in srgb, var(--surface) 74%, transparent)) !important;
+    -webkit-backdrop-filter: blur(18px) saturate(1.6); backdrop-filter: blur(18px) saturate(1.6);
+    position: relative; z-index: 2;
+  }
+  #header { border-bottom-color: transparent !important; box-shadow: inset 0 1px 0 rgba(255,255,255,.06), 0 4px 18px rgba(0,0,0,.16); }
+  #tabs { border-bottom-color: transparent !important; box-shadow: 0 6px 16px rgba(0,0,0,.10); }
+  #chat-input-row { border-top-color: transparent !important; box-shadow: 0 -6px 20px rgba(0,0,0,.14), inset 0 1px 0 rgba(255,255,255,.06); }
+  #chat-input {
+    background: color-mix(in srgb, var(--bg) 70%, transparent) !important;
+    border-color: transparent !important;
+    box-shadow: inset 0 1px 3px rgba(0,0,0,.18), inset 0 0 0 1px rgba(255,255,255,.06);
+  }
+  :is([data-theme="pink"], [data-theme="lavender"], [data-theme="sage"], [data-theme="mist"], [data-theme="babyangel"], [data-theme="sakura"], [data-theme="apricot"]) #header {
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.9), inset 0 -6px 14px rgba(255,255,255,.3), 0 4px 16px rgba(80,80,110,.08);
+  }
+  :is([data-theme="pink"], [data-theme="lavender"], [data-theme="sage"], [data-theme="mist"], [data-theme="babyangel"], [data-theme="sakura"], [data-theme="apricot"]) #tabs {
+    box-shadow: inset 0 -1px 0 rgba(255,255,255,.6), 0 6px 14px rgba(80,80,110,.06);
+  }
+  :is([data-theme="pink"], [data-theme="lavender"], [data-theme="sage"], [data-theme="mist"], [data-theme="babyangel"], [data-theme="sakura"], [data-theme="apricot"]) #chat-input-row {
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.9), 0 -6px 18px rgba(80,80,110,.08);
+  }
+  :is([data-theme="pink"], [data-theme="lavender"], [data-theme="sage"], [data-theme="mist"], [data-theme="babyangel"], [data-theme="sakura"], [data-theme="apricot"]) #chat-input {
+    background: color-mix(in srgb, #fff 70%, transparent) !important;
+    box-shadow: inset 0 1px 2px rgba(80,80,110,.10), inset 0 0 0 1px rgba(255,255,255,.7), 0 1px 0 rgba(255,255,255,.8);
+  }
+
   /* --- header --- */
   #header {
     display: flex; align-items: center; justify-content: space-between;
