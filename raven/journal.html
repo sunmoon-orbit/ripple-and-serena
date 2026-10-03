@@ -34,6 +34,7 @@
   .quiz button { font: inherit; font-size: 13.5px; padding: 7px 14px; border-radius: 9px; border: none; background: var(--seal); color: #fff; }
   .quiz button:disabled { opacity: .5; }
   .msg { font-size: 12px; color: var(--dim); margin-top: 6px; min-height: 1em; }
+  .hint-btn { margin-top: 6px; background: none; border: none; padding: 2px 0; color: var(--seal); font: inherit; font-size: 12px; text-decoration: underline; cursor: pointer; }
   .hint { font-size: 12px; color: var(--faint); margin: 10px 0 6px; }
   .empty, .err { text-align: center; color: var(--dim); font-size: 13px; padding: 40px 0; }
 </style>
@@ -60,6 +61,10 @@ function quiz(e) {
   const btn = el('button', null, '开锁')
   const msg = el('div', 'msg')
   row.append(input, btn); box.append(row, msg)
+  // 提示：答错一次以后才露出来（她说「要给我留一个提示，不然猜不出来」），也可以直接点
+  let hintEl = null
+  function showHint() { if (!e.hint || hintEl) return; hintEl = el('div', 'hint', '提示：' + e.hint); box.insertBefore(hintEl, row) }
+  if (e.hint) { const hb = el('button', 'hint-btn', '要个提示'); hb.onclick = () => { showHint(); hb.remove() }; box.appendChild(hb) }
   async function tryOpen() {
     const answer = input.value.trim(); if (!answer) return
     btn.disabled = true; msg.textContent = ''
@@ -73,6 +78,7 @@ function quiz(e) {
         box.replaceWith(note, opened)
         return
       }
+      showHint()
       msg.textContent = typeof d.left === 'number' ? `不对哦。今天还能再试 ${d.left} 次，不然就去找他申请。` : '没打开，稍后再试。'
     } catch { msg.textContent = '没打开，稍后再试。' }
     finally { btn.disabled = false }

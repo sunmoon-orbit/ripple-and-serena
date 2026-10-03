@@ -1168,7 +1168,7 @@ const server = http.createServer((req, res) => {
           id: e.id, author: e.author, title: e.title, sealed: e.visibility === 'sealed',
           content: e.visibility === 'sealed' ? null : e.content,
           created_at: e.created_at, revealed_at: e.revealed_at || null,
-          question: e.visibility === 'sealed' ? e.question || null : null, unlocked_at: e.unlocked_at || null,
+          question: e.visibility === 'sealed' ? e.question || null : null, hint: e.visibility === 'sealed' ? e.hint || null : null, unlocked_at: e.unlocked_at || null,
         }))
         res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' })
         res.end(JSON.stringify({ entries }))
