@@ -44,6 +44,104 @@ export function getEnabledMcpToolDefinitions(servers, limit = MCP_EXTERNAL_TOOL_
   return definitions
 }
 
+// ─── 外部工具索引（1004，参考 cedarstar 的 clio 工具索引教程）────────────────
+// 以前开着的 MCP 工具每轮都把整份 schema 发给模型，游戏服务一开就是几千 token，她只好平时关着。
+// 现在只发两个固定工具：ext_tool_info 的描述里是一行一行的索引，要用时先拿完整参数，再用 ext_tool_call 执行。
+// 好处之一是工具列表每轮不变，提示缓存不会因为开关工具而断。
+export const EXT_TOOL_INFO = 'ext_tool_info'
+export const EXT_TOOL_CALL = 'ext_tool_call'
+
+function enabledMcpEntries(servers, limit = MCP_EXTERNAL_TOOL_LIMIT) {
+  const out = []
+  for (const server of Array.isArray(servers) ? servers : []) {
+    if (!server?.enabled) continue
+    for (const tool of Array.isArray(server.tools) ? server.tools : []) {
+      if (!tool?.enabled || !tool?.name) continue
+      out.push({ server, tool })
+      if (out.length >= limit) return out
+    }
+  }
+  return out
+}
+
+function firstSentence(text, max = 80) {
+  const t = String(text || '').replace(/\s+/g, ' ').trim()
+  const m = t.match(/^.*?(?:[。！？]|[.!?](?=\s|$))/)
+  const cut = m ? m[0] : t
+  return cut.length > max ? `${cut.slice(0, max - 1)}…` : cut
+}
+
+export function mcpIndexLine({ server, tool }) {
+  const access = tool.annotations?.readOnlyHint === true ? '只读' : '可写'
+  const required = Array.isArray(tool.inputSchema?.required) ? tool.inputSchema.required : []
+  const need = required.length ? `；必填 ${required.join('、')}` : ''
+  return `- ${tool.name}（${server.name || '未命名服务'}·${access}）${firstSentence(tool.description) ? `：${firstSentence(tool.description)}` : ''}${need}`
+}
+
+export function getMcpIndexToolDefinitions(servers) {
+  const entries = enabledMcpEntries(servers)
+  if (!entries.length) return []
+  const index = entries.map(mcpIndexLine).join('\n')
+  return [
+    {
+      name: EXT_TOOL_INFO,
+      description: `外部 MCP 工具目录（只列名字和用途，参数要现查）。要用其中某个工具时，先用这个工具查它的完整参数，再用 ${EXT_TOOL_CALL} 执行；参数已经清楚的可以直接执行。\n${index}`,
+      parameters: {
+        type: 'object',
+        properties: {
+          tool: { type: 'string', description: '目录里的工具名' },
+          server: { type: 'string', description: '服务名；只有两个服务里有同名工具时才需要' },
+        },
+        required: ['tool'],
+      },
+    },
+    {
+      name: EXT_TOOL_CALL,
+      description: `执行 ${EXT_TOOL_INFO} 目录里的一个外部 MCP 工具。`,
+      parameters: {
+        type: 'object',
+        properties: {
+          tool: { type: 'string', description: '目录里的工具名' },
+          server: { type: 'string', description: '服务名；只有同名工具时才需要' },
+          arguments: { type: 'object', description: '按完整参数说明填写' },
+        },
+        required: ['tool'],
+      },
+    },
+  ]
+}
+
+export function resolveMcpIndexTool(toolName, serverName, servers) {
+  const name = String(toolName || '').trim()
+  const hits = enabledMcpEntries(servers).filter(({ server, tool }) =>
+    (tool.name === name || mcpWireName(server.id, tool.name) === name) &&
+    (!serverName || server.name === serverName || server.id === serverName))
+  if (!hits.length) throw new Error(`目录里没有「${name}」，可能没勾选或服务关着。请只用 ${EXT_TOOL_INFO} 目录里列出的工具`)
+  if (hits.length > 1) throw new Error(`有多个服务都有「${name}」：${hits.map((h) => h.server.name).join('、')}，请带上 server`)
+  return hits[0]
+}
+
+export function describeMcpIndexTool(toolName, serverName, servers) {
+  const { server, tool } = resolveMcpIndexTool(toolName, serverName, servers)
+  const writable = tool.annotations?.readOnlyHint !== true
+  return JSON.stringify({
+    tool: tool.name,
+    server: server.name,
+    access: writable ? (server.allowWrites ? '可写（已允许）' : '可写（这个服务没开写权限，执行会被拒）') : '只读',
+    description: tool.description || '',
+    parameters: normalizeInputSchema(tool.inputSchema),
+  })
+}
+
+export async function callMcpIndexTool(args, servers, backendConfig) {
+  const { server, tool } = resolveMcpIndexTool(args?.tool, args?.server, servers)
+  try {
+    return await executeMcpTool(mcpWireName(server.id, tool.name), args?.arguments || {}, servers, backendConfig)
+  } catch (error) {
+    throw new Error(`${error.message}。如果是参数不对，先用 ${EXT_TOOL_INFO} 查「${tool.name}」的完整参数再试`)
+  }
+}
+
 export function mergeDiscoveredMcpTools(existingTools, discoveredTools) {
   const enabledByName = new Map((existingTools || []).map((tool) => [tool.name, tool.enabled === true]))
   return (discoveredTools || []).filter((tool) => tool?.name).map((tool) => ({

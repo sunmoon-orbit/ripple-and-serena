@@ -5,6 +5,9 @@ export const TOOL_DRAWER_MAX_GROUPS = 2
 const CORE_TOOL_NAMES = new Set([
   'search_memories',
   'write_memory',
+  // 外部工具目录本身只占一点，常驻不进抽屉，工具列表才稳定（1004）
+  'ext_tool_info',
+  'ext_tool_call',
 ])
 
 const GROUPS = [

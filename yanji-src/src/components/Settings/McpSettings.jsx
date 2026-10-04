@@ -183,7 +183,7 @@ export default function McpSettings() {
   }
 
   return <>
-    <div className="settings-card"><div className="settings-card-title">远程 MCP 工具</div><p className="card-hint">Streamable HTTP 连接统一由言叽后端发起。手动凭据与 OAuth token 不进浏览器存储、备份、Git 或错误日志；仍只把手动勾选的工具交给模型。关掉的服务里勾选的工具不占名额、也不随聊天发送，平时不用就把整个服务关掉，省 token。</p><div className="card-row"><span className="card-row-label">已选外部工具</span><span className={selectedCount >= MCP_EXTERNAL_TOOL_LIMIT ? 'perm-badge perm-deny' : 'perm-badge perm-ok'}>{selectedCount} / {MCP_EXTERNAL_TOOL_LIMIT}</span></div>{autoTools === false && <p className="card-hint" style={{ color: 'var(--danger, #b65f5f)' }}>通用设置里的「自动工具」已关闭，MCP 工具不会随聊天发送。</p>}</div>
+    <div className="settings-card"><div className="settings-card-title">远程 MCP 工具</div><p className="card-hint">Streamable HTTP 连接统一由言叽后端发起。手动凭据与 OAuth token 不进浏览器存储、备份、Git 或错误日志；仍只把手动勾选的工具交给模型。开着的服务只把一行一行的目录发给模型，它要用时再现查参数，所以常开也不太费 token；关掉的服务连目录都不发。</p><div className="card-row"><span className="card-row-label">已选外部工具</span><span className={selectedCount >= MCP_EXTERNAL_TOOL_LIMIT ? 'perm-badge perm-deny' : 'perm-badge perm-ok'}>{selectedCount} / {MCP_EXTERNAL_TOOL_LIMIT}</span></div>{autoTools === false && <p className="card-hint" style={{ color: 'var(--danger, #b65f5f)' }}>通用设置里的「自动工具」已关闭，MCP 工具不会随聊天发送。</p>}</div>
     {mcpServers.map((server) => <ServerCard key={server.id} server={server} backendConfig={backendConfig} selectedCount={selectedCount} busy={busyId === server.id} onUpdate={(patch) => {
       updateMcpServer(server.id, patch)
       // 总闸与工具闸必须同步生效；表单文字仍等测试/授权时统一保存，避免每次按键都发请求。

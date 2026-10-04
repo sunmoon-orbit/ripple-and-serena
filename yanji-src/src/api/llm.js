@@ -10,7 +10,7 @@ import { TAROT_TOOL_DEF, executeTarot } from './tarot'
 import { NOWHERE_TOOL_DEFS, executeNowhereTool } from './nowhere'
 import { buildMoodFxPrompt } from '../utils/moodFx'
 import { normalizeGenerationConfig } from '../utils/generationConfig'
-import { executeMcpTool, getEnabledMcpToolDefinitions } from './mcp'
+import { EXT_TOOL_CALL, EXT_TOOL_INFO, callMcpIndexTool, describeMcpIndexTool, executeMcpTool, getMcpIndexToolDefinitions } from './mcp'
 import { createToolDrawer, TOOL_DRAWER_NAME } from './toolDrawer'
 import { createToolCommitGuard, TOOL_LOOP_REQUEST_LIMIT } from './toolCommitGuard'
 
@@ -146,7 +146,8 @@ function getAllTools(searchConfig, moonMemoryConfig, onFile, mcpServers, onAskUs
   if (moonMemoryConfig?.enabled && moonMemoryConfig?.apiToken) tools.push(TAROT_TOOL_DEF)
 
   tools.push(...NOWHERE_TOOL_DEFS)
-  tools.push(...getEnabledMcpToolDefinitions(mcpServers))
+  // 外部 MCP 工具只发目录和两个固定入口，不再整份 schema 每轮都发（1004）
+  tools.push(...getMcpIndexToolDefinitions(mcpServers))
   return tools
 }
 
@@ -192,6 +193,11 @@ async function executeToolRaw(name, args, { searchConfig, moonMemoryConfig, mcpS
   if (ALBUM_TOOLS.some(tool => tool.name === name)) {
     onStatus?.(name.startsWith('save_') ? '收藏进相册…' : '翻相册…')
     return executeAlbumTool(name, args || {}, moonMemoryConfig, albumMessages)
+  }
+  if (name === EXT_TOOL_INFO) return describeMcpIndexTool(args?.tool, args?.server, mcpServers)
+  if (name === EXT_TOOL_CALL) {
+    onStatus?.(`调用外部工具 ${args?.tool || ''}…`)
+    return await callMcpIndexTool(args, mcpServers, moonMemoryConfig)
   }
   if (name.startsWith('mcp_')) {
     onStatus?.('调用 MCP 工具…')
