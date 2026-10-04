@@ -45,6 +45,15 @@ html, body { min-height: 100%; background: var(--bg); color: var(--text); font-f
     linear-gradient(180deg, color-mix(in srgb, var(--bg) 30%, transparent), color-mix(in srgb, var(--bg) 62%, transparent)),
     var(--wall) center / cover no-repeat;
 }
+/* 壁纸花的时候，直接压在图上的字（标题、问候、分区标签）加一圈柔光托住，不然像她截图里那样糊进花瓣里 */
+#app.has-wall #home-title, #app.has-wall #home-domain, #app.has-wall .section-label {
+  text-shadow: 0 0 6px var(--bg), 0 0 14px var(--bg), 0 0 22px var(--bg);
+}
+#app.has-wall #home-header::before {
+  content: ''; position: absolute; left: 0; right: 0; top: 0; height: 150px; z-index: -1; pointer-events: none;
+  background: linear-gradient(180deg, color-mix(in srgb, var(--bg) 70%, transparent), transparent);
+}
+#app.has-wall #home-header { position: relative; }
 /* 有壁纸时卡片换成真正透一点的玻璃（.card 后面那条规则写的是实色底） */
 #app.has-wall .card, #app.has-wall .stat-chip, #app.has-wall .glass {
   background: linear-gradient(180deg,
