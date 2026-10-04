@@ -1569,14 +1569,20 @@ function wsSendWithAck(payload) {
     if (!awaitingAck.has(payload.cid)) return
     awaitingAck.delete(payload.cid)
     pendingOutbox.push(payload)
-    appendMsg('[没收到回执，连接可能已断，重连后自动重发]', 'system', false)
+    const warn = appendMsg('[没收到回执，连接可能已断，重连后自动重发]', 'system', false)
+    if (warn) ackWarnings.set(payload.cid, warn)
     try { ws && ws.close() } catch { }   // 触发 onclose → 3 秒后重连 → 补发
   }, 8000)
   awaitingAck.set(payload.cid, { payload, timer })
 }
 
+// 1004：她手机网络抖的时候，回执刚好掉在断线那一下，消息其实已经到了，重连补发后服务端也回了执，
+// 可那行「没收到回执」一直挂着，看着像没发出去。补发收到回执就把那行撤掉
+const ackWarnings = new Map()  // cid → 那行提示的元素
 function ackReceived(cid) {
   if (!cid) return
+  const warn = ackWarnings.get(cid)
+  if (warn) { ackWarnings.delete(cid); try { warn.remove() } catch { } }
   const entry = awaitingAck.get(cid)
   if (!entry) return
   clearTimeout(entry.timer)
