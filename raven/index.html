@@ -1377,7 +1377,7 @@ marked.use({ breaks: true, gfm: true })
 
 // 纯英文小写词组成的方括号 = 语气标签；后面紧跟 ( 的是 markdown 链接，不算。
 // 放在这么前面：历史消息在脚本顶层就开始渲染，定义在后面会撞 TDZ
-const VOICE_TAG_RE = /\[([a-z][a-z ,]{1,58})\](?!\()/g
+const VOICE_TAG_RE = /\[([a-z][a-z ,'’-]{1,158})\](?!\()/g  // 1004 放宽：带画面的长标签（连字符、撇号）也认
 
 const PURIFY_OPTS = {
   ALLOWED_TAGS: [
