@@ -76,7 +76,8 @@
   function renderModelList(current) {
     if (!modelList) return
     modelList.replaceChildren()
-    const groups = [['常用', o => o.dataset.source !== 'legacy'], ['历史版本', o => o.dataset.source === 'legacy']]
+    const isAll = o => o.dataset.source === 'official' || o.dataset.source === 'legacy'
+    const groups = [['常用', o => !isAll(o)], ['全部版本（官方列出的）', isAll]]
     for (const [title, test] of groups) {
       const opts = [...modelSelect.options].filter(o => o.value && test(o))
       if (!opts.length) continue

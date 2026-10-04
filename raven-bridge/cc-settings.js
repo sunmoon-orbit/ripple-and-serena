@@ -2,12 +2,14 @@
 const fs = require('fs')
 const path = require('path')
 const crypto = require('crypto')
-const { modelCatalog, validModel } = require('./claude-runtime')
+const { modelCatalog, validModel, officialModels } = require('./claude-runtime')
 const MAX_BYTES = 256 * 1024
 const hash = s => crypto.createHash('sha256').update(s).digest('hex')
 const fail = (status, message) => Object.assign(new Error(message), { status })
 
 function createStore({ project, home, backups, claudeState = path.join(home, '.claude.json'), usageSnapshot = path.join(home, '.claude', 'rate_limits_latest.json') }) {
+  // 桥一启动就先去官方拉一次版本列表，她第一次打开设置时就不是手写名单了
+  officialModels(path.join(home, '.claude', '.credentials.json'))
   const targets = {
     project: path.join(project, 'CLAUDE.md'),
     global: path.join(home, '.claude', 'CLAUDE.md'),
@@ -65,7 +67,7 @@ function createStore({ project, home, backups, claudeState = path.join(home, '.c
         currentModel: validModel(snapshot?.model) ? snapshot.model : '',
         // 快照是状态栏每次重绘时写的，终端里切了模型、还没出下一条回复前它是旧的
         currentModelAgeSeconds: Number(snapshot?.updated_at) ? Math.max(0, Math.round(Date.now() / 1000 - Number(snapshot.updated_at))) : null,
-        models: modelCatalog({ stateFile: claudeState, settingsFile: targets.model, usageFile: usageSnapshot }),
+        models: modelCatalog({ stateFile: claudeState, settingsFile: targets.model, usageFile: usageSnapshot, officialList: officialModels(path.join(home, '.claude', '.credentials.json')) }),
         revision: item.revision,
         applies: 'next_session',
       }

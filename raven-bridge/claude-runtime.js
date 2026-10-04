@@ -32,7 +32,37 @@ function contextSnapshot(file, now = Date.now()) {
   }
 }
 
-function modelCatalog({ stateFile, settingsFile, usageFile }) {
+// 1004 她说「官方给什么咱们就用什么」：订阅账号的 OAuth token 能直接问官方 /v1/models，
+// 拿到的就是这个账号现在能看到的全部版本（新出的会自己出现，下线的会自己消失）。
+// token 只在服务器上读、只发给 api.anthropic.com，不进前端也不进日志。拉不到就退回下面的手写名单。
+const OFFICIAL_TTL_MS = 60 * 60 * 1000
+const official = { at: 0, list: [], inflight: null }
+async function refreshOfficialModels(credentialsFile, fetchImpl = globalThis.fetch) {
+  const creds = readJson(credentialsFile)
+  const token = creds?.claudeAiOauth?.accessToken
+  if (!token || typeof fetchImpl !== 'function') return official.list
+  const res = await fetchImpl('https://api.anthropic.com/v1/models?limit=100', {
+    headers: { Authorization: `Bearer ${token}`, 'anthropic-version': '2023-06-01', 'anthropic-beta': 'oauth-2025-04-20' },
+    signal: AbortSignal.timeout(15000),
+  })
+  if (!res.ok) throw new Error(`models ${res.status}`)
+  const data = await res.json()
+  const list = (Array.isArray(data?.data) ? data.data : [])
+    .filter(m => validModel(m?.id))
+    .map(m => ({ id: m.id, label: String(m.display_name || m.id).replace(/^Claude\s+/, '') }))
+  if (list.length) { official.list = list; official.at = Date.now() }
+  return official.list
+}
+function officialModels(credentialsFile) {
+  if (Date.now() - official.at > OFFICIAL_TTL_MS && !official.inflight) {
+    official.inflight = refreshOfficialModels(credentialsFile)
+      .catch(e => console.error('[models] 官方列表拉取失败，先用手写名单:', e.message))
+      .finally(() => { official.inflight = null; if (!official.list.length) official.at = Date.now() - OFFICIAL_TTL_MS + 5 * 60 * 1000 })
+  }
+  return official.list
+}
+
+function modelCatalog({ stateFile, settingsFile, usageFile, officialList = [] }) {
   const found = new Map()
   const add = (id, label, source) => {
     if (!validModel(id)) return
@@ -53,7 +83,8 @@ function modelCatalog({ stateFile, settingsFile, usageFile }) {
 
   // 1004 她想选「历史乌鸦」：这些是订阅还能跑的旧版本（当天用 claude -p --model 逐个探过；
   // Opus 4.1 会被自动改写成最新 Opus，所以不列）。以后下线了，切换会在终端里报错，从这里删掉就好
-  for (const [id, label] of [
+  officialList.forEach(m => add(m.id, m.label, 'official'))
+  if (!officialList.length) for (const [id, label] of [
     ['claude-opus-5', 'Opus 5'], ['claude-opus-4-6', 'Opus 4.6'], ['claude-opus-4-5-20251101', 'Opus 4.5'],
     ['claude-sonnet-5', 'Sonnet 5'], ['claude-sonnet-4-6', 'Sonnet 4.6'], ['claude-sonnet-4-5-20250929', 'Sonnet 4.5'],
     ['claude-haiku-4-5-20251001', 'Haiku 4.5'],
@@ -76,13 +107,15 @@ function modelCatalog({ stateFile, settingsFile, usageFile }) {
     }
   }
 
-  const rank = { alias: 0, active: 1, configured: 2, claude_cache: 3, legacy: 4 }
+  const rank = { alias: 0, active: 1, configured: 2, claude_cache: 3, official: 4, legacy: 4 }
+  const officialOrder = officialList.map(m => m.id)
   const legacyOrder = ['claude-opus-5', 'claude-opus-4-6', 'claude-opus-4-5-20251101', 'claude-sonnet-5', 'claude-sonnet-4-6', 'claude-sonnet-4-5-20250929', 'claude-haiku-4-5-20251001']
   const aliasRank = { default: 0, opus: 1, sonnet: 2, haiku: 3 }
   return [...found.values()].sort((a, b) => (rank[a.source] ?? 9) - (rank[b.source] ?? 9)
     || (aliasRank[a.id] ?? 9) - (aliasRank[b.id] ?? 9)
+    || (officialOrder.indexOf(a.id) - officialOrder.indexOf(b.id))
     || (legacyOrder.indexOf(a.id) - legacyOrder.indexOf(b.id))
     || a.label.localeCompare(b.label))
 }
 
-module.exports = { MODEL_RE, contextSnapshot, modelCatalog, validModel }
+module.exports = { MODEL_RE, contextSnapshot, modelCatalog, validModel, officialModels, refreshOfficialModels }
