@@ -42,64 +42,48 @@
   }
 
   [data-theme="pink"] {
-    --bg: #fbf5f0;
-    --surface: #f7ecec;
-    --border: #e8d5d2;
-    --text: #403f44;
-    --text-dim: #a08888;
-    --accent: #f2c8ca;
-    --green: #6aaa80;
-    --red: #cc6060;
-    --yellow: #c8a060;
-    --terminal-bg: #f5eae8;
-    --terminal-text: #5a3838;
-    --bubble-user-bg: linear-gradient(140deg, rgba(236,192,196,0.92), rgba(218,170,176,0.88));
-    --bubble-user-text: #403f44;
-    --bubble-user-border: rgba(210,165,170,0.4);
-    --bubble-user-shadow: 0 2px 10px rgba(180,130,135,0.15), inset 0 1px 0 rgba(255,230,232,0.3);
-    --bubble-user-link: #4d2634;
-    --bubble-user-code: rgba(96,48,64,.13);
-    --bubble-user-selection: rgba(255,245,246,.75);
-    --bubble-assistant-bg: rgba(248,242,238,0.65);
-    --bubble-assistant-text: var(--text);
-    --bubble-assistant-border: rgba(220,190,188,0.3);
-    --bubble-assistant-shadow: 0 2px 14px rgba(180,130,130,0.1), inset 0 1px 0 rgba(255,255,255,0.45);
-    --bubble-assistant-link: #8f4c64;
-    --bubble-assistant-code: rgba(112,72,96,.11);
-    --bubble-assistant-selection: rgba(232,187,196,.58);
+    --bg:#f3f0f1; --surface:#e9e3e6; --border:#d9cfd4;
+    --text:#4d516d; --text-dim:#8a8399; --accent:#a8868c;
+    --terminal-bg:#e9e3e6; --terminal-text:#4d516d;
+    --bubble-user-bg:linear-gradient(140deg,#e8dce4,#e0d2dc); --bubble-user-text:#45475f;
+    --bubble-user-border:#d6c6d0; --bubble-user-shadow:0 2px 10px rgba(60,55,70,.08);
+    --bubble-user-link:#4d516d; --bubble-user-code:rgba(60,55,70,.08); --bubble-user-selection:rgba(255,255,255,.7);
+    --bubble-assistant-bg:rgba(243,234,231,.94); --bubble-assistant-text:var(--text);
+    --bubble-assistant-border:#e6d8d3; --bubble-assistant-shadow:0 2px 10px rgba(60,55,70,.07);
+    --bubble-assistant-link:#8a6a72; --bubble-assistant-code:rgba(60,55,70,.07); --bubble-assistant-selection:rgba(190,180,200,.45);
   }
   [data-theme="lavender"] {
-    --bg:#f4f0f8; --surface:#ebe4f2; --border:#d8cbe4;
-    --text:#45404d; --text-dim:#82738f; --accent:#947daf;
-    --terminal-bg:#eee8f4; --terminal-text:#574466;
-    --bubble-user-bg:linear-gradient(140deg,#d1c0df,#bda7d0); --bubble-user-text:#342c3d;
-    --bubble-user-border:#ae96c4; --bubble-user-shadow:0 2px 10px rgba(85,58,110,.13);
-    --bubble-user-link:#3d244f; --bubble-user-code:rgba(70,45,88,.13); --bubble-user-selection:rgba(255,255,255,.7);
-    --bubble-assistant-bg:rgba(250,248,252,.88); --bubble-assistant-text:var(--text);
-    --bubble-assistant-border:#ded3e8; --bubble-assistant-shadow:0 2px 10px rgba(72,53,88,.07);
-    --bubble-assistant-link:#70528c; --bubble-assistant-code:rgba(80,60,96,.1); --bubble-assistant-selection:rgba(197,177,216,.55);
+    --bg:#f2f0f4; --surface:#e7e3ec; --border:#d8d1df;
+    --text:#4b4655; --text-dim:#857d8f; --accent:#9b90a8;
+    --terminal-bg:#e7e3ec; --terminal-text:#4b4655;
+    --bubble-user-bg:linear-gradient(140deg,#e4dde9,#dcd4e3); --bubble-user-text:#403a4a;
+    --bubble-user-border:#cfc5d8; --bubble-user-shadow:0 2px 10px rgba(60,55,70,.08);
+    --bubble-user-link:#3d3547; --bubble-user-code:rgba(60,55,70,.08); --bubble-user-selection:rgba(255,255,255,.7);
+    --bubble-assistant-bg:rgba(239,235,229,.94); --bubble-assistant-text:var(--text);
+    --bubble-assistant-border:#ddd6cd; --bubble-assistant-shadow:0 2px 10px rgba(60,55,70,.07);
+    --bubble-assistant-link:#6e6280; --bubble-assistant-code:rgba(60,55,70,.07); --bubble-assistant-selection:rgba(190,180,200,.45);
   }
   [data-theme="sage"] {
-    --bg:#f1f5ef; --surface:#e5ede1; --border:#cbd9c5;
-    --text:#3c493d; --text-dim:#71816e; --accent:#789273;
-    --terminal-bg:#e9f0e5; --terminal-text:#415b40;
-    --bubble-user-bg:linear-gradient(140deg,#bfd3b9,#a9c2a2); --bubble-user-text:#29372b;
-    --bubble-user-border:#98b391; --bubble-user-shadow:0 2px 10px rgba(54,84,52,.12);
-    --bubble-user-link:#173a20; --bubble-user-code:rgba(45,76,45,.13); --bubble-user-selection:rgba(255,255,255,.7);
-    --bubble-assistant-bg:rgba(249,251,247,.9); --bubble-assistant-text:var(--text);
-    --bubble-assistant-border:#d3dfcf; --bubble-assistant-shadow:0 2px 10px rgba(48,70,47,.07);
-    --bubble-assistant-link:#4f704d; --bubble-assistant-code:rgba(55,82,54,.1); --bubble-assistant-selection:rgba(181,205,174,.58);
+    --bg:#f1f2ee; --surface:#e4e7df; --border:#d1d6ca;
+    --text:#434a42; --text-dim:#7b8276; --accent:#8a917f;
+    --terminal-bg:#e4e7df; --terminal-text:#434a42;
+    --bubble-user-bg:linear-gradient(140deg,#e0e5d9,#d7ddd0); --bubble-user-text:#3b4239;
+    --bubble-user-border:#c9d0c0; --bubble-user-shadow:0 2px 10px rgba(60,55,70,.08);
+    --bubble-user-link:#2f3a2e; --bubble-user-code:rgba(60,55,70,.08); --bubble-user-selection:rgba(255,255,255,.7);
+    --bubble-assistant-bg:rgba(242,237,229,.94); --bubble-assistant-text:var(--text);
+    --bubble-assistant-border:#e0d8cb; --bubble-assistant-shadow:0 2px 10px rgba(60,55,70,.07);
+    --bubble-assistant-link:#5d6a58; --bubble-assistant-code:rgba(60,55,70,.07); --bubble-assistant-selection:rgba(190,180,200,.45);
   }
   [data-theme="mist"] {
-    --bg:#f0f5f8; --surface:#e3edf3; --border:#c7d8e3;
-    --text:#3d4852; --text-dim:#6e8393; --accent:#7295ad;
-    --terminal-bg:#e7eff5; --terminal-text:#3f6077;
-    --bubble-user-bg:linear-gradient(140deg,#bad2e0,#a4c2d4); --bubble-user-text:#273741;
-    --bubble-user-border:#91b2c7; --bubble-user-shadow:0 2px 10px rgba(48,82,103,.12);
-    --bubble-user-link:#10394f; --bubble-user-code:rgba(40,75,96,.13); --bubble-user-selection:rgba(255,255,255,.72);
-    --bubble-assistant-bg:rgba(249,252,253,.9); --bubble-assistant-text:var(--text);
-    --bubble-assistant-border:#d2e0e8; --bubble-assistant-shadow:0 2px 10px rgba(48,72,88,.07);
-    --bubble-assistant-link:#4d7088; --bubble-assistant-code:rgba(52,78,94,.1); --bubble-assistant-selection:rgba(177,205,221,.58);
+    --bg:#eff1f1; --surface:#e2e7e8; --border:#cdd5d8;
+    --text:#383b4e; --text-dim:#6f7a85; --accent:#798e9d;
+    --terminal-bg:#e2e7e8; --terminal-text:#383b4e;
+    --bubble-user-bg:linear-gradient(140deg,#dde5eb,#d3dde4); --bubble-user-text:#33384a;
+    --bubble-user-border:#c3d0d9; --bubble-user-shadow:0 2px 10px rgba(60,55,70,.08);
+    --bubble-user-link:#2a3446; --bubble-user-code:rgba(60,55,70,.08); --bubble-user-selection:rgba(255,255,255,.7);
+    --bubble-assistant-bg:rgba(239,235,228,.94); --bubble-assistant-text:var(--text);
+    --bubble-assistant-border:#ddd6cb; --bubble-assistant-shadow:0 2px 10px rgba(60,55,70,.07);
+    --bubble-assistant-link:#5a6f80; --bubble-assistant-code:rgba(60,55,70,.07); --bubble-assistant-selection:rgba(190,180,200,.45);
   }
   /* 0929 两套新主题：阿颖嫌柔粉「她的气泡太艳、跟我的没对比」。这两套靠色相分左右，不靠深浅 */
   [data-theme="babyangel"] { /* 粉蓝 Baby Angel：她雾粉，我雾蓝 */
@@ -125,15 +109,15 @@
     --bubble-assistant-link:#8a5a6a; --bubble-assistant-code:rgba(90,70,80,.08); --bubble-assistant-selection:rgba(200,160,168,.45);
   }
   [data-theme="apricot"] {
-    --bg:#fbf5ea; --surface:#f4e9d7; --border:#e5d3b8;
-    --text:#51463a; --text-dim:#917b63; --accent:#aa8356;
-    --terminal-bg:#f5ecdd; --terminal-text:#705330;
-    --bubble-user-bg:linear-gradient(140deg,#e9cda3,#daba87); --bubble-user-text:#3e3124;
-    --bubble-user-border:#cea974; --bubble-user-shadow:0 2px 10px rgba(105,74,38,.12);
-    --bubble-user-link:#4b2b0d; --bubble-user-code:rgba(88,58,28,.13); --bubble-user-selection:rgba(255,255,255,.7);
-    --bubble-assistant-bg:rgba(255,251,244,.9); --bubble-assistant-text:var(--text);
-    --bubble-assistant-border:#eadcc7; --bubble-assistant-shadow:0 2px 10px rgba(91,68,41,.07);
-    --bubble-assistant-link:#865e32; --bubble-assistant-code:rgba(91,67,39,.1); --bubble-assistant-selection:rgba(229,199,156,.58);
+    --bg:#f7f1ec; --surface:#efe5dc; --border:#e0d2c4;
+    --text:#54473c; --text-dim:#92806f; --accent:#b0927a;
+    --terminal-bg:#efe5dc; --terminal-text:#54473c;
+    --bubble-user-bg:linear-gradient(140deg,#f1e3d6,#eadac9); --bubble-user-text:#4c3f34;
+    --bubble-user-border:#dccab7; --bubble-user-shadow:0 2px 10px rgba(60,55,70,.08);
+    --bubble-user-link:#4b3324; --bubble-user-code:rgba(60,55,70,.08); --bubble-user-selection:rgba(255,255,255,.7);
+    --bubble-assistant-bg:rgba(239,237,233,.94); --bubble-assistant-text:var(--text);
+    --bubble-assistant-border:#dedad2; --bubble-assistant-shadow:0 2px 10px rgba(60,55,70,.07);
+    --bubble-assistant-link:#8a6a50; --bubble-assistant-code:rgba(60,55,70,.07); --bubble-assistant-selection:rgba(190,180,200,.45);
   }
   @import url('https://fonts.bunny.net/css?family=inter:400,500,600|lora:400,400i,500,600,700,700i&display=swap');
 
@@ -3321,8 +3305,8 @@ document.getElementById('notes-clear').addEventListener('click', () => {
 
 // --- theme ---
 const THEMES = ['dark', 'pink', 'babyangel', 'sakura', 'lavender', 'sage', 'mist', 'apricot']
-const THEME_COLORS = { dark: '#1a1a1f', pink: '#fbf5f0', lavender: '#f4f0f8', sage: '#f1f5ef', mist: '#f0f5f8', apricot: '#fbf5ea', babyangel: '#f6f9fe', sakura: '#f5f2f4' }
-const THEME_NAMES = { dark: '深夜', pink: '柔粉', lavender: '香芋紫', sage: '鼠尾草绿', mist: '雾蓝', apricot: '奶杏', babyangel: '粉蓝', sakura: '樱花灰' }
+const THEME_COLORS = { dark: '#1a1a1f', pink: '#f3f0f1', lavender: '#f2f0f4', sage: '#f1f2ee', mist: '#eff1f1', apricot: '#f7f1ec', babyangel: '#f6f9fe', sakura: '#f5f2f4' }
+const THEME_NAMES = { dark: '深夜', pink: '淡紫余白', lavender: '干燥薰衣草', sage: '灰鼠尾草', mist: '静寂', apricot: '焦糖奶油', babyangel: '粉蓝', sakura: '樱花灰' }
 
 let currentTheme = localStorage.getItem('raven-theme') || 'dark'
 
@@ -3354,7 +3338,9 @@ let bgFit = localStorage.getItem(BG_FIT_KEY) === 'cover' ? 'cover' : 'contain'
 function applyBg(dataUrl) {
   const el = document.getElementById('chat-messages')
   if (dataUrl) {
-    el.style.backgroundImage = `url(${JSON.stringify(dataUrl)})`
+    // 1004：壁纸上盖一层主题底色，照片的颜色往主题里收，冷色主题配暖调照片不再打架
+    const wash = 'color-mix(in srgb, var(--bg) 34%, transparent)'
+    el.style.backgroundImage = `linear-gradient(${wash}, ${wash}), url(${JSON.stringify(dataUrl)})`
     el.style.backgroundSize = bgFit
     el.style.backgroundPosition = 'center'
     // Size against the visible scroll container, never the full chat history.
