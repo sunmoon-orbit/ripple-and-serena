@@ -55,6 +55,8 @@
       option.value = model.id
       const label = model.label === model.id ? prettyModel(model.id) : model.label
       option.textContent = label + (model.id === data.currentModel ? '（正在用）' : '')
+      option.dataset.source = model.source || ''
+      option.dataset.label = label
       modelSelect.append(option)
     }
     if (!modelSelect.options.length) {
@@ -66,6 +68,30 @@
     const preferred = [selected, data.currentModel, data.model].find(value => value && [...modelSelect.options].some(option => option.value === value))
     modelSelect.value = preferred || modelSelect.options[0].value
     modelApply.disabled = busy || !modelSelect.value
+    renderModelList(data.currentModel)
+  }
+  // 1004：系统下拉框在手机上是一块白底弹窗，跟归巢不搭（她说「有鸟为了图省事用的系统框」）。
+  // 换成页面里自己画的列表，select 藏起来继续当数据源；历史版本单独一组
+  const modelList = document.getElementById('cc-model-list')
+  function renderModelList(current) {
+    if (!modelList) return
+    modelList.replaceChildren()
+    const groups = [['常用', o => o.dataset.source !== 'legacy'], ['历史版本', o => o.dataset.source === 'legacy']]
+    for (const [title, test] of groups) {
+      const opts = [...modelSelect.options].filter(o => o.value && test(o))
+      if (!opts.length) continue
+      const h = document.createElement('div'); h.className = 'cc-model-group'; h.textContent = title
+      modelList.append(h)
+      for (const o of opts) {
+        const b = document.createElement('button'); b.type = 'button'; b.className = 'cc-model-item'
+        if (o.value === modelSelect.value) b.classList.add('on')
+        const name = document.createElement('span'); name.textContent = o.dataset.label || o.textContent
+        b.append(name)
+        if (o.value === current) { const tag = document.createElement('em'); tag.textContent = '正在用'; b.append(tag) }
+        b.onclick = () => { modelSelect.value = o.value; modelSelect.onchange && modelSelect.onchange(); renderModelList(current) }
+        modelList.append(b)
+      }
+    }
   }
   function modelMatchesSelection(actual, selected) {
     if (!actual || !selected) return false

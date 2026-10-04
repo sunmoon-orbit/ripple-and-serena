@@ -33,6 +33,9 @@ test('model catalog uses current aliases and account options instead of stale pr
   fs.writeFileSync(usageFile, JSON.stringify({ model: 'active-model' }))
   assert.deepEqual(modelCatalog({ stateFile, settingsFile, usageFile }).map(item => item.id), [
     'default', 'opus', 'sonnet', 'haiku', 'active-model', 'configured-model', 'claude-fable-5-1[1m]',
+    // 订阅还能跑的历史版本，排在最后（1004）
+    'claude-opus-5', 'claude-opus-4-6', 'claude-opus-4-5-20251101',
+    'claude-sonnet-5', 'claude-sonnet-4-6', 'claude-sonnet-4-5-20250929', 'claude-haiku-4-5-20251001',
   ])
   assert.equal(modelCatalog({ stateFile, settingsFile, usageFile }).find(item => item.id === 'claude-fable-5-1[1m]').label, 'Fable 5.1')
   assert.equal(modelCatalog({ stateFile, settingsFile, usageFile }).some(item => item.id === 'recent-model'), false)

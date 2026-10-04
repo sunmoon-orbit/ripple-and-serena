@@ -51,6 +51,14 @@ function modelCatalog({ stateFile, settingsFile, usageFile }) {
   add('sonnet', 'Sonnet（自动使用最新版本）', 'alias')
   add('haiku', 'Haiku（自动使用最新版本）', 'alias')
 
+  // 1004 她想选「历史乌鸦」：这些是订阅还能跑的旧版本（当天用 claude -p --model 逐个探过；
+  // Opus 4.1 会被自动改写成最新 Opus，所以不列）。以后下线了，切换会在终端里报错，从这里删掉就好
+  for (const [id, label] of [
+    ['claude-opus-5', 'Opus 5'], ['claude-opus-4-6', 'Opus 4.6'], ['claude-opus-4-5-20251101', 'Opus 4.5'],
+    ['claude-sonnet-5', 'Sonnet 5'], ['claude-sonnet-4-6', 'Sonnet 4.6'], ['claude-sonnet-4-5-20250929', 'Sonnet 4.5'],
+    ['claude-haiku-4-5-20251001', 'Haiku 4.5'],
+  ]) add(id, label, 'legacy')
+
   const usage = readJson(usageFile)
   add(usage?.model, usage?.model, 'active')
 
@@ -68,10 +76,12 @@ function modelCatalog({ stateFile, settingsFile, usageFile }) {
     }
   }
 
-  const rank = { alias: 0, active: 1, configured: 2, claude_cache: 3 }
+  const rank = { alias: 0, active: 1, configured: 2, claude_cache: 3, legacy: 4 }
+  const legacyOrder = ['claude-opus-5', 'claude-opus-4-6', 'claude-opus-4-5-20251101', 'claude-sonnet-5', 'claude-sonnet-4-6', 'claude-sonnet-4-5-20250929', 'claude-haiku-4-5-20251001']
   const aliasRank = { default: 0, opus: 1, sonnet: 2, haiku: 3 }
   return [...found.values()].sort((a, b) => (rank[a.source] ?? 9) - (rank[b.source] ?? 9)
     || (aliasRank[a.id] ?? 9) - (aliasRank[b.id] ?? 9)
+    || (legacyOrder.indexOf(a.id) - legacyOrder.indexOf(b.id))
     || a.label.localeCompare(b.label))
 }
 
