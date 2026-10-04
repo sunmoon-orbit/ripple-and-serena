@@ -5161,6 +5161,7 @@ body.mp-active .scroll-bottom-btn { bottom: 139px; }
   align-items: start;
   padding: 6px 2px 4px;
 }
+.board-col { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
 .board-empty {
   grid-column: 1 / -1;
   text-align: center; color: var(--text-faint);

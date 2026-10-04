@@ -84,6 +84,19 @@ export default function BoardWall({ onClose }) {
     }
   }
 
+  // 两列瀑布流（1004 她发现：网格按行对齐，一张长的旁边是短的，就空出一大块）。
+  // 按估算的高度，每张贴到当前更矮的那一列；估算只看字数和换行，不用量 DOM，也不会贴完再跳
+  const splitColumns = (list) => {
+    const cols = [[], []]; const h = [0, 0]
+    list.forEach((n, i) => {
+      const t = String(n.text || '')
+      const lines = t.split('\n').reduce((s, l) => s + Math.max(1, Math.ceil(l.length / 11)), 0)
+      const c = h[0] <= h[1] ? 0 : 1
+      cols[c].push({ n, i }); h[c] += 70 + lines * 24
+    })
+    return cols
+  }
+
   const renderNote = (n, i) => (
     <div
       key={n.id}
@@ -154,7 +167,9 @@ export default function BoardWall({ onClose }) {
                     <span className="board-bundle-caret">{isOpen ? '解开了' : '一捆'}</span>
                   </button>
                 )}
-                {isOpen && g.notes.map(renderNote)}
+                {isOpen && splitColumns(g.notes).map((col, ci) => (
+                  <div key={ci} className="board-col">{col.map(({ n, i }) => renderNote(n, i))}</div>
+                ))}
               </div>
             )
           })}
