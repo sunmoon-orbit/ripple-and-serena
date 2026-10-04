@@ -49,6 +49,8 @@ html, body { min-height: 100%; background: var(--bg); color: var(--text); font-f
 #app.has-wall #home-title, #app.has-wall #home-domain, #app.has-wall .section-label {
   text-shadow: 0 0 6px var(--bg), 0 0 14px var(--bg), 0 0 22px var(--bg);
 }
+/* 浅金色小字压在灰褐照片上会和图混成一片（她换黑胶壁纸后看得出来），有壁纸时改用正文色 */
+#app.has-wall #home-domain, #app.has-wall .section-label, #app.has-wall #hero-sub { color: color-mix(in srgb, var(--text) 72%, transparent); }
 #app.has-wall #home-header::before {
   content: ''; position: absolute; left: 0; right: 0; top: 0; height: 150px; z-index: -1; pointer-events: none;
   background: linear-gradient(180deg, color-mix(in srgb, var(--bg) 70%, transparent), transparent);
