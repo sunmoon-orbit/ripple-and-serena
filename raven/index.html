@@ -813,6 +813,11 @@
     font-size: 12px; border-top: 1px solid var(--border);
     border-radius: 0 0 12px 4px;
   }
+  .thinking-tr {
+    display: block; margin: 8px 0 2px auto; padding: 0; border: none; background: none;
+    font: inherit; font-size: 11px; color: var(--text-dim); text-decoration: underline; cursor: pointer;
+  }
+  .thinking-tr:disabled { text-decoration: none; opacity: .7; }
 
   /* permission prompt modal */
   #perm-modal {
@@ -2298,7 +2303,34 @@ function appendThinkingBlock(text, beforeEl) {
   el.className = 'thinking-block'
   el.innerHTML = `
     <summary><span><em class="thinking-chevron">›</em>乌鸦在想什么…</span></summary>
-    <div class="thinking-body">${text.replace(/</g,'&lt;')}</div>`
+    <div class="thinking-body"></div>`
+  const bodyEl = el.querySelector('.thinking-body')
+  const textEl = document.createElement('div')
+  textEl.textContent = text
+  bodyEl.appendChild(textEl)
+  // 思考大半是英文时才给「查看翻译」（1004）：点一下换成中文，再点换回原文；译文服务端按原文缓存
+  const latin = (text.match(/[A-Za-z]/g) || []).length, han = (text.match(/[一-鿿]/g) || []).length
+  if (latin > 80 && latin > han * 2) {
+    const btn = document.createElement('button')
+    btn.type = 'button'; btn.className = 'thinking-tr'; btn.textContent = '查看翻译'
+    let zh = null, showingZh = false
+    btn.onclick = async () => {
+      if (btn.disabled) return
+      if (showingZh) { textEl.textContent = text; btn.textContent = '查看翻译'; showingZh = false; return }
+      if (!zh) {
+        btn.disabled = true; btn.textContent = '翻译中…'
+        try {
+          const r = await fetch('/raven/translate-thinking', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + (localStorage.getItem('raven-token') || '') }, body: JSON.stringify({ text }) })
+          const d = await r.json().catch(() => ({}))
+          if (!r.ok || !d.text) throw new Error('fail')
+          zh = d.text
+        } catch { btn.disabled = false; btn.textContent = '没翻出来，再点一次'; return }
+        btn.disabled = false
+      }
+      textEl.textContent = zh; btn.textContent = '查看原文'; showingZh = true
+    }
+    bodyEl.insertBefore(btn, textEl)
+  }
   // if targetMsg is inside a .msg-wrap, insert before the wrapper
   const insertAnchor = (targetMsg && targetMsg.parentElement && targetMsg.parentElement.classList.contains('msg-wrap'))
     ? targetMsg.parentElement

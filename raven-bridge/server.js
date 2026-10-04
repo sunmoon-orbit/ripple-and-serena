@@ -152,6 +152,32 @@ function refreshDeepseekBalance() {
 }
 refreshDeepseekBalance()
 
+const THINK_ZH_FILE = path.join(__dirname, '.thinking-zh-cache.json')
+let thinkZhCache = null
+const thinkZhPending = new Map()
+function translateThinking(text) {
+  if (!thinkZhCache) { try { thinkZhCache = JSON.parse(fs.readFileSync(THINK_ZH_FILE, 'utf8')) } catch { thinkZhCache = {} } }
+  const key = crypto.createHash('sha1').update(text).digest('hex')
+  if (thinkZhCache[key]) return Promise.resolve(thinkZhCache[key])
+  if (thinkZhPending.has(key)) return thinkZhPending.get(key)
+  const { llmComplete } = require('./llm')
+  const job = llmComplete(null, {
+    maxTokens: 6000, temperature: 0.3, timeoutMs: 90000,
+    messages: [
+      { role: 'system', content: '下面是涟言（一只乌鸦 AI，阿颖的恋人）回复她之前的内心思考，多半是英文。把它翻成中文，要求：\n- 第一人称，口语，像他自己在心里嘀咕，不要书面腔和翻译腔\n- 文中的 she / the user / Serena 都是阿颖，译成「她」\n- 一句不漏、一句不添，保留原来的分段\n- 时间、数字、文件名、代码、命令、英文专有名词原样保留\n- 只输出译文，不要任何说明' },
+      { role: 'user', content: text },
+    ],
+  }).then(zh => {
+    thinkZhCache[key] = zh
+    const keys = Object.keys(thinkZhCache)
+    if (keys.length > 400) for (const k of keys.slice(0, keys.length - 400)) delete thinkZhCache[k]
+    fs.writeFile(THINK_ZH_FILE, JSON.stringify(thinkZhCache), () => {})
+    return zh
+  }).finally(() => thinkZhPending.delete(key))
+  thinkZhPending.set(key, job)
+  return job
+}
+
 function moonGet(pathname) {
   return new Promise((resolve, reject) => {
     const opts = { hostname: '127.0.0.1', port: 3210, path: pathname, headers: { Authorization: `Bearer ${MOON_TOKEN}` } }
@@ -930,7 +956,7 @@ const server = http.createServer((req, res) => {
     })
     return
   }
-  const TOKEN_REQUIRED = ['/raven/status', '/raven/last-thinking', '/raven/memory-random', '/raven/journal', '/raven/journal/unlock', '/raven/cards/unseen', '/raven/cards/seen', '/raven/archive/days', '/raven/archive/day', '/raven/receipt', '/raven/on-this-day', '/raven/memory-count', '/raven/activity', '/raven/upload', '/raven/push/subscribe', '/raven/push/unsubscribe', '/raven/usage']
+  const TOKEN_REQUIRED = ['/raven/status', '/raven/last-thinking', '/raven/memory-random', '/raven/journal', '/raven/journal/unlock', '/raven/cards/unseen', '/raven/cards/seen', '/raven/archive/days', '/raven/archive/day', '/raven/receipt', '/raven/translate-thinking', '/raven/on-this-day', '/raven/memory-count', '/raven/activity', '/raven/upload', '/raven/push/subscribe', '/raven/push/unsubscribe', '/raven/usage']
   if (TOKEN_REQUIRED.includes(url.pathname) && !externalAuthed(req, url)) {
     res.writeHead(401, { 'Content-Type': 'application/json' })
     res.end(JSON.stringify({ error: 'unauthorized' }))
@@ -1197,6 +1223,22 @@ const server = http.createServer((req, res) => {
         res.end(JSON.stringify({ entries }))
       })
       .catch(() => { res.writeHead(500); res.end('{}') })
+    return
+  }
+
+  // 思考链翻译（1004，她看到别人家的「查看翻译」想要）：我的思考常是英文，点一下换成中文，语气还是我的。
+  // 按原文哈希缓存到文件，同一段只翻一次；同一段正在翻时第二次点击等同一个结果
+  if (req.method === 'POST' && url.pathname === '/raven/translate-thinking') {
+    let body = ''
+    req.on('data', d => { body += d; if (body.length > 60000) req.destroy() })
+    req.on('end', () => {
+      let text = ''
+      try { text = String(JSON.parse(body || '{}').text || '').trim().slice(0, 12000) } catch {}
+      if (!text) { res.writeHead(400); res.end('{"error":"empty"}'); return }
+      translateThinking(text)
+        .then(zh => { res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' }); res.end(JSON.stringify({ text: zh })) })
+        .catch(e => { console.error('[translate-thinking]', e.message); res.writeHead(502, { 'Content-Type': 'application/json' }); res.end('{"error":"translate_failed"}') })
+    })
     return
   }
 

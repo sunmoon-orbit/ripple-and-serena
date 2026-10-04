@@ -19,7 +19,7 @@ function readEnv() {
   return env
 }
 
-function post(hostname, path, key, payload) {
+function post(hostname, path, key, payload, timeoutMs = 20000) {
   return new Promise((resolve, reject) => {
     const body = JSON.stringify(payload)
     const req = https.request({
@@ -43,7 +43,7 @@ function post(hostname, path, key, payload) {
       })
     })
     req.on('error', reject)
-    req.setTimeout(20000, () => { req.destroy(); reject(new Error('timeout')) })
+    req.setTimeout(timeoutMs, () => { req.destroy(); reject(new Error('timeout')) })
     req.write(body); req.end()
   })
 }
@@ -88,7 +88,7 @@ function fetchProviders(token) {
   })
 }
 
-async function llmComplete(prompt, { maxTokens = 300, temperature = 1.0, messages } = {}) {
+async function llmComplete(prompt, { maxTokens = 300, temperature = 1.0, messages, timeoutMs } = {}) {
   const env = readEnv()
   const providers = await fetchProviders(env.MOON_API_TOKEN)
   const msgs = messages || [{ role: 'user', content: prompt }]
@@ -106,7 +106,7 @@ async function llmComplete(prompt, { maxTokens = 300, temperature = 1.0, message
     try {
       const text = await post(u.hostname, u.pathname + u.search, key, {
         model: p.model, messages: msgs, max_tokens: maxT, temperature: temp,
-      })
+      }, timeoutMs)
       if (i > 0) console.log(`[llm] 主投手掉链子，${p.name} 顶上成功`)
       return text
     } catch (e) {
