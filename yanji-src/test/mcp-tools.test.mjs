@@ -18,8 +18,8 @@ test('MCP wire names are stable, provider-safe and at most 64 chars', () => {
   assert.ok(first.length <= 64)
 })
 
-test('only enabled MCP servers and tools are exposed, capped at eight', () => {
-  const tools = Array.from({ length: 12 }, (_, i) => ({ name: `tool_${i}`, enabled: true, inputSchema: { type: 'object' } }))
+test('only enabled MCP servers and tools are exposed, capped at the limit', () => {
+  const tools = Array.from({ length: MCP_EXTERNAL_TOOL_LIMIT + 4 }, (_, i) => ({ name: `tool_${i}`, enabled: true, inputSchema: { type: 'object' } }))
   const definitions = getEnabledMcpToolDefinitions([
     { id: 'off', name: 'off', enabled: false, tools },
     { id: 'on', name: 'on', enabled: true, tools },

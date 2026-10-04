@@ -1,4 +1,6 @@
-export const MCP_EXTERNAL_TOOL_LIMIT = 8
+// 一次随聊天发给模型的外部工具上限。原来是 8，游戏类服务一个就有十几个工具，不够用（1004 她提的）；
+// 只算开着的服务，关着的服务里勾选的工具不占名额，所以平时关掉服务就不花 token
+export const MCP_EXTERNAL_TOOL_LIMIT = 40
 
 function shortHash(value) {
   let hash = 2166136261
