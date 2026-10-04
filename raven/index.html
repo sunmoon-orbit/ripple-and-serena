@@ -1564,13 +1564,26 @@ const awaitingAck = new Map()  // cid → {payload, timer}，等服务端回执�
 // 整条消息凭空消失。所以发完必须等回执，超时就当没发出去：踢掉这条死连接、
 // 把消息塞回积压队列，重连后自动补发。（0726 阿颖在归巢遇到）
 function wsSendWithAck(payload) {
-  try { ws.send(JSON.stringify(payload)) } catch { }
+  try { const { _retried, ...wire } = payload; ws.send(JSON.stringify(wire)) } catch { }
   const timer = setTimeout(() => {
     if (!awaitingAck.has(payload.cid)) return
     awaitingAck.delete(payload.cid)
+    // 1004：服务端每 5 秒推一次状态。最近 6 秒内还收到过东西，说明连接是活的，只是这条回执丢了或慢了：
+    // 就在这条连接上原样重发（服务端按 cid 去重，不会变成两条），别把好好的连接拆掉、也别刷提示
+    if (ws && ws.readyState === 1 && Date.now() - lastWsActivity < 6000 && !payload._retried) {
+      payload._retried = true
+      wsSendWithAck(payload)
+      return
+    }
     pendingOutbox.push(payload)
-    const warn = appendMsg('[没收到回执，连接可能已断，重连后自动重发]', 'system', false)
-    if (warn) ackWarnings.set(payload.cid, warn)
+    // 提示同一时间只挂一行（她关代理那阵攒了一屏「没收到回执」）
+    if (!ackWarnings.size) {
+      const warn = appendMsg('[没收到回执，连接可能已断，重连后自动重发]', 'system', false)
+      if (warn) ackWarnings.set(payload.cid, warn)
+    } else {
+      const [firstCid, warnEl] = ackWarnings.entries().next().value
+      ackWarnings.set(payload.cid, warnEl)
+    }
     try { ws && ws.close() } catch { }   // 触发 onclose → 3 秒后重连 → 补发
   }, 8000)
   awaitingAck.set(payload.cid, { payload, timer })
@@ -1582,7 +1595,11 @@ const ackWarnings = new Map()  // cid → 那行提示的元素
 function ackReceived(cid) {
   if (!cid) return
   const warn = ackWarnings.get(cid)
-  if (warn) { ackWarnings.delete(cid); try { warn.remove() } catch { } }
+  if (warn) {
+    ackWarnings.delete(cid)
+    // 几条共用一行提示：最后一条也到了才撤
+    if (![...ackWarnings.values()].includes(warn)) { try { warn.remove() } catch { } }
+  }
   const entry = awaitingAck.get(cid)
   if (!entry) return
   clearTimeout(entry.timer)
