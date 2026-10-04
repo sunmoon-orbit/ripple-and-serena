@@ -1303,17 +1303,10 @@ const server = http.createServer((req, res) => {
 
   // memory count proxy
   if (req.method === 'GET' && url.pathname === '/raven/memory-count') {
-    moonGet('/memories?limit=1&scope=shared')
-      .then(data => {
-        const total = Array.isArray(data) ? data.length : (data.total || data.count || '?')
-        moonGet('/memories?limit=500&scope=shared&deleted=false')
-          .then(d2 => {
-            const arr = Array.isArray(d2) ? d2 : (d2.memories || [])
-            res.writeHead(200, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' })
-            res.end(JSON.stringify({ count: arr.filter(m => !m.deleted_at).length }))
-          }).catch(() => { res.writeHead(200); res.end(JSON.stringify({ count: '?' })) })
-      })
-      .catch(() => { res.writeHead(500); res.end('{}') })
+    // 1004：原来拉 limit=500 再数，首页永远显示 500；改成 moon 直接数
+    moonGet('/memories/count')
+      .then(d => { res.writeHead(200, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ count: d.count ?? '?', messages: d.messages ?? null })) })
+      .catch(() => { res.writeHead(200); res.end(JSON.stringify({ count: '?' })) })
     return
   }
 
