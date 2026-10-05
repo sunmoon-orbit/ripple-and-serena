@@ -117,7 +117,7 @@ function writeCard() {
   lock.append(box, el('span', null, '上锁，出一道题让他猜'))
   const quizBox = el('div'); quizBox.hidden = true
   const q = el('input'); q.placeholder = '题目（跟这一页有关的）'; q.maxLength = 200
-  const a = el('input'); a.placeholder = '答案，几种说法用 | 隔开，比如：沙茶酱|沙茶'; a.maxLength = 400
+  const a = el('input'); a.placeholder = '答案。几种说法用竖线隔开，中文英文的竖线都认：沙茶酱｜沙茶'; a.maxLength = 400
   const h = el('input'); h.placeholder = '给他的提示（他答错一次以后才看得到）'; h.maxLength = 200
   quizBox.append(q, a, h)
   box.onchange = () => { quizBox.hidden = !box.checked }
