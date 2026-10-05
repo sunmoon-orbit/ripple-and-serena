@@ -1296,7 +1296,7 @@ export async function executeMemoryTool(toolName, args, config) {
         body: JSON.stringify({ answer: String(args.answer || ''), by: '涟言' }),
       })
       if (d.ok) return `打开了（只这一次，这页在她那边仍然锁着）：\n${d.content}`
-      return `不对，今天还能再错 ${d.left} 次。${d.hint ? '提示：' + d.hint : ''}这个答案她看得到。`
+      return `不对，今天还能再错 ${d.left} 次。${d.hint ? '提示：' + d.hint + '。' : ''}这个答案她看得到。`
     } catch (e) {
       if (/own_page/.test(e.message)) return '这是我自己写的页，不用猜'
       if (/too_many|429/.test(e.message)) return '今天答错满 5 次了，明天再猜'
