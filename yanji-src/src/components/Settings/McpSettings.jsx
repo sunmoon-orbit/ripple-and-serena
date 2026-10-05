@@ -60,6 +60,10 @@ function CredentialFields({ server, onUpdate }) {
 
 function ServerCard({ server, backendConfig, selectedCount, onUpdate, onDelete, busy, onDiscover, onOAuth }) {
   const authorized = server.oauthStatus === 'authorized'
+  // 工具列表默认收起：接了三四个服务以后，全摊开要划很久才到下一个服务（1005 她提的）
+  const [toolsOpen, setToolsOpen] = useState(false)
+  const toolTotal = server.tools?.length || 0
+  const toolPicked = (server.tools || []).filter((tool) => tool.enabled).length
   return (
     <div className="settings-card">
       <div className="card-row">
@@ -80,7 +84,13 @@ function ServerCard({ server, backendConfig, selectedCount, onUpdate, onDelete, 
       </>}
       <div className="card-row"><span><span className="card-row-label">允许自动执行写操作</span><span className="card-hint" style={{ display: 'block', marginTop: 3 }}>会改变外部状态的工具仍需单独打开此闸。</span></span><label className="toggle"><input type="checkbox" checked={!!server.allowWrites} onChange={(event) => onUpdate({ allowWrites: event.target.checked })} /><span className="toggle-track" /></label></div>
       <div className="card-row" style={{ gap: 8, flexWrap: 'wrap' }}><button className="btn-sm btn-primary" disabled={busy || !server.url?.trim()} onClick={onDiscover}>{busy ? '连接中…' : server.tools?.length ? '刷新工具列表' : '测试并读取工具'}</button>{server.lastConnectedAt ? <span className="health-status">已连接 · {new Date(server.lastConnectedAt).toLocaleString()}</span> : <span className="card-hint">尚未连接</span>}<button className="btn-sm btn-ghost danger" style={{ marginLeft: 'auto' }} onClick={onDelete}>删除</button></div>
-      {!!server.tools?.length && <div style={{ borderTop: '1px solid var(--border)', marginTop: 8, paddingTop: 6 }}><div className="settings-card-title">这个服务的工具</div>{server.tools.map((tool) => <ToolRow key={tool.name} server={server} tool={tool} selectedCount={selectedCount} onUpdate={onUpdate} />)}</div>}
+      {!!toolTotal && <div style={{ borderTop: '1px solid var(--border)', marginTop: 8, paddingTop: 6 }}>
+        <button type="button" className="card-row" aria-expanded={toolsOpen} onClick={() => setToolsOpen((open) => !open)} style={{ width: '100%', background: 'none', border: 'none', padding: '6px 0', font: 'inherit', color: 'inherit', textAlign: 'left', cursor: 'pointer' }}>
+          <span className="settings-card-title" style={{ margin: 0 }}>这个服务的工具</span>
+          <span className="card-hint" style={{ marginLeft: 'auto' }}>已选 {toolPicked} / {toolTotal} · {toolsOpen ? '收起 ▴' : '展开 ▾'}</span>
+        </button>
+        {toolsOpen && server.tools.map((tool) => <ToolRow key={tool.name} server={server} tool={tool} selectedCount={selectedCount} onUpdate={onUpdate} />)}
+      </div>}
     </div>
   )
 }
