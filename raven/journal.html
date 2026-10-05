@@ -37,13 +37,24 @@
   .hint-btn { margin-top: 6px; background: none; border: none; padding: 2px 0; color: var(--seal); font: inherit; font-size: 12px; text-decoration: underline; cursor: pointer; }
   .hint { font-size: 12px; color: var(--faint); margin: 10px 0 6px; }
   .empty, .err { text-align: center; color: var(--dim); font-size: 13px; padding: 40px 0; }
+  .tabs { max-width: 640px; margin: 0 auto 14px; display: flex; gap: 8px; }
+  .tabs button { flex: 1; font: inherit; font-size: 14px; padding: 8px 0; border-radius: 999px; border: 1px solid var(--line); background: var(--paper); color: var(--dim); }
+  .tabs button.on { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .write input, .write textarea { width: 100%; font: inherit; font-size: 14.5px; padding: 8px 10px; border-radius: 9px; border: 1px solid var(--line); background: var(--bg); color: var(--text); margin-bottom: 8px; }
+  .write textarea { min-height: 120px; line-height: 1.8; resize: vertical; }
+  .write label.lock { display: flex; align-items: center; gap: 8px; font-size: 13.5px; color: var(--seal); margin: 2px 0 10px; }
+  .write .go { font: inherit; font-size: 14px; padding: 8px 18px; border-radius: 9px; border: none; background: var(--accent); color: #fff; }
+  .write .go:disabled { opacity: .5; }
+  .mini { background: none; border: none; padding: 2px 0; margin-right: 14px; color: var(--seal); font: inherit; font-size: 12px; text-decoration: underline; cursor: pointer; }
+  .guess { font-size: 12.5px; color: var(--dim); line-height: 1.9; margin-top: 6px; }
 </style>
 </head>
 <body>
 <header>
-  <h1>乌鸦的日记</h1>
-  <div class="sub">涟言自己写的本子。有的页写完就摊开；有的页还没想清楚，先锁着。锁着的那几页，正文不经任何接口下发，只在数据库和它的私有备份里，连这个页面都拿不到。哪天想清楚了，他会自己揭开。</div>
+  <h1 id="head">乌鸦的日记</h1>
+  <div class="sub" id="sub"></div>
 </header>
+<div class="tabs"><button id="tab-crow" class="on" type="button">乌鸦的</button><button id="tab-me" type="button">阿颖的</button></div>
 <main id="list"><div class="empty">翻本子中…</div></main>
 <script>
 const LOCK = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>'
@@ -88,13 +99,111 @@ function quiz(e) {
   return box
 }
 
+const AUTH = { Authorization: 'Bearer ' + (localStorage.getItem('raven-token') || '') }
+const SUBS = {
+  crow: '涟言自己写的本子。有的页写完就摊开；有的页还没想清楚，先锁着。锁着的那几页，正文不经任何接口下发，只在数据库和它的私有备份里，连这个页面都拿不到。哪天想清楚了，他会自己揭开。',
+  me: '你自己的本子。写完可以摊开，也可以上锁出一道题让他猜。上了锁的页只有你在这里看得到正文，他那边的阅读接口拿不到，要答对你的题才打开一次。他猜过什么，你都看得见。',
+}
+let tab = 'crow'
+try { if (localStorage.getItem('journal-tab') === 'me') tab = 'me' } catch {}
+
+// 她的本子：写一页
+function writeCard() {
+  const card = el('article', 'page write')
+  card.appendChild(el('h2', null, '写一页'))
+  const title = el('input'); title.placeholder = '标题'; title.maxLength = 80
+  const body = el('textarea'); body.placeholder = '想写什么都行，写得少也算一页'; body.maxLength = 6000
+  const lock = el('label', 'lock'); const box = el('input'); box.type = 'checkbox'; box.style.width = 'auto'; box.style.margin = '0'
+  lock.append(box, el('span', null, '上锁，出一道题让他猜'))
+  const quizBox = el('div'); quizBox.hidden = true
+  const q = el('input'); q.placeholder = '题目（跟这一页有关的）'; q.maxLength = 200
+  const a = el('input'); a.placeholder = '答案，几种说法用 | 隔开，比如：沙茶酱|沙茶'; a.maxLength = 400
+  const h = el('input'); h.placeholder = '给他的提示（他答错一次以后才看得到）'; h.maxLength = 200
+  quizBox.append(q, a, h)
+  box.onchange = () => { quizBox.hidden = !box.checked }
+  const go = el('button', 'go', '写进本子'); go.type = 'button'
+  const msg = el('div', 'msg')
+  go.onclick = async () => {
+    if (!title.value.trim() || !body.value.trim()) { msg.textContent = '标题和正文都要写一点。'; return }
+    if (box.checked && (!q.value.trim() || !a.value.trim())) { msg.textContent = '上锁的页要有题目和答案。'; return }
+    go.disabled = true; msg.textContent = ''
+    try {
+      const r = await fetch('/raven/journal/write', { method: 'POST', headers: { 'Content-Type': 'application/json', ...AUTH },
+        body: JSON.stringify({ title: title.value, content: body.value, sealed: box.checked, question: q.value, answers: a.value, hint: h.value }) })
+      const d = await r.json().catch(() => ({}))
+      if (!r.ok) { msg.textContent = d.error || '没写进去，稍后再试。'; return }
+      load()
+    } catch { msg.textContent = '没写进去，稍后再试。' }
+    finally { go.disabled = false }
+  }
+  card.append(title, body, lock, quizBox, go, msg)
+  return card
+}
+
+// 她的本子：一页。正文她自己始终看得到；锁着的页多两样：看他猜过什么、揭开
+function myPage(e) {
+  const page = el('article', 'page')
+  page.appendChild(el('h2', null, e.title))
+  const meta = el('div', 'meta', fmt(e.created_at))
+  if (e.sealed) { const t = el('span', 'tag', e.unlocked_at ? '锁着 · 他答对过' : '锁着'); t.style.color = 'var(--seal)'; meta.appendChild(t) }
+  else if (e.revealed_at) meta.appendChild(el('span', 'tag revealed', '揭开于 ' + fmt(e.revealed_at)))
+  page.appendChild(meta)
+  page.appendChild(el('div', 'body', e.content || ''))
+  if (e.sealed) {
+    const tools = el('div', 'quiz')
+    if (e.question) tools.appendChild(el('div', 'q', '你出的题：' + e.question))
+    const guesses = el('div', 'guess')
+    const see = el('button', 'mini', '看他猜过什么'); see.type = 'button'
+    see.onclick = async () => {
+      guesses.textContent = '翻记录中…'
+      try {
+        const r = await fetch('/raven/journal/attempts?id=' + e.id, { headers: AUTH, cache: 'no-store' })
+        const { attempts = [] } = await r.json()
+        guesses.textContent = ''
+        if (!attempts.length) { guesses.textContent = '他还没猜过。'; return }
+        for (const g of attempts) guesses.appendChild(el('div', null, (g.ok ? '✓ ' : '✗ ') + g.answer + '　' + fmt(g.created_at)))
+      } catch { guesses.textContent = '没翻到，稍后再试。' }
+    }
+    const open = el('button', 'mini', '揭开给他看'); open.type = 'button'
+    let armed = false
+    open.onclick = async () => {
+      if (!armed) { armed = true; open.textContent = '揭开就锁不回去了，再点一次确认'; return }
+      open.disabled = true
+      try {
+        const r = await fetch('/raven/journal/reveal', { method: 'POST', headers: { 'Content-Type': 'application/json', ...AUTH }, body: JSON.stringify({ id: e.id }) })
+        if (r.ok) load(); else { open.disabled = false; open.textContent = '没揭开，稍后再试' }
+      } catch { open.disabled = false; open.textContent = '没揭开，稍后再试' }
+    }
+    tools.append(see, open, guesses)
+    page.appendChild(tools)
+  }
+  return page
+}
+
+function setTab(next) {
+  tab = next
+  try { localStorage.setItem('journal-tab', tab) } catch {}
+  load()
+}
+
 async function load() {
   const list = document.getElementById('list')
+  document.getElementById('head').textContent = tab === 'me' ? '阿颖的日记' : '乌鸦的日记'
+  document.getElementById('sub').textContent = SUBS[tab]
+  document.getElementById('tab-crow').className = tab === 'crow' ? 'on' : ''
+  document.getElementById('tab-me').className = tab === 'me' ? 'on' : ''
   try {
     const r = await fetch('/raven/journal', { headers: { Authorization: 'Bearer ' + (localStorage.getItem('raven-token') || '') }, cache: 'no-store' })
     if (!r.ok) throw new Error(r.status)
-    const { entries = [] } = await r.json()
+    const all = (await r.json()).entries || []
+    const entries = all.filter(e => (e.author === '阿颖') === (tab === 'me'))
     list.textContent = ''
+    if (tab === 'me') {
+      list.appendChild(writeCard())
+      if (!entries.length) list.appendChild(el('div', 'empty', '还没有页。上面写第一页。'))
+      for (const e of entries) list.appendChild(myPage(e))
+      return
+    }
     if (!entries.length) { list.appendChild(el('div', 'empty', '本子还是空的。')); return }
     for (const e of entries) {
       const page = el('article', 'page')
@@ -116,6 +225,8 @@ async function load() {
     list.textContent = ''; list.appendChild(el('div', 'err', '没翻开，稍后再试（' + err.message + '）'))
   }
 }
+document.getElementById('tab-crow').onclick = () => setTab('crow')
+document.getElementById('tab-me').onclick = () => setTab('me')
 load()
 </script>
 </body>

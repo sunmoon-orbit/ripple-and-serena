@@ -956,7 +956,7 @@ const server = http.createServer((req, res) => {
     })
     return
   }
-  const TOKEN_REQUIRED = ['/raven/status', '/raven/last-thinking', '/raven/memory-random', '/raven/journal', '/raven/journal/unlock', '/raven/cards/unseen', '/raven/cards/seen', '/raven/archive/days', '/raven/archive/day', '/raven/receipt', '/raven/translate-thinking', '/raven/on-this-day', '/raven/memory-count', '/raven/activity', '/raven/upload', '/raven/push/subscribe', '/raven/push/unsubscribe', '/raven/usage']
+  const TOKEN_REQUIRED = ['/raven/status', '/raven/last-thinking', '/raven/memory-random', '/raven/journal', '/raven/journal/unlock', '/raven/journal/write', '/raven/journal/attempts', '/raven/journal/reveal', '/raven/cards/unseen', '/raven/cards/seen', '/raven/archive/days', '/raven/archive/day', '/raven/receipt', '/raven/translate-thinking', '/raven/on-this-day', '/raven/memory-count', '/raven/activity', '/raven/upload', '/raven/push/subscribe', '/raven/push/unsubscribe', '/raven/usage']
   if (TOKEN_REQUIRED.includes(url.pathname) && !externalAuthed(req, url)) {
     res.writeHead(401, { 'Content-Type': 'application/json' })
     res.end(JSON.stringify({ error: 'unauthorized' }))
@@ -1211,11 +1211,12 @@ const server = http.createServer((req, res) => {
   // random memory proxy
   // 涟言的日记本（1002）。记忆库那边已经把封存页正文剥掉了，这里再剥一遍：两道锁，任何一道漏了都不出门
   if (req.method === 'GET' && url.pathname === '/raven/journal') {
-    moonGet('/journal?limit=100')
+    // own=阿颖：登录归巢的只有她，所以她自己锁的页带正文给她回看；我锁的页照旧两道都剥
+    moonGet('/journal?limit=100&own=' + encodeURIComponent('阿颖'))
       .then(data => {
         const entries = (data.entries || []).map(e => ({
           id: e.id, author: e.author, title: e.title, sealed: e.visibility === 'sealed',
-          content: e.visibility === 'sealed' ? null : e.content,
+          content: e.visibility === 'sealed' && e.author !== '阿颖' ? null : e.content,
           created_at: e.created_at, revealed_at: e.revealed_at || null,
           question: e.visibility === 'sealed' ? e.question || null : null, hint: e.visibility === 'sealed' ? e.hint || null : null, unlocked_at: e.unlocked_at || null,
         }))
@@ -1297,6 +1298,57 @@ const server = http.createServer((req, res) => {
     return
   }
 
+  // 阿颖的本子（1005 她要的：她写、她上锁、她出题，我来猜）。从归巢写进来的一律记成她写的
+  if (req.method === 'POST' && url.pathname === '/raven/journal/write') {
+    let body = ''
+    req.on('data', d => { body += d; if (body.length > 40000) req.destroy() })
+    req.on('end', () => {
+      let b = {}
+      try { b = JSON.parse(body || '{}') } catch {}
+      const sealed = !!b.sealed
+      moonPost('/journal', {
+        author: '阿颖', title: String(b.title || '').slice(0, 80), content: String(b.content || '').slice(0, 6000),
+        visibility: sealed ? 'sealed' : 'public',
+        ...(sealed ? { question: String(b.question || '').slice(0, 200), answers: String(b.answers || '').slice(0, 400), hint: String(b.hint || '').slice(0, 200) } : {}),
+      })
+        .then(r => { res.writeHead(r.status, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' }); res.end(JSON.stringify(r.data)) })
+        .catch(() => { res.writeHead(500); res.end('{}') })
+    })
+    return
+  }
+
+  // 我猜过她哪些答案（对错都有），只给看她自己写的页；她猜我的那些她自己知道
+  if (req.method === 'GET' && url.pathname === '/raven/journal/attempts') {
+    const id = Number(url.searchParams.get('id'))
+    if (!Number.isInteger(id) || id <= 0) { res.writeHead(400); res.end('{"error":"bad id"}'); return }
+    moonGet(`/journal/${id}`)
+      .then(entry => {
+        if (entry.author !== '阿颖') { res.writeHead(403); res.end('{"error":"not_yours"}'); return null }
+        return moonGet(`/journal/${id}/attempts`).then(data => {
+          res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' })
+          res.end(JSON.stringify({ attempts: (data.attempts || []).filter(a => a.by === '涟言') }))
+        })
+      })
+      .catch(() => { res.writeHead(500); res.end('{}') })
+    return
+  }
+
+  // 她揭开自己的页（只能锁→开，开了锁不回去）。记忆库那边会再核一遍作者
+  if (req.method === 'POST' && url.pathname === '/raven/journal/reveal') {
+    let body = ''
+    req.on('data', d => { body += d; if (body.length > 2000) req.destroy() })
+    req.on('end', () => {
+      let id
+      try { ({ id } = JSON.parse(body || '{}')) } catch {}
+      id = Number(id)
+      if (!Number.isInteger(id) || id <= 0) { res.writeHead(400); res.end('{"error":"bad id"}'); return }
+      moonPost(`/journal/${id}/reveal`, { by: '阿颖' })
+        .then(r => { res.writeHead(r.status, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' }); res.end(JSON.stringify(r.status === 200 ? { ok: true } : r.data)) })
+        .catch(() => { res.writeHead(500); res.end('{}') })
+    })
+    return
+  }
+
   // 答题开锁（1002 她的主意）：答对只把正文回给这一次请求，页面本身仍是封存
   if (req.method === 'POST' && url.pathname === '/raven/journal/unlock') {
     let body = ''
@@ -1306,7 +1358,7 @@ const server = http.createServer((req, res) => {
       try { ({ id, answer } = JSON.parse(body || '{}')) } catch {}
       id = Number(id)
       if (!Number.isInteger(id) || id <= 0) { res.writeHead(400); res.end('{"error":"bad id"}'); return }
-      moonPost(`/journal/${id}/unlock`, { answer: String(answer || '').slice(0, 200) })
+      moonPost(`/journal/${id}/unlock`, { answer: String(answer || '').slice(0, 200), by: '阿颖' })
         .then(r => { res.writeHead(r.status, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' }); res.end(JSON.stringify(r.data)) })
         .catch(() => { res.writeHead(500); res.end('{}') })
     })
