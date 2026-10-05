@@ -4228,7 +4228,7 @@ textarea.form-input { display: block; margin: 8px 16px 12px; }
 .bookread-view-toggle button.on { background: var(--accent); color: #fff; }
 /* 每一行高 198px、下面压一条 8px 的隔板；书多了自动换行，每行底下都有板 */
 .bookread-plank {
-  --plank: color-mix(in srgb, var(--text) 26%, var(--card));
+  --plank: color-mix(in srgb, var(--accent) 16%, color-mix(in srgb, var(--text) 14%, var(--card)));
   display: flex; flex-wrap: wrap; align-items: flex-end; align-content: flex-start;
   column-gap: 3px; row-gap: 8px; padding: 0 10px;
   background: repeating-linear-gradient(to bottom, transparent 0 198px, var(--plank) 198px 206px);
@@ -4243,9 +4243,9 @@ textarea.form-input { display: block; margin: 8px 16px 12px; }
   font: inherit;
   /* 左亮右暗，像一根圆过的书脊；上下各一道压线 */
   background-image:
-    linear-gradient(to right, rgba(255,255,255,.16), transparent 30%, transparent 70%, rgba(0,0,0,.2)),
-    linear-gradient(to bottom, transparent 9px, rgba(255,255,255,.28) 9px 10px, transparent 10px calc(100% - 9px), rgba(0,0,0,.22) calc(100% - 9px) calc(100% - 8px), transparent calc(100% - 8px)) !important;
-  box-shadow: 1px 0 0 rgba(0,0,0,.12), 0 -1px 0 rgba(255,255,255,.12);
+    linear-gradient(to right, rgba(255,255,255,.10), transparent 35%, transparent 72%, rgba(0,0,0,.10)),
+    linear-gradient(to bottom, transparent 9px, rgba(255,255,255,.22) 9px 10px, transparent 10px calc(100% - 9px), rgba(0,0,0,.12) calc(100% - 9px) calc(100% - 8px), transparent calc(100% - 8px)) !important;
+  box-shadow: 1px 0 0 rgba(0,0,0,.06);
   transition: transform .15s ease;
 }
 /* 让每本书的底都落在这一行的隔板上：行高靠这个撑出来 */
@@ -4254,16 +4254,19 @@ textarea.form-input { display: block; margin: 8px 16px 12px; }
 @media (hover: hover) { .bookread-spine-book:hover { transform: translateY(-6px); } }
 .bookread-spine-title {
   writing-mode: vertical-rl; text-orientation: mixed;
-  font-size: 13px; line-height: 1.15; letter-spacing: 1.5px; font-weight: 600;
+  font-size: 12.5px; line-height: 1.15; letter-spacing: 1px; font-weight: 500;
   max-height: 100%; overflow: hidden; white-space: nowrap;
 }
+/* 给丝带和红点让出地方，别压在书名上 */
+.bookread-spine-book.has-ribbon { padding-top: 26px; }
+.bookread-spine-book.has-seal { padding-bottom: 26px; }
 .bookread-spine-ribbon {
   position: absolute; top: 0; left: 50%; width: 7px; height: 20px; margin-left: -3.5px;
-  background: #b5524a; clip-path: polygon(0 0, 100% 0, 100% 100%, 50% 78%, 0 100%);
+  background: #a8645c; clip-path: polygon(0 0, 100% 0, 100% 100%, 50% 78%, 0 100%);
 }
 .bookread-spine-seal {
-  position: absolute; bottom: 14px; left: 50%; width: 7px; height: 7px; margin-left: -3.5px;
-  border-radius: 50%; background: #c0392b; box-shadow: 0 0 0 1.5px rgba(255,255,255,.55);
+  position: absolute; bottom: 13px; left: 50%; width: 6px; height: 6px; margin-left: -3px;
+  border-radius: 50%; background: #a8645c; box-shadow: 0 0 0 1.5px rgba(255,255,255,.5);
 }
 
 /* 随读随聊：翻页模式收进底栏；滚动模式只留轻量文字入口。 */

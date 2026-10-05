@@ -28,13 +28,18 @@ const SHELF_ORDER = ['闲书层', '正经层', '工具层']
 // 书脊视图（1005）：书立起来摆在隔板上。厚薄看章数，高矮按 id 错落，同一本书每次打开都一样
 const SHELF_VIEW_KEY = 'bookread-shelf-view'
 function spineLook(book) {
+  // 书脊上只写书名本身：导入时带上的后缀和「 - （法）」这类尾巴不上脊，完整名字在列表里看
+  const title = String(book.title || '').replace(/[_\s-]*言叽导入版$/, '').replace(/\s*[-—–]\s*[（(][^）)]*[）)]\s*$/, '').trim() || String(book.title || '')
   const chapters = Number(book.chapter_count) || 1
-  const width = Math.round(Math.min(56, 30 + Math.sqrt(chapters) * 5))
-  const height = 150 + ((Number(book.id) || 0) * 37) % 41
+  const width = Math.round(Math.min(52, 30 + Math.sqrt(chapters) * 4.5))
+  // 高度先保证书名放得下（一个字约 14px），再按 id 错落一点，不超过一层的高度
+  const height = Math.min(196, Math.max(134 + ((Number(book.id) || 0) * 29) % 41, [...title].length * 14 + 50))
   const hex = /^#[0-9a-f]{6}$/i.test(book.cover_color || '') ? book.cover_color : '#8b6f47'
-  const [r, g, b] = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16))
-  const light = (r * 299 + g * 587 + b * 114) / 1000 > 165
-  return { width, height, color: hex, ink: light ? 'rgba(40,32,24,.88)' : 'rgba(255,252,245,.94)' }
+  // 上架时挑的颜色偏艳，立成一排会抢眼：往暖灰里掺四成半，压成莫兰迪的调子（1005 她说饱和度高）
+  const GREY = [201, 193, 182]
+  const [r, g, b] = [1, 3, 5].map((k, n) => Math.round(parseInt(hex.slice(k, k + 2), 16) * 0.55 + GREY[n] * 0.45))
+  const light = (r * 299 + g * 587 + b * 114) / 1000 > 158
+  return { title, width, height, color: `rgb(${r}, ${g}, ${b})`, ink: light ? 'rgba(58,48,38,.86)' : 'rgba(255,252,246,.95)' }
 }
 
 function beijingDateKey(date = new Date()) {
@@ -839,13 +844,14 @@ export default function BookRead({ onClose }) {
       const reading = b.bookmark_chapter != null
       return (
         <button
-          key={b.id} type="button" className="bookread-spine-book" onClick={() => openBook(b)}
+          key={b.id} type="button" onClick={() => openBook(b)}
+          className={'bookread-spine-book' + (reading ? ' has-ribbon' : '') + (b.stamps?.length > 0 ? ' has-seal' : '')}
           title={`${b.title}${b.author ? ' · ' + b.author : ''}`}
           aria-label={`${b.title}${reading ? `，书签在第 ${b.bookmark_chapter + 1} 章` : ''}`}
           style={{ width: look.width, height: look.height, '--h': look.height + 'px', backgroundColor: look.color, color: look.ink }}
         >
           {reading && <i className="bookread-spine-ribbon" />}
-          <span className="bookread-spine-title">{b.title}</span>
+          <span className="bookread-spine-title">{look.title}</span>
           {b.stamps?.length > 0 && <i className="bookread-spine-seal" />}
         </button>
       )
