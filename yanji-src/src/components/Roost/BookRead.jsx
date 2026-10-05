@@ -25,6 +25,18 @@ const SPINE_COLORS = ['#4a7c59', '#8b6f47', '#5b6e8c', '#9c5b5b', '#7a5c8a', '#4
 // 书架分层：书多了各归各位（2026-07-12 阿颖提的）；空串=未分层，排最后
 const SHELF_ORDER = ['闲书层', '正经层', '工具层']
 
+// 书脊视图（1005）：书立起来摆在隔板上。厚薄看章数，高矮按 id 错落，同一本书每次打开都一样
+const SHELF_VIEW_KEY = 'bookread-shelf-view'
+function spineLook(book) {
+  const chapters = Number(book.chapter_count) || 1
+  const width = Math.round(Math.min(56, 30 + Math.sqrt(chapters) * 5))
+  const height = 150 + ((Number(book.id) || 0) * 37) % 41
+  const hex = /^#[0-9a-f]{6}$/i.test(book.cover_color || '') ? book.cover_color : '#8b6f47'
+  const [r, g, b] = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16))
+  const light = (r * 299 + g * 587 + b * 114) / 1000 > 165
+  return { width, height, color: hex, ink: light ? 'rgba(40,32,24,.88)' : 'rgba(255,252,245,.94)' }
+}
+
 function beijingDateKey(date = new Date()) {
   const parts = new Intl.DateTimeFormat('en-US', {
     timeZone: 'Asia/Shanghai', year: 'numeric', month: '2-digit', day: '2-digit',
@@ -158,6 +170,13 @@ export default function BookRead({ onClose }) {
   const connection = connections.find((c) => c.id === activeConnectionId)
 
   const [books, setBooks] = useState(null)      // null=loading
+  const [shelfView, setShelfView] = useState(() => {
+    try { return localStorage.getItem(SHELF_VIEW_KEY) === 'list' ? 'list' : 'spines' } catch { return 'spines' }
+  })
+  const switchShelfView = (next) => {
+    setShelfView(next)
+    try { localStorage.setItem(SHELF_VIEW_KEY, next) } catch { /* 存不上就每次回到默认 */ }
+  }
   const [active, setActive] = useState(null)    // 选中的书（列表项）
   const [chapter, setChapter] = useState(null)  // {idx,title,content,annotations}
   const [chapterViewKey, setChapterViewKey] = useState(0) // 只在真正打开章节时触发阅读位置恢复
@@ -815,6 +834,22 @@ export default function BookRead({ onClose }) {
         )}
       </div>
     )
+    const renderSpine = (b) => {
+      const look = spineLook(b)
+      const reading = b.bookmark_chapter != null
+      return (
+        <button
+          key={b.id} type="button" className="bookread-spine-book" onClick={() => openBook(b)}
+          title={`${b.title}${b.author ? ' · ' + b.author : ''}`}
+          aria-label={`${b.title}${reading ? `，书签在第 ${b.bookmark_chapter + 1} 章` : ''}`}
+          style={{ width: look.width, height: look.height, '--h': look.height + 'px', backgroundColor: look.color, color: look.ink }}
+        >
+          {reading && <i className="bookread-spine-ribbon" />}
+          <span className="bookread-spine-title">{b.title}</span>
+          {b.stamps?.length > 0 && <i className="bookread-spine-seal" />}
+        </button>
+      )
+    }
     return (
       <div className="roost-overlay" onClick={onClose}>
         <div className="roost-modal roost-modal-tall coread-modal" onClick={(e) => e.stopPropagation()}>
@@ -828,14 +863,25 @@ export default function BookRead({ onClose }) {
             <button className="roost-btn" style={{ width: '100%', marginBottom: 12 }} onClick={() => setUpload({ color: SPINE_COLORS[0], shelf: '闲书层' })}>
               ＋ 上架新书（txt / 粘贴文本）
             </button>
+            {books?.length > 0 && (
+              <div className="bookread-view-toggle" role="tablist" aria-label="书架的看法">
+                <button type="button" role="tab" aria-selected={shelfView === 'spines'} className={shelfView === 'spines' ? 'on' : ''} onClick={() => switchShelfView('spines')}>书架</button>
+                <button type="button" role="tab" aria-selected={shelfView === 'list'} className={shelfView === 'list' ? 'on' : ''} onClick={() => switchShelfView('list')}>列表</button>
+              </div>
+            )}
             <div className="bookread-shelf">
               {groups.map(([label, list]) => list.length > 0 && (
                 <div key={label} className="bookread-shelf-section">
                   <div className="bookread-shelf-label">{label}<span>{list.length} 本</span></div>
-                  {list.map(renderBook)}
+                  {shelfView === 'spines'
+                    ? <div className="bookread-plank">{list.map(renderSpine)}</div>
+                    : list.map(renderBook)}
                 </div>
               ))}
             </div>
+            {shelfView === 'spines' && books?.length > 0 && (
+              <div className="bookread-foot-hint" style={{ marginTop: 10, textAlign: 'center' }}>丝带是书签，红点是读讫。追更和删除在「列表」里。</div>
+            )}
           </div>
         </div>
       </div>
