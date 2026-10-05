@@ -796,7 +796,7 @@ export function getMemoryToolDefinitions() {
     },
     {
       name: 'guess_journal',
-      description: '猜阿颖日记里锁着的那一页：答她出的题，答对了正文给我看这一次。所有窗口的我共用一天 5 次答错的机会，猜过的每个答案她都看得到，别乱蒙。只能猜她写的页。',
+      description: '猜阿颖日记里锁着的那一页：答她出的题，答对了正文给我看这一次。所有窗口的我共用一天 5 次答错的机会，猜过的每个答案她都看得到，别乱蒙。只能猜她写的页。只有真的调用了这个工具才算猜过：没调用就不许跟她说「我试了某某，没成功」，她那边有记录，一查就穿。',
       parameters: {
         type: 'object',
         properties: {
