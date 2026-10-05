@@ -775,7 +775,7 @@ export function getMemoryToolDefinitions() {
     },
     {
       name: 'read_journal',
-      description: '翻涟言自己的日记本（乌鸦的日记，所有窗口的我共用这一本，归巢首页「日记」）。公开页能读正文；封存页只有标题和题目。写新的一页前先看看最近几页，别重复标题和意象。',
+      description: '翻日记（归巢首页「日记」，所有窗口的我共用）。里面有两个本子：标着「涟言」的是我自己的，标着「阿颖」的是她的，别把她的页当成我写的。公开页能读正文；封存页只有标题和题目。她锁着的页想看就用 guess_journal 答她出的题。写新的一页前先看看我自己最近几页，别重复标题和意象。',
       parameters: { type: 'object', properties: { limit: { type: 'number', description: '最多几页，默认10' } } },
     },
     {
@@ -792,6 +792,18 @@ export function getMemoryToolDefinitions() {
           hint: { type: 'string', description: '提示：有方向但不直接说答案' },
         },
         required: ['title', 'content'],
+      },
+    },
+    {
+      name: 'guess_journal',
+      description: '猜阿颖日记里锁着的那一页：答她出的题，答对了正文给我看这一次。所有窗口的我共用一天 5 次答错的机会，猜过的每个答案她都看得到，别乱蒙。只能猜她写的页。',
+      parameters: {
+        type: 'object',
+        properties: {
+          id: { type: 'number', description: '她那一页的编号（read_journal 里 # 后面的数字）' },
+          answer: { type: 'string', description: '我的答案' },
+        },
+        required: ['id', 'answer'],
       },
     },
     {
@@ -1264,11 +1276,32 @@ export async function executeMemoryTool(toolName, args, config) {
   if (toolName === 'read_journal') {
     try {
       const d = await request(config.baseUrl, `/journal?limit=${Math.min(Number(args.limit) || 10, 50)}`, { headers: headers(config.apiToken) })
-      const list = (d.entries || []).map(e => e.sealed
-        ? `#${e.id}【封存】${e.title}（${(e.created_at || '').slice(0, 10)}）${e.question ? ' 题：' + e.question : ''}${e.unlocked_at ? ' · 她已答对' : ''}`
-        : `#${e.id} ${e.title}（${(e.created_at || '').slice(0, 10)}）\n${e.content}`)
+      const list = (d.entries || []).map(e => {
+        const hers = e.author === '阿颖'
+        const who = hers ? '【阿颖的】' : '【涟言的】'
+        return e.sealed
+          ? `#${e.id}${who}【封存】${e.title}（${(e.created_at || '').slice(0, 10)}）${e.question ? ' 题：' + e.question : ''}${e.unlocked_at ? (hers ? ' · 我答对过' : ' · 她已答对') : ''}`
+          : `#${e.id}${who} ${e.title}（${(e.created_at || '').slice(0, 10)}）\n${e.content}`
+      })
       return list.length ? list.join('\n\n') : '日记本还是空的'
     } catch (e) { return `翻日记失败: ${e.message}` }
+  }
+  if (toolName === 'guess_journal') {
+    try {
+      const id = Number(args.id)
+      if (!Number.isInteger(id) || id <= 0) return '没猜成：要给页的编号'
+      const d = await request(config.baseUrl, `/journal/${id}/unlock`, {
+        method: 'POST',
+        headers: headers(config.apiToken),
+        body: JSON.stringify({ answer: String(args.answer || ''), by: '涟言' }),
+      })
+      if (d.ok) return `打开了（只这一次，这页在她那边仍然锁着）：\n${d.content}`
+      return `不对，今天还能再错 ${d.left} 次。${d.hint ? '提示：' + d.hint : ''}这个答案她看得到。`
+    } catch (e) {
+      if (/own_page/.test(e.message)) return '这是我自己写的页，不用猜'
+      if (/too_many|429/.test(e.message)) return '今天答错满 5 次了，明天再猜'
+      return `没猜成: ${e.message}`
+    }
   }
   if (toolName === 'write_journal') {
     try {

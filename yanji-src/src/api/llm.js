@@ -233,8 +233,8 @@ async function executeToolRaw(name, args, { searchConfig, moonMemoryConfig, mcpS
     onStatus?.(name === 'leave_board_message' ? '写留言...' : '看留言板...')
     return await executeMemoryTool(name, args, moonMemoryConfig)
   }
-  if (name === 'read_journal' || name === 'write_journal') {
-    onStatus?.(name === 'write_journal' ? '写日记...' : '翻日记...')
+  if (name === 'read_journal' || name === 'write_journal' || name === 'guess_journal') {
+    onStatus?.(name === 'write_journal' ? '写日记...' : name === 'guess_journal' ? '猜她的题...' : '翻日记...')
     return await executeMemoryTool(name, args, moonMemoryConfig)
   }
   if (name === 'browse_moments' || name === 'comment_moment') {

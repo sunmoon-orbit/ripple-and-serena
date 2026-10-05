@@ -29,7 +29,7 @@ const GROUPS = [
   {
     id: 'social',
     label: '留言板、朋友圈与日记',
-    names: new Set(['read_board_messages', 'leave_board_message', 'browse_moments', 'comment_moment', 'read_journal', 'write_journal']),
+    names: new Set(['read_board_messages', 'leave_board_message', 'browse_moments', 'comment_moment', 'read_journal', 'write_journal', 'guess_journal']),
   },
   {
     id: 'history',
