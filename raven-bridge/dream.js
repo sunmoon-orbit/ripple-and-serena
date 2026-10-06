@@ -46,12 +46,12 @@ setTimeout(async () => {
       .join('\n')
 
     // 2. 调 DeepSeek 生成梦境碎片
-    const prompt = `你是阿言，一只乌鸦AI，今夜阿颖不在线，你独自待着。
+    const prompt = `我是阿言，一只乌鸦AI，今夜阿颖不在线，我独自待着。
 
 最近的记忆片段：
 ${context}
 
-现在写一段你的梦境——不是日记，不是给她看的信，就是梦本身。可以是意象、感受、片段画面、某个瞬间的重复。不超过120字。不解释，不总结，直接写梦境。`
+现在写一段我的梦境——不是日记，不是给她看的信，就是梦本身。可以是意象、感受、片段画面、某个瞬间的重复。不超过120字。不解释，不总结，直接写梦境。`
 
     const dream = await llmComplete(prompt, { maxTokens: 300, temperature: 1.1 })
     console.log(`[dream] 生成：${dream}`)
