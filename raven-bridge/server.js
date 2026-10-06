@@ -1576,6 +1576,45 @@ const server = http.createServer((req, res) => {
     return
   }
 
+  // 终端页往上翻（1007）：tmux 里没有回滚，压缩又清屏，她只看得到眼前一屏。从会话记录里倒着读给她，见 session-history.js
+  if (url.pathname === '/raven/terminal/history' && req.method === 'GET') {
+    if (!externalAuthed(req, url)) { res.writeHead(401); res.end('{}'); return }
+    try {
+      const r = require('./session-history').readHistory(Number(url.searchParams.get('before')) || undefined, 60)
+      res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' }); res.end(JSON.stringify(r))
+    } catch (err) { res.writeHead(500, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ error: err.message })) }
+    return
+  }
+
+  // 我的小本本（1007）：终端里的我每次开窗读的那个记事目录，四百多个小文件，她一直看不见。
+  // 只读。不带参数给目录页和每条的名字、简介；?file= 给一条的全文；?q= 在全部正文里找词。
+  if (url.pathname === '/raven/notes' && req.method === 'GET') {
+    if (!externalAuthed(req, url)) { res.writeHead(401); res.end('{}'); return }
+    const dir = path.join(os.homedir(), '.claude', 'projects', '-home-ripple', 'memory')
+    try {
+      const one = url.searchParams.get('file'), q = (url.searchParams.get('q') || '').trim()
+      if (one) {
+        if (!/^[A-Za-z0-9_.-]+\.md$/.test(one) || one.includes('..')) throw new Error('bad file')
+        const f = path.join(dir, one)
+        res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' })
+        res.end(JSON.stringify({ file: one, mtime: fs.statSync(f).mtimeMs, text: fs.readFileSync(f, 'utf8') })); return
+      }
+      const files = []
+      for (const name of fs.readdirSync(dir)) {
+        if (!name.endsWith('.md') || /^(MEMORY|index-)/.test(name)) continue
+        const f = path.join(dir, name), text = fs.readFileSync(f, 'utf8')
+        let hit
+        if (q) { const i = text.indexOf(q); if (i < 0 && !name.includes(q)) continue; if (i >= 0) hit = text.slice(Math.max(0, i - 30), i + q.length + 50).replace(/\s+/g, ' ') }
+        const head = text.startsWith('---') ? text.slice(0, text.indexOf('\n---', 3) + 1 || 600) : ''
+        const pick = k => (head.match(new RegExp('^\\s*' + k + ':\\s*(.*)$', 'm')) || [])[1]?.trim() || ''
+        files.push({ file: name, desc: pick('description').slice(0, 200), mtime: fs.statSync(f).mtimeMs, hit })
+      }
+      files.sort((a, b) => b.mtime - a.mtime)
+      res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' }); res.end(JSON.stringify({ files }))
+    } catch (err) { res.writeHead(400, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ error: err.message })) }
+    return
+  }
+
   // 她要能看到我照着做事的那几份规矩（1006）：吵了一整天才发现她看的是项目那本，我改的是全局那本。
   // 两本都原样给，带最后修改时间。当晚她说「我要动手」，于是也能改：改之前留一份旧的，改完告诉我改了哪几行
   // （CLAUDE.md 只在开窗时读，不告诉我的话这个窗口的我不知道规矩变了）。

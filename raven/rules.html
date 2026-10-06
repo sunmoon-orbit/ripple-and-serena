@@ -41,6 +41,13 @@
   textarea { width: 100%; min-height: 46vh; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--bg); color: var(--ink);
     font: 13.5px/1.65 'JetBrains Mono', Menlo, Consolas, 'Noto Sans Mono CJK SC', monospace; resize: vertical; }
   .add { display: block; margin: 14px auto 0; }
+  .chips { display: flex; gap: 6px; flex-wrap: wrap; margin: 0 0 12px; }
+  .chips button { border: 1px solid var(--line); background: transparent; color: var(--dim); border-radius: 999px; padding: 3px 11px; font: inherit; font-size: 12.5px; cursor: pointer; }
+  .chips button.on { color: var(--paper); background: var(--accent); border-color: var(--accent); }
+  .note { background: var(--paper); border: 1px solid var(--line); border-radius: 12px; padding: 10px 14px; margin-bottom: 8px; cursor: pointer; }
+  .note b { display: block; font-size: 14px; overflow-wrap: anywhere; } .note span { color: var(--dim); font-size: 13px; display: block; overflow-wrap: anywhere; }
+  .note small { color: var(--dim); font-size: 11.5px; }
+  .back { border: none; background: none; color: var(--accent); font: inherit; cursor: pointer; padding: 0; margin-bottom: 10px; }
 </style>
 </head>
 <body>
@@ -93,9 +100,46 @@ function sections(text) {
   return secs.filter(s => s.lines.some(x => x.trim()))
 }
 let shown = []
+// 小本本：终端里的我自己记的那四百多条。只读；目录按最近改动排，分类看文件名前缀，搜词是在全部正文里找
+const KINDS = [['', '全部'], ['relationship', '我们'], ['user', '你的事'], ['serena', '你的事'], ['feedback', '你纠正我的'], ['project', '干的活'], ['reference', '参考']]
+let notes = null, noteKind = '', noteOpen = null, noteTimer = 0
+const fmtT = ms => new Date(ms).toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai', hour12: false, month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })
+const noteGet = qs => fetch('/raven/notes' + qs, { headers: { Authorization: 'Bearer ' + (localStorage.getItem('raven-token') || '') }, cache: 'no-store' }).then(r => r.ok ? r.json() : Promise.reject(r.status))
+async function renderNotes() {
+  const q = $('q').value.trim()
+  $('meta').textContent = '终端里的我每次开窗先读目录、用到再翻的记事本。只能看，写错了你告诉我或者以后给你开改的口子'
+  if (noteOpen) {
+    $('out').innerHTML = '<div class="empty">翻开中…</div>'
+    const d = await noteGet('?file=' + encodeURIComponent(noteOpen)).catch(e => ({ text: '没翻开（' + e + '）', mtime: 0 }))
+    const body = d.text.replace(/^---[\s\S]*?\n---\n?/, '')
+    $('out').innerHTML = `<button class="back" id="back">‹ 回目录</button><details open><summary>${esc(noteOpen.replace(/\.md$/, ''))}</summary><div class="body">${block(body.split('\n'))}<div class="act"><span class="msg">上次改动 ${d.mtime ? fmtT(d.mtime) : '—'}</span></div></div></details>`
+    $('back').onclick = () => { noteOpen = null; renderNotes() }
+    if (q) mark($('out'), q)
+    return
+  }
+  if (!notes || notes.q !== q) { $('out').innerHTML = '<div class="empty">翻开中…</div>'; notes = await noteGet(q ? '?q=' + encodeURIComponent(q) : '').catch(e => ({ files: [], err: e })); notes.q = q }
+  const kinds = KINDS.filter((k, i) => KINDS.findIndex(x => x[1] === k[1]) === i)
+  const inKind = f => !noteKind || KINDS.filter(k => k[1] === noteKind).some(k => f.file.startsWith(k[0] + '-'))
+  const list = notes.files.filter(inKind)
+  $('out').innerHTML = `<div class="chips">${kinds.map(k => `<button data-kind="${k[0] ? k[1] : ''}" class="${(k[0] ? k[1] : '') === noteKind ? 'on' : ''}">${k[1]}</button>`).join('')}</div>`
+    + (notes.err ? `<div class="empty">没翻开（${esc(notes.err)}）</div>` : !list.length ? '<div class="empty">没有</div>' :
+      list.slice(0, 300).map(f => `<div class="note" data-file="${esc(f.file)}"><b>${esc(f.file.replace(/\.md$/, ''))}</b><span>${esc(f.hit ? '…' + f.hit + '…' : f.desc)}</span><small>${fmtT(f.mtime)}</small></div>`).join('')
+      + `<div class="meta" style="text-align:center">${list.length > 300 ? '只列了最近的 300 条，共 ' + list.length + ' 条，搜词能找到其余的' : '共 ' + list.length + ' 条'}</div>`)
+  if (q) mark($('out'), q)
+}
+$('out').addEventListener('click', e => {
+  if (books[cur]?.key !== 'notes') return
+  const k = e.target.dataset?.kind, n = e.target.closest?.('.note')
+  if (k != null) { noteKind = k; renderNotes() } else if (n) { noteOpen = n.dataset.file; renderNotes(); scrollTo(0, 0) }
+})
+
 function render() {
   const b = books[cur]; if (!b) return
-  $('tabs').innerHTML = books.map((x, i) => `<button class="${i === cur ? 'on' : ''}" data-i="${i}">${esc(x.name)}那本</button>`).join('')
+  if (b.key === 'notes') {
+    $('tabs').innerHTML = books.map((x, i) => `<button class="${i === cur ? 'on' : ''}" data-i="${i}">${esc(x.name)}${x.key === 'notes' ? '' : '那本'}</button>`).join('')
+    clearTimeout(noteTimer); noteTimer = setTimeout(renderNotes, notes ? 250 : 0); return
+  }
+  $('tabs').innerHTML = books.map((x, i) => `<button class="${i === cur ? 'on' : ''}" data-i="${i}">${esc(x.name)}${x.key === 'notes' ? '' : '那本'}</button>`).join('')
   const t = b.mtime ? new Date(b.mtime).toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai', hour12: false, month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—'
   $('meta').textContent = `${b.note}。上次改动：${t}`
   const q = $('q').value.trim()
@@ -137,11 +181,11 @@ function mark(root, q) {
   while (w.nextNode()) if (w.currentNode.nodeValue.includes(q)) nodes.push(w.currentNode)
   for (const n of nodes) { const span = document.createElement('span'); span.innerHTML = esc(n.nodeValue).split(esc(q)).join('<mark>' + esc(q) + '</mark>'); n.replaceWith(...span.childNodes) }
 }
-$('tabs').addEventListener('click', e => { const i = e.target.dataset?.i; if (i != null) { cur = +i; render() } })
+$('tabs').addEventListener('click', e => { const i = e.target.dataset?.i; if (i != null) { cur = +i; noteOpen = null; render() } })
 $('q').addEventListener('input', render)
 fetch('/raven/rules', { headers: { Authorization: 'Bearer ' + (localStorage.getItem('raven-token') || '') }, cache: 'no-store' })
   .then(r => r.ok ? r.json() : Promise.reject(r.status))
-  .then(d => { books = d; render() })
+  .then(d => { books = [...d, { key: 'notes', name: '小本本' }]; render() })
   .catch(e => { $('out').innerHTML = `<div class="empty">没翻开（${esc(e)}）。回首页重新进一次试试</div>` })
 </script>
 </body>

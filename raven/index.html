@@ -663,6 +663,19 @@
 
   /* ========= TERMINAL PANEL ========= */
   #terminal-wrap { flex: 1; overflow-y: auto; background: var(--terminal-bg); padding: 12px; }
+  #term-more { display: block; margin: 0 auto 12px; border: 1px solid var(--border, rgba(128,128,128,.35)); background: transparent; color: var(--terminal-text); opacity: .8; border-radius: 999px; padding: 6px 16px; font-size: 12.5px; cursor: pointer; }
+  #term-more:disabled { opacity: .45; }
+  #term-now { display: none; text-align: center; font-size: 11px; opacity: .5; color: var(--terminal-text); margin: 14px 0 8px; }
+  #term-hist:not(:empty) + #term-now { display: block; }
+  #term-hist { font-family: 'Menlo','Monaco',monospace; font-size: 12px; line-height: 1.6; color: var(--terminal-text); }
+  .th { white-space: pre-wrap; word-break: break-word; margin: 0 0 8px; }
+  .th time { opacity: .45; font-size: 10.5px; margin-right: 6px; }
+  .th-you { border-left: 2px solid currentColor; padding-left: 8px; font-weight: 600; }
+  .th-say { border-left: 2px solid currentColor; padding-left: 8px; opacity: .92; }
+  .th-tool { opacity: .6; } .th-tool::before { content: '⏺ '; }
+  .th-out { opacity: .42; padding-left: 14px; max-height: 6.4em; overflow: hidden; }
+  .th-mark { text-align: center; opacity: .5; margin: 14px 0; } .th-mark::before, .th-mark::after { content: ' ──── '; }
+  .th-day { text-align: center; opacity: .5; font-size: 11px; margin: 12px 0 8px; }
   #terminal-out { font-family: 'Menlo','Monaco',monospace; font-size: 12px; line-height: 1.6; color: var(--terminal-text); white-space: pre-wrap; word-break: break-all; }
 
   /* ========= STATUS PANEL ========= */
@@ -1215,6 +1228,9 @@
   <!-- TERMINAL -->
   <div id="terminal" class="panel">
     <div id="terminal-wrap">
+      <button id="term-more" type="button">往上翻记录</button>
+      <div id="term-hist"></div>
+      <div id="term-now">— 下面是终端现在这一屏 —</div>
       <pre id="terminal-out">等待终端输出…</pre>
     </div>
   </div>
@@ -2401,10 +2417,38 @@ document.getElementById('cal-next').addEventListener('click', () => {
 
 // --- terminal ---
 function renderTerminal(lines) {
-  document.getElementById('terminal-out').textContent = lines.join('\n')
   const wrap = document.getElementById('terminal-wrap')
-  wrap.scrollTop = wrap.scrollHeight
+  // 她正往上翻记录的时候别把她拽回底下
+  const atBottom = wrap.scrollHeight - wrap.scrollTop - wrap.clientHeight < 80
+  document.getElementById('terminal-out').textContent = lines.join('\n')
+  if (atBottom) wrap.scrollTop = wrap.scrollHeight
 }
+// 往上翻：终端只有眼前一屏，更早的从会话记录里一段一段取（压缩之前的也在）。termCursor 是下一段从哪儿接着读
+let termCursor = null
+document.getElementById('term-more').addEventListener('click', async e => {
+  const btn = e.currentTarget, wrap = document.getElementById('terminal-wrap'), hist = document.getElementById('term-hist')
+  btn.disabled = true; btn.textContent = '在翻…'
+  try {
+    const r = await fetch('/raven/terminal/history' + (termCursor ? '?before=' + termCursor : ''), { headers: { Authorization: 'Bearer ' + (localStorage.getItem('raven-token') || '') }, cache: 'no-store' })
+    if (!r.ok) throw new Error(r.status)
+    const d = await r.json(), frag = document.createDocumentFragment()
+    const bj = ts => new Date(ts + 8 * 3600e3).toISOString()
+    let day = ''
+    for (const en of d.entries) {
+      const iso = en.ts ? bj(en.ts) : ''
+      if (iso && iso.slice(0, 10) !== day) { day = iso.slice(0, 10); const h = document.createElement('div'); h.className = 'th-day'; h.textContent = day; frag.appendChild(h) }
+      const el = document.createElement('div'); el.className = 'th th-' + en.k
+      if (iso && (en.k === 'you' || en.k === 'say' || en.k === 'me')) { const t = document.createElement('time'); t.textContent = iso.slice(11, 16); el.appendChild(t) }
+      el.appendChild(document.createTextNode((en.k === 'say' ? '→ 归巢　' : '') + en.t)); frag.appendChild(el)
+    }
+    const before = wrap.scrollHeight
+    hist.insertBefore(frag, hist.firstChild)
+    wrap.scrollTop += wrap.scrollHeight - before   // 加在上面，眼前的不动
+    termCursor = d.cursor
+    if (!d.cursor) { btn.textContent = '已经是这个窗口的第一句了'; return }
+    btn.disabled = false; btn.textContent = '再往上翻'
+  } catch (err) { btn.disabled = false; btn.textContent = '没翻动（' + err.message + '），再点一次' }
+})
 
 // --- status ---
 function renderStatus(data) {
