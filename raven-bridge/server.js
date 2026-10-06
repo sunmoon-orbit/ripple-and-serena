@@ -404,17 +404,23 @@ function ccBusy() { return captureShowsBusy(tmuxCapture()) }
 // 终端里的 CC 进程还活着，但每条注入都只会换来报错。认出屏幕底部这类报错，就当 CC 不在线，
 // 消息走取件箱/离线兜底，别再往里塞。报错会一直留在屏幕上，所以不再注入就能一直认得出；
 // 重新登录要重启 CC，屏幕一清就自动恢复。
-let ccAuthCache = { broken: false, ts: 0 }
-function captureShowsAuthBroken(capture) {
-  const tail = capture.split('\n').slice(-20).join('\n')
-  return /^\s*(?:⎿|●)?\s*(?:Please run \/login\b|API Error: 40[13]\b|.*Credit balance is too low)/m.test(tail)
+// 1006 重写：看「谁在最后」加保质期，细节和来由在 cc-auth-state.js。
+// broken = 屏幕上最后一件事是登录／授权报错；blocked = 这一刻先别往里塞；probe = 卡够久了，下一条真消息放过去探一探
+const { authStateFromCapture, createAuthGate } = require('./cc-auth-state')
+const authGate = createAuthGate()
+let ccAuthCache = { broken: false, blocked: false, probe: false, ts: 0 }
+let lastAuthProbeAt = 0
+function ccAuthLook() {
+  if (Date.now() - ccAuthCache.ts < 10000) return ccAuthCache
+  const now = Date.now()
+  const broken = authStateFromCapture(tmuxCapture()).broken
+  const gate = authGate.observe(broken, now)
+  if (broken && !ccAuthCache.broken) console.log(`[cc] 屏幕上最后是登录/授权报错，先当作不在线；${authGate.minutesUntilProbe(now)} 分钟后放下一条消息过去探一探`)
+  if (!broken && ccAuthCache.broken) console.log('[cc] 报错后面有新动静了，认回来')
+  ccAuthCache = { broken, blocked: gate.blocked, probe: gate.probe, ts: now }
+  return ccAuthCache
 }
-function ccAuthBroken() {
-  if (Date.now() - ccAuthCache.ts < 10000) return ccAuthCache.broken
-  ccAuthCache = { broken: captureShowsAuthBroken(tmuxCapture()), ts: Date.now() }
-  if (ccAuthCache.broken) console.log('[cc] 屏幕上是登录/订阅报错，当作不在线')
-  return ccAuthCache.broken
-}
+function ccAuthBroken() { return ccAuthLook().broken }
 
 function interruptCc() {
   if (!ccBusy()) return false
@@ -456,6 +462,10 @@ function ingestUserMessage(text, cid) {
   }
   const delivered = tmuxSend(senderPrefix + text)
   { const sentTs = Date.now(); lastUserReactKey = `user:${sentTs}`; broadcast({ type: 'sent', text, ts: sentTs, cid: cid || null, supplemental }) }
+  // 这一条是放过去探路的：半分钟后看一眼，换回来的还是报错就告诉她，别让它悄悄沉下去
+  if (delivered && Date.now() - lastAuthProbeAt < 2000) {
+    setTimeout(() => { ccAuthCache.ts = 0; if (ccAuthLook().broken) warnUndelivered('probe') }, 30000)
+  }
   // 终端里没人接，但 remote-control 那个 CC 可能正醒着——先往取件箱里放，让它自己来拿。
   if (!delivered && remoteListenerAlive()) {
     pendingForRemote.push({ text, supplemental, ts: Date.now() })
@@ -465,29 +475,39 @@ function ingestUserMessage(text, cid) {
   }
   // 两条路都没人。这时候才报错——沉默地吞掉是最坏的一种失败：
   // 她会以为说完了，其实对面根本没人。消息本身已进 L0（archiveMsg 先跑），不会丢。
-  if (!delivered) {
-    const warn = {
-      type: 'reply',
-      text: '⚠️ 这条没送到——终端里现在没有能接消息的涟言（可能刚崩了，或者只开着 Claude app 那条路）。\n\n你的话已经存进记忆库了，不会丢，他回来能补看。急的话去后端喊他一声。',
-      ts: Date.now(),
-      id: `r${Date.now()}${Math.random().toString(36).slice(2, 6)}`,
-    }
-    lastReplyMsgs.push(warn); if (lastReplyMsgs.length > 50) lastReplyMsgs.shift()
-    broadcast(warn)
-    pushReplyNotif('⚠️ 消息没送到：终端里没有能接消息的涟言')
-    console.log('[tmux] 无可用 CC pane，消息未送达（已存档）')
-  }
+  if (!delivered) warnUndelivered(ccTarget() && ccAuthLook().broken ? 'auth' : 'gone')
+}
+
+// 没送到的三种说法（1006）：原来不管什么原因都说「可能刚崩了」，卡在授权报错上的时候这话是错的
+function warnUndelivered(kind) {
+  const wait = authGate.minutesUntilProbe(Date.now())
+  const text = kind === 'auth'
+    ? `⚠️ 这条没送到——终端里的涟言卡在一行登录／授权报错上。多半是一下子的事，不一定真掉线了。\n\n你的话已经存进记忆库了，不会丢。${wait > 0 ? `大约 ${wait} 分钟后你再发一条，桥会放过去试一次` : '你再发一条，桥会放过去试一次'}；急的话在电脑那头随便敲一个字，就能把他叫醒。`
+    : kind === 'probe'
+      ? '⚠️ 刚才那条试着送过去了，换回来的还是登录／授权报错，看来不是一下子的事。\n\n你的话已经存进记忆库了，不会丢。要在电脑上看一眼：重新登录（/login），或者订阅、模型权限出了问题。'
+      : '⚠️ 这条没送到——终端里现在没有能接消息的涟言（可能刚崩了，或者只开着 Claude app 那条路）。\n\n你的话已经存进记忆库了，不会丢，他回来能补看。急的话去后端喊他一声。'
+  const warn = { type: 'reply', text, ts: Date.now(), id: `r${Date.now()}${Math.random().toString(36).slice(2, 6)}` }
+  lastReplyMsgs.push(warn); if (lastReplyMsgs.length > 50) lastReplyMsgs.shift()
+  broadcast(warn)
+  pushReplyNotif(kind === 'gone' ? '⚠️ 消息没送到：终端里没有能接消息的涟言' : '⚠️ 消息没送到：涟言卡在授权报错上')
+  console.log(`[tmux] 消息未送达（${kind}，已存档）`)
 }
 
 // 返回是否真的送出去了；调用方必须看返回值，别再假设「调了就等于到了」
 function tmuxSend(text) {
   const target = ccTarget()
-  if (!target || ccAuthBroken()) return false
+  const auth = ccAuthLook()
+  if (!target || auth.blocked) return false
   const clean = text.replace(/\n/g, ' ')
   try {
     if (!boundedSync.execFileBounded('tmux-send-text', 'tmux', ['send-keys', '-t', target, '-l', clean])) return false
     const ok = boundedSync.execFileBounded('tmux-send-enter', 'tmux', ['send-keys', '-t', target, 'Enter'])
     if (ok) verifySubmitted(target, clean)
+    if (ok && auth.probe) {
+      // 这一条是探针：把下次能探的时间往后推，并让下一次看屏幕不走缓存
+      authGate.probed(Date.now()); lastAuthProbeAt = Date.now(); ccAuthCache.ts = 0
+      console.log('[cc] 卡在授权报错上够久了，这一条放过去当探针')
+    }
     return ok
   } catch { return false }
 }
