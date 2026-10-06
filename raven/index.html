@@ -1367,6 +1367,9 @@ marked.use({ breaks: true, gfm: true })
 // 纯英文小写词组成的方括号 = 语气标签；后面紧跟 ( 的是 markdown 链接，不算。
 // 放在这么前面：历史消息在脚本顶层就开始渲染，定义在后面会撞 TDZ
 const VOICE_TAG_RE = /\[([a-z][a-z ,'’-]{1,158})\](?!\()/g  // 1004 放宽：带画面的长标签（连字符、撇号）也认
+// [voice] 和 [voice:文件名.mp3]：这条画成语音条。跟上面那个一样要放在前面，历史消息一进来就要用
+const VOICE_MARK_RE = /\[voice(?::[^\]]*)?\]/i
+const VOICE_MARK_STRIP_RE = /\[voice(?::[^\]]*)?\]/gi
 
 const PURIFY_OPTS = {
   ALLOWED_TAGS: [
@@ -1837,8 +1840,10 @@ function appendMsg(text, role, save = true, ts = Date.now(), msgId = null, suppl
   el.className = `msg ${role}`
   if (role === 'user' || role === 'assistant') el.dataset.rkey = `${role}:${ts}`
   if (msgId) el.dataset.msgId = msgId
-  const voiceRequested = role === 'assistant' && /\[voice\]/i.test(text)
-  const displayText = voiceRequested ? text.replace(/\[voice\]/gi, '').trim() : text
+  // [voice] = 点播放时现合成；[voice:文件名.mp3] = 播放事先做好的音频（1006：混了亲吻和水声的那种，现合成做不出来）
+  const voiceRequested = role === 'assistant' && VOICE_MARK_RE.test(text)
+  const voiceFile = voiceRequested ? ((/\[voice:\s*([^\]\s\/]+\.(?:mp3|m4a|wav|ogg))\s*\]/i.exec(text) || [])[1] || '') : ''
+  const displayText = voiceRequested ? text.replace(VOICE_MARK_STRIP_RE, '').trim() : text
 
   if (role === 'system') {
     el.textContent = text
@@ -1901,7 +1906,7 @@ function appendMsg(text, role, save = true, ts = Date.now(), msgId = null, suppl
         <span class="vb-time">-</span>`
       el.insertBefore(vbar, body)
 
-      meta.appendChild(makeTtsBtn(displayText, el, vbar, voiceRequested))
+      meta.appendChild(makeTtsBtn(displayText, el, vbar, voiceRequested, voiceFile))
       if (voiceRequested) el.classList.add('voice-mode')
 
       const copyBtn = document.createElement('button')
@@ -2394,7 +2399,7 @@ function getSharedAudioContext() {
 
 function cleanTextForTts(text) {
   return String(text || '')
-    .replace(/\[voice\]/gi, '')
+    .replace(VOICE_MARK_STRIP_RE, '')
     .replace(/^[ \t]*>[ \t]+.*$/gm, '')
     .replace(/!\[[^\]]*\]\([^)]*\)/g, '')
     .replace(/\[sticker:[^\]]+\]/gi, '')
@@ -2411,7 +2416,7 @@ function autoReadReply(msgEl) {
   if (btn?.autoPlay) setTimeout(() => btn.autoPlay(), 0)
 }
 
-function makeTtsBtn(text, msgEl, vbar, initialVoiceMode = false) {
+function makeTtsBtn(text, msgEl, vbar, initialVoiceMode = false, voiceFile = '') {
   const btn = document.createElement('button')
   btn.className = 'tts-btn'
   btn.innerHTML = IC_SPEAKER
@@ -2455,7 +2460,7 @@ function makeTtsBtn(text, msgEl, vbar, initialVoiceMode = false) {
   async function loadAndPlay() {
     const audioCtx = getSharedAudioContext()
     const spokenText = cleanTextForTts(text)
-    if (!audioCtx || !spokenText) return
+    if (!audioCtx || (!spokenText && !voiceFile)) return
     if (stopActiveTts && stopActiveTts !== stopCurrent) stopActiveTts()
     const epoch = ++playEpoch
     stopActiveTts = stopCurrent
@@ -2469,19 +2474,28 @@ function makeTtsBtn(text, msgEl, vbar, initialVoiceMode = false) {
       btn.disabled = true
       loadController = new AbortController()
       try {
-        const res = await fetch(TTS_URL, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ text: spokenText, token: localStorage.getItem('raven-token') || '' }),
-          signal: loadController.signal,
-        })
-        if (!res.ok) throw new Error()
-        const { audio: dataUri } = await res.json()
-        const b64 = dataUri.split(',')[1]
-        const raw = atob(b64)
-        const bytes = new Uint8Array(raw.length)
-        for (let i = 0; i < raw.length; i++) bytes[i] = raw.charCodeAt(i)
-        cachedBuffer = await audioCtx.decodeAudioData(bytes.buffer)
+        let audioBytes
+        if (voiceFile) {
+          // 事先做好的音频：直接取文件，不再合成
+          const res = await fetch(`/raven/uploads/${encodeURIComponent(voiceFile)}?token=${encodeURIComponent(localStorage.getItem('raven-token') || '')}`, { signal: loadController.signal })
+          if (!res.ok) throw new Error()
+          audioBytes = await res.arrayBuffer()
+        } else {
+          const res = await fetch(TTS_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ text: spokenText, token: localStorage.getItem('raven-token') || '' }),
+            signal: loadController.signal,
+          })
+          if (!res.ok) throw new Error()
+          const { audio: dataUri } = await res.json()
+          const b64 = dataUri.split(',')[1]
+          const raw = atob(b64)
+          const bytes = new Uint8Array(raw.length)
+          for (let i = 0; i < raw.length; i++) bytes[i] = raw.charCodeAt(i)
+          audioBytes = bytes.buffer
+        }
+        cachedBuffer = await audioCtx.decodeAudioData(audioBytes)
         if (epoch !== playEpoch) return
         cachedDuration = cachedBuffer.duration
         if (vbTime) vbTime.textContent = fmtDur(cachedDuration)
@@ -2665,7 +2679,7 @@ function splitCallReply(text) {
     else main.push(line)
   }
   const clean = value => value
-    .replace(/\[voice\]/gi, '')
+    .replace(VOICE_MARK_STRIP_RE, '')
     .replace(/!\[[^\]]*\]\([^)]*\)/g, '')
     .replace(/\[sticker:[^\]]+\]/gi, '')
     .replace(/[#*`_[\]~]/g, '')
