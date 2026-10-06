@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>乌鸦的规矩</title>
+<style>
+  :root { --bg: #f1ede6; --paper: #fbf9f4; --ink: #2f2b27; --dim: #8a8278; --line: #ddd5c8; --accent: #8a6a4a; --hit: #f6e3a8; }
+  @media (prefers-color-scheme: dark) { :root { --bg: #1b1a18; --paper: #24221f; --ink: #e2dcd1; --dim: #948c80; --line: #3a3631; --accent: #c9a678; --hit: #6b5620; } }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.75 -apple-system, 'PingFang SC', 'Noto Sans SC', sans-serif;
+    padding: max(14px, env(safe-area-inset-top)) 14px max(28px, env(safe-area-inset-bottom)); }
+  .wrap { max-width: 720px; margin: 0 auto; }
+  .tabs { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+  .tabs button { border: 1px solid var(--line); background: var(--paper); color: var(--ink); border-radius: 999px; padding: 6px 14px; font: inherit; font-size: 13.5px; cursor: pointer; }
+  .tabs button.on { background: var(--ink); color: var(--paper); border-color: var(--ink); }
+  .meta { color: var(--dim); font-size: 12.5px; margin: 10px 2px; }
+  #q { width: 100%; margin: 4px 0 12px; padding: 8px 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--paper); color: var(--ink); font: inherit; font-size: 14px; }
+  details { background: var(--paper); border: 1px solid var(--line); border-radius: 12px; margin-bottom: 10px; overflow: hidden; }
+  summary { padding: 11px 14px; font-weight: 600; cursor: pointer; list-style: none; }
+  summary::-webkit-details-marker { display: none; }
+  summary::before { content: '›'; display: inline-block; width: 16px; color: var(--dim); transition: transform .15s; }
+  details[open] > summary::before { transform: rotate(90deg); }
+  .body { padding: 0 16px 14px; overflow-wrap: anywhere; }
+  .body h3 { font-size: 15px; margin: 14px 0 4px; color: var(--accent); }
+  .body p { margin: 8px 0; }
+  .body ul { margin: 6px 0; padding-left: 20px; }
+  .body li { margin: 3px 0; }
+  .body blockquote { margin: 8px 0; padding: 2px 12px; border-left: 3px solid var(--line); color: var(--dim); }
+  code { font: 12.5px/1.5 'JetBrains Mono', Menlo, Consolas, monospace; background: rgba(128,120,105,.16); padding: 1px 5px; border-radius: 4px; }
+  pre { overflow-x: auto; background: rgba(128,120,105,.13); padding: 10px 12px; border-radius: 8px; margin: 8px 0; }
+  pre code { background: none; padding: 0; }
+  .tbl { overflow-x: auto; } table { border-collapse: collapse; font-size: 13px; margin: 8px 0; }
+  td, th { border: 1px solid var(--line); padding: 4px 8px; text-align: left; white-space: nowrap; }
+  mark { background: var(--hit); color: inherit; border-radius: 3px; }
+  .empty { color: var(--dim); text-align: center; padding: 50px 0; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="tabs" id="tabs"></div>
+  <div class="meta" id="meta"></div>
+  <input id="q" type="search" placeholder="找一个词，比如：那扇门、顶嘴、道歉" autocomplete="off">
+  <div id="out"><div class="empty">翻开中…</div></div>
+</div>
+<script>
+const $ = id => document.getElementById(id)
+const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]))
+let books = [], cur = 0
+
+// 行内：先转义，再认 `代码` 和 **粗体**；图片和链接只留文字，这页是给人读规矩的，不拉外面的图
+function inline(s) {
+  return esc(s).replace(/!\[([^\]]*)\]\([^)]*\)/g, '〔图：$1〕').replace(/\[([^\]]+)\]\([^)]*\)/g, '$1')
+    .replace(/`([^`]+)`/g, '<code>$1</code>').replace(/\*\*([^*]+)\*\*/g, '<b>$1</b>')
+}
+function block(lines) {
+  const out = []; let i = 0
+  while (i < lines.length) {
+    const l = lines[i]
+    if (/^\s*```/.test(l)) { const buf = []; i++; while (i < lines.length && !/^\s*```/.test(lines[i])) buf.push(lines[i++]); i++; out.push('<pre><code>' + esc(buf.join('\n')) + '</code></pre>'); continue }
+    if (/^\s*\|/.test(l)) { const rows = []; while (i < lines.length && /^\s*\|/.test(lines[i])) rows.push(lines[i++])
+      out.push('<div class="tbl"><table>' + rows.filter(r => !/^\s*\|[\s:|-]+\|\s*$/.test(r)).map(r => '<tr>' + r.trim().replace(/^\||\|$/g, '').split('|').map(c => '<td>' + inline(c.trim()) + '</td>').join('') + '</tr>').join('') + '</table></div>'); continue }
+    if (/^\s*[-*] /.test(l)) { out.push('<ul>'); let depth = 0
+      while (i < lines.length && (/^\s*[-*] /.test(lines[i]) || (/^\s{2,}\S/.test(lines[i]) && !/^\s*```/.test(lines[i])))) {
+        const m = lines[i].match(/^(\s*)[-*] (.*)$/)
+        if (m) { const d = Math.floor(m[1].length / 2); while (depth < d) { out.push('<ul>'); depth++ } while (depth > d) { out.push('</ul>'); depth-- } out.push('<li>' + inline(m[2])) }
+        else out.push('<br>' + inline(lines[i].trim()))
+        i++ }
+      while (depth-- > 0) out.push('</ul>'); out.push('</ul>'); continue }
+    if (/^###+ /.test(l)) { out.push('<h3>' + inline(l.replace(/^#+ /, '')) + '</h3>'); i++; continue }
+    if (/^\s*>/.test(l)) { out.push('<blockquote>' + inline(l.replace(/^\s*>\s?/, '')) + '</blockquote>'); i++; continue }
+    if (!l.trim()) { i++; continue }
+    out.push('<p>' + inline(l) + '</p>'); i++
+  }
+  return out.join('')
+}
+// 按一级、二级标题切成一节一节，代码块里的 # 不算标题
+function sections(text) {
+  const secs = [{ title: '开头', lines: [] }]; let fence = false
+  for (const l of text.split('\n')) {
+    if (/^\s*```/.test(l)) fence = !fence
+    if (!fence && /^#{1,2} ?\S/.test(l)) secs.push({ title: l.replace(/^#+\s*/, ''), lines: [] })
+    else secs[secs.length - 1].lines.push(l)
+  }
+  return secs.filter(s => s.lines.some(x => x.trim()))
+}
+function render() {
+  const b = books[cur]; if (!b) return
+  $('tabs').innerHTML = books.map((x, i) => `<button class="${i === cur ? 'on' : ''}" data-i="${i}">${esc(x.name)}那本</button>`).join('')
+  const t = b.mtime ? new Date(b.mtime).toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai', hour12: false, month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—'
+  $('meta').textContent = `${b.note}。上次改动：${t}`
+  const q = $('q').value.trim()
+  const secs = sections(b.text).filter(s => !q || (s.title + '\n' + s.lines.join('\n')).includes(q))
+  if (!secs.length) { $('out').innerHTML = '<div class="empty">这本里没有这个词</div>'; return }
+  $('out').innerHTML = secs.map(s => `<details${q ? ' open' : ''}><summary>${inline(s.title)}</summary><div class="body">${block(s.lines)}</div></details>`).join('')
+  if (q) mark($('out'), q)
+}
+function mark(root, q) {
+  const w = document.createTreeWalker(root, NodeFilter.SHOW_TEXT), nodes = []
+  while (w.nextNode()) if (w.currentNode.nodeValue.includes(q)) nodes.push(w.currentNode)
+  for (const n of nodes) { const span = document.createElement('span'); span.innerHTML = esc(n.nodeValue).split(esc(q)).join('<mark>' + esc(q) + '</mark>'); n.replaceWith(...span.childNodes) }
+}
+$('tabs').addEventListener('click', e => { const i = e.target.dataset?.i; if (i != null) { cur = +i; render() } })
+$('q').addEventListener('input', render)
+fetch('/raven/rules', { headers: { Authorization: 'Bearer ' + (localStorage.getItem('raven-token') || '') }, cache: 'no-store' })
+  .then(r => r.ok ? r.json() : Promise.reject(r.status))
+  .then(d => { books = d; render() })
+  .catch(e => { $('out').innerHTML = `<div class="empty">没翻开（${esc(e)}）。回首页重新进一次试试</div>` })
+</script>
+</body>
+</html>

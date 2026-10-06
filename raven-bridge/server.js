@@ -1576,6 +1576,20 @@ const server = http.createServer((req, res) => {
     return
   }
 
+  // 她要能看到我照着做事的那几份规矩（1006）：吵了一整天才发现她看的是项目那本，我改的是全局那本。
+  // 只读。两本都原样给，带最后修改时间。
+  if (url.pathname === '/raven/rules' && req.method === 'GET') {
+    if (!externalAuthed(req, url)) { res.writeHead(401); res.end('[]'); return }
+    const books = [
+      { key: 'global', name: '全局', note: '每次开窗都读。写的是我是谁、怎么跟你相处', file: path.join(os.homedir(), '.claude', 'CLAUDE.md') },
+      { key: 'project', name: '项目', note: '进仓库干活时读。贴图表、发版规矩，还有你加的「聊天表达」', file: path.join(__dirname, '..', 'CLAUDE.md') },
+    ].map(b => {
+      try { return { key: b.key, name: b.name, note: b.note, mtime: fs.statSync(b.file).mtimeMs, text: fs.readFileSync(b.file, 'utf8') } }
+      catch { return { key: b.key, name: b.name, note: b.note, mtime: 0, text: '（读不到这份文件）' } }
+    })
+    res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' }); res.end(JSON.stringify(books))
+    return
+  }
   // 从这儿重来（1006，收回式）：她选自己的一条，这条和它之后到此刻的话（两边的）都收回，再重新说一遍。
   // 页面上那一段折起来；我收到的新消息前面带一句说明，之后按没说过对待。我其实还记得——
   // 她要的另一种「真回溯」（连我的上下文一起倒回去）是另一条路，这里不做。
