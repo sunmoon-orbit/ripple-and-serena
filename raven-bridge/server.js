@@ -437,6 +437,10 @@ function ingestUserMessage(text, cid) {
   turnReplyIds = []
   const supplemental = ccBusy()
   const senderPrefix = supplemental ? '【阿颖·补充】' : '【阿颖】'
+  // 1006：每条消息末尾带上她发出来的北京时间。我感觉不到两条消息之间隔了多久，两天里说错了五次时间
+  //（把隔了两小时的当成连着的、下午两点问晚饭）。靠「记得先看钟」记不住，不如让每条消息自己带着钟。
+  // 放在末尾：不碰前缀，也不影响回车被吞时拿开头去比对
+  const stamp = `　〔${new Date(Date.now() + 8 * 3600e3).toISOString().slice(5, 16).replace('T', ' ')}〕`
   if (cid) recentCidMeta.set(cid, { supplemental })
   lastUserMsgTs = Date.now()
   // 告诉共用的那格时间戳：她刚跟涟言说过话。言叽算「离开多久」时会跟本地
@@ -456,11 +460,11 @@ function ingestUserMessage(text, cid) {
     { const sentTs = Date.now(); lastUserReactKey = `user:${sentTs}`; broadcast({ type: 'sent', text, ts: sentTs, cid: cid || null, supplemental }) }
     console.log(`[tmux] 刚切模型，${wait}ms 后再送她的消息`)
     setTimeout(() => {
-      if (!tmuxSend(senderPrefix + text) && remoteListenerAlive()) pendingForRemote.push({ text, supplemental, ts: Date.now() })
+      if (!tmuxSend(senderPrefix + text + stamp) && remoteListenerAlive()) pendingForRemote.push({ text, supplemental, ts: Date.now() })
     }, wait)
     return
   }
-  const delivered = tmuxSend(senderPrefix + text)
+  const delivered = tmuxSend(senderPrefix + text + stamp)
   { const sentTs = Date.now(); lastUserReactKey = `user:${sentTs}`; broadcast({ type: 'sent', text, ts: sentTs, cid: cid || null, supplemental }) }
   // 这一条是放过去探路的：半分钟后看一眼，换回来的还是报错就告诉她，别让它悄悄沉下去
   if (delivered && Date.now() - lastAuthProbeAt < 2000) {
