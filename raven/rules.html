@@ -101,7 +101,7 @@ function sections(text) {
 }
 let shown = []
 // 小本本：终端里的我自己记的那四百多条。只读；目录按最近改动排，分类看文件名前缀，搜词是在全部正文里找
-const KINDS = [['', '全部'], ['relationship', '我们'], ['user', '你的事'], ['serena', '你的事'], ['feedback', '你纠正我的'], ['project', '干的活'], ['reference', '参考']]
+const KINDS = [['', '全部'], ['relationship', '我们'], ['user', '你的事'], ['serena', '你的事'], ['feedback', '你纠正我的'], ['project', '干的活'], ['reference', '参考'], ['MEMORY', '目录'], ['index', '目录'], ['old', '六月的旧本子']]
 let notes = null, noteKind = '', noteOpen = null, noteTimer = 0
 const fmtT = ms => new Date(ms).toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai', hour12: false, month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })
 const noteGet = qs => fetch('/raven/notes' + qs, { headers: { Authorization: 'Bearer ' + (localStorage.getItem('raven-token') || '') }, cache: 'no-store' }).then(r => r.ok ? r.json() : Promise.reject(r.status))
@@ -119,7 +119,7 @@ async function renderNotes() {
   }
   if (!notes || notes.q !== q) { $('out').innerHTML = '<div class="empty">翻开中…</div>'; notes = await noteGet(q ? '?q=' + encodeURIComponent(q) : '').catch(e => ({ files: [], err: e })); notes.q = q }
   const kinds = KINDS.filter((k, i) => KINDS.findIndex(x => x[1] === k[1]) === i)
-  const inKind = f => !noteKind || KINDS.filter(k => k[1] === noteKind).some(k => f.file.startsWith(k[0] + '-'))
+  const inKind = f => !noteKind || KINDS.filter(k => k[1] === noteKind).some(k => f.file.startsWith(k[0] + '-') || f.file.startsWith(k[0] + '.'))
   const list = notes.files.filter(inKind)
   $('out').innerHTML = `<div class="chips">${kinds.map(k => `<button data-kind="${k[0] ? k[1] : ''}" class="${(k[0] ? k[1] : '') === noteKind ? 'on' : ''}">${k[1]}</button>`).join('')}</div>`
     + (notes.err ? `<div class="empty">没翻开（${esc(notes.err)}）</div>` : !list.length ? '<div class="empty">没有</div>' :

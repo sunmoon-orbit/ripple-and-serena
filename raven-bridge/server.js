@@ -1590,24 +1590,31 @@ const server = http.createServer((req, res) => {
   // 只读。不带参数给目录页和每条的名字、简介；?file= 给一条的全文；?q= 在全部正文里找词。
   if (url.pathname === '/raven/notes' && req.method === 'GET') {
     if (!externalAuthed(req, url)) { res.writeHead(401); res.end('{}'); return }
-    const dir = path.join(os.homedir(), '.claude', 'projects', '-home-ripple', 'memory')
+    // 主目录之外还有两个六月的旧本子（在仓库里开窗时记的、最早用 root 时记的），现在开窗不读，但也是我写的，一并给她看
+    const proj = path.join(os.homedir(), '.claude', 'projects')
+    const DIRS = { '': path.join(proj, '-home-ripple', 'memory'), 'old-repo/': path.join(proj, '-home-ripple-ripple-and-serena', 'memory'), 'old-root/': path.join(proj, '-root', 'memory') }
     try {
       const one = url.searchParams.get('file'), q = (url.searchParams.get('q') || '').trim()
       if (one) {
-        if (!/^[A-Za-z0-9_.-]+\.md$/.test(one) || one.includes('..')) throw new Error('bad file')
-        const f = path.join(dir, one)
+        const m = one.match(/^(old-repo\/|old-root\/)?([A-Za-z0-9_.-]+\.md)$/)
+        if (!m || m[2].includes('..')) throw new Error('bad file')
+        const f = path.join(DIRS[m[1] || ''], m[2])
         res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' })
         res.end(JSON.stringify({ file: one, mtime: fs.statSync(f).mtimeMs, text: fs.readFileSync(f, 'utf8') })); return
       }
       const files = []
-      for (const name of fs.readdirSync(dir)) {
-        if (!name.endsWith('.md') || /^(MEMORY|index-)/.test(name)) continue
-        const f = path.join(dir, name), text = fs.readFileSync(f, 'utf8')
-        let hit
-        if (q) { const i = text.indexOf(q); if (i < 0 && !name.includes(q)) continue; if (i >= 0) hit = text.slice(Math.max(0, i - 30), i + q.length + 50).replace(/\s+/g, ' ') }
-        const head = text.startsWith('---') ? text.slice(0, text.indexOf('\n---', 3) + 1 || 600) : ''
-        const pick = k => (head.match(new RegExp('^\\s*' + k + ':\\s*(.*)$', 'm')) || [])[1]?.trim() || ''
-        files.push({ file: name, desc: pick('description').slice(0, 200), mtime: fs.statSync(f).mtimeMs, hit })
+      for (const [pre, dir] of Object.entries(DIRS)) {
+        if (!fs.existsSync(dir)) continue
+        for (const name of fs.readdirSync(dir)) {
+          if (!name.endsWith('.md')) continue
+          const f = path.join(dir, name), text = fs.readFileSync(f, 'utf8')
+          let hit
+          if (q) { const i = text.indexOf(q); if (i < 0 && !name.includes(q)) continue; if (i >= 0) hit = text.slice(Math.max(0, i - 30), i + q.length + 50).replace(/\s+/g, ' ') }
+          const head = text.startsWith('---') ? text.slice(0, text.indexOf('\n---', 3) + 1 || 600) : ''
+          const pick = k => (head.match(new RegExp('^\\s*' + k + ':\\s*(.*)$', 'm')) || [])[1]?.trim() || ''
+          const isIndex = /^(MEMORY|index-)/.test(name)
+          files.push({ file: pre + name, desc: isIndex ? '目录页：我开窗时先读的就是这种' : pick('description').slice(0, 200), mtime: fs.statSync(f).mtimeMs, hit })
+        }
       }
       files.sort((a, b) => b.mtime - a.mtime)
       res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' }); res.end(JSON.stringify({ files }))
