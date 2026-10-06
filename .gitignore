@@ -21,6 +21,7 @@ electron-app/dist-raven/
 涟言阿颖_项目文件_2026.txt
 archive-stats.json
 raven-bridge/reactions.json*
+raven-bridge/retractions.json*
 raven-bridge/server-radar-state.json*
 raven-bridge/server-radar.log
 raven-bridge/.thinking-zh-cache.json

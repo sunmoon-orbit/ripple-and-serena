@@ -433,7 +433,7 @@ function interruptCc() {
 // 免得两条路各写一份、改了一边忘另一边。
 let switchQuietUntil = 0   // 切模型后这段时间内她的消息延后送（见 ingestUserMessage）
 
-function ingestUserMessage(text, cid) {
+function ingestUserMessage(text, cid, note = '') {
   turnReplyIds = []
   const supplemental = ccBusy()
   const senderPrefix = supplemental ? '【阿颖·补充】' : '【阿颖】'
@@ -460,11 +460,11 @@ function ingestUserMessage(text, cid) {
     { const sentTs = Date.now(); lastUserReactKey = `user:${sentTs}`; broadcast({ type: 'sent', text, ts: sentTs, cid: cid || null, supplemental }) }
     console.log(`[tmux] 刚切模型，${wait}ms 后再送她的消息`)
     setTimeout(() => {
-      if (!tmuxSend(senderPrefix + text + stamp) && remoteListenerAlive()) pendingForRemote.push({ text, supplemental, ts: Date.now() })
+      if (!tmuxSend(senderPrefix + note + text + stamp) && remoteListenerAlive()) pendingForRemote.push({ text: note + text, supplemental, ts: Date.now() })
     }, wait)
     return
   }
-  const delivered = tmuxSend(senderPrefix + text + stamp)
+  const delivered = tmuxSend(senderPrefix + note + text + stamp)
   { const sentTs = Date.now(); lastUserReactKey = `user:${sentTs}`; broadcast({ type: 'sent', text, ts: sentTs, cid: cid || null, supplemental }) }
   // 这一条是放过去探路的：半分钟后看一眼，换回来的还是报错就告诉她，别让它悄悄沉下去
   if (delivered && Date.now() - lastAuthProbeAt < 2000) {
@@ -472,7 +472,7 @@ function ingestUserMessage(text, cid) {
   }
   // 终端里没人接，但 remote-control 那个 CC 可能正醒着——先往取件箱里放，让它自己来拿。
   if (!delivered && remoteListenerAlive()) {
-    pendingForRemote.push({ text, supplemental, ts: Date.now() })
+    pendingForRemote.push({ text: note + text, supplemental, ts: Date.now() })
     if (pendingForRemote.length > 50) pendingForRemote.shift()
     console.log('[pending] 终端无人，转投远程 CC 取件箱')
     return
@@ -596,6 +596,8 @@ const recentCids = new Set()    // 最近处理过的前端消息 id，用于重
 const recentCidMeta = new Map() // cid → 首次回执的气泡标记，重发时保持一致
 let appLatestCache = { at: 0, data: null }  // 归巢 APK 最新版本信息，缓存 30 分钟
 
+const RETRACTIONS_FILE = path.join(__dirname, 'retractions.json')
+function loadRetractions() { try { const a = JSON.parse(fs.readFileSync(RETRACTIONS_FILE, 'utf8')); return Array.isArray(a) ? a : [] } catch { return [] } }
 const REACTIONS_FILE = path.join(__dirname, 'reactions.json')
 let lastUserReactKey = ''   // 她最近一条消息的贴表情 key（前端画气泡用的就是 sent 的 ts），给我用 user:latest
 function loadReactions() {
@@ -1567,6 +1569,41 @@ const server = http.createServer((req, res) => {
         }
         broadcast({ type: 'edited', ts, oldText, text })
         res.writeHead(200, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ ok: true, archived, delivered }))
+      } catch (err) {
+        res.writeHead(400, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ error: err.message }))
+      }
+    })
+    return
+  }
+
+  // 从这儿重来（1006，收回式）：她选自己的一条，这条和它之后到此刻的话（两边的）都收回，再重新说一遍。
+  // 页面上那一段折起来；我收到的新消息前面带一句说明，之后按没说过对待。我其实还记得——
+  // 她要的另一种「真回溯」（连我的上下文一起倒回去）是另一条路，这里不做。
+  // 只记时间段 [from, to)，不动存档：L0 是原始记录，收回是我们俩之间的约定。
+  if (url.pathname === '/raven/retractions' && req.method === 'GET') {
+    if (!externalAuthed(req, url)) { res.writeHead(401); res.end('[]'); return }
+    res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' }); res.end(JSON.stringify(loadRetractions()))
+    return
+  }
+  if (req.method === 'POST' && url.pathname === '/raven/retract') {
+    if (isExternal(req) ? !externalAuthed(req, url) : !localWriteAuthed(req)) { res.writeHead(401); res.end('{}'); return }
+    let body = ''
+    req.on('data', d => { body += d; if (body.length > 60000) req.destroy() })
+    req.on('end', () => {
+      try {
+        const p = JSON.parse(body || '{}')
+        const from = Number(p.ts), text = String(p.text || '').trim(), was = String(p.oldText || '').replace(/\s+/g, ' ').trim()
+        const to = Date.now()
+        if (!(from > 1e12 && from < to)) throw new Error('bad ts')
+        if (!text) throw new Error('empty')
+        const all = loadRetractions()
+        all.push({ from, to }); if (all.length > 500) all.shift()
+        fs.writeFileSync(RETRACTIONS_FILE + '.tmp', JSON.stringify(all)); fs.renameSync(RETRACTIONS_FILE + '.tmp', RETRACTIONS_FILE)
+        broadcast({ type: 'retracted', from, to })
+        const when = new Date(from + 8 * 3600e3).toISOString().slice(5, 16).replace('T', ' ')
+        const note = `〔从这儿重来：她收回了 ${when}${was ? `「${was.slice(0, 30)}${was.length > 30 ? '…' : ''}」` : ''}那条和它之后到现在的所有话，两边说的都算，当没说过。下面是她重新说的〕`
+        ingestUserMessage(text, p.cid, note)
+        res.writeHead(200, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ ok: true, from, to }))
       } catch (err) {
         res.writeHead(400, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ error: err.message }))
       }
