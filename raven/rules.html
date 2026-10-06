@@ -136,17 +136,17 @@ $('out').addEventListener('click', e => {
 function render() {
   const b = books[cur]; if (!b) return
   if (b.key === 'notes') {
-    $('tabs').innerHTML = books.map((x, i) => `<button class="${i === cur ? 'on' : ''}" data-i="${i}">${esc(x.name)}${x.key === 'notes' ? '' : '那本'}</button>`).join('')
+    $('tabs').innerHTML = books.map((x, i) => `<button class="${i === cur ? 'on' : ''}" data-i="${i}">${esc(x.name)}${x.key === 'notes' || x.readonly ? '' : '那本'}</button>`).join('')
     clearTimeout(noteTimer); noteTimer = setTimeout(renderNotes, notes ? 250 : 0); return
   }
-  $('tabs').innerHTML = books.map((x, i) => `<button class="${i === cur ? 'on' : ''}" data-i="${i}">${esc(x.name)}${x.key === 'notes' ? '' : '那本'}</button>`).join('')
+  $('tabs').innerHTML = books.map((x, i) => `<button class="${i === cur ? 'on' : ''}" data-i="${i}">${esc(x.name)}${x.key === 'notes' || x.readonly ? '' : '那本'}</button>`).join('')
   const t = b.mtime ? new Date(b.mtime).toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai', hour12: false, month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—'
   $('meta').textContent = `${b.note}。上次改动：${t}`
   const q = $('q').value.trim()
   shown = sections(b.text).filter(s => !q || (s.title + '\n' + s.lines.join('\n')).includes(q))
   if (!shown.length) { $('out').innerHTML = '<div class="empty">这本里没有这个词</div>'; return }
-  $('out').innerHTML = shown.map((s, n) => `<details${q ? ' open' : ''}><summary>${inline(s.title)}</summary><div class="body">${block(s.lines)}<div class="act"><button data-edit="${n}">改这一节</button></div></div></details>`).join('')
-    + '<button class="add" id="add">在最后加一节</button>'
+  $('out').innerHTML = shown.map((s, n) => `<details${q ? ' open' : ''}><summary>${inline(s.title)}</summary><div class="body">${block(s.lines)}${b.readonly ? '' : `<div class="act"><button data-edit="${n}">改这一节</button></div>`}</div></details>`).join('')
+    + (b.readonly ? '' : '<button class="add" id="add">在最后加一节</button>')
   if (q) mark($('out'), q)
 }
 // 改一节：把这一节的原文（连标题行）放进输入框，存的时候按行范围放回整本里。整本一起发给桥，桥留一份旧的再写

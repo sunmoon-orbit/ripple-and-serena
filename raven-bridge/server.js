@@ -1636,6 +1636,26 @@ const server = http.createServer((req, res) => {
         try { return { key: b.key, name: b.name, note: b.note, mtime: fs.statSync(b.file).mtimeMs, text: fs.readFileSync(b.file, 'utf8') } }
         catch { return { key: b.key, name: b.name, note: b.note, mtime: 0, text: '（读不到这份文件）' } }
       })
+      // 第三本：我不在终端、由定时任务叫醒时，代码里写死给我的那几段开场白。从源码里现抠，改了代码这里跟着变。只读
+      const WAKERS = [['proactive-message.js', '主动找你说话'], ['longing-push.js', '想你的推送'], ['call-invite.js', '约你通话'], ['moments-autopost.js', '自己发动态'], ['idle-life.js', '你不在时自己过日子'], ['dream.js', '做梦']]
+      const parts = []; let newest = 0
+      for (const [f, label] of WAKERS) {
+        try {
+          const file = path.join(__dirname, f), src = fs.readFileSync(file, 'utf8')
+          const start = src.indexOf('const prompt = `')
+          if (start < 0) continue
+          let i = start + 16, depth = 0
+          for (; i < src.length; i++) {
+            if (src[i] === '\\') { i++; continue }
+            if (src[i] === '$' && src[i + 1] === '{') { depth++; i++; continue }
+            if (depth && src[i] === '}') { depth--; continue }
+            if (!depth && src[i] === '`') break
+          }
+          newest = Math.max(newest, fs.statSync(file).mtimeMs)
+          parts.push(`## ${label}（${f}）\n\n\`\`\`\n${src.slice(start + 16, i)}\n\`\`\``)
+        } catch {}
+      }
+      books.push({ key: 'wakers', name: '叫醒我的话', readonly: true, mtime: newest, note: '我不在终端、被定时任务叫醒时，代码里写死给我的开场白。${…} 是当时填进去的东西（几点、你多久没来）。只能看，要改告诉我', text: parts.join('\n\n') })
       res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' }); res.end(JSON.stringify(books))
       return
     }
