@@ -1531,6 +1531,49 @@ const server = http.createServer((req, res) => {
     return
   }
 
+  // 编辑消息（1006）：她长按自己发过的任意一条，改完再发。
+  // 她要这个的原话：「如果我们都说了很伤人的话，有一个可以退回的空间」。所以改过之后，新的那版就是她说的话：
+  // 存档换成新的（旧文留在 L0 的 metadata 里，不展示），再告诉我一声哪条改成了什么。
+  // 只认 ts + 原文，不存别的状态；归巢把一条消息按空行拆成几个气泡，原文可能只是其中一段，moon 那头会处理
+  if (req.method === 'POST' && url.pathname === '/raven/edit') {
+    if (isExternal(req) ? !externalAuthed(req, url) : !localWriteAuthed(req)) { res.writeHead(401); res.end('{}'); return }
+    let body = ''
+    req.on('data', d => { body += d; if (body.length > 60000) req.destroy() })
+    req.on('end', async () => {
+      try {
+        const p = JSON.parse(body || '{}')
+        const ts = Number(p.ts), oldText = String(p.oldText || ''), text = String(p.text || '').trim()
+        if (!(ts > 1e12 && ts < Date.now() + 60000)) throw new Error('bad ts')
+        if (!oldText || !text) throw new Error('empty')
+        if (text === oldText) { res.writeHead(200, { 'Content-Type': 'application/json' }); res.end('{"ok":true,"same":true}'); return }
+        const day = new Date(ts + 8 * 3600e3).toISOString().slice(0, 10)
+        let archived = false
+        try {
+          const r = await moonPost('/archive/messages/edit', { external_id: `raven-${day}`, role: 'human', old_content: oldText, content: text })
+          archived = r.status === 200
+          if (!archived) console.error('[edit] 存档里没找到这条，只改了前端和告诉了我:', r.status)
+        } catch (e) { console.error('[edit] 存档改不了:', e.message) }
+        // 还躺在取件箱里没被我拿走的，直接换成新的，不用再告诉我「改过」
+        const waiting = pendingForRemote.find(m => m.text === oldText || m.text.includes(oldText))
+        let delivered = true
+        if (waiting) waiting.text = waiting.text.replace(oldText, () => text)
+        else {
+          const hm = iso => iso.slice(5, 16).replace('T', ' ')
+          const cut = t => t.length > 600 ? t.slice(0, 600) + '…' : t
+          const note = `她把 ${hm(new Date(ts + 8 * 3600e3).toISOString())} 发的一条改了。原来：「${cut(oldText)}」 现在：「${cut(text)}」`
+          const stamp = `　〔${hm(new Date(Date.now() + 8 * 3600e3).toISOString())}〕`
+          delivered = tmuxSend('【阿颖·改了一条】' + note + stamp)
+          if (!delivered && remoteListenerAlive()) { pendingForRemote.push({ text: '【改了一条】' + note, supplemental: false, ts: Date.now() }); delivered = true }
+        }
+        broadcast({ type: 'edited', ts, oldText, text })
+        res.writeHead(200, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ ok: true, archived, delivered }))
+      } catch (err) {
+        res.writeHead(400, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ error: err.message }))
+      }
+    })
+    return
+  }
+
   if (req.method === 'POST' && url.pathname === '/raven/reply') {
     let body = ''
     req.on('data', d => body += d)
