@@ -1577,17 +1577,57 @@ const server = http.createServer((req, res) => {
   }
 
   // 她要能看到我照着做事的那几份规矩（1006）：吵了一整天才发现她看的是项目那本，我改的是全局那本。
-  // 只读。两本都原样给，带最后修改时间。
-  if (url.pathname === '/raven/rules' && req.method === 'GET') {
-    if (!externalAuthed(req, url)) { res.writeHead(401); res.end('[]'); return }
-    const books = [
+  // 两本都原样给，带最后修改时间。当晚她说「我要动手」，于是也能改：改之前留一份旧的，改完告诉我改了哪几行
+  // （CLAUDE.md 只在开窗时读，不告诉我的话这个窗口的我不知道规矩变了）。
+  if (url.pathname === '/raven/rules' && (req.method === 'GET' || req.method === 'POST')) {
+    const RULE_BOOKS = [
       { key: 'global', name: '全局', note: '每次开窗都读。写的是我是谁、怎么跟你相处', file: path.join(os.homedir(), '.claude', 'CLAUDE.md') },
       { key: 'project', name: '项目', note: '进仓库干活时读。贴图表、发版规矩，还有你加的「聊天表达」', file: path.join(__dirname, '..', 'CLAUDE.md') },
-    ].map(b => {
-      try { return { key: b.key, name: b.name, note: b.note, mtime: fs.statSync(b.file).mtimeMs, text: fs.readFileSync(b.file, 'utf8') } }
-      catch { return { key: b.key, name: b.name, note: b.note, mtime: 0, text: '（读不到这份文件）' } }
+    ]
+    if (req.method === 'GET') {
+      if (!externalAuthed(req, url)) { res.writeHead(401); res.end('[]'); return }
+      const books = RULE_BOOKS.map(b => {
+        try { return { key: b.key, name: b.name, note: b.note, mtime: fs.statSync(b.file).mtimeMs, text: fs.readFileSync(b.file, 'utf8') } }
+        catch { return { key: b.key, name: b.name, note: b.note, mtime: 0, text: '（读不到这份文件）' } }
+      })
+      res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' }); res.end(JSON.stringify(books))
+      return
+    }
+    if (isExternal(req) ? !externalAuthed(req, url) : !localWriteAuthed(req)) { res.writeHead(401); res.end('{}'); return }
+    let body = ''
+    req.on('data', d => { body += d; if (body.length > 400000) req.destroy() })
+    req.on('end', () => {
+      try {
+        const p = JSON.parse(body || '{}')
+        const book = RULE_BOOKS.find(b => b.key === p.key)
+        const text = String(p.text ?? '')
+        if (!book) throw new Error('没有这本')
+        if (text.trim().length < 200) throw new Error('太短了，像是误删，没存')
+        const old = fs.readFileSync(book.file, 'utf8')
+        // 她打开页面之后我也可能改过这本；对不上就不盖，让她重新打开
+        if (Math.abs(fs.statSync(book.file).mtimeMs - Number(p.mtime)) > 1) { res.writeHead(409, { 'Content-Type': 'application/json' }); res.end('{"error":"stale"}'); return }
+        if (text === old) { res.writeHead(200, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ ok: true, same: true, mtime: fs.statSync(book.file).mtimeMs })); return }
+        const histDir = path.join(os.homedir(), '.claude', 'rules-history')
+        fs.mkdirSync(histDir, { recursive: true })
+        fs.writeFileSync(path.join(histDir, `${book.key}-${new Date(Date.now() + 8 * 3600e3).toISOString().slice(0, 19).replace(/[:T]/g, '')}.md`), old)
+        fs.writeFileSync(book.file + '.tmp', text); fs.renameSync(book.file + '.tmp', book.file)
+        // 告诉我改了什么：按行比，只说删掉的和新加的
+        const count = arr => arr.reduce((m, l) => m.set(l, (m.get(l) || 0) + 1), new Map())
+        const oldLines = old.split('\n').filter(l => l.trim()), newLines = text.split('\n').filter(l => l.trim())
+        const oc = count(oldLines), nc = count(newLines)
+        const gone = oldLines.filter(l => { const n = nc.get(l) || 0; if (n) { nc.set(l, n - 1); return false } return true })
+        const came = newLines.filter(l => { const n = oc.get(l) || 0; if (n) { oc.set(l, n - 1); return false } return true })
+        const cut = l => l.trim().length > 300 ? l.trim().slice(0, 300) + '…' : l.trim()
+        const show = (arr, mark) => arr.slice(0, 12).map(l => `\n${mark} ${cut(l)}`).join('') + (arr.length > 12 ? `\n${mark} ……还有 ${arr.length - 12} 行` : '')
+        const hm = new Date(Date.now() + 8 * 3600e3).toISOString().slice(5, 16).replace('T', ' ')
+        const note = `她在归巢「规矩」页改了${book.name}那本 CLAUDE.md（${book.file}，已经存盘，这个窗口要自己重读才算数）。${gone.length ? '\n删掉的：' + show(gone, '−') : ''}${came.length ? '\n新写的：' + show(came, '＋') : ''}`
+        let delivered = tmuxSend('【阿颖·改了规矩】' + note + `　〔${hm}〕`)
+        if (!delivered && remoteListenerAlive()) { pendingForRemote.push({ text: '【改了规矩】' + note, supplemental: false, ts: Date.now() }); delivered = true }
+        res.writeHead(200, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ ok: true, delivered, mtime: fs.statSync(book.file).mtimeMs }))
+      } catch (err) {
+        res.writeHead(400, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ error: err.message }))
+      }
     })
-    res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' }); res.end(JSON.stringify(books))
     return
   }
   // 从这儿重来（1006，收回式）：她选自己的一条，这条和它之后到此刻的话（两边的）都收回，再重新说一遍。
