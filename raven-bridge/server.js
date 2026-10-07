@@ -131,16 +131,18 @@ const MOON_BASE = 'http://127.0.0.1:3210'
 const yanjiMcp = require('./yanji-mcp').createService({ userToken: MOON_TOKEN })
 
 // DeepSeek 余额（0930 答应的，1003 补上）：言叽、独处、做梦这些轻任务走 DeepSeek，充值制，见底了就悄悄失败。
-// 密钥只在 moon-memory 的 .env 里读，不落别处；10 分钟内只查一次，失败保留上次的数字并标 stale
+// 密钥只在 moon-memory 的 .env 里读，不落别处；失败保留上次的数字并标 stale
+// 1007：原来 10 分钟才查一次，而且打开页面拿到的总是上一次的旧数（这次只负责触发后台去查）。她刚充了钱进来看，数没变。
+// 改成 1 分钟内不重复查；超过了就现查，页面等它最多 3.5 秒，拿到的就是新数
 let deepseekBalance = { available: false }
 let deepseekCheckedAt = 0
 function refreshDeepseekBalance() {
-  if (Date.now() - deepseekCheckedAt < 10 * 60 * 1000) return
+  if (Date.now() - deepseekCheckedAt < 60 * 1000) return Promise.resolve()
   deepseekCheckedAt = Date.now()
   let key = ''
   try { key = (fs.readFileSync('/home/ripple/moon-memory/.env', 'utf8').match(/^DEEPSEEK_API_KEY=(.*)$/m) || [])[1]?.trim() || '' } catch {}
-  if (!key) { deepseekBalance = { available: false, error: '没配密钥' }; return }
-  fetch('https://api.deepseek.com/user/balance', { headers: { Authorization: `Bearer ${key}`, Accept: 'application/json' }, signal: AbortSignal.timeout(10000) })
+  if (!key) { deepseekBalance = { available: false, error: '没配密钥' }; return Promise.resolve() }
+  return fetch('https://api.deepseek.com/user/balance', { headers: { Authorization: `Bearer ${key}`, Accept: 'application/json' }, signal: AbortSignal.timeout(10000) })
     .then(r => r.ok ? r.json() : Promise.reject(new Error('HTTP ' + r.status)))
     .then(d => {
       const info = (d.balance_infos || []).find(b => b.currency === 'CNY') || (d.balance_infos || [])[0] || {}
@@ -1043,9 +1045,11 @@ const server = http.createServer((req, res) => {
 
   // 涟言和曜 · Codex 还剩多少额度（详见 usage.js：只读快照文件，不碰任何凭证）
   if (req.method === 'GET' && url.pathname === '/raven/usage') {
-    refreshDeepseekBalance()  // 后台刷，不等；这次先给缓存里的
-    res.writeHead(200, { 'Content-Type': 'application/json' })
-    res.end(JSON.stringify({ ...getUsage(), deepseek: deepseekBalance }))
+    // 等余额查回来再答，最多等 3.5 秒；查不回来就给上一次的
+    Promise.race([refreshDeepseekBalance(), new Promise(r => setTimeout(r, 3500))]).catch(() => {}).then(() => {
+      res.writeHead(200, { 'Content-Type': 'application/json' })
+      res.end(JSON.stringify({ ...getUsage(), deepseek: deepseekBalance }))
+    })
     return
   }
 
