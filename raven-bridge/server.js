@@ -2058,6 +2058,9 @@ wss.on('connection', (ws) => {
     ws.send(JSON.stringify({ type: 'status', data: getStatus() }))
     ws.send(JSON.stringify({ type: 'terminal', lines: lastCapture.split('\n').slice(-80) }))
     ws.send(JSON.stringify({ type: 'busy', active: ccBusy() }))
+    // 三个点也要对一次表（1007）：她的连接常断，要是「不在想了」那一下广播时她正好掉线，重连回来点点就一直亮着，
+    // 直到我下一轮想完才灭——她看着像我一直挂着什么在跑。
+    ws.send(JSON.stringify({ type: 'thinking', active: isThinking }))
     // 补发最近 10 条 reply，重连后不丢消息
     for (const m of lastReplyMsgs) ws.send(JSON.stringify({ ...m, replayed: true }))
     // 补发待处理的权限提示（断线重连时弹窗不丢失）
