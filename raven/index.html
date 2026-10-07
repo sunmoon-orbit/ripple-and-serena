@@ -232,7 +232,7 @@
   #remark-his { margin-top: 10px; font-size: 12.5px; color: var(--text-dim); }
   #remark-save { background: var(--accent); border-color: var(--accent); color: #fff; }
   /* 聊天里的一行小字：「你将对方的备注从「…」改为「…」」 */
-  .chat-notice { align-self: center; max-width: 82%; margin: 6px auto; padding: 5px 13px; border-radius: 12px; font-size: 11.5px; line-height: 1.5; text-align: center; color: var(--text-dim); background: color-mix(in srgb, var(--surface) 62%, transparent); border: 1px solid color-mix(in srgb, var(--border) 60%, transparent); -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px); overflow-wrap: anywhere; }
+  .chat-notice { align-self: center; max-width: 82%; margin: 8px auto; font-size: 11.5px; line-height: 1.5; text-align: center; color: var(--text-dim); opacity: .85; overflow-wrap: anywhere; text-shadow: 0 0 6px var(--bg); }   /* 1007 她：不要圈起来，只留字更干净。字底下一圈同底色的晕，压在壁纸上也看得清 */
   #header-title .crow-icon { font-size: 20px; line-height: 1; }
   #home-btn { display: flex; align-items: center; color: var(--text); opacity: .7; padding: 6px 4px; margin-left: -4px; -webkit-tap-highlight-color: transparent; }
   #home-btn:active { opacity: 1; }
@@ -491,12 +491,12 @@
   /* timestamp + copy */
   .msg-meta { display: flex; justify-content: flex-end; align-items: center; gap: 8px; margin-top: 5px; }
   /* 长按贴表情（0930） */
-  .msg.has-react { margin-bottom: 12px; }
-  .msg-reacts { position: absolute; bottom: -13px; display: flex; gap: 2px; pointer-events: none; }
-  .msg.user .msg-reacts { right: 8px; }
-  .msg.assistant .msg-reacts { left: 8px; }
-  .msg-react { font-size: 13px; line-height: 1; padding: 3px 5px; border-radius: 99px; background: var(--surface); border: 1px solid var(--border); box-shadow: 0 1px 4px rgba(0,0,0,.18); }
-  .msg-react-who { font-size: 10px; color: var(--text-dim); margin-left: 2px; vertical-align: 1px; }
+  /* 贴表情（1007 改）：原来是压在气泡角上的小圆片加一个「颖／言」字，她说留一行小字更干净：「臭鸟 给你贴了一个 💗」 */
+  .msg.has-react { margin-bottom: 22px; }
+  .msg-reacts { position: absolute; bottom: -19px; display: flex; gap: 10px; pointer-events: none; white-space: nowrap; font-size: 11px; line-height: 1.4; color: var(--text-dim); text-shadow: 0 0 6px var(--bg); }
+  .msg.user .msg-reacts { right: 6px; }
+  .msg.assistant .msg-reacts { left: 6px; }
+  .msg-react { font-size: 11px; }
   #react-pop { position: fixed; z-index: 200; display: none; gap: 2px; padding: 5px 6px; border-radius: 99px; background: var(--surface); border: 1px solid var(--border); box-shadow: 0 6px 20px rgba(0,0,0,.28); }
   #react-pop.open { display: flex; flex-wrap: wrap; justify-content: center; max-width: min(256px, calc(100vw - 16px)); border-radius: 22px; animation: msgIn .15s ease-out; }  /* 十一个表情加引用键，一排放不下手机屏，折成两排 */
   #react-pop button { border: 0; background: none; font-size: 22px; line-height: 1; padding: 5px 6px; border-radius: 99px; cursor: pointer; }
@@ -2177,13 +2177,14 @@ function applyEdit(ts, oldText, text) {
 // ── 备注（1007）──────────────────────────────────────────────────────
 // 她给我起的名字，桥存着（换设备也在），显示在顶上正中和输入框的提示里。
 // 每改一次：聊天里插一行小字，桥同时告诉我「备注从 A 改成了 B」。小字只存在本机，最多留 40 行。
-let peerName = 'Ripple'
+var peerName = 'Ripple'   // 用 var：贴表情那行小字可能在这一行执行之前就要读它
 // 用函数声明而不是 const：开头恢复聊天记录时就要用到它，那会儿这一段还没执行到
 function loadNotices() { try { return JSON.parse(localStorage.getItem('raven-notices') || '[]') } catch { return [] } }
 function showPeerName(name) {
   peerName = name || 'Ripple'
   document.getElementById('peer-name').textContent = peerName
   document.getElementById('chat-input').placeholder = `发消息给 ${peerName}…`
+  if (typeof paintAllReactions === 'function') { try { paintAllReactions() } catch {} }   // 贴表情那行小字里也有这个名字
 }
 function insertNotice(n) {
   const box = document.getElementById('chat-messages')
@@ -3303,12 +3304,11 @@ function paintReaction(key, reactions) {
   if (!entries.length) return
   const box = document.createElement('div'); box.className = 'msg-reacts'
   for (const [who, emoji] of entries) {
-    const chip = document.createElement('span'); chip.className = 'msg-react'
-    // 手机上没有悬停提示，所以把「谁贴的」直接写在角标里（1001 阿颖）
-    chip.textContent = emoji
-    const tag = document.createElement('span'); tag.className = 'msg-react-who'; tag.textContent = REACT_SHORT[who] || who
-    chip.appendChild(tag); chip.title = (REACT_WHO[who] || who) + ' 贴的'
-    box.appendChild(chip)
+    const line = document.createElement('span'); line.className = 'msg-react'
+    // 一行小字说清是谁贴的：他贴的用她给他的备注名，她自己贴的就写「你」
+    const onHers = el.classList.contains('user')
+    line.textContent = who === 'lianyan' ? `${peerName} ${onHers ? '给你' : ''}贴了一个 ${emoji}` : who === 'aying' ? `你贴了一个 ${emoji}` : `${REACT_WHO[who] || who} 贴了一个 ${emoji}`
+    box.appendChild(line)
   }
   el.appendChild(box)
 }
