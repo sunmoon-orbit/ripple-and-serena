@@ -3366,7 +3366,10 @@ function openReactPop(msgEl) {
   qb.addEventListener('click', ev => {
     ev.stopPropagation(); closeReactPop()
     const bodyEl = msgEl.querySelector('.msg-body')
-    const raw = (bodyEl ? bodyEl.innerText : msgEl.innerText) || ''
+    // 被引用的这条自己顶上也带着一小块引用的话，别把那块也引进来（1007：她引我那条时，引进来的是「我引她的话＋我的话」）
+    const src = (bodyEl || msgEl).cloneNode(true); src.querySelectorAll('.quote-ref').forEach(q => q.remove())
+    document.body.appendChild(src); src.style.cssText = 'position:fixed;left:-9999px;top:0;width:300px'
+    const raw = src.innerText || ''; src.remove()
     setQuote(raw.replace(/\s+/g, ' ').trim().slice(0, 60) || '[贴图或附件]')
   })
   reactPop.appendChild(qb)
