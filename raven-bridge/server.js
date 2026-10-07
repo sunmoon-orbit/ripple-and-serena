@@ -1249,6 +1249,7 @@ const server = http.createServer((req, res) => {
           content: e.visibility === 'sealed' && e.author !== '阿颖' ? null : e.content,
           created_at: e.created_at, revealed_at: e.revealed_at || null,
           question: e.visibility === 'sealed' ? e.question || null : null, hint: e.visibility === 'sealed' ? e.hint || null : null, unlocked_at: e.unlocked_at || null,
+          answers: e.answers || null, answers_lost: !!e.answers_lost,   // 她自己的页随时带；我的页她答对过才带（moon 那边已经把过关）
         }))
         res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' })
         res.end(JSON.stringify({ entries }))

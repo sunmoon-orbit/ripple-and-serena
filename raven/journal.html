@@ -36,6 +36,7 @@
   .msg { font-size: 12px; color: var(--dim); margin-top: 6px; min-height: 1em; }
   .hint-btn { margin-top: 6px; background: none; border: none; padding: 2px 0; color: var(--seal); font: inherit; font-size: 12px; text-decoration: underline; cursor: pointer; }
   .hint { font-size: 12px; color: var(--faint); margin: 10px 0 6px; }
+  .answers { font-size: 12px; color: var(--faint); margin: 6px 0; overflow-wrap: anywhere; }
   .empty, .err { text-align: center; color: var(--dim); font-size: 13px; padding: 40px 0; }
   .tabs { max-width: 640px; margin: 0 auto 14px; display: flex; gap: 8px; }
   .tabs button { flex: 1; font: inherit; font-size: 14px; padding: 8px 0; border-radius: 999px; border: 1px solid var(--line); background: var(--paper); color: var(--dim); }
@@ -86,7 +87,8 @@ function quiz(e) {
       if (d.ok) {
         const opened = el('div', 'body', d.content || '')
         const note = el('div', 'hint', '答对了。这一页只对你打开，对别人还是锁着的。')
-        box.replaceWith(note, opened)
+        const all = d.answers ? el('div', 'answers', '他填的全部答案：' + d.answers.join(' ／ ')) : ''
+        box.replaceWith(note, all, opened)
         return
       }
       showHint()
@@ -152,6 +154,8 @@ function myPage(e) {
   if (e.sealed) {
     const tools = el('div', 'quiz')
     if (e.question) tools.appendChild(el('div', 'q', '你出的题：' + e.question))
+    // 1007：自己出的题自己能看到答案（她出完题自己忘了，库里又读不回来）
+    if (e.question) tools.appendChild(el('div', 'answers', e.answers ? '你填的答案：' + e.answers.join(' ／ ') : '你填的答案：这一页是答案能回看之前写的，原文没存下来'))
     const guesses = el('div', 'guess')
     const see = el('button', 'mini', '看他猜过什么'); see.type = 'button'
     see.onclick = async () => {
@@ -216,6 +220,7 @@ async function load() {
         const s = el('div', 'sealed'); s.innerHTML = LOCK
         s.appendChild(el('span', null, '这一页还锁着。他还没想好怎么说，等他自己揭开。'))
         page.appendChild(s)
+        if (e.answers) page.appendChild(el('div', 'answers', '你答对过。他填的全部答案：' + e.answers.join(' ／ ')))
         if (e.question) page.appendChild(quiz(e))
         else page.appendChild(el('div', 'hint', '这一页没有题。想看的话，去跟他申请。'))
       } else page.appendChild(el('div', 'body', e.content || ''))
