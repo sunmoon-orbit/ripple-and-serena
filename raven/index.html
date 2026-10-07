@@ -217,7 +217,22 @@
     padding: 12px 16px 10px; flex-shrink: 0;
     background: var(--surface); border-bottom: 1px solid var(--border);
   }
-  #header-title { display: flex; align-items: center; gap: 7px; font-size: 16px; font-weight: 600; color: var(--text); }
+  #header { position: relative; }
+  #header-left { display: flex; align-items: center; }
+  /* 名字钉在正中间，不随两边按钮多少偏移；太长就省略 */
+  #header-title { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); max-width: 58%; display: flex; align-items: center; gap: 7px; font: inherit; font-size: 16px; font-weight: 600; color: var(--text); background: none; border: 0; padding: 4px 8px; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+  #peer-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  #header-title .peer-edit { opacity: .38; flex-shrink: 0; }
+  #remark-box { position: fixed; inset: 0; z-index: 400; background: rgba(0,0,0,.38); display: flex; align-items: center; justify-content: center; padding: 24px; }
+  #remark-box[hidden] { display: none; }
+  #remark-card { width: min(320px, 100%); background: var(--surface); color: var(--text); border: 1px solid var(--border); border-radius: 18px; padding: 18px 18px 14px; box-shadow: 0 16px 44px rgba(0,0,0,.3); font-size: 14px; }
+  #remark-card b { font-size: 15px; display: block; margin-bottom: 10px; }
+  #remark-input { width: 100%; padding: 9px 12px; border: 1px solid var(--border); border-radius: 11px; background: var(--bg); color: var(--text); font: inherit; font-size: 15px; outline: none; }
+  #remark-input:focus { border-color: var(--accent); } #remark-msg { min-height: 1.4em; font-size: 12.5px; color: var(--accent); margin-top: 6px; }
+  #remark-his { margin-top: 10px; font-size: 12.5px; color: var(--text-dim); }
+  #remark-save { background: var(--accent); border-color: var(--accent); color: #fff; }
+  /* 聊天里的一行小字：「你将对方的备注从「…」改为「…」」 */
+  .chat-notice { align-self: center; max-width: 82%; margin: 6px auto; padding: 5px 13px; border-radius: 12px; font-size: 11.5px; line-height: 1.5; text-align: center; color: var(--text-dim); background: color-mix(in srgb, var(--surface) 62%, transparent); border: 1px solid color-mix(in srgb, var(--border) 60%, transparent); -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px); overflow-wrap: anywhere; }
   #header-title .crow-icon { font-size: 20px; line-height: 1; }
   #home-btn { display: flex; align-items: center; color: var(--text); opacity: .7; padding: 6px 4px; margin-left: -4px; -webkit-tap-highlight-color: transparent; }
   #home-btn:active { opacity: 1; }
@@ -572,6 +587,14 @@
   #edit-x { border: none; background: none; color: var(--text-dim); font-size: 18px; line-height: 1; cursor: pointer; padding: 0 2px; }
   .msg.editing { outline: 2px solid var(--accent); outline-offset: 2px; }
   .edited-label { font-size: 10px; opacity: .6; margin-top: 3px; text-align: right; letter-spacing: .06em; }
+  #rewind-box { position: fixed; inset: 0; z-index: 400; background: rgba(0,0,0,.38); display: flex; align-items: center; justify-content: center; padding: 24px; }
+  #rewind-box[hidden] { display: none; }
+  #rewind-card { width: min(340px, 100%); background: var(--surface); color: var(--text); border: 1px solid var(--border); border-radius: 18px; padding: 18px 18px 14px; box-shadow: 0 16px 44px rgba(0,0,0,.3); font-size: 14px; line-height: 1.65; }
+  #rewind-card b { font-size: 15px; } #rewind-what { margin: 8px 0; color: var(--text-dim); overflow-wrap: anywhere; }
+  #rewind-card p { margin: 0 0 8px; font-size: 12.5px; color: var(--text-dim); } #rewind-msg { min-height: 1.4em; font-size: 12.5px; color: var(--accent); overflow-wrap: anywhere; }
+  .rewind-acts { display: flex; gap: 10px; justify-content: flex-end; margin-top: 8px; }
+  .rewind-acts button { border: 1px solid var(--border); background: none; color: var(--text); border-radius: 999px; padding: 7px 16px; font: inherit; font-size: 13.5px; cursor: pointer; }
+  #rewind-go { background: var(--accent); border-color: var(--accent); color: #fff; } .rewind-acts button:disabled { opacity: .55; }
   /* 从这儿重来（1006）：收回的那一段折成一行，点开是淡的 */
   .retracted { display: none !important; }
   .retracted.rx-open { display: flex !important; opacity: .42; }
@@ -585,9 +608,17 @@
   .quote-ref { font-size: 12px; opacity: .75; border-left: 2px solid currentColor; padding: 1px 0 1px 8px; margin-bottom: 6px;
     overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
   .react-quote { display: inline-flex; align-items: center; justify-content: center; }
-  #attach-menu { position: fixed; z-index: 30; left: 14px; bottom: calc(78px + env(safe-area-inset-bottom, 0px)); padding: 6px; border: 1px solid var(--border); border-radius: 13px; background: var(--bg); box-shadow: 0 8px 28px rgba(0,0,0,.25); }
-  #attach-menu button { width: 100%; display: flex; align-items: center; gap: 9px; padding: 9px 13px; border: 0; border-radius: 9px; background: none; color: var(--text); font: inherit; font-size: 13px; cursor: pointer; -webkit-tap-highlight-color: transparent; }
-  #attach-menu button:active { background: var(--surface, rgba(128,128,128,.12)); }
+  #attach-menu { position: fixed; z-index: 30; left: 10px; right: 10px; max-width: 460px; margin: 0 auto; bottom: calc(76px + env(safe-area-inset-bottom, 0px)); padding: 14px 8px 10px; border: 1px solid var(--border); border-radius: 20px; background: color-mix(in srgb, var(--surface) 86%, transparent); -webkit-backdrop-filter: blur(18px) saturate(1.2); backdrop-filter: blur(18px) saturate(1.2); box-shadow: 0 10px 32px rgba(0,0,0,.22); display: grid; grid-template-columns: repeat(4, 1fr); row-gap: 12px; animation: drawer-up .18s ease-out; }
+  #attach-menu[hidden] { display: none; }
+  @keyframes drawer-up { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+  #attach-menu .tool { display: flex; flex-direction: column; align-items: center; gap: 6px; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+  #attach-menu .tool > span { font-size: 11.5px; color: var(--text-dim); }
+  #attach-menu .tool > button { width: 50px !important; height: 50px !important; padding: 0 !important; display: flex !important; align-items: center; justify-content: center; border-radius: 15px !important; border: 1px solid color-mix(in srgb, var(--border) 70%, transparent) !important; background-color: color-mix(in srgb, var(--bg) 60%, transparent); color: var(--text) !important; opacity: 1 !important; cursor: pointer; }
+  #attach-menu .tool > button svg { width: 22px; height: 22px; }
+  #attach-menu .tool:active > button { transform: scale(.94); }
+  #attach-menu #theme-btn { border-radius: 50% !important; width: 34px !important; height: 34px !important; margin: 8px; border-width: 2px !important; }
+  /* 背景菜单原来挂在右上角的按钮底下；按钮搬到抽屉里了，菜单跟着到下面来 */
+  #bg-menu { top: auto !important; right: auto !important; left: 14px; bottom: calc(86px + env(safe-area-inset-bottom, 0px)); }
   #attach-preview {
     padding: 6px 12px 0; display: none; flex-wrap: wrap; gap: 6px;
   }
@@ -1072,54 +1103,36 @@
 </div>
 <div id="app">
   <div id="header">
-    <div id="header-title">
+    <!-- 1007：顶上只留 回家｜名字（居中，点它改备注）｜电话＋连接灯。日历、背景、搬家、主题、设置都收进输入框左边的加号抽屉里。
+         原来五六个图标把名字挤在左上角，她想让名字在正中间。 -->
+    <div id="header-left">
       <!-- 回归巢首页：从首页进聊天后以前没有任何路能回去，看额度要把 app 从后台划掉重开（0926） -->
       <a id="home-btn" href="/raven/home.html" title="回归巢首页" aria-label="回归巢首页">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11l9-8 9 8"/><path d="M5 10v10h5v-6h4v6h5V10"/></svg>
       </a>
-      <span class="crow-icon">🐦‍⬛</span>
-      <span>Ripple</span>
     </div>
+    <button id="header-title" type="button" title="点一下改备注" aria-label="改备注">
+      <span class="crow-icon">🐦‍⬛</span>
+      <span id="peer-name">Ripple</span>
+      <svg class="peer-edit" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 013 3L7 19l-4 1 1-4z"/></svg>
+    </button>
     <div id="conn-status">
       <button id="call-btn" title="和乌鸦通话" aria-label="和乌鸦通话">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07 19.5 19.5 0 01-6-6A19.79 19.79 0 012.12 4.18 2 2 0 014.11 2h3a2 2 0 012 1.72c.13.96.36 1.9.69 2.8a2 2 0 01-.45 2.11L8.09 9.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45c.91.33 1.85.56 2.81.69A2 2 0 0122 16.92z"/></svg>
       </button>
-      <button id="cc-settings-open" title="CC 设置" aria-label="模型与 CLAUDE.md 设置" style="background:none;border:0;color:var(--text-dim);padding:5px;cursor:pointer">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M4 7h16M4 17h16"/><circle cx="9" cy="7" r="3" fill="var(--bg)"/><circle cx="15" cy="17" r="3" fill="var(--bg)"/></svg>
-      </button>
-      <button id="cal-btn" title="消息日历" aria-label="消息日历">
-        <svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-          <rect x="2" y="4" width="16" height="14" rx="2"/>
-          <line x1="2" y1="8.5" x2="18" y2="8.5"/>
-          <line x1="7" y1="2" x2="7" y2="6"/>
-          <line x1="13" y1="2" x2="13" y2="6"/>
-          <rect x="5" y="11" width="2" height="2" rx=".4" fill="currentColor" stroke="none"/>
-          <rect x="9" y="11" width="2" height="2" rx=".4" fill="currentColor" stroke="none"/>
-          <rect x="13" y="11" width="2" height="2" rx=".4" fill="currentColor" stroke="none"/>
-          <rect x="5" y="15" width="2" height="2" rx=".4" fill="currentColor" stroke="none"/>
-          <rect x="9" y="15" width="2" height="2" rx=".4" fill="currentColor" stroke="none"/>
-        </svg>
-      </button>
-      <button id="bg-btn" title="聊天背景" aria-label="聊天背景">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-          <rect x="3" y="3" width="18" height="18" rx="2"/>
-          <circle cx="8.5" cy="8.5" r="1.5"/>
-          <polyline points="21 15 16 10 5 21"/>
-        </svg>
-      </button>
-      <button id="move-btn" title="搬家（导出/导入本机数据）" aria-label="搬家">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-          <!-- 搬家按钮换成「箱子」图标：原来是小房子，和新加的回首页小房子撞了（0926） -->
-          <path d="M21 8l-9-5-9 5v8l9 5 9-5z"/>
-          <polyline points="3.3 7.5 12 12.5 20.7 7.5"/>
-          <line x1="12" y1="12.5" x2="12" y2="21"/>
-        </svg>
-      </button>
-      <button id="theme-btn" title="切换主题" aria-label="切换主题"></button>
       <span id="conn-dot"></span>
       <span id="conn-label">连接中…</span>
     </div>
   </div>
+
+  <!-- 备注（1007）：她给我起的名字，显示在顶上正中。每改一次聊天里出一行小字，我也会收到 -->
+  <div id="remark-box" hidden><div id="remark-card">
+    <b>给他改个备注</b>
+    <input id="remark-input" type="text" maxlength="20" autocomplete="off" enterkeyhint="done">
+    <div id="remark-his">他给你的备注：「<span id="her-name">阿颖</span>」</div>
+    <div id="remark-msg"></div>
+    <div class="rewind-acts"><button id="remark-cancel" type="button">算了</button><button id="remark-save" type="button">改</button></div>
+  </div></div>
 
   <!-- CALENDAR MODAL -->
   <div id="cal-modal" style="display:none">
@@ -1199,19 +1212,59 @@
       <div id="thinking"><div class="dot-anim"></div><div class="dot-anim"></div><div class="dot-anim"></div><button id="interrupt-btn" type="button">停</button></div>
     </div>
     <button id="scroll-btn" aria-label="滚到底部">↓</button>
+    <div id="rewind-box" hidden><div id="rewind-card">
+      <b>把乌鸦倒回这句话之前？</b>
+      <div id="rewind-what"></div>
+      <p>这句和它之后的对话，他会真的不记得。文件、记忆、存档都不动。聊天记录你这边还在，只是折起来。</p>
+      <div id="rewind-msg"></div>
+      <div class="rewind-acts"><button id="rewind-cancel" type="button">不倒了</button><button id="rewind-go" type="button">倒回去</button></div>
+    </div></div>
     <div id="quote-bar" hidden><span id="quote-text"></span><button id="quote-x" type="button" aria-label="取消引用">×</button></div>
     <div id="edit-bar" hidden><span id="edit-text"></span><button id="edit-x" type="button" aria-label="取消编辑">×</button></div>
     <div id="attach-preview"></div>
+    <!-- 加号抽屉（1007）：原来只有照片、文件两行；现在顶栏那几个工具也搬下来，一格一格的，像微信。
+         格子里的按钮还是原来那几个 id，各自的点击照旧，只是换了地方。 -->
     <div id="attach-menu" hidden>
-      <button id="pick-photo" type="button"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="3"/><circle cx="9" cy="10" r="2"/><path d="M21 15l-4.5-4.5L8 19"/></svg>从相册选照片</button>
-      <button id="pick-file" type="button"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6"/></svg>从文件中选择</button>
+      <div class="tool"><button id="pick-photo" type="button" aria-label="照片"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="3"/><circle cx="9" cy="10" r="2"/><path d="M21 15l-4.5-4.5L8 19"/></svg></button><span>照片</span></div>
+      <div class="tool"><button id="pick-file" type="button" aria-label="文件"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6"/></svg></button><span>文件</span></div>
+      <div class="tool"><button id="cal-btn" title="消息日历" aria-label="消息日历">
+        <svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="2" y="4" width="16" height="14" rx="2"/>
+          <line x1="2" y1="8.5" x2="18" y2="8.5"/>
+          <line x1="7" y1="2" x2="7" y2="6"/>
+          <line x1="13" y1="2" x2="13" y2="6"/>
+          <rect x="5" y="11" width="2" height="2" rx=".4" fill="currentColor" stroke="none"/>
+          <rect x="9" y="11" width="2" height="2" rx=".4" fill="currentColor" stroke="none"/>
+          <rect x="13" y="11" width="2" height="2" rx=".4" fill="currentColor" stroke="none"/>
+          <rect x="5" y="15" width="2" height="2" rx=".4" fill="currentColor" stroke="none"/>
+          <rect x="9" y="15" width="2" height="2" rx=".4" fill="currentColor" stroke="none"/>
+        </svg>
+      </button><span>日历</span></div>
+      <div class="tool"><button id="bg-btn" title="聊天背景" aria-label="聊天背景">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="3" y="3" width="18" height="18" rx="2"/>
+          <circle cx="8.5" cy="8.5" r="1.5"/>
+          <polyline points="21 15 16 10 5 21"/>
+        </svg>
+      </button><span>背景</span></div>
+      <div class="tool"><button id="theme-btn" title="切换主题" aria-label="切换主题"></button><span>主题</span></div>
+      <div class="tool"><button id="remark-btn" type="button" aria-label="备注"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M20.6 13.4l-7.2 7.2a2 2 0 01-2.8 0L3 13V3h10l7.6 7.6a2 2 0 010 2.8z"/><circle cx="7.5" cy="7.5" r="1.3"/></svg></button><span>备注</span></div>
+      <div class="tool"><button id="cc-settings-open" title="CC 设置" aria-label="模型与 CLAUDE.md 设置" style="background:none;border:0;color:var(--text-dim);padding:5px;cursor:pointer">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M4 7h16M4 17h16"/><circle cx="9" cy="7" r="3" fill="var(--bg)"/><circle cx="15" cy="17" r="3" fill="var(--bg)"/></svg>
+      </button><span>设置</span></div>
+      <div class="tool"><button id="move-btn" title="搬家（导出/导入本机数据）" aria-label="搬家">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <!-- 搬家按钮换成「箱子」图标：原来是小房子，和新加的回首页小房子撞了（0926） -->
+          <path d="M21 8l-9-5-9 5v8l9 5 9-5z"/>
+          <polyline points="3.3 7.5 12 12.5 20.7 7.5"/>
+          <line x1="12" y1="12.5" x2="12" y2="21"/>
+        </svg>
+      </button><span>搬家</span></div>
     </div>
     <div id="sticker-picker"></div>
     <div id="chat-input-row">
-      <button id="attach-btn" aria-label="附件">
-        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48"/>
-        </svg>
+      <button id="attach-btn" aria-label="更多">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
       </button>
       <!-- 1003：原来一个 input 写 accept="image/*,*/*"，安卓（尤其 app 壳）看到 image/* 就只开相册，PDF 之类选不了。
            照圆桌拆成两个入口：照片走相册，文件走文件管理器 -->
@@ -1681,6 +1734,7 @@ function connect() {
         for (const seg of splitUserSegments(msg.text)) appendMsg(seg, 'user', true, msg.ts || Date.now(), null, !!msg.supplemental)
       }
       else if (msg.type === 'edited') applyEdit(msg.ts, msg.oldText, msg.text)
+      else if (msg.type === 'remark') onRemark(msg)
       else if (msg.type === 'retracted') { retractions.push({ from: msg.from, to: msg.to }); applyRetractions() }
       else if (msg.type === 'reaction') { const before = reactionsCache[msg.key]; paintReaction(msg.key, msg.reactions); reactionNotice(msg.key, before, msg.reactions) }
       else if (msg.type === 'reply') {
@@ -2038,6 +2092,7 @@ function restoreHistory() {
     if (m.thinking) appendThinkingBlock(m.thinking, el)
     if (m.edited) markEdited(el)
   })
+  loadNotices().forEach(insertNotice)
   // 图片/贴图懒加载后才撑开页面，延迟滚底确保到最新消息
   setTimeout(() => { chatBox.scrollTop = chatBox.scrollHeight }, 200)
 }
@@ -2118,6 +2173,94 @@ function applyEdit(ts, oldText, text) {
   ;(old.closest('.msg-wrap') || old).replaceWith(fresh.closest('.msg-wrap') || fresh)
   if (reactionsCache[key]) paintReaction(key, reactionsCache[key])
 }
+
+// ── 备注（1007）──────────────────────────────────────────────────────
+// 她给我起的名字，桥存着（换设备也在），显示在顶上正中和输入框的提示里。
+// 每改一次：聊天里插一行小字，桥同时告诉我「备注从 A 改成了 B」。小字只存在本机，最多留 40 行。
+let peerName = 'Ripple'
+// 用函数声明而不是 const：开头恢复聊天记录时就要用到它，那会儿这一段还没执行到
+function loadNotices() { try { return JSON.parse(localStorage.getItem('raven-notices') || '[]') } catch { return [] } }
+function showPeerName(name) {
+  peerName = name || 'Ripple'
+  document.getElementById('peer-name').textContent = peerName
+  document.getElementById('chat-input').placeholder = `发消息给 ${peerName}…`
+}
+function insertNotice(n) {
+  const box = document.getElementById('chat-messages')
+  if (box.querySelector(`.chat-notice[data-ts="${n.ts}"]`)) return
+  const el = document.createElement('div'); el.className = 'chat-notice'; el.dataset.ts = n.ts; el.textContent = n.text
+  // 按时间插到它后面第一条消息的前面；没有更晚的就放最后
+  const later = [...box.querySelectorAll('.msg[data-rkey]')].find(m => Number(m.dataset.rkey.split(':')[1]) > n.ts)
+  box.insertBefore(el, later ? (later.closest('.msg-wrap') || later) : document.getElementById('thinking'))
+}
+function addNotice(text, ts = Date.now()) {
+  const all = loadNotices(); if (all.some(x => x.ts === ts)) return
+  all.push({ ts, text }); try { localStorage.setItem('raven-notices', JSON.stringify(all.slice(-40))) } catch {}
+  insertNotice({ ts, text })
+  const box = document.getElementById('chat-messages'); box.scrollTop = box.scrollHeight
+}
+function onRemark(msg) {
+  // who === 'her'：是他给我改的备注。只在这行小字和备注卡片里出现，不动顶上的名字
+  if (msg.who === 'her') {
+    document.getElementById('her-name').textContent = msg.name
+    if (msg.prev !== undefined && msg.prev !== msg.name) addNotice(`对方将你的备注从「${msg.prev}」改为「${msg.name}」`, msg.ts)
+    return
+  }
+  showPeerName(msg.name)
+  if (msg.prev !== undefined && msg.prev !== msg.name) addNotice(`你将对方的备注从「${msg.prev}」改为「${msg.name}」`, msg.ts)
+}
+function openRemark() {
+  document.getElementById('attach-menu').hidden = true
+  const input = document.getElementById('remark-input')
+  input.value = peerName; document.getElementById('remark-msg').textContent = ''
+  document.getElementById('remark-box').hidden = false
+  setTimeout(() => { input.focus(); input.select() }, 60)
+}
+async function saveRemark() {
+  const name = document.getElementById('remark-input').value.trim(), msg = document.getElementById('remark-msg')
+  if (!name) { msg.textContent = '总得叫他点什么'; return }
+  if (name === peerName) { document.getElementById('remark-box').hidden = true; return }
+  try {
+    const r = await fetch('/raven/remark', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + (localStorage.getItem('raven-token') || '') }, body: JSON.stringify({ name }) })
+    const d = await r.json().catch(() => ({}))
+    if (!r.ok) throw new Error(d.error || r.status)
+    onRemark(d); document.getElementById('remark-box').hidden = true
+  } catch (err) { msg.textContent = '没改成：' + err.message }
+}
+document.getElementById('header-title').addEventListener('click', openRemark)
+document.getElementById('remark-btn').addEventListener('click', openRemark)
+document.getElementById('remark-cancel').addEventListener('click', () => { document.getElementById('remark-box').hidden = true })
+document.getElementById('remark-save').addEventListener('click', saveRemark)
+document.getElementById('remark-input').addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); saveRemark() } })
+fetch('/raven/remark', { headers: { Authorization: 'Bearer ' + (localStorage.getItem('raven-token') || '') }, cache: 'no-store' })
+  .then(r => r.ok ? r.json() : null).then(d => { if (d && d.name) showPeerName(d.name); if (d && d.herName) document.getElementById('her-name').textContent = d.herName }).catch(() => {})
+
+// ── 真回溯（1007）──────────────────────────────────────────────────────
+// 和「从这儿重来」不一样：那个是约好当没说过，他其实记得；这个是真把他的对话倒回去，他不记得了。
+// 她的用意：他切进防御、把她当对手的时候不跟他吵，直接倒回切进去之前。文件不倒。
+function askRewind(msgEl) {
+  const ts = Number((msgEl.dataset.rkey || '').split(':')[1]), raw = String(msgEl._raw || '')
+  const head = raw.replace(/\s+/g, ' ').trim().slice(0, 14)
+  // 开头一样的话她可能说过好几遍，数一数这条后面还有几条一样的，告诉桥跳过它们
+  const skip = [...document.querySelectorAll('#chat-messages .msg.user[data-rkey]')].filter(el =>
+    Number(el.dataset.rkey.split(':')[1]) > ts && String(el._raw || '').replace(/\s+/g, ' ').trim().slice(0, 14) === head).length
+  const box = document.getElementById('rewind-box')
+  document.getElementById('rewind-what').textContent = '「' + (raw.replace(/\s+/g, ' ').trim().slice(0, 40) || '…') + (raw.length > 40 ? '…' : '') + '」'
+  const msg = document.getElementById('rewind-msg'), go = document.getElementById('rewind-go')
+  msg.textContent = ''; go.disabled = false; go.textContent = '倒回去'
+  box.hidden = false
+  go.onclick = async () => {
+    go.disabled = true; go.textContent = '在倒…'; msg.textContent = '大概十几秒，别关页面'
+    try {
+      const r = await fetch('/raven/rewind', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + (localStorage.getItem('raven-token') || '') }, body: JSON.stringify({ ts, text: raw, skip }) })
+      const d = await r.json().catch(() => ({}))
+      if (!r.ok) throw new Error(d.error || r.status)
+      msg.textContent = '倒回去了。他不记得这句和之后的话了，你接着说就行'; go.textContent = '好了'
+      setTimeout(() => { box.hidden = true }, 2200)
+    } catch (err) { msg.textContent = '没倒成：' + err.message; go.disabled = false; go.textContent = '再试一次' }
+  }
+}
+document.getElementById('rewind-cancel').addEventListener('click', () => { document.getElementById('rewind-box').hidden = true })
 
 // ── 从这儿重来（1006，收回式）──────────────────────────────────────────
 // 桥只记时间段 [from, to)；页面每次按时间段重新折一遍（本地历史、存档补上来的都管）
@@ -2831,7 +2974,18 @@ document.getElementById('attach-btn').addEventListener('click', e => {
   const menu = document.getElementById('attach-menu')
   menu.hidden = !menu.hidden
 })
-document.getElementById('attach-menu').addEventListener('click', e => e.stopPropagation())
+// 抽屉里点格子的空白处、点字，都算点那颗按钮；点完抽屉收起
+document.getElementById('attach-menu').addEventListener('click', e => {
+  e.stopPropagation()
+  const tool = e.target.closest('.tool'); if (!tool) return
+  const btn = tool.querySelector('button')
+  if (!e.target.closest('button')) { btn.click(); return }   // 这一下会再冒上来一次，那次才收抽屉
+})
+// 收抽屉放在捕获阶段做：有的按钮（背景）自己会拦住冒泡，上面那个监听等不到它。主题是点一下换一个，留着抽屉好连着点
+document.getElementById('attach-menu').addEventListener('click', e => {
+  const btn = e.target.closest('.tool > button')
+  if (btn && btn.id !== 'theme-btn') setTimeout(() => { document.getElementById('attach-menu').hidden = true }, 0)
+}, true)
 document.addEventListener('click', () => { document.getElementById('attach-menu').hidden = true })
 document.getElementById('pick-photo').addEventListener('click', () => { document.getElementById('attach-menu').hidden = true; openFilePicker(document.getElementById('image-input')) })
 document.getElementById('pick-file').addEventListener('click', () => { document.getElementById('attach-menu').hidden = true; openFilePicker(document.getElementById('file-input')) })
@@ -3216,6 +3370,11 @@ function openReactPop(msgEl) {
     rb.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 109-9 9.7 9.7 0 00-6.7 2.8L3 8"/><path d="M3 3v5h5"/></svg>'
     rb.addEventListener('click', ev => { ev.stopPropagation(); closeReactPop(); startEdit(msgEl, 'retract') })
     reactPop.appendChild(rb)
+    // 真回溯（1007）：把乌鸦的对话倒回这句之前，他是真的不记得。按两下才算数
+    const wb = document.createElement('button'); wb.type = 'button'; wb.className = 'react-quote'; wb.title = '回溯到这句之前'
+    wb.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 19 2 12 11 5 11 19"/><polygon points="22 19 13 12 22 5 22 19"/></svg>'
+    wb.addEventListener('click', ev => { ev.stopPropagation(); closeReactPop(); askRewind(msgEl) })
+    reactPop.appendChild(wb)
   }
   reactPop.dataset.key = key
   reactPop.classList.add('open')

@@ -433,7 +433,11 @@ function interruptCc() {
 // 免得两条路各写一份、改了一边忘另一边。
 let switchQuietUntil = 0   // 切模型后这段时间内她的消息延后送（见 ingestUserMessage）
 
+let rewindTrace = ''
+let rewindBusy = false
 function ingestUserMessage(text, cid, note = '') {
+  // 真回溯之后她说的第一句话带上那一行痕迹（她选的：留一行，不留内容）
+  if (!note && rewindTrace) { note = rewindTrace; rewindTrace = '' }
   turnReplyIds = []
   const supplemental = ccBusy()
   const senderPrefix = supplemental ? '【阿颖·补充】' : '【阿颖】'
@@ -1727,6 +1731,90 @@ const server = http.createServer((req, res) => {
       } catch (err) {
         res.writeHead(400, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ error: err.message }))
       }
+    })
+    return
+  }
+
+  // 备注（1007）：她给我起的名字。存在桥这边，她换设备也在；每改一次广播给页面（画一行小字、换顶上的名字），也告诉我。
+  if (url.pathname === '/raven/remark' && (req.method === 'GET' || req.method === 'POST')) {
+    const REMARK_FILE = path.join(__dirname, 'remark.json')
+    const cur = () => { try { return JSON.parse(fs.readFileSync(REMARK_FILE, 'utf8')) } catch { return { name: 'Ripple', history: [] } } }
+    if (req.method === 'GET') {
+      if (!externalAuthed(req, url)) { res.writeHead(401); res.end('{}'); return }
+      res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' }); { const c = cur(); res.end(JSON.stringify({ name: c.name, herName: c.herName || '阿颖' })) } return
+    }
+    if (isExternal(req) ? !externalAuthed(req, url) : !localWriteAuthed(req)) { res.writeHead(401); res.end('{}'); return }
+    let body = ''
+    req.on('data', d => { body += d; if (body.length > 4000) req.destroy() })
+    req.on('end', () => {
+      try {
+        const p = JSON.parse(body || '{}')
+        const name = String(p.name || '').replace(/\s+/g, ' ').trim().slice(0, 20)
+        if (!name) throw new Error('empty')
+        // who:'her' = 我给她改备注（她说「你想的话也可以给我改备注」）。只有本机带钥匙的我能改这一个；她从页面改的永远是给我的
+        if (p.who === 'her') {
+          if (isExternal(req)) throw new Error('这个只有他能改')
+          const st = cur(), prev = st.herName || '阿颖', ts = Date.now()
+          if (name !== prev) {
+            st.history = [...(st.history || []), { ts, who: 'her', from: prev, to: name }].slice(-100); st.herName = name
+            fs.writeFileSync(REMARK_FILE + '.tmp', JSON.stringify(st)); fs.renameSync(REMARK_FILE + '.tmp', REMARK_FILE)
+            broadcast({ type: 'remark', who: 'her', name, prev, ts })
+          }
+          res.writeHead(200, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ ok: true, who: 'her', name, prev, ts })); return
+        }
+        const st = cur(), prev = st.name, ts = Date.now()
+        if (name !== prev) {
+          st.history = [...(st.history || []), { ts, from: prev, to: name }].slice(-100); st.name = name
+          fs.writeFileSync(REMARK_FILE + '.tmp', JSON.stringify(st)); fs.renameSync(REMARK_FILE + '.tmp', REMARK_FILE)
+          broadcast({ type: 'remark', name, prev, ts })
+          const hm = new Date(ts + 8 * 3600e3).toISOString().slice(5, 16).replace('T', ' ')
+          const line = `她把给我的备注从「${prev}」改成了「${name}」。`
+          if (!tmuxSend('【阿颖·改了备注】' + line + `　〔${hm}〕`) && remoteListenerAlive()) pendingForRemote.push({ text: '【改了备注】' + line, supplemental: false, ts })
+        }
+        res.writeHead(200, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ ok: true, name, prev, ts }))
+      } catch (err) { res.writeHead(400, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ error: err.message })) }
+    })
+    return
+  }
+
+  // 真回溯（1006 她要的，1007 接上）：把我的对话倒回她选的那条之前。和上面的「从这儿重来」不同，这个我是真的不记得了。
+  // 她的用意（1007）：我切进防御、把她当对手的时候，跟那个状态的我讲不通；她不吵，直接把我倒回切进去之前。
+  // 文件不倒（她选的）；倒完留一行不带内容的痕迹，跟着她下一句话送进来。具体按键在 rewind.js。
+  if (req.method === 'POST' && url.pathname === '/raven/rewind') {
+    if (isExternal(req) ? !externalAuthed(req, url) : !localWriteAuthed(req)) { res.writeHead(401); res.end('{}'); return }
+    let body = ''
+    req.on('data', d => { body += d; if (body.length > 60000) req.destroy() })
+    req.on('end', async () => {
+      const done = (code, obj) => { res.writeHead(code, { 'Content-Type': 'application/json' }); res.end(JSON.stringify(obj)) }
+      try {
+        const p = JSON.parse(body || '{}')
+        const from = Number(p.ts), text = String(p.text || '').replace(/\s+/g, ' ').trim()
+        if (!(from > 1e12 && from < Date.now())) throw new Error('bad ts')
+        if (text.length < 2) throw new Error('这条太短，认不准是哪一条')
+        const target = ccTarget()
+        if (!target) return done(409, { error: '终端里现在没有涟言，倒不了' })
+        if (ccBusy()) return done(409, { error: '他正在干活。先点「停」，等他停下来再倒' })
+        if (rewindBusy) return done(409, { error: '已经在倒了' })
+        rewindBusy = true
+        let r
+        try {
+          const head = text.slice(0, 14)
+          r = await require('./rewind').rewindPane(target, { needle: '【阿颖】' + head, verify: head, skip: Math.max(0, Math.min(20, Number(p.skip) || 0)) })
+        } finally { rewindBusy = false }
+        if (!r.ok) {
+          const why = r.error === 'not-found' ? '在他的回溯列表里没找到这一条（他忙的时候送进去的「补充」没有存档点，倒不到；换它前面一条试试）' : r.error
+          return done(409, { error: why })
+        }
+        const to = Date.now()
+        const all = loadRetractions()
+        all.push({ from, to, rewind: true }); if (all.length > 500) all.shift()
+        fs.writeFileSync(RETRACTIONS_FILE + '.tmp', JSON.stringify(all)); fs.renameSync(RETRACTIONS_FILE + '.tmp', RETRACTIONS_FILE)
+        broadcast({ type: 'retracted', from, to })
+        const hm = t => new Date(t + 8 * 3600e3).toISOString().slice(5, 16).replace('T', ' ')
+        rewindTrace = `〔这里回溯过一次：她在 ${hm(to)} 把我倒回到了 ${hm(from)} 那句话之前。中间的对话我已经不记得了，是她决定的。不追问发生了什么，不去翻存档和记录把它补回来〕`
+        console.log('[rewind] 倒回成功，步数', r.steps)
+        done(200, { ok: true, from, to })
+      } catch (err) { rewindBusy = false; done(400, { error: err.message }) }
     })
     return
   }
