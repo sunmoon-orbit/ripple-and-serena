@@ -1951,7 +1951,10 @@ function appendMsg(text, role, save = true, ts = Date.now(), msgId = null, suppl
       // 我发图多半写成 ![](url)，以前只认 [sticker:X]，所以我发的贴图一直裹着气泡
       if (STICKER_ONLY_RE.test(displayText)) el.classList.add('sticker-msg')
       // 终端抓取会把 ![alt](url) 剥成裸 URL：单独成行的图片 URL 还原成图片
-      const withImgs = displayText.replace(/^[ \t]*(https?:\/\/\S+\.(?:png|jpe?g|gif|webp))[ \t]*$/gim, '![]($1)')
+      // 1007：我也能引用她的话回复。第一行写「> 引用：…」，和她那边一样画成一小块引用，不交给 markdown 当大段引文
+      const aq = /^> ?引用[：:] ?([^\n]{1,200})\n+/.exec(displayText)
+      const atext = aq ? displayText.slice(aq[0].length) : displayText   // displayText 是 const，后面别处还要用原文
+      const withImgs = atext.replace(/^[ \t]*(https?:\/\/\S+\.(?:png|jpe?g|gif|webp))[ \t]*$/gim, '![]($1)')
       const withAttach = withImgs.replace(ATTACH_TAG_RE, (_, p) => attachToHtml(p))
       const withStickers = withAttach.replace(/\[sticker:([^\]]+)\]/g, (_, name) =>
         `<img src="/raven/stickers/${stickerFile(name)}" style="max-width:220px;border-radius:8px;display:block;margin:4px 0;" alt="${name}">`)
@@ -1961,6 +1964,7 @@ function appendMsg(text, role, save = true, ts = Date.now(), msgId = null, suppl
       body.innerHTML = DOMPurify.sanitize(rendered, PURIFY_OPTS)
       attachStickerFallback(body)
       enhanceCodeBlocks(body)
+      if (aq) { const q = document.createElement('div'); q.className = 'quote-ref'; q.textContent = aq[1]; body.prepend(q) }
     } else {
       // 1003 引用回复：第一行「> 引用：…」画成一小块引用，正文照常
       const qm = /^> 引用：([^\n]{1,200})\n?/.exec(text)
