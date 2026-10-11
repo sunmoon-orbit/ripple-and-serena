@@ -440,16 +440,41 @@ let switchQuietUntil = 0   // 切模型后这段时间内她的消息延后送�
 // 送到我这儿之前把意思接在后面：[sticker:文件名｜意思]。只改给我看的那份，存档和页面上的还是原样。
 // 思路来自 Monagwd/sticker-shelf（「你发的表情包交给小机之前变成名字」），代码是自己写的。
 const STICKER_INDEX = path.join(__dirname, '..', 'raven', 'stickers', 'index.json')
-let stickerNames = { mtime: 0, map: new Map() }
+// 她自己的贴图架（1011）：她在归巢里上传的图放在仓库外（和上传的附件、安装包一个道理，不把仓库撑肥），
+// shelf.json 里记她传的每一张，以及她对仓库里那些图改过的名字／开关（overrides）。
+const SHELF_DIR = '/home/ripple/raven-stickers'
+const SHELF_FILE = path.join(SHELF_DIR, 'shelf.json')
+const SHELF_ID = /^u-[a-f0-9]{10}\.(png|jpg|gif|webp)$/
+const SHELF_MAX = 300
+function readShelf() {
+  try { const d = JSON.parse(fs.readFileSync(SHELF_FILE, 'utf8')); return { stickers: d.stickers || [], overrides: d.overrides || {} } }
+  catch { return { stickers: [], overrides: {} } }
+}
+function writeShelf(d) {
+  fs.mkdirSync(SHELF_DIR, { recursive: true })
+  fs.writeFileSync(SHELF_FILE + '.tmp', JSON.stringify(d, null, 1)); fs.renameSync(SHELF_FILE + '.tmp', SHELF_FILE)
+  stickerCache.key = ''
+}
+const cleanStickerName = v => String(v ?? '').replace(/[\[\]｜\r\n]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 40)
+// 合并后的总账：她传的在前（新的最前），后面是仓库里的；她改过名字／开关的以她的为准
+let stickerCache = { key: '', list: [], map: new Map() }
+function mergedStickers() {
+  let k = ''
+  try { k += fs.statSync(STICKER_INDEX).mtimeMs } catch {}
+  try { k += '|' + fs.statSync(SHELF_FILE).mtimeMs } catch {}
+  if (k && k === stickerCache.key) return stickerCache
+  let base = []
+  try { base = JSON.parse(fs.readFileSync(STICKER_INDEX, 'utf8')).stickers || [] } catch {}
+  const shelf = readShelf()
+  const mine = [...shelf.stickers].sort((x, y) => (y.ts || 0) - (x.ts || 0)).map(x => ({ file: x.file, name: x.name || '', use: '', ai: x.ai !== false, mine: true }))
+  const rest = base.map(x => { const o = shelf.overrides[x.file] || {}; return { file: x.file, name: o.name ?? x.name ?? '', use: x.use || '', ai: o.ai ?? (x.ai !== false) } })
+  const list = [...mine, ...rest]
+  stickerCache = { key: k, list, map: new Map(list.map(x => [x.file, cleanStickerName(x.name)])) }
+  return stickerCache
+}
 function stickerName(file) {
-  try {
-    const m = fs.statSync(STICKER_INDEX).mtimeMs
-    if (m !== stickerNames.mtime) {
-      const list = JSON.parse(fs.readFileSync(STICKER_INDEX, 'utf8')).stickers || []
-      stickerNames = { mtime: m, map: new Map(list.map(x => [x.file, String(x.name || '').replace(/[\[\]｜\n]/g, ' ').trim()])) }
-    }
-  } catch {}
-  return stickerNames.map.get(file) || stickerNames.map.get(file.replace(/\.(png|jpe?g|gif|webp)$/i, '') + '.jpg') || ''
+  const m = mergedStickers().map
+  return m.get(file) || m.get(file.replace(/\.(png|jpe?g|gif|webp)$/i, '') + '.jpg') || ''
 }
 function withStickerNames(text) {
   return String(text).replace(/\[sticker:([^\]｜]+)\]/g, (all, f) => { const n = stickerName(f.trim()); return n ? `[sticker:${f.trim()}｜${n}]` : all })
@@ -2129,6 +2154,88 @@ const server = http.createServer((req, res) => {
     }
     res.writeHead(200, { ...base, 'Content-Length': stat.size })
     fs.createReadStream(abs).pipe(res)
+    return
+  }
+
+  // ── 贴图架 ──────────────────────────────────────────────────────────
+  // 合并后的总账（选择器、管理页都读这个）。静态目录里那份 index.json 只是仓库部分，所以要抢在静态兜底前面答。
+  if ((req.method === 'GET' || req.method === 'HEAD') && url.pathname === '/raven/stickers/index.json') {
+    const body = JSON.stringify({ stickers: mergedStickers().list })
+    res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-cache', 'Content-Length': Buffer.byteLength(body) })
+    res.end(req.method === 'HEAD' ? undefined : body); return
+  }
+  // 她传的图：u-<十位十六进制>.<后缀>，内容定了名字就定了，所以可以长期缓存
+  if ((req.method === 'GET' || req.method === 'HEAD') && url.pathname.startsWith('/raven/stickers/u-')) {
+    const name = path.basename(url.pathname)
+    const abs = path.join(SHELF_DIR, name)
+    if (!SHELF_ID.test(name) || !regularFile(abs)) { res.writeHead(404); res.end(); return }
+    const ext = path.extname(name)
+    res.writeHead(200, { 'Content-Type': MIME[ext] || 'application/octet-stream', 'Content-Length': fs.statSync(abs).size, 'Cache-Control': 'public, max-age=604800, immutable' })
+    if (req.method === 'HEAD') { res.end(); return }
+    fs.createReadStream(abs).pipe(res); return
+  }
+  // 上传一张：{ name, data: "data:image/...;base64,..." }。看文件头认类型，不信后缀；动图原样存，会动。
+  if (req.method === 'POST' && url.pathname === '/raven/stickers/upload') {
+    if (isExternal(req) ? !externalAuthed(req, url) : !localWriteAuthed(req)) { res.writeHead(401); res.end('{}'); return }
+    const chunks = []; let size = 0
+    req.on('data', d => { size += d.length; if (size > 7.5 * 1024 * 1024) { req.destroy(); return } chunks.push(d) })
+    req.on('end', () => {
+      const done = (code, obj) => { res.writeHead(code, { 'Content-Type': 'application/json' }); res.end(JSON.stringify(obj)) }
+      try {
+        const p = JSON.parse(Buffer.concat(chunks).toString('utf8') || '{}')
+        const name = cleanStickerName(p.name)
+        if (!name) throw new Error('要起个名字，他只靠名字认这张图')
+        const m = /^data:image\/[a-z+.-]+;base64,(.+)$/s.exec(String(p.data || ''))
+        if (!m) throw new Error('没收到图片')
+        const raw = Buffer.from(m[1], 'base64')
+        if (raw.length > 5 * 1024 * 1024) throw new Error('这张超过 5MB 了')
+        const ext = raw.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])) ? 'png'
+          : raw[0] === 0xff && raw[1] === 0xd8 ? 'jpg'
+          : raw.subarray(0, 4).toString('latin1') === 'GIF8' ? 'gif'
+          : raw.subarray(0, 4).toString('latin1') === 'RIFF' && raw.subarray(8, 12).toString('latin1') === 'WEBP' ? 'webp' : ''
+        if (!ext) throw new Error('只收 PNG、JPG、GIF、WebP')
+        const file = `u-${crypto.createHash('sha1').update(raw).digest('hex').slice(0, 10)}.${ext}`
+        const shelf = readShelf()
+        const had = shelf.stickers.find(x => x.file === file)
+        if (had) { had.name = name }   // 同一张图再传一次＝改名
+        else {
+          if (shelf.stickers.length >= SHELF_MAX) throw new Error(`最多 ${SHELF_MAX} 张，先删几张`)
+          fs.mkdirSync(SHELF_DIR, { recursive: true })
+          fs.writeFileSync(path.join(SHELF_DIR, file), raw)
+          shelf.stickers.push({ file, name, ai: p.ai !== false, ts: Date.now() })
+        }
+        writeShelf(shelf)
+        done(200, { ok: true, file, name, again: !!had })
+      } catch (err) { done(400, { error: err.message }) }
+    })
+    return
+  }
+  // 改名／开关／删除：{ file, name?, ai?, remove? }。她传的可以删；仓库里的不能删，只记她改的名字和开关。
+  if (req.method === 'POST' && url.pathname === '/raven/stickers/update') {
+    if (isExternal(req) ? !externalAuthed(req, url) : !localWriteAuthed(req)) { res.writeHead(401); res.end('{}'); return }
+    let body = ''
+    req.on('data', d => { body += d; if (body.length > 4000) req.destroy() })
+    req.on('end', () => {
+      const done = (code, obj) => { res.writeHead(code, { 'Content-Type': 'application/json' }); res.end(JSON.stringify(obj)) }
+      try {
+        const p = JSON.parse(body || '{}'); const file = String(p.file || '')
+        const known = mergedStickers().list.find(x => x.file === file)
+        if (!known) throw new Error('没有这张')
+        const shelf = readShelf()
+        const own = shelf.stickers.find(x => x.file === file)
+        if (p.remove) {
+          if (!own) throw new Error('这张是原来就有的，删不了，可以关掉「他能用」')
+          shelf.stickers = shelf.stickers.filter(x => x.file !== file)
+          try { fs.unlinkSync(path.join(SHELF_DIR, file)) } catch {}
+        } else {
+          const target = own || (shelf.overrides[file] = shelf.overrides[file] || {})
+          if (p.name !== undefined) { const n = cleanStickerName(p.name); if (!n) throw new Error('名字不能空'); target.name = n }
+          if (p.ai !== undefined) target.ai = !!p.ai
+        }
+        writeShelf(shelf)
+        done(200, { ok: true })
+      } catch (err) { done(400, { error: err.message }) }
+    })
     return
   }
 

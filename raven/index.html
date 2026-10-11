@@ -587,6 +587,11 @@
   #edit-x { border: none; background: none; color: var(--text-dim); font-size: 18px; line-height: 1; cursor: pointer; padding: 0 2px; }
   .msg.editing { outline: 2px solid var(--accent); outline-offset: 2px; }
   .edited-label { font-size: 10px; opacity: .6; margin-top: 3px; text-align: right; letter-spacing: .06em; }
+  #frame-box { position: fixed; inset: 0; z-index: 380; background: var(--bg); display: flex; flex-direction: column; padding-top: env(safe-area-inset-top, 0px); }
+  #frame-box[hidden] { display: none; }
+  #frame-bar { display: flex; align-items: center; justify-content: space-between; padding: 10px 16px; font-size: 15px; font-weight: 600; color: var(--text); }
+  #frame-x { border: 1px solid var(--border); background: none; color: var(--text); border-radius: 999px; padding: 5px 14px; font: inherit; font-size: 13px; cursor: pointer; }
+  #frame-if { flex: 1; width: 100%; border: 0; background: transparent; }
   #rewind-box { position: fixed; inset: 0; z-index: 400; background: rgba(0,0,0,.38); display: flex; align-items: center; justify-content: center; padding: 24px; }
   #rewind-box[hidden] { display: none; }
   #rewind-card { width: min(340px, 100%); background: var(--surface); color: var(--text); border: 1px solid var(--border); border-radius: 18px; padding: 18px 18px 14px; box-shadow: 0 16px 44px rgba(0,0,0,.3); font-size: 14px; line-height: 1.65; }
@@ -1216,6 +1221,10 @@
       <div id="thinking"><div class="dot-anim"></div><div class="dot-anim"></div><div class="dot-anim"></div><button id="interrupt-btn" type="button">停</button></div>
     </div>
     <button id="scroll-btn" aria-label="滚到底部">↓</button>
+    <div id="frame-box" hidden>
+      <div id="frame-bar"><span id="frame-title"></span><button id="frame-x" type="button">关掉</button></div>
+      <iframe id="frame-if" title="小页面"></iframe>
+    </div>
     <div id="rewind-box" hidden><div id="rewind-card">
       <b>把乌鸦倒回这句话之前？</b>
       <div id="rewind-what"></div>
@@ -1252,6 +1261,7 @@
         </svg>
       </button><span>背景</span></div>
       <div class="tool"><button id="theme-btn" title="切换主题" aria-label="切换主题"></button><span>主题</span></div>
+      <div class="tool"><button id="shelf-btn" type="button" aria-label="贴图架"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M8.5 14.5c1 1.3 2.1 2 3.5 2s2.5-.7 3.5-2"/><circle cx="9" cy="10" r=".9" fill="currentColor"/><circle cx="15" cy="10" r=".9" fill="currentColor"/></svg></button><span>贴图架</span></div>
       <div class="tool"><button id="remark-btn" type="button" aria-label="备注"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M20.6 13.4l-7.2 7.2a2 2 0 01-2.8 0L3 13V3h10l7.6 7.6a2 2 0 010 2.8z"/><circle cx="7.5" cy="7.5" r="1.3"/></svg></button><span>备注</span></div>
       <div class="tool"><button id="cc-settings-open" title="CC 设置" aria-label="模型与 CLAUDE.md 设置" style="background:none;border:0;color:var(--text-dim);padding:5px;cursor:pointer">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M4 7h16M4 17h16"/><circle cx="9" cy="7" r="3" fill="var(--bg)"/><circle cx="15" cy="17" r="3" fill="var(--bg)"/></svg>
@@ -3497,10 +3507,26 @@ function fillStickerPicker(list) {
   if (old.length) { old[0].before(frag); old.forEach(n => n.remove()) } else stickerPicker.appendChild(frag)
 }
 fillStickerPicker(STICKERS)
-fetch('/raven/stickers/index.json', { cache: 'no-store' })
-  .then(r => r.ok ? r.json() : null)
-  .then(d => { if (d && Array.isArray(d.stickers) && d.stickers.length) fillStickerPicker(d.stickers) })
-  .catch(() => {})
+function refreshStickers() {
+  return fetch('/raven/stickers/index.json', { cache: 'no-store' })
+    .then(r => r.ok ? r.json() : null)
+    .then(d => { if (d && Array.isArray(d.stickers) && d.stickers.length) fillStickerPicker(d.stickers) })
+    .catch(() => {})
+}
+// 贴图架（1011）：她自己传图、起名、开关「他能用」。在聊天页里开一个整页浮层，关掉时把抽屉里的贴图重新读一遍
+function openFrame(src, title) {
+  document.getElementById('attach-menu').hidden = true
+  document.getElementById('frame-title').textContent = title
+  document.getElementById('frame-if').src = src
+  document.getElementById('frame-box').hidden = false
+}
+document.getElementById('frame-x').addEventListener('click', () => {
+  document.getElementById('frame-box').hidden = true
+  document.getElementById('frame-if').src = 'about:blank'
+  refreshStickers()
+})
+document.getElementById('shelf-btn').addEventListener('click', () => openFrame('/raven/stickers.html', '贴图架'))
+refreshStickers()
 
 // ── 颜文字页签（0930）：种子是从 L0 里捞出来的她自己最常打的，按次数排；
 // 她加的存本机（raven-kaomoji-custom），点得越多越靠前（raven-kaomoji-uses）。点一下插到光标处，不发送。
