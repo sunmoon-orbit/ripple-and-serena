@@ -25,6 +25,7 @@
   .cell img { width: 100%; aspect-ratio: 1; object-fit: contain; border-radius: 12px; background: var(--paper); display: block; }
   .cell span { display: block; font-size: 11.5px; line-height: 1.35; color: var(--dim); margin-top: 4px; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow-wrap: anywhere; }
   .cell.noai img { opacity: .45; } .cell.noai span::after { content: '（他不用）'; }
+  .cell.kept span::after { content: ' · 他收了'; color: var(--accent); }
   .cell.on img { outline: 2px solid var(--accent); }
   #edit { position: sticky; bottom: 10px; margin-top: 16px; background: var(--paper); border: 1px solid var(--line); border-radius: 16px; padding: 12px 14px; box-shadow: 0 10px 30px rgba(0,0,0,.18); }
   #edit[hidden] { display: none; }
@@ -39,7 +40,7 @@
 <div class="wrap">
   <button class="btn go" id="pick" type="button">＋ 选图片加进来</button>
   <input type="file" id="files" accept="image/*" multiple hidden>
-  <div class="tip">他只靠名字认图，看不到画面。名字写它在说什么，比如「委屈巴巴」「摸摸头」；图上有字就直接写那行字。动图会原样保留。</div>
+  <div class="tip">名字写它在说什么，比如「委屈巴巴」「摸摸头」；图上有字就直接写那行字。动图会原样保留。你加的图先是你自己的；他看过以后想用，会自己收进他的库，收了的那张下面会写「他收了」。</div>
   <div id="queue"></div>
 
   <h2>我加的</h2>
@@ -50,7 +51,8 @@
 
   <div id="edit" hidden>
     <div class="row"><img id="e-img" alt=""><input type="text" id="e-name" maxlength="40" autocomplete="off"></div>
-    <label class="sw"><input type="checkbox" id="e-ai"> 他能用（关掉以后他不会发这张，你自己照样能发）</label>
+    <label class="sw" id="e-ai-row"><input type="checkbox" id="e-ai"> 他能用（关掉以后他不会发这张，你自己照样能发）</label>
+    <div class="tip" id="e-kept" style="margin:6px 0" hidden></div>
     <div class="acts"><span class="msg" id="e-msg"></span><button class="btn danger" id="e-del" type="button">删掉</button><button class="btn" id="e-x" type="button">收起</button><button class="btn go" id="e-save" type="button">存</button></div>
   </div>
 </div>
@@ -73,7 +75,7 @@ async function load() {
     box.innerHTML = ''
     if (!list.length) { box.appendChild(el('div', 'empty', '还没有。')); continue }
     for (const s of list) {
-      const c = el('div', 'cell' + (s.ai === false ? ' noai' : '') + (cur === s.file ? ' on' : ''))
+      const c = el('div', 'cell' + (s.mine ? (s.kept ? ' kept' : '') : (s.ai === false ? ' noai' : '')) + (cur === s.file ? ' on' : ''))
       const img = el('img'); img.src = src(s.file); img.loading = 'lazy'; img.alt = s.name || s.file
       c.append(img, el('span', null, s.name || '（没名字）'))
       c.onclick = () => open(s.file)
@@ -85,12 +87,14 @@ function open(file) {
   const s = all.find(x => x.file === file); if (!s) return
   cur = file
   $('e-img').src = src(file); $('e-name').value = s.name || ''; $('e-ai').checked = s.ai !== false
-  $('e-del').hidden = !s.mine; $('e-msg').textContent = ''; $('edit').hidden = false
+  $('e-ai-row').hidden = !!s.mine; $('e-kept').hidden = !s.mine; $('e-kept').textContent = s.kept ? '他收进自己的库了。' : '他还没收这张。'
+    $('e-del').hidden = !s.mine; $('e-msg').textContent = ''; $('edit').hidden = false
   document.querySelectorAll('.cell.on').forEach(n => n.classList.remove('on'))
 }
 $('e-x').onclick = () => { $('edit').hidden = true; cur = null }
 $('e-save').onclick = async () => {
-  try { await post('/raven/stickers/update', { file: cur, name: $('e-name').value, ai: $('e-ai').checked }); $('e-msg').textContent = '存好了'; await load() }
+  try { const mineNow = (all.find(x => x.file === cur) || {}).mine
+    await post('/raven/stickers/update', mineNow ? { file: cur, name: $('e-name').value } : { file: cur, name: $('e-name').value, ai: $('e-ai').checked }); $('e-msg').textContent = '存好了'; await load() }
   catch (e) { $('e-msg').textContent = '没存上：' + e.message }
 }
 // 删除要点两下：第一下只是把字换成「再点一次就删」
