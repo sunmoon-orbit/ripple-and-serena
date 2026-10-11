@@ -987,6 +987,9 @@
     background: var(--surface); color: var(--text-dim); cursor: pointer;
   }
   #call-bilingual[aria-pressed="true"] { color: var(--accent); border-color: var(--accent); }
+  #call-mode-row { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; }
+  #call-auto { border: 1px solid var(--border); border-radius: 12px; padding: 5px 10px; background: var(--surface); color: var(--text-dim); cursor: pointer; }
+  #call-auto[aria-pressed="true"] { color: var(--accent); border-color: var(--accent); }
   #call-text-row {
     width: min(100%, 560px); margin: 9px auto 0; display: flex; align-items: center; gap: 8px;
   }
@@ -1435,6 +1438,7 @@
   <div id="call-log" aria-live="polite"></div>
   <div id="call-mode-row">
     <button id="call-bilingual" type="button" aria-pressed="true">英文朗读 · 中文字幕</button>
+    <button id="call-auto" type="button" aria-pressed="true">说完自动发 · 开</button>
   </div>
   <div id="call-text-row">
     <input id="call-text-input" type="text" enterkeyhint="send" autocomplete="off" placeholder="打字告诉乌鸦…" aria-label="通话文字消息">
@@ -1749,6 +1753,7 @@ function connect() {
       }
       else if (msg.type === 'edited') applyEdit(msg.ts, msg.oldText, msg.text)
       else if (msg.type === 'remark') onRemark(msg)
+      else if (msg.type === 'call-wait') { if (callActive) armQuiet(false) }
       else if (msg.type === 'retracted') { retractions.push({ from: msg.from, to: msg.to }); applyRetractions() }
       else if (msg.type === 'reaction') { const before = reactionsCache[msg.key]; paintReaction(msg.key, msg.reactions); reactionNotice(msg.key, before, msg.reactions) }
       else if (msg.type === 'reply') {
@@ -2398,6 +2403,7 @@ async function loadOlder() {
   setTimeout(() => { hint.hidden = false }, 1500)
 })()
 
+let pendingCut = null
 function sendMsg(overrideText) {
   const inp = document.getElementById('chat-input')
   if (pendingEdit && !overrideText) { submitEdit(); return }
@@ -2414,6 +2420,7 @@ function sendMsg(overrideText) {
   }
   const cid = 'c' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8)
   const payload = { type: 'send', text, cid, token: localStorage.getItem('raven-token') || '' }
+  if (pendingCut) { payload.cut = pendingCut; pendingCut = null }   // 通话里她打断过我：告诉桥我那条只念到哪儿
   if (!ws || ws.readyState !== 1) {
     pendingOutbox.push(payload)
     appendMsg('[消息已暂存，重连后自动发送]', 'system', false)
@@ -2812,6 +2819,17 @@ const IC_DOTS    = `<svg viewBox="0 0 24 24" width="12" height="12" fill="curren
 let sharedAudioCtx = null
 let stopActiveTts = null
 let voiceReplyUntil = 0
+// 最近一次没念完就被掐断的朗读：{ text 念的全文, frac 念了几成, ts }。下一条语音消息带着它告诉桥，用过就清
+let lastTtsCut = null
+// 把「念了几成」换成「念到哪几个字」。按字数比例估，只精确到句子附近，所以对我说的是「左右」
+function takeTtsCut() {
+  const c = lastTtsCut; lastTtsCut = null
+  if (!c || Date.now() - c.ts > 3 * 60 * 1000) return null
+  const plain = c.text.replace(/\[[^\]]*\]/g, '').replace(/\s+/g, ' ').trim()
+  if (!plain) return null
+  const heard = plain.slice(0, Math.round(plain.length * c.frac))
+  return { pct: Math.round(c.frac * 100), tail: heard.slice(-18) }
+}
 
 function getSharedAudioContext() {
   const AudioContextClass = window.AudioContext || window.webkitAudioContext
@@ -2848,6 +2866,7 @@ function makeTtsBtn(text, msgEl, vbar, initialVoiceMode = false, voiceFile = '')
   let cachedBuffer = null
   let cachedDuration = 0
   let currentSource = null
+  let playStartedAt = 0
   let voiceMode = initialVoiceMode
   let loadController = null
   let playEpoch = 0
@@ -2872,7 +2891,13 @@ function makeTtsBtn(text, msgEl, vbar, initialVoiceMode = false, voiceFile = '')
   function stopCurrent() {
     playEpoch += 1
     if (loadController) { loadController.abort(); loadController = null }
-    if (currentSource) { try { currentSource.stop() } catch {} currentSource = null }
+    // 1011：没念完就被掐断的，记下念到了几成（通话里她打断我时，我一直以为整段她都听完了）。自然念完的不记
+    if (currentSource && cachedDuration && playStartedAt) {
+      const frac = (getSharedAudioContext().currentTime - playStartedAt) / cachedDuration
+      if (frac < 0.92) lastTtsCut = { text: cleanTextForTts(text), frac: Math.max(0, frac), ts: Date.now() }
+    }
+    playStartedAt = 0
+    if (currentSource) { try { currentSource.onended = null; currentSource.stop() } catch {} currentSource = null }
     if (stopActiveTts === stopCurrent) stopActiveTts = null
     btn.classList.remove('loading')
     btn.disabled = false
@@ -2939,8 +2964,9 @@ function makeTtsBtn(text, msgEl, vbar, initialVoiceMode = false, voiceFile = '')
     const src = audioCtx.createBufferSource()
     src.buffer = cachedBuffer
     src.connect(audioCtx.destination)
-    src.onended = stopCurrent
+    src.onended = () => { playStartedAt = 0; stopCurrent() }   // 自己念完的：先清掉起点，stopCurrent 就不会当成被掐断
     src.start(0)
+    playStartedAt = audioCtx.currentTime
     currentSource = src
     stopActiveTts = stopCurrent
     setPlaying(true)
@@ -3027,6 +3053,62 @@ let callActive = false
 let callStartedAt = 0
 let callTimerId = null
 let callHadInteraction = false
+// 1011 三样（思路来自 KKarsyline/call_call，按咱们「点一下说话、我在终端里想几秒再回」的结构改小了）：
+// ① 说完自己发：听到她说过话、又安静了 1.3 秒就收；我念完自动再开始听（callAuto 开着时）
+// ② 她打断我时告诉我念到哪儿（上面的 lastTtsCut）
+// ③ 自动开的那一轮里只「嗯」「啊」一声的不发，不然随口一声就烧一轮
+const CALL_AUTO_KEY = 'raven-call-auto'
+let callAuto = localStorage.getItem(CALL_AUTO_KEY) !== '0'
+let recordingAuto = false      // 这一轮麦克风是我念完后自动开的，不是她点的
+let stopVad = null
+const FILLER_RE = /^(嗯+|恩+|啊+|哦+|噢+|喔+|呃+|额+|唔+|哎+|欸+|诶+|e+m+|h+m+|u+h+|u+m+|m+)$/i
+const isFiller = t => FILLER_RE.test(String(t).replace(/[\s，。！？、…~～.,!?]+/g, ''))
+function renderAutoToggle() {
+  const b = document.getElementById('call-auto')
+  b.setAttribute('aria-pressed', callAuto ? 'true' : 'false')
+  b.textContent = callAuto ? '说完自动发 · 开' : '说完自动发 · 关'
+}
+// ④ 通话里她一阵没出声，问他要不要自己开口（她 1011 说要）。每次问都是他的一轮，所以很省着问：
+//    他念完以后安静 45 秒问一次，他说先不说（[wait]）或者说了一句她还是没接，再等 120 秒问第二次，然后不再问，直到她开口。
+let quietTimer = null, quietCount = 0, quietSince = 0
+function armQuiet(reset) {
+  clearTimeout(quietTimer); quietTimer = null
+  if (reset) { quietCount = 0; quietSince = Date.now() }
+  if (!callActive || quietCount >= 2) return
+  quietTimer = setTimeout(() => {
+    quietTimer = null
+    // 这会儿她正在说、正在转写、他正在念、或者她那条还没等到回答：都不算安静
+    if (!callActive || activeSttController || callOverlay.classList.contains('speaking') || waitingReply) return
+    if (mediaRecorder && !recordingAuto) return
+    if (!ws || ws.readyState !== 1) return
+    quietCount += 1
+    ws.send(JSON.stringify({ type: 'call-silence', secs: Math.round((Date.now() - quietSince) / 1000), nth: quietCount, bilingual: voiceBilingual, token: localStorage.getItem('raven-token') || '' }))
+  }, quietCount === 0 ? 45000 : 120000)
+}
+function stopQuiet() { clearTimeout(quietTimer); quietTimer = null; quietCount = 0 }
+let waitingReply = false   // 她的话已经发给他、他还没回
+
+// 盯着麦克风的音量：onEnd(reason) 只叫一次。reason: 'spoke' 说完了 / 'silent' 一直没出声 / 'long' 说太久
+function watchVoice(stream, { auto }, onEnd) {
+  const ctx = getSharedAudioContext(); if (!ctx) return () => {}
+  let node, an
+  try { node = ctx.createMediaStreamSource(stream); an = ctx.createAnalyser(); an.fftSize = 1024; node.connect(an) } catch { return () => {} }
+  const buf = new Float32Array(an.fftSize)
+  const t0 = performance.now(); let floor = 0, floorN = 0, spokeMs = 0, lastVoice = 0, last = t0, done = false
+  const finish = why => { if (done) return; done = true; clearInterval(timer); try { node.disconnect() } catch {} ; if (why) onEnd(why) }
+  const timer = setInterval(() => {
+    an.getFloatTimeDomainData(buf)
+    let sum = 0; for (let i = 0; i < buf.length; i++) sum += buf[i] * buf[i]
+    const rms = Math.sqrt(sum / buf.length), now = performance.now(), dt = now - last; last = now
+    if (now - t0 < 350) { floor += rms; floorN++; return }            // 头 0.35 秒量一下环境有多吵
+    const thr = Math.max(0.018, (floorN ? floor / floorN : 0) * 2.6)
+    if (rms > thr) { spokeMs += dt; lastVoice = now }
+    if (spokeMs >= 260 && now - lastVoice >= 1300) return finish('spoke')
+    if (spokeMs < 260 && now - t0 >= (auto ? 8000 : 20000)) return finish('silent')
+    if (now - t0 >= 75000) return finish('long')
+  }, 60)
+  return () => finish('')
+}
 
 function renderBilingualToggle() {
   callBilingualBtn.setAttribute('aria-pressed', voiceBilingual ? 'true' : 'false')
@@ -3057,6 +3139,7 @@ function openCall() {
   voiceReplyUntil = 0
   callStartedAt = Date.now()
   callHadInteraction = false
+  stopQuiet(); waitingReply = false; lastTtsCut = null
   document.getElementById('call-avatar').src = localStorage.getItem('raven-avatar') || '/raven/avatar-ripple.svg'
   document.getElementById('call-log').innerHTML = ''
   callOverlay.classList.add('show')
@@ -3071,6 +3154,7 @@ function closeCall() {
   const duration = Math.max(0, Math.floor((Date.now() - callStartedAt) / 1000))
   const record = { status: callHadInteraction ? 'ended' : 'cancelled', duration }
   callActive = false
+  stopQuiet(); waitingReply = false
   voiceReplyUntil = 0
   clearInterval(callTimerId)
   callTimerId = null
@@ -3123,16 +3207,25 @@ function splitCallReply(text) {
 
 function handleCallReply(text, msgEl) {
   callHadInteraction = true
+  const firstAfterHer = waitingReply; waitingReply = false
+  // 自动开着的麦还在等她出声，他的下一句就来了：这一段不要了，免得把他的朗读当成她说的
+  if (mediaRecorder && recordingAuto && mediaRecorder.state === 'recording') { discardRecording = true; try { mediaRecorder.stop() } catch {} }
   const parts = splitCallReply(text)
   if (parts.main || parts.translation) appendCallLine('assistant', parts.main || '（乌鸦发来了一条消息）', parts.translation)
   setCallStatus(parts.main ? '乌鸦准备开口…' : '乌鸦发来了一条消息')
+  let wasPlaying = false
   msgEl.addEventListener('raven-tts-state', event => {
     if (!callActive) return
     const state = event.detail?.state
     if (state === 'loading') setCallStatus('乌鸦准备开口…')
     else if (state === 'playing') setCallStatus('乌鸦正在说话，点麦克风可以打断', true)
     else if (state === 'error') setCallStatus('这句没能读出来，再点一次麦克风继续说')
-    else if (!mediaRecorder && !activeSttController) setCallStatus('点麦克风，接着说')
+    else if (!mediaRecorder && !activeSttController) {
+      setCallStatus('点麦克风，接着说')
+      // 刚才是在念、现在停了：要是她点麦克风掐断的，那边已经在开麦了，autoListen 里会看见并让开
+      if (wasPlaying) { setTimeout(() => autoListen(), 450); armQuiet(firstAfterHer) }   // 他念完了：从这一刻开始数她安静了多久
+    }
+    wasPlaying = state === 'playing'
   })
   if (parts.main) autoReadReply(msgEl)
 }
@@ -3148,7 +3241,8 @@ function showVoiceError(message) {
   if (callActive) setCallStatus(message)
 }
 
-async function transcribeAndSend(blob, forCall) {
+async function transcribeAndSend(blob, forCall, wasAuto = false) {
+  let resumeAfter = false
   syncMicState('transcribing')
   if (forCall && callActive) setCallStatus('正在听清你说的话…')
   const form = new FormData()
@@ -3165,24 +3259,42 @@ async function transcribeAndSend(blob, forCall) {
     if (!response.ok) throw new Error(`转写失败（${response.status}）`)
     const result = await response.json()
     const text = String(result.text || '').trim()
-    if (!text) throw new Error('没有听清，再说一次吧')
+    if (!text) {
+      // 自动开的那一轮没听出字，多半是环境声，不往聊天里塞一行报错
+      if (wasAuto) { if (callActive) setCallStatus('点麦克风，接着说'); return }
+      throw new Error('没有听清，再说一次吧')
+    }
     if (forCall && !callActive) return
+    if (forCall && wasAuto && isFiller(text)) {
+      setCallStatus(`听到一声「${text}」，没发给他。接着说，或者点麦克风`)
+      resumeAfter = true
+      return
+    }
     if (forCall) {
       callHadInteraction = true
       appendCallLine('user', text)
       setCallStatus('已经告诉乌鸦，等他回答…')
     }
     voiceReplyUntil = Date.now() + 5 * 60 * 1000
+    pendingCut = takeTtsCut()
+    stopQuiet(); waitingReply = true
     sendMsg((voiceBilingual ? '【语音·双语】' : '【语音】') + text)
   } catch (error) {
     if (error.name !== 'AbortError') showVoiceError(error.message || '语音转写失败，请再试一次')
   } finally {
     if (activeSttController === controller) activeSttController = null
     syncMicState('idle')
+    if (resumeAfter && callActive && callAuto) setTimeout(() => autoListen(), 300)
   }
 }
+// 我念完以后自动再开麦（只在通话里、开关开着、而且这会儿没在录也没在转写的时候）
+function autoListen() {
+  if (!callActive || !callAuto || mediaRecorder || voiceStarting || activeSttController || waitingReply) return
+  if (callOverlay.classList.contains('speaking')) return   // 他又开口了：开着麦会把他的声音录进去
+  startRecording(true, true)
+}
 
-async function startRecording(forCall = false) {
+async function startRecording(forCall = false, auto = false) {
   if (!navigator.mediaDevices?.getUserMedia || !window.MediaRecorder) {
     showVoiceError('当前浏览器不支持录音')
     return
@@ -3192,6 +3304,7 @@ async function startRecording(forCall = false) {
   if (stopActiveTts) stopActiveTts()
   voiceStarting = true
   recordingForCall = forCall
+  recordingAuto = auto
   if (forCall) setCallStatus('正在打开麦克风…')
   let stream
   try {
@@ -3229,16 +3342,17 @@ async function startRecording(forCall = false) {
   recorder.onstop = () => {
     stream.getTracks().forEach(track => track.stop())
     if (mediaRecorder === recorder) mediaRecorder = null
-    const wasForCall = recordingForCall
-    recordingForCall = false
+    const wasForCall = recordingForCall, wasAuto = recordingAuto
+    recordingForCall = false; recordingAuto = false
+    if (stopVad) { stopVad(); stopVad = null }
     syncMicState('idle')
-    if (discardRecording) { discardRecording = false; return }
+    if (discardRecording) { discardRecording = false; if (wasForCall && callActive) setCallStatus('点麦克风，接着说'); return }
     const blob = new Blob(recordedChunks, { type: recorder.mimeType || 'audio/webm' })
     if (blob.size < 1200) {
       showVoiceError('录音太短了，再说一次吧')
       return
     }
-    transcribeAndSend(blob, wasForCall)
+    transcribeAndSend(blob, wasForCall, wasAuto)
   }
   try {
     recorder.start()
@@ -3250,7 +3364,15 @@ async function startRecording(forCall = false) {
     return
   }
   syncMicState('recording')
-  if (forCall) setCallStatus('正在听你说话，再点一下发送')
+  if (forCall) setCallStatus(callAuto ? '正在听你说话，说完会自己发' : '正在听你说话，再点一下发送')
+  // 自动断句只在通话里、开关开着时管；关着就还是老样子，点第二下才发
+  if (forCall && callAuto) {
+    stopVad = watchVoice(stream, { auto }, why => {
+      if (mediaRecorder !== recorder || recorder.state !== 'recording') return
+      if (why === 'silent') discardRecording = true     // 从头到尾没出声：不送去转写
+      try { recorder.stop() } catch {}
+    })
+  }
 }
 
 function toggleRecording(forCall = false) {
@@ -3273,6 +3395,8 @@ function sendCallText() {
   appendCallLine('user', text)
   setCallStatus('已经告诉乌鸦，等他回答…')
   voiceReplyUntil = Date.now() + 5 * 60 * 1000
+  pendingCut = takeTtsCut()
+  stopQuiet(); waitingReply = true
   sendMsg((voiceBilingual ? '【语音·双语】' : '【语音】') + text)
   input.value = ''
   input.focus()
@@ -3280,6 +3404,8 @@ function sendCallText() {
 
 renderBilingualToggle()
 callBilingualBtn.addEventListener('click', toggleBilingual)
+renderAutoToggle()
+document.getElementById('call-auto').addEventListener('click', () => { callAuto = !callAuto; localStorage.setItem(CALL_AUTO_KEY, callAuto ? '1' : '0'); renderAutoToggle() })
 callBtn.addEventListener('click', openCall)
 document.getElementById('call-close').addEventListener('click', closeCall)
 document.getElementById('call-hangup').addEventListener('click', closeCall)
