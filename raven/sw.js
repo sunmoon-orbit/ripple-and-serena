@@ -1,5 +1,6 @@
-// v20260630 — 推送事件内也主动暖缓存；唯一订阅重新注册后确保图标正常
-const ICON_CACHE = 'raven-icons-v1'
+// v20261011 — 换了新图标（两个对话气泡）：缓存改名 v2，激活时删掉旧缓存，否则通知里还是老头像
+// （push-icon / badge 是 cache-first，caches.match 会跨缓存命中旧的，所以必须把 v1 整个删掉）
+const ICON_CACHE = 'raven-icons-v2'
 const PUSH_ICONS = [
   'https://memory.ravenlove.cc/raven/push-icon-192.png',
   'https://memory.ravenlove.cc/raven/badge-96.png',
@@ -12,7 +13,11 @@ self.addEventListener('install', (e) => {
   )
 })
 
-self.addEventListener('activate', (e) => e.waitUntil(self.clients.claim()))
+self.addEventListener('activate', (e) => e.waitUntil(
+  caches.keys()
+    .then((ks) => Promise.all(ks.filter((k) => k.startsWith('raven-icons-') && k !== ICON_CACHE).map((k) => caches.delete(k))))
+    .then(() => self.clients.claim())
+))
 
 self.addEventListener('fetch', (e) => {
   const url = new URL(e.request.url)
