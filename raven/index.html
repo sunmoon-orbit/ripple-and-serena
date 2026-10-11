@@ -3468,10 +3468,16 @@ const STICKERS = [
   'm-cuole.jpg','m-budangai.jpg','m-a.jpg','m-wuen.jpg','m-jianlaji.jpg',
 ]
 const stickerPicker = document.getElementById('sticker-picker')
-STICKERS.forEach(name => {
+// 1011：清单以 /raven/stickers/index.json 这本总账为准（加一张图只改那一处）。上面那个数组留着当兜底：
+// 总账读不到的时候（断网、桥没起）抽屉里照样有图。先用数组画出来，总账到了再原地换一遍。
+function stickerOption(item) {
+  const name = typeof item === 'string' ? item : item.file
   const div = document.createElement('div')
   div.className = 'sticker-opt'
-  div.innerHTML = `<img src="/raven/stickers/${stickerFile(name)}" alt="${name}" loading="lazy">`
+  const img = document.createElement('img')
+  img.src = `/raven/stickers/${stickerFile(name)}`; img.alt = name; img.loading = 'lazy'
+  if (item.name) img.title = item.name
+  div.appendChild(img)
   div.addEventListener('click', () => {
     stickerPicker.classList.remove('open')
     const inp = document.getElementById('chat-input')
@@ -3482,8 +3488,19 @@ STICKERS.forEach(name => {
     inp.setSelectionRange(pos + tag.length, pos + tag.length)
     inp.dispatchEvent(new Event('input'))
   })
-  stickerPicker.appendChild(div)
-})
+  return div
+}
+function fillStickerPicker(list) {
+  const old = [...stickerPicker.querySelectorAll(':scope > .sticker-opt')]
+  const frag = document.createDocumentFragment()
+  list.forEach(item => frag.appendChild(stickerOption(item)))
+  if (old.length) { old[0].before(frag); old.forEach(n => n.remove()) } else stickerPicker.appendChild(frag)
+}
+fillStickerPicker(STICKERS)
+fetch('/raven/stickers/index.json', { cache: 'no-store' })
+  .then(r => r.ok ? r.json() : null)
+  .then(d => { if (d && Array.isArray(d.stickers) && d.stickers.length) fillStickerPicker(d.stickers) })
+  .catch(() => {})
 
 // ── 颜文字页签（0930）：种子是从 L0 里捞出来的她自己最常打的，按次数排；
 // 她加的存本机（raven-kaomoji-custom），点得越多越靠前（raven-kaomoji-uses）。点一下插到光标处，不发送。

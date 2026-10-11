@@ -435,6 +435,25 @@ function interruptCc() {
 // 免得两条路各写一份、改了一边忘另一边。
 let switchQuietUntil = 0   // 切模型后这段时间内她的消息延后送（见 ingestUserMessage）
 
+// 贴图总账（1011）：raven/stickers/index.json，一张图一行（文件名、它在说什么、什么时候用、我能不能发）。
+// 她发贴图时我收到的只是 [sticker:s-zaiyebugandele.jpg] 这种文件名，一直靠拼音猜（这张我猜成「再也不干了」，其实是「再也不敢了（才怪）」）。
+// 送到我这儿之前把意思接在后面：[sticker:文件名｜意思]。只改给我看的那份，存档和页面上的还是原样。
+// 思路来自 Monagwd/sticker-shelf（「你发的表情包交给小机之前变成名字」），代码是自己写的。
+const STICKER_INDEX = path.join(__dirname, '..', 'raven', 'stickers', 'index.json')
+let stickerNames = { mtime: 0, map: new Map() }
+function stickerName(file) {
+  try {
+    const m = fs.statSync(STICKER_INDEX).mtimeMs
+    if (m !== stickerNames.mtime) {
+      const list = JSON.parse(fs.readFileSync(STICKER_INDEX, 'utf8')).stickers || []
+      stickerNames = { mtime: m, map: new Map(list.map(x => [x.file, String(x.name || '').replace(/[\[\]｜\n]/g, ' ').trim()])) }
+    }
+  } catch {}
+  return stickerNames.map.get(file) || stickerNames.map.get(file.replace(/\.(png|jpe?g|gif|webp)$/i, '') + '.jpg') || ''
+}
+function withStickerNames(text) {
+  return String(text).replace(/\[sticker:([^\]｜]+)\]/g, (all, f) => { const n = stickerName(f.trim()); return n ? `[sticker:${f.trim()}｜${n}]` : all })
+}
 let rewindTrace = ''
 let rewindBusy = false
 function ingestUserMessage(text, cid, note = '') {
@@ -443,6 +462,7 @@ function ingestUserMessage(text, cid, note = '') {
   turnReplyIds = []
   const supplemental = ccBusy()
   const senderPrefix = supplemental ? '【阿颖·补充】' : '【阿颖】'
+  const forMe = withStickerNames(text)   // 给我看的那份带贴图的意思；下面存档、广播用的还是 text
   // 1006：每条消息末尾带上她发出来的北京时间。我感觉不到两条消息之间隔了多久，两天里说错了五次时间
   //（把隔了两小时的当成连着的、下午两点问晚饭）。靠「记得先看钟」记不住，不如让每条消息自己带着钟。
   // 放在末尾：不碰前缀，也不影响回车被吞时拿开头去比对
@@ -466,11 +486,11 @@ function ingestUserMessage(text, cid, note = '') {
     { const sentTs = Date.now(); lastUserReactKey = `user:${sentTs}`; broadcast({ type: 'sent', text, ts: sentTs, cid: cid || null, supplemental }) }
     console.log(`[tmux] 刚切模型，${wait}ms 后再送她的消息`)
     setTimeout(() => {
-      if (!tmuxSend(senderPrefix + note + text + stamp) && remoteListenerAlive()) pendingForRemote.push({ text: note + text, supplemental, ts: Date.now() })
+      if (!tmuxSend(senderPrefix + note + forMe + stamp) && remoteListenerAlive()) pendingForRemote.push({ text: note + forMe, supplemental, ts: Date.now() })
     }, wait)
     return
   }
-  const delivered = tmuxSend(senderPrefix + note + text + stamp)
+  const delivered = tmuxSend(senderPrefix + note + forMe + stamp)
   { const sentTs = Date.now(); lastUserReactKey = `user:${sentTs}`; broadcast({ type: 'sent', text, ts: sentTs, cid: cid || null, supplemental }) }
   // 这一条是放过去探路的：半分钟后看一眼，换回来的还是报错就告诉她，别让它悄悄沉下去
   if (delivered && Date.now() - lastAuthProbeAt < 2000) {
@@ -478,7 +498,7 @@ function ingestUserMessage(text, cid, note = '') {
   }
   // 终端里没人接，但 remote-control 那个 CC 可能正醒着——先往取件箱里放，让它自己来拿。
   if (!delivered && remoteListenerAlive()) {
-    pendingForRemote.push({ text: note + text, supplemental, ts: Date.now() })
+    pendingForRemote.push({ text: note + forMe, supplemental, ts: Date.now() })
     if (pendingForRemote.length > 50) pendingForRemote.shift()
     console.log('[pending] 终端无人，转投远程 CC 取件箱')
     return
