@@ -442,6 +442,7 @@ let switchQuietUntil = 0   // 切模型后这段时间内她的消息延后送�
 const STICKER_INDEX = path.join(__dirname, '..', 'raven', 'stickers', 'index.json')
 // 她自己的贴图架（1011）：她在归巢里上传的图放在仓库外（和上传的附件、安装包一个道理，不把仓库撑肥），
 // shelf.json 里记她传的每一张，以及她对仓库里那些图改过的名字／开关（overrides）。
+const PRIVATE_STATIC_DIR = '/home/ripple/raven-private/static'
 const SHELF_DIR = '/home/ripple/raven-stickers'
 const SHELF_FILE = path.join(SHELF_DIR, 'shelf.json')
 const SHELF_ID = /^u-[a-f0-9]{10}\.(png|jpg|gif|webp)$/
@@ -2274,8 +2275,11 @@ const server = http.createServer((req, res) => {
   if ((req.method === 'GET' || req.method === 'HEAD') && url.pathname.startsWith('/raven/')) {
     let filePath = url.pathname.slice('/raven'.length) || '/'
     if (filePath === '/') filePath = '/index.html'
-    const abs = path.join(STATIC_DIR, filePath)
+    let abs = path.join(STATIC_DIR, filePath)
     if (!abs.startsWith(STATIC_DIR)) { res.writeHead(403); res.end(); return }
+    // 不能进公开仓库的图（画师只授权自用、不公开的图标）放在仓库外，同名的优先用那边的
+    const priv = path.join(PRIVATE_STATIC_DIR, filePath)
+    if (priv.startsWith(PRIVATE_STATIC_DIR + path.sep) && fs.existsSync(priv)) abs = priv
     fs.stat(abs, (err, stat) => {
       if (err) { res.writeHead(404); res.end(); return }
       const ext = path.extname(abs)
