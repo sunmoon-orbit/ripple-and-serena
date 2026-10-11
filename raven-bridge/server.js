@@ -455,6 +455,10 @@ function writeShelf(d) {
   fs.writeFileSync(SHELF_FILE + '.tmp', JSON.stringify(d, null, 1)); fs.renameSync(SHELF_FILE + '.tmp', SHELF_FILE)
   stickerCache.key = ''
 }
+// 我自己收的（1011，她的主意：像微信那样，她传她的，我看了觉得想用再自己收进库里）。
+// 单独一个文件，shelf.json 是她的。只有本机带钥匙才能改，页面只能看。
+const CROW_FILE = path.join(SHELF_DIR, 'crow.json')
+function readCrowKept() { try { return new Set(JSON.parse(fs.readFileSync(CROW_FILE, 'utf8')).kept || []) } catch { return new Set() } }
 const cleanStickerName = v => String(v ?? '').replace(/[\[\]｜\r\n]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 40)
 // 合并后的总账：她传的在前（新的最前），后面是仓库里的；她改过名字／开关的以她的为准
 let stickerCache = { key: '', list: [], map: new Map() }
@@ -462,11 +466,12 @@ function mergedStickers() {
   let k = ''
   try { k += fs.statSync(STICKER_INDEX).mtimeMs } catch {}
   try { k += '|' + fs.statSync(SHELF_FILE).mtimeMs } catch {}
+  try { k += '|' + fs.statSync(CROW_FILE).mtimeMs } catch {}
   if (k && k === stickerCache.key) return stickerCache
   let base = []
   try { base = JSON.parse(fs.readFileSync(STICKER_INDEX, 'utf8')).stickers || [] } catch {}
-  const shelf = readShelf()
-  const mine = [...shelf.stickers].sort((x, y) => (y.ts || 0) - (x.ts || 0)).map(x => ({ file: x.file, name: x.name || '', use: '', ai: x.ai !== false, mine: true }))
+  const shelf = readShelf(), kept = readCrowKept()
+  const mine = [...shelf.stickers].sort((x, y) => (y.ts || 0) - (x.ts || 0)).map(x => ({ file: x.file, name: x.name || '', use: '', ai: kept.has(x.file), kept: kept.has(x.file), mine: true }))
   const rest = base.map(x => { const o = shelf.overrides[x.file] || {}; return { file: x.file, name: o.name ?? x.name ?? '', use: x.use || '', ai: o.ai ?? (x.ai !== false) } })
   const list = [...mine, ...rest]
   stickerCache = { key: k, list, map: new Map(list.map(x => [x.file, cleanStickerName(x.name)])) }
@@ -2211,8 +2216,27 @@ const server = http.createServer((req, res) => {
           shelf.stickers.push({ file, name, ai: p.ai !== false, ts: Date.now() })
         }
         writeShelf(shelf)
+        // 告诉我一声有新图，我去看了再决定收不收。我正忙就不打断，回头自己查没收的那几张
+        if (!had && !ccBusy() && !ccAuthLook().blocked) tmuxSend(`【贴图架】她新加了一张「${name}」：${path.join(SHELF_DIR, file)}　看一眼图，想用就收，不用为这个专门回她一条。`)
         done(200, { ok: true, file, name, again: !!had })
       } catch (err) { done(400, { error: err.message }) }
+    })
+    return
+  }
+  // 我收／不收她传的某一张：{ file, keep }。只认本机钥匙，外面进不来
+  if (req.method === 'POST' && url.pathname === '/raven/stickers/keep') {
+    if (isExternal(req) || !localWriteAuthed(req)) { res.writeHead(401); res.end('{}'); return }
+    let body = ''
+    req.on('data', d => { body += d; if (body.length > 2000) req.destroy() })
+    req.on('end', () => {
+      try {
+        const p = JSON.parse(body || '{}'), file = String(p.file || '')
+        if (!SHELF_ID.test(file) || !readShelf().stickers.some(x => x.file === file)) throw new Error('架子上没有这张')
+        const kept = readCrowKept(); p.keep === false ? kept.delete(file) : kept.add(file)
+        fs.writeFileSync(CROW_FILE + '.tmp', JSON.stringify({ kept: [...kept] }, null, 1)); fs.renameSync(CROW_FILE + '.tmp', CROW_FILE)
+        stickerCache.key = ''
+        res.writeHead(200, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ ok: true, kept: kept.has(file) }))
+      } catch (err) { res.writeHead(400, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ error: err.message })) }
     })
     return
   }
