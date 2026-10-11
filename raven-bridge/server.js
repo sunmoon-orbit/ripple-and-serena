@@ -2076,9 +2076,12 @@ const server = http.createServer((req, res) => {
     if (!name || !abs.startsWith(DOWNLOAD_DIR + path.sep) || !regularFile(abs)) { res.writeHead(404); res.end(); return }
     const stat = fs.statSync(abs)
     const base = {
+      // ⚠️ .zip 必须给 application/zip，不能给 octet-stream（1011 她在归巢 App 里点 roost-apk.zip，存下来变成 roost-apk.bin）：
+      // App 的 WebView 下载走 URLUtil.guessFileName(url, contentDisposition, mimeType)，它发现「.zip 这个后缀对应的类型」
+      // 和服务器给的类型对不上，就把后缀整个换成服务器类型对应的那个——octet-stream 对应的就是 .bin。Chrome 里没这回事，所以 0804 没撞上。
       'Content-Type': name.endsWith('.apk')
         ? 'application/vnd.android.package-archive'
-        : 'application/octet-stream',
+        : name.endsWith('.zip') ? 'application/zip' : 'application/octet-stream',
       'Content-Disposition': `attachment; filename="${name}"`,
       // 断点续传：阿颖那边跨洋 + 手机网络，一抖就断。不给 Accept-Ranges 的话
       // Chrome 的下载管理器只能从头重来，重来几次就报「下载失败」（0804 亲历）。
