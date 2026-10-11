@@ -1875,6 +1875,12 @@ const server = http.createServer((req, res) => {
     req.on('end', () => {
       try {
         const { text, thinking } = JSON.parse(body)
+        // 通话里她安静了一阵，桥来问我要不要开口（见下面的 call-silence）。我回 [wait] 就是「先不说」：
+        // 不画气泡、不念、不进存档、不推通知，只告诉页面可以接着等。
+        if (typeof text === 'string' && /^\s*\[wait\]\s*$/i.test(text)) {
+          broadcast({ type: 'call-wait' })
+          res.writeHead(200); res.end('{"wait":true}'); return
+        }
         if (text) {
           replyExtractionEnabled = false
           lastMcpReplyTs = Date.now()
@@ -2372,6 +2378,18 @@ wss.on('connection', (ws) => {
         await roundtable.handleWs(ws, msg)
         return
       }
+      // 通话里的安静（1011，她说要的）：她一阵没出声，页面来报一声，我可以自己开口，也可以回 [wait] 不说。
+      // 不是她说的话，所以不进存档、不回执、不走 ingestUserMessage；我正忙就整条丢掉，不排队。
+      if (msg.type === 'call-silence') {
+        if (!tokenIsValid(msg.token)) return
+        const secs = Math.max(10, Math.min(900, Math.round(Number(msg.secs) || 0)))
+        const nth = Math.max(1, Math.min(9, Math.round(Number(msg.nth) || 1)))
+        if (ccBusy() || ccAuthLook().blocked) { ws.send(JSON.stringify({ type: 'call-wait' })); return }
+        const hm = new Date(Date.now() + 8 * 3600e3).toISOString().slice(5, 16).replace('T', ' ')
+        const line = `【通话·安静${msg.bilingual ? '·双语' : ''}】通话还开着，她已经 ${secs} 秒没出声了（这一段里第 ${nth} 次问我）。想说点什么就照通话的规矩回一句短的；不想打扰她就只回 [wait]。　〔${hm}〕`
+        if (!tmuxSend(line)) ws.send(JSON.stringify({ type: 'call-wait' }))
+        return
+      }
       if (msg.type === 'send' && msg.text) {
         if (!tokenIsValid(msg.token)) {
           ws.send(JSON.stringify({ type: 'auth_failed' }))
@@ -2392,7 +2410,16 @@ wss.on('connection', (ws) => {
             recentCidMeta.delete(oldest)
           }
         }
-        ingestUserMessage(msg.text, msg.cid)
+        // 通话里她打断了我的朗读（1011）：页面告诉桥我那条念到了几成、最后十几个字是什么，桥把它拼成一句话放在她这条前面。
+        // 只收一个百分数和一小段字，句子在这儿拼，不让页面直接塞整段话进来。
+        let cutNote = ''
+        if (msg.cut && typeof msg.cut === 'object') {
+          const pct = Math.round(Number(msg.cut.pct)), tail = String(msg.cut.tail || '').replace(/[〔〕\[\]\r\n]/g, ' ').trim().slice(-24)
+          if (pct >= 0 && pct < 92) cutNote = tail
+            ? `〔她打断了你上一条的朗读：大约念到「…${tail}」左右（约 ${pct}%），后面的她没听到〕`
+            : `〔她打断了你上一条的朗读：刚开头就停了，她基本没听到〕`
+        }
+        ingestUserMessage(msg.text, msg.cid, cutNote)
       }
       if (msg.type === 'permission' && msg.choice) {
         if (!validSocketSession(ws, tokenIsValid)) return
