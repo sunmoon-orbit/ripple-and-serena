@@ -1,3 +1,4 @@
+import PickerSelect from '../PickerSelect'
 import { useState, useEffect, useRef } from 'react'
 import { useStore, DEFAULT_CUSTOM_THEME } from '../../store'
 import { normalizeProvider, BUILTIN_MODELS } from '../../api/llm'
@@ -403,12 +404,12 @@ function ConnectionCard({ conn, onSave, onDelete, onActivate, isActive }) {
           </div>
           <div className="form-row">
             <label className="form-label">Provider</label>
-            <select className="filter-select" value={form.provider || 'openai'} onChange={(e) => setForm({ ...form, provider: e.target.value, defaultModel: '' })}>
+            <PickerSelect className="filter-select" value={form.provider || 'openai'} onChange={(e) => setForm({ ...form, provider: e.target.value, defaultModel: '' })}>
               <option value="openai">OpenAI / 兼容</option>
               <option value="anthropic">Anthropic</option>
               <option value="gemini">Gemini</option>
               <option value="deepseek">DeepSeek</option>
-            </select>
+            </PickerSelect>
           </div>
           <div className="form-row">
             <label className="form-label">API Key</label>
@@ -426,15 +427,15 @@ function ConnectionCard({ conn, onSave, onDelete, onActivate, isActive }) {
           <div className="form-row">
             <label className="form-label">默认模型</label>
             {fetchedModels.length > 0 ? (
-              <select className="filter-select" style={{ flex: 1 }} value={form.defaultModel || ''} onChange={(e) => setForm({ ...form, defaultModel: e.target.value })}>
+              <PickerSelect title="选择默认模型" className="filter-select" style={{ flex: 1 }} value={form.defaultModel || ''} onChange={(e) => setForm({ ...form, defaultModel: e.target.value })}>
                 <option value="">请选择模型…</option>
                 {fetchedModels.map((m) => <option key={m} value={m}>{m}</option>)}
-              </select>
+              </PickerSelect>
             ) : models.length > 0 ? (
-              <select className="filter-select" value={form.defaultModel || ''} onChange={(e) => setForm({ ...form, defaultModel: e.target.value })}>
+              <PickerSelect title="选择默认模型" className="filter-select" value={form.defaultModel || ''} onChange={(e) => setForm({ ...form, defaultModel: e.target.value })}>
                 <option value="">自定义...</option>
                 {models.map((m) => <option key={m} value={m}>{m}</option>)}
-              </select>
+              </PickerSelect>
             ) : (
               <input className="form-input" value={form.defaultModel || ''} onChange={(e) => setForm({ ...form, defaultModel: e.target.value })} placeholder="模型名称（或点「拉取模型」）" />
             )}
@@ -447,10 +448,10 @@ function ConnectionCard({ conn, onSave, onDelete, onActivate, isActive }) {
           )}
           <div className="form-row">
             <label className="form-label">计费方式</label>
-            <select className="filter-select" value={form.billingMode || 'request'} onChange={(e) => setForm({ ...form, billingMode: e.target.value })}>
+            <PickerSelect className="filter-select" value={form.billingMode || 'request'} onChange={(e) => setForm({ ...form, billingMode: e.target.value })}>
               <option value="request">按次计费</option>
               <option value="token">按 Token 计费</option>
-            </select>
+            </PickerSelect>
           </div>
           <div className="form-row">
             <label className="form-label">自动分章</label>
@@ -488,12 +489,12 @@ function ConnectionCard({ conn, onSave, onDelete, onActivate, isActive }) {
           </div>
           <div className="form-row">
             <label className="form-label">轻任务格式</label>
-            <select className="filter-select" value={form.lightProvider || ''} onChange={(e) => setForm({ ...form, lightProvider: e.target.value })}>
+            <PickerSelect className="filter-select" value={form.lightProvider || ''} onChange={(e) => setForm({ ...form, lightProvider: e.target.value })}>
               <option value="">默认（openai）</option>
               <option value="openai">openai</option>
               <option value="anthropic">anthropic</option>
               <option value="gemini">gemini</option>
-            </select>
+            </PickerSelect>
           </div>
           <div className="form-row">
             <label className="form-label"></label>
@@ -891,12 +892,12 @@ export default function Settings() {
                   </div>
                   <div className="form-row">
                     <label className="form-label">Provider</label>
-                    <select className="filter-select" value={newConn.provider} onChange={(e) => setNewConn({ ...newConn, provider: e.target.value, defaultModel: '' })}>
+                    <PickerSelect className="filter-select" value={newConn.provider} onChange={(e) => setNewConn({ ...newConn, provider: e.target.value, defaultModel: '' })}>
                       <option value="openai">OpenAI / 兼容</option>
                       <option value="anthropic">Anthropic</option>
                       <option value="gemini">Gemini</option>
                       <option value="deepseek">DeepSeek</option>
-                    </select>
+                    </PickerSelect>
                   </div>
                   <div className="form-row">
                     <label className="form-label">API Key</label>
@@ -914,20 +915,20 @@ export default function Settings() {
                   <div className="form-row">
                     <label className="form-label">默认模型</label>
                     {fetchedModels.length > 0 ? (
-                      <select className="filter-select" style={{ flex: 1 }} value={newConn.defaultModel} onChange={(e) => setNewConn({ ...newConn, defaultModel: e.target.value })}>
+                      <PickerSelect title="选择默认模型" className="filter-select" style={{ flex: 1 }} value={newConn.defaultModel} onChange={(e) => setNewConn({ ...newConn, defaultModel: e.target.value })}>
                         <option value="">请选择模型…</option>
                         {fetchedModels.map((m) => <option key={m} value={m}>{m}</option>)}
-                      </select>
+                      </PickerSelect>
                     ) : (
                       <input className="form-input" value={newConn.defaultModel} onChange={(e) => setNewConn({ ...newConn, defaultModel: e.target.value })} placeholder="模型名称（或点「拉取模型」）" />
                   )}
                   </div>
                   <div className="form-row">
                     <label className="form-label">计费方式</label>
-                    <select className="filter-select" value={newConn.billingMode || 'request'} onChange={(e) => setNewConn({ ...newConn, billingMode: e.target.value })}>
+                    <PickerSelect className="filter-select" value={newConn.billingMode || 'request'} onChange={(e) => setNewConn({ ...newConn, billingMode: e.target.value })}>
                       <option value="request">按次计费</option>
                       <option value="token">按 Token 计费</option>
-                    </select>
+                    </PickerSelect>
                   </div>
                   <div className="form-row form-actions">
                     <button className="btn-sm btn-ghost" onClick={() => { setAddingConn(false); setFetchedModels([]); }}>取消</button>
@@ -1257,10 +1258,10 @@ export default function Settings() {
                   <>
                     <div className="card-row">
                       <span className="card-row-label">模式</span>
-                      <select className="filter-select" value={contextLimit.mode} onChange={(e) => setContextLimit({ mode: e.target.value })}>
+                      <PickerSelect className="filter-select" value={contextLimit.mode} onChange={(e) => setContextLimit({ mode: e.target.value })}>
                         <option value="rounds">按轮数</option>
                         <option value="tokens">按 Token 数</option>
-                      </select>
+                      </PickerSelect>
                     </div>
                     {contextLimit.mode === 'rounds' && (
                       <div className="card-row">
@@ -1283,9 +1284,9 @@ export default function Settings() {
               <div className="settings-card">
                 <div className="card-row">
                   <span className="card-row-label">回复节奏</span>
-                  <select className="filter-select" value={replyDelay || 'off'} onChange={(e) => setReplyDelay(e.target.value)}>
+                  <PickerSelect className="filter-select" value={replyDelay || 'off'} onChange={(e) => setReplyDelay(e.target.value)}>
                     {DELAY_MODES.map((m) => <option key={m.id} value={m.id}>{m.label}</option>)}
-                  </select>
+                  </PickerSelect>
                 </div>
                 <p className="card-hint">开启后涟言有时不会秒回，像一个在忙别的事的人；晾着期间你继续发的消息会攒着一起回。到点时页面要开着（或重新打开）才会回。</p>
               </div>
@@ -1323,11 +1324,11 @@ export default function Settings() {
                 </div>
                 <div className="card-row">
                   <span className="card-row-label">搜索 Provider</span>
-                  <select className="filter-select" value={searchConfig.provider || ''} onChange={(e) => setSearchConfig({ provider: e.target.value || null })}>
+                  <PickerSelect className="filter-select" value={searchConfig.provider || ''} onChange={(e) => setSearchConfig({ provider: e.target.value || null })}>
                     <option value="">未配置</option>
                     <option value="serper">Serper.dev</option>
                     <option value="tavily">Tavily</option>
-                  </select>
+                  </PickerSelect>
                 </div>
                 {searchConfig.provider && (
                   <div className="form-row">

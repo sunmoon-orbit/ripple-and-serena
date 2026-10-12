@@ -1,3 +1,4 @@
+import PickerSelect from '../PickerSelect'
 import { useState, useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { showToast } from '../Toast'
@@ -126,9 +127,9 @@ export default function FortuneWheel({ onClose }) {
             {customOpen && (
               <div className="fw-custom-body">
                 <div className="fw-custom-form">
-                  <select className="filter-select" value={customDim} onChange={(e) => setCustomDim(e.target.value)}>
+                  <PickerSelect className="filter-select" value={customDim} onChange={(e) => setCustomDim(e.target.value)}>
                     {normalDims.map((d) => <option key={d.id} value={d.id}>{d.zh}</option>)}
-                  </select>
+                  </PickerSelect>
                   <input
                     className="fw-custom-input"
                     value={customText}

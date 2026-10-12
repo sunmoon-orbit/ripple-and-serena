@@ -1,3 +1,4 @@
+import PickerSelect from '../PickerSelect'
 import { useState, useEffect, useCallback } from 'react'
 import { createPortal } from 'react-dom'
 import { useToolMemory } from './ToolMemory'
@@ -249,19 +250,19 @@ export default function GamesRoom({ onClose }) {
               <div className="games-form-2col">
                 <div>
                   <label className="games-flabel">谁在玩</label>
-                  <select className="games-input" value={form.player} onChange={(e) => setForm((f) => ({ ...f, player: e.target.value }))}>
+                  <PickerSelect className="games-input" value={form.player} onChange={(e) => setForm((f) => ({ ...f, player: e.target.value }))}>
                     <option value="chat">对话·阿言</option>
                     <option value="cc">服务器·阿言</option>
                     <option value="api">言叽·阿言</option>
-                  </select>
+                  </PickerSelect>
                 </div>
                 <div>
                   <label className="games-flabel">状态</label>
-                  <select className="games-input" value={form.status} onChange={(e) => setForm((f) => ({ ...f, status: e.target.value }))}>
+                  <PickerSelect className="games-input" value={form.status} onChange={(e) => setForm((f) => ({ ...f, status: e.target.value }))}>
                     <option value="playing">进行中</option>
                     <option value="paused">暂停</option>
                     <option value="ended">已结束</option>
-                  </select>
+                  </PickerSelect>
                 </div>
               </div>
 

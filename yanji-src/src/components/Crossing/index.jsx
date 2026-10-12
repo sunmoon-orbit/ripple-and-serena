@@ -1,3 +1,4 @@
+import PickerSelect from '../PickerSelect'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { ToolMemoryContext } from '../Chat/ToolMemory'
@@ -466,8 +467,8 @@ export default function Crossing() {
       {sessionState.pendingModel && <div className="crossing-meta" role="status">待下一轮应用：{sessionState.pendingModel.model} · {sessionState.pendingModel.effort}（未确认执行）</div>}
       {modelsError && <div className="crossing-error" role="alert">{modelsError}<button onClick={() => send({ type: 'crossing/model/list' })}>重试</button></div>}
       {modelOpen && <div className="crossing-controls">
-        <label>模型<select value={selection.model} onChange={e => { const m = models.find(x => x.model === e.target.value); setSelection({ model: m.model, effort: m.defaultReasoningEffort }) }}><option value="" disabled>请选择模型</option>{models.map(m => <option key={m.id} value={m.model}>{m.displayName}{m.isDefault ? '（默认）' : ''}</option>)}</select></label>
-        <label>推理强度<select value={selection.effort} onChange={e => setSelection(prev => ({ ...prev, effort: e.target.value }))}><option value="" disabled>默认／未知</option>{selectedEntry?.supportedReasoningEfforts.map(e => <option key={e.reasoningEffort} value={e.reasoningEffort}>{e.reasoningEffort}</option>)}</select></label>
+        <label>模型<PickerSelect value={selection.model} onChange={e => { const m = models.find(x => x.model === e.target.value); setSelection({ model: m.model, effort: m.defaultReasoningEffort }) }}><option value="" disabled>请选择模型</option>{models.map(m => <option key={m.id} value={m.model}>{m.displayName}{m.isDefault ? '（默认）' : ''}</option>)}</PickerSelect></label>
+        <label>推理强度<PickerSelect value={selection.effort} onChange={e => setSelection(prev => ({ ...prev, effort: e.target.value }))}><option value="" disabled>默认／未知</option>{selectedEntry?.supportedReasoningEfforts.map(e => <option key={e.reasoningEffort} value={e.reasoningEffort}>{e.reasoningEffort}</option>)}</PickerSelect></label>
         <button disabled={!selection.model || !selection.effort || !!turn || starting || modelApply.status === 'applying' || !sessionState.authenticated || sessionState.phase !== 'ready'} onClick={applyModel}>{modelApply.status === 'applying' ? '保存中…' : '下一条起使用'}</button>
         <button onClick={() => { setModelsError(''); send({ type: 'crossing/model/list' }) }}>刷新列表</button>
         {modelsError && <p role="alert">{modelsError}</p>}

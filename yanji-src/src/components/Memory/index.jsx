@@ -1,3 +1,4 @@
+import PickerSelect from '../PickerSelect'
 import { useState, useEffect, useCallback } from 'react'
 import { useStore } from '../../store'
 import { fetchMemories, createMemory, updateMemory, trashMemory, fetchHeatmap } from '../../api/moonMemory'
@@ -158,14 +159,14 @@ export default function Memory() {
           </svg>
           <input className="filter-input" placeholder="搜索记忆..." value={searchQ} onChange={(e) => setSearchQ(e.target.value)} />
         </div>
-        <select className="filter-select" value={filterScope} onChange={(e) => setFilterScope(e.target.value)}>
+        <PickerSelect className="filter-select" value={filterScope} onChange={(e) => setFilterScope(e.target.value)}>
           <option value="">全部范围</option>
           {Object.entries(SCOPE_LABELS).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
-        </select>
-        <select className="filter-select" value={filterLayer} onChange={(e) => setFilterLayer(e.target.value)}>
+        </PickerSelect>
+        <PickerSelect className="filter-select" value={filterLayer} onChange={(e) => setFilterLayer(e.target.value)}>
           <option value="">全部层</option>
           {Object.entries(LAYER_LABELS).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
-        </select>
+        </PickerSelect>
       </div>
 
       {/* Create form */}
@@ -181,13 +182,13 @@ export default function Memory() {
           />
           <div className="memory-create-meta">
             <input className="memory-create-tags" placeholder="标签（逗号分隔）" value={newTags} onChange={(e) => setNewTags(e.target.value)} />
-            <select className="filter-select" value={newScope} onChange={(e) => setNewScope(e.target.value)}>
+            <PickerSelect className="filter-select" value={newScope} onChange={(e) => setNewScope(e.target.value)}>
               {Object.entries(SCOPE_LABELS).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
-            </select>
-            <select className="filter-select" value={newLayer} onChange={(e) => setNewLayer(e.target.value)}>
+            </PickerSelect>
+            <PickerSelect className="filter-select" value={newLayer} onChange={(e) => setNewLayer(e.target.value)}>
               <option value="">无层级</option>
               {Object.entries(LAYER_LABELS).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
-            </select>
+            </PickerSelect>
           </div>
           <div className="memory-create-actions">
             <button className="btn-sm btn-ghost" onClick={() => setCreating(false)}>取消</button>

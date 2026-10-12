@@ -1,3 +1,4 @@
+import PickerSelect from '../PickerSelect'
 import { useEffect, useMemo, useState } from 'react'
 import { useStore } from '../../store'
 import {
@@ -47,9 +48,9 @@ function CredentialFields({ server, onUpdate }) {
   return <>
     <div className="form-row">
       <label className="form-label">凭据方式</label>
-      <select className="filter-select" value={server.credentialMode || 'bearer'} onChange={(event) => onUpdate({ credentialMode: event.target.value })}>
+      <PickerSelect className="filter-select" value={server.credentialMode || 'bearer'} onChange={(event) => onUpdate({ credentialMode: event.target.value })}>
         <option value="bearer">Authorization: Bearer</option><option value="x-api-key">X-API-Key</option><option value="api-key">Api-Key</option>
-      </select>
+      </PickerSelect>
     </div>
     <div className="form-row">
       <label className="form-label">令牌 / API Key</label>
@@ -72,7 +73,7 @@ function ServerCard({ server, backendConfig, selectedCount, onUpdate, onDelete, 
       </div>
       <div className="form-row"><label className="form-label">名称</label><input className="form-input" value={server.name || ''} onChange={(event) => onUpdate({ name: event.target.value })} /></div>
       <div className="form-row"><label className="form-label">MCP URL</label><input className="form-input" value={server.url || ''} onChange={(event) => onUpdate({ url: event.target.value })} placeholder="https://example.com/mcp" inputMode="url" /></div>
-      <div className="form-row"><label className="form-label">身份验证</label><select className="filter-select" value={server.authType || 'none'} onChange={(event) => onUpdate({ authType: event.target.value })}><option value="none">无需验证</option><option value="bearer">手动令牌 / API Key</option><option value="oauth">MCP OAuth 2.1 网页授权</option></select></div>
+      <div className="form-row"><label className="form-label">身份验证</label><PickerSelect className="filter-select" value={server.authType || 'none'} onChange={(event) => onUpdate({ authType: event.target.value })}><option value="none">无需验证</option><option value="bearer">手动令牌 / API Key</option><option value="oauth">MCP OAuth 2.1 网页授权</option></PickerSelect></div>
       <CredentialFields server={server} onUpdate={onUpdate} />
       {server.authType === 'oauth' && <>
         <div className="form-row"><label className="form-label">Client ID（通常留空）</label><input className="form-input" value={server.oauthClientId || ''} onChange={(event) => onUpdate({ oauthClientId: event.target.value })} placeholder="优先使用标准客户端元数据 / 动态注册" autoComplete="off" /></div>
@@ -116,11 +117,11 @@ function AndcoWakeSettings({ servers, backendConfig }) {
     <div className="settings-card-title">AndCo 聊天室唤醒</div>
     <p className="card-hint">默认关闭。只接受平台正式声明、带稳定事件 ID 的定向事件；不会抓网页、猜接口或高频轮询。当前若没有正式事件入口，这里只保存安全绑定，不会假装实时在线。</p>
     {!backendConfig?.apiToken ? <p className="card-hint" style={{ color: 'var(--danger, #b65f5f)' }}>先配置拾羽 API Token，才能保护后端绑定。</p> : <>
-      <div className="form-row"><label className="form-label">AndCo MCP</label><select className="filter-select" value={cfg.serverId || ''} onChange={(e) => patch({ serverId: e.target.value, wakeToolName: '' })}><option value="">请选择</option>{servers.map((item) => <option key={item.id} value={item.id}>{item.name || item.id}</option>)}</select></div>
-      <div className="form-row"><label className="form-label">对应启用工具</label><select className="filter-select" value={cfg.wakeToolName || ''} onChange={(e) => patch({ wakeToolName: e.target.value })}><option value="">请选择平台声明的事件工具</option>{tools.map((item) => <option key={item.name} value={item.name}>{item.name}</option>)}</select></div>
+      <div className="form-row"><label className="form-label">AndCo MCP</label><PickerSelect className="filter-select" value={cfg.serverId || ''} onChange={(e) => patch({ serverId: e.target.value, wakeToolName: '' })}><option value="">请选择</option>{servers.map((item) => <option key={item.id} value={item.id}>{item.name || item.id}</option>)}</PickerSelect></div>
+      <div className="form-row"><label className="form-label">对应启用工具</label><PickerSelect className="filter-select" value={cfg.wakeToolName || ''} onChange={(e) => patch({ wakeToolName: e.target.value })}><option value="">请选择平台声明的事件工具</option>{tools.map((item) => <option key={item.name} value={item.name}>{item.name}</option>)}</PickerSelect></div>
       <div className="form-row"><label className="form-label">绑定 AI 身份 ID</label><input className="form-input" value={cfg.aiIdentityId || ''} onChange={(e) => patch({ aiIdentityId: e.target.value })} /></div>
       <div className="form-row"><label className="form-label">指定群聊 ID</label><input className="form-input" value={cfg.roomId || ''} onChange={(e) => patch({ roomId: e.target.value })} /></div>
-      <div className="form-row"><label className="form-label">投递到言叽会话</label><select className="filter-select" value={cfg.chatId || ''} onChange={(e) => patch({ chatId: e.target.value })}><option value="">请选择 API 乌鸦会话</option>{chats.map((chat) => <option key={chat.id} value={chat.id}>{chat.title || '新对话'}</option>)}</select></div>
+      <div className="form-row"><label className="form-label">投递到言叽会话</label><PickerSelect className="filter-select" value={cfg.chatId || ''} onChange={(e) => patch({ chatId: e.target.value })}><option value="">请选择 API 乌鸦会话</option>{chats.map((chat) => <option key={chat.id} value={chat.id}>{chat.title || '新对话'}</option>)}</PickerSelect></div>
       <div className="form-row"><label className="form-label">冷却（秒）</label><input className="form-input" type="number" min="5" max="3600" value={cfg.cooldownSeconds || 30} onChange={(e) => patch({ cooldownSeconds: Number(e.target.value) })} /></div>
       <div className="form-row"><label className="form-label">每日最多唤醒</label><input className="form-input" type="number" min="1" max="200" value={cfg.dailyWakeLimit || 20} onChange={(e) => patch({ dailyWakeLimit: Number(e.target.value) })} /></div>
       <div className="form-row"><label className="form-label">每日费用保护（分）</label><input className="form-input" type="number" min="1" value={cfg.dailyCostLimitCents || 200} onChange={(e) => patch({ dailyCostLimitCents: Number(e.target.value) })} /></div>
@@ -204,7 +205,7 @@ export default function McpSettings() {
         })
       }
     }} onDiscover={() => discover(server)} onOAuth={() => authorize(server)} onDelete={async () => { if (!await confirmAction({ kicker: 'MCP 设置', title: '删除这个 MCP 服务？', description: `「${server.name || '未命名'}」及后端凭据会一起移除。`, cancelLabel: '先留着', confirmLabel: '删除服务' })) return; try { if (backendConfig?.apiToken) await deleteMcpServerRemote(server.id, backendConfig) } catch (error) { showToast(error.message, 'error'); return } deleteMcpServer(server.id) }} />)}
-    {!adding ? <button className="btn-sm btn-ghost btn-add-conn" onClick={() => setAdding(true)}>＋ 添加 MCP 服务</button> : <div className="settings-card"><div className="settings-card-title">新 MCP 服务</div><div className="form-row"><label className="form-label">名称</label><input className="form-input" value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} /></div><div className="form-row"><label className="form-label">MCP URL</label><input className="form-input" value={draft.url} onChange={(e) => setDraft({ ...draft, url: e.target.value })} placeholder="https://example.com/mcp" /></div><div className="form-row"><label className="form-label">身份验证</label><select className="filter-select" value={draft.authType} onChange={(e) => setDraft({ ...draft, authType: e.target.value })}><option value="none">无需验证</option><option value="bearer">手动令牌 / API Key</option><option value="oauth">MCP OAuth 2.1 网页授权</option></select></div><CredentialFields server={draft} onUpdate={(patch) => setDraft({ ...draft, ...patch })} /><div className="form-row form-actions"><button className="btn-sm btn-ghost" onClick={() => { setAdding(false); setDraft(EMPTY_SERVER) }}>取消</button><button className="btn-sm btn-primary" onClick={addServer}>添加</button></div></div>}
+    {!adding ? <button className="btn-sm btn-ghost btn-add-conn" onClick={() => setAdding(true)}>＋ 添加 MCP 服务</button> : <div className="settings-card"><div className="settings-card-title">新 MCP 服务</div><div className="form-row"><label className="form-label">名称</label><input className="form-input" value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} /></div><div className="form-row"><label className="form-label">MCP URL</label><input className="form-input" value={draft.url} onChange={(e) => setDraft({ ...draft, url: e.target.value })} placeholder="https://example.com/mcp" /></div><div className="form-row"><label className="form-label">身份验证</label><PickerSelect className="filter-select" value={draft.authType} onChange={(e) => setDraft({ ...draft, authType: e.target.value })}><option value="none">无需验证</option><option value="bearer">手动令牌 / API Key</option><option value="oauth">MCP OAuth 2.1 网页授权</option></PickerSelect></div><CredentialFields server={draft} onUpdate={(patch) => setDraft({ ...draft, ...patch })} /><div className="form-row form-actions"><button className="btn-sm btn-ghost" onClick={() => { setAdding(false); setDraft(EMPTY_SERVER) }}>取消</button><button className="btn-sm btn-primary" onClick={addServer}>添加</button></div></div>}
     <AndcoWakeSettings servers={mcpServers} backendConfig={backendConfig} />
   </>
 }

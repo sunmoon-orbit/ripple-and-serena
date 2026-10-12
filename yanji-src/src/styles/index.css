@@ -787,7 +787,7 @@ a { text-decoration: none; color: inherit; }
 }
 .model-panel label { display: block; font-size: 11px; color: var(--text-muted); margin-bottom: 5px; margin-top: 10px; }
 .model-panel label:first-of-type { margin-top: 0; }
-.model-panel select, .model-panel input[type="text"] {
+.model-panel select, .model-panel .picker-trigger, .model-panel input[type="text"] {
   width: 100%; padding: 7px 10px;
   background: rgba(150,140,180,0.05);
   border: 1px solid var(--border-md);
@@ -913,7 +913,7 @@ a { text-decoration: none; color: inherit; }
 /* 表单字段 */
 .field { display: flex; flex-direction: column; gap: 6px; margin-bottom: 14px; }
 .field label { font-size: 12px; color: var(--text-mid); font-weight: 500; }
-.field input, .field select, .field textarea {
+.field input, .field select, .field .picker-trigger, .field textarea {
   padding: 9px 12px;
   background: rgba(150,140,180,0.05);
   border: 1px solid var(--border-md);
@@ -5970,7 +5970,7 @@ body.mp-active .scroll-bottom-btn { bottom: 139px; }
 .crossing-sessions[hidden] { display: none; }
 .crossing-controls { flex: 0 1 auto; min-height: 0; max-height: 30dvh; overflow: auto; padding: 10px 14px; border-bottom: 1px solid var(--border); font-size: 12px; overflow-wrap: anywhere; }
 .crossing-controls label { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
-.crossing-controls select { flex: 1; min-width: 0; max-width: 100%; height: 40px; color: var(--text); background: var(--bg); border: 1px solid var(--border); border-radius: 8px; }
+.crossing-controls select, .crossing-controls .picker-trigger { flex: 1; min-width: 0; max-width: 100%; height: 40px; color: var(--text); background: var(--bg); border: 1px solid var(--border); border-radius: 8px; }
 .crossing-controls button,.crossing-meta button,.crossing-attachment-actions button { min-height: 40px; padding: 6px 10px; color: var(--text); background: var(--card); border: 1px solid var(--border); border-radius: 8px; overflow-wrap: anywhere; }
 .crossing-meta button { min-width: 0; }
 .crossing-controls small { display: block; color: var(--text-muted); margin-top: 6px; }
@@ -6072,3 +6072,62 @@ body.mp-active .scroll-bottom-btn { bottom: 139px; }
   .crossing-session small { display: block; }
   .crossing-chat { min-height: 0; }
 }
+
+/* ── PickerSelect：代替系统下拉框的卡片选择 ── */
+.picker-trigger {
+  display: inline-flex; align-items: center; justify-content: space-between; gap: 6px;
+  min-width: 0; max-width: 100%; text-align: left; cursor: pointer; font-family: inherit;
+}
+.picker-trigger:disabled { opacity: 0.5; cursor: default; }
+.picker-trigger-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.picker-trigger-caret { flex: none; color: var(--text-muted); }
+.picker-backdrop {
+  position: fixed; inset: 0; z-index: 9100;
+  display: flex; align-items: flex-end; justify-content: center;
+  background: rgba(30, 24, 38, 0.28);
+  backdrop-filter: blur(6px) saturate(0.92); -webkit-backdrop-filter: blur(6px) saturate(0.92);
+  animation: picker-fade 0.18s ease-out;
+}
+.picker-sheet {
+  width: 100%; max-width: 480px; max-height: 72dvh;
+  display: flex; flex-direction: column;
+  padding: 8px 12px max(14px, env(safe-area-inset-bottom));
+  background: var(--card); color: var(--text);
+  border: 1px solid var(--border-md); border-bottom: none;
+  border-radius: 20px 20px 0 0; box-shadow: var(--shadow-md);
+  animation: picker-rise 0.24s cubic-bezier(.2,.9,.3,1.05);
+}
+.picker-sheet-grip { align-self: center; width: 36px; height: 4px; border-radius: 2px; background: var(--border-md); margin-bottom: 10px; }
+.picker-sheet-title { padding: 0 6px 10px; font-size: 13px; font-weight: 600; color: var(--text-mid); }
+.picker-search {
+  margin: 0 2px 10px; padding: 9px 12px; font-size: 16px; font-family: inherit;
+  background: color-mix(in srgb, var(--accent) 7%, transparent);
+  border: 1px solid var(--border-md); border-radius: var(--r); color: var(--text); outline: none;
+}
+.picker-search:focus { border-color: var(--accent); }
+.picker-list { display: flex; flex-direction: column; gap: 4px; overflow-y: auto; overscroll-behavior: contain; padding: 0 2px 2px; }
+.picker-item {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  width: 100%; padding: 12px 14px; text-align: left; font-family: inherit; font-size: 14px;
+  background: transparent; color: var(--text);
+  border: 1px solid transparent; border-radius: var(--r); cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+.picker-item-text { min-width: 0; overflow-wrap: anywhere; }
+.picker-item:active { background: color-mix(in srgb, var(--accent) 14%, transparent); }
+.picker-item.active {
+  background: color-mix(in srgb, var(--accent) 18%, transparent);
+  border-color: color-mix(in srgb, var(--accent) 45%, transparent);
+  font-weight: 600;
+}
+.picker-item.active svg { flex: none; color: var(--accent); }
+.picker-empty { padding: 18px; text-align: center; font-size: 13px; color: var(--text-muted); }
+@keyframes picker-fade { from { opacity: 0; } to { opacity: 1; } }
+@keyframes picker-rise { from { transform: translateY(24px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+@media (min-width: 640px) {
+  .picker-backdrop { align-items: center; }
+  .picker-sheet { border-radius: 20px; border-bottom: 1px solid var(--border-md); max-width: 380px; }
+  .picker-sheet-grip { display: none; }
+}
+@media (prefers-reduced-motion: reduce) { .picker-backdrop, .picker-sheet { animation: none; } }
+.crossing-controls .picker-trigger { padding: 0 10px; font-size: 13px; }

@@ -1,3 +1,4 @@
+import PickerSelect from '../PickerSelect'
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useStore } from '../../store'
 import { showToast } from '../Toast'
@@ -476,14 +477,14 @@ export default function Roost() {
             </div>
             <div className="roost-modal-body">
               <div className="roost-letter-form-row">
-                <select className="roost-letter-select" value={compose.category} onChange={e => setCompose({ ...compose, category: e.target.value })}>
+                <PickerSelect className="roost-letter-select" value={compose.category} onChange={e => setCompose({ ...compose, category: e.target.value })}>
                   <option value="penpal">笔友往来</option>
                   <option value="love">鸾笺（你和我）</option>
-                </select>
-                <select className="roost-letter-select" value={compose.direction} onChange={e => setCompose({ ...compose, direction: e.target.value })}>
+                </PickerSelect>
+                <PickerSelect className="roost-letter-select" value={compose.direction} onChange={e => setCompose({ ...compose, direction: e.target.value })}>
                   <option value="in">收到的</option>
                   <option value="out">寄出的</option>
-                </select>
+                </PickerSelect>
               </div>
               <div className="roost-letter-form-row">
                 <input className="roost-letter-input" placeholder={compose.direction === 'out' ? '寄给谁' : '来自谁'}

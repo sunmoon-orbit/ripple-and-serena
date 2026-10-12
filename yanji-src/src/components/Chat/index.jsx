@@ -1,3 +1,4 @@
+import PickerSelect from '../PickerSelect'
 import { useState, useCallback, useRef, useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import { useShallow } from 'zustand/react/shallow'
@@ -1864,7 +1865,7 @@ export default function Chat() {
               </div>
               <div className="model-panel-section">
                 <div className="model-panel-label">连接</div>
-                <select
+                <PickerSelect
                   className="model-conn-select"
                   value={currentConnId}
                   onChange={(e) => {
@@ -1875,7 +1876,7 @@ export default function Chat() {
                   {connections.map((c) => (
                     <option key={c.id} value={c.id}>{c.name}</option>
                   ))}
-                </select>
+                </PickerSelect>
               </div>
               {builtinModels.length > 0 && (
                 <div className="model-panel-section">
