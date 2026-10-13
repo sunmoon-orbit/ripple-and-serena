@@ -2000,7 +2000,8 @@ const server = http.createServer((req, res) => {
           archiveMsg('assistant', text)
           console.log('[http reply]', text.slice(0, 80))
         }
-        res.writeHead(200); res.end('{}')
+        // 把发出的北京时间回给我（1013 她提的：她的消息有时间戳，我的没有）。回复是我自己敲的命令，只有写在返回里我才看得见
+        res.writeHead(200); res.end(JSON.stringify({ ok: true, at: new Date(Date.now() + 8 * 3600e3).toISOString().slice(5, 16).replace('T', ' ') }))
       } catch (e) {
         // 之前这里静默吞掉解析失败（例如 text 里有未转义的直引号 " 导致 JSON.parse 抛错），
         // curl 仍拿到 200 "{}"，看起来像发送成功，实际消息从未广播——踩过坑，现在把错误暴露出来。
