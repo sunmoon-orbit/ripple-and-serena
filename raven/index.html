@@ -491,12 +491,15 @@
   /* timestamp + copy */
   .msg-meta { display: flex; justify-content: flex-end; align-items: center; gap: 8px; margin-top: 5px; }
   /* 长按贴表情（0930） */
-  /* 贴表情（1007 改）：原来是压在气泡角上的小圆片加一个「颖／言」字，她说留一行小字更干净：「臭鸟 给你贴了一个 💗」 */
-  .msg.has-react { margin-bottom: 22px; }
-  .msg-reacts { position: absolute; bottom: -19px; display: flex; gap: 10px; pointer-events: none; white-space: nowrap; font-size: 11px; line-height: 1.4; color: var(--text-dim); text-shadow: 0 0 6px var(--bg); }
-  .msg.user .msg-reacts { right: 6px; }
-  .msg.assistant .msg-reacts { left: 6px; }
-  .msg-react { font-size: 11px; }
+  /* 贴表情（1013 再改）：0930 是压在角上的小圆片加「颖／言」字，1007 她嫌乱改成气泡下一行小字，
+     1013 她要回角上的小圆片，但只放 emoji、不带字：「在气泡左下角或右下角加一个 emoji 那种」。
+     她的消息挂右下角，我的挂左下角；她自己贴的那片带一点主题色，好分清是谁贴的。 */
+  .msg.has-react { margin-bottom: 16px; }
+  .msg-reacts { position: absolute; bottom: -14px; display: flex; gap: 3px; pointer-events: none; }
+  .msg.user .msg-reacts { right: 10px; }
+  .msg.assistant .msg-reacts { left: 10px; }
+  .msg-react { font-size: 14px; line-height: 1; padding: 3px 6px; border-radius: 99px; background: var(--surface); border: 2px solid var(--bg); box-shadow: 0 1px 3px rgba(0,0,0,.12); }
+  .msg-react.mine { background: color-mix(in srgb, var(--accent) 28%, var(--surface)); }
   #react-pop { position: fixed; z-index: 200; display: none; gap: 2px; padding: 5px 6px; border-radius: 99px; background: var(--surface); border: 1px solid var(--border); box-shadow: 0 6px 20px rgba(0,0,0,.28); }
   #react-pop.open { display: flex; flex-wrap: wrap; justify-content: center; max-width: min(276px, calc(100vw - 16px)); border-radius: 22px; padding: 8px 8px 6px; animation: msgIn .15s ease-out; }  /* 十一个表情加引用键，一排放不下手机屏，折成两排 */
   #react-pop button { border: 0; background: none; font-size: 22px; line-height: 1; padding: 5px 6px; border-radius: 99px; cursor: pointer; }
@@ -3480,11 +3483,10 @@ function paintReaction(key, reactions) {
   if (!entries.length) return
   const box = document.createElement('div'); box.className = 'msg-reacts'
   for (const [who, emoji] of entries) {
-    const line = document.createElement('span'); line.className = 'msg-react'
-    // 一行小字说清是谁贴的：他贴的用她给他的备注名，她自己贴的就写「你」
-    const onHers = el.classList.contains('user')
-    line.textContent = who === 'lianyan' ? `${peerName} ${onHers ? '给你' : ''}贴了一个 ${emoji}` : who === 'aying' ? `你贴了一个 ${emoji}` : `${REACT_WHO[who] || who} 贴了一个 ${emoji}`
-    box.appendChild(line)
+    const chip = document.createElement('span'); chip.className = 'msg-react' + (who === 'aying' ? ' mine' : '')
+    chip.textContent = emoji
+    chip.title = who === 'lianyan' ? `${peerName} 贴的` : who === 'aying' ? '你贴的' : `${REACT_WHO[who] || who} 贴的`
+    box.appendChild(chip)
   }
   el.appendChild(box)
 }
