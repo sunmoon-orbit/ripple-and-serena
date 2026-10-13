@@ -19,6 +19,7 @@ export async function albumRequest(config, path = '', options = {}) {
 
 export const listAlbum = (config, before = '', trash = false) => albumRequest(config, `?limit=20${before ? `&before=${encodeURIComponent(before)}` : ''}${trash ? '&trash=1' : ''}`)
 export const saveAlbum = (config, { thumb_data, ...body }) => albumRequest(config, '', { method: 'POST', body: JSON.stringify(body) })
+export const editAlbumItem = (config, id, { title, description }) => albumRequest(config, `/${encodeURIComponent(id)}`, { method: 'PATCH', body: JSON.stringify({ title, description }) })
 export const hideAlbumItem = (config, id) => albumRequest(config, `/${encodeURIComponent(id)}`, { method: 'DELETE' })
 export const restoreAlbumItem = (config, id) => albumRequest(config, `/${encodeURIComponent(id)}/restore`, { method: 'POST', body: '{}' })
 export const searchAlbumImages = (config, query) => albumRequest(config, `/search?q=${encodeURIComponent(query)}`)

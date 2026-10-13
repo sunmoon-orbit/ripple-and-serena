@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useToolMemory } from './ToolMemory'
-import { albumImage, conversationCard, hideAlbumItem, listAlbum, prepareAlbumImage, restoreAlbumItem, saveAlbum } from '../../api/album'
+import { albumImage, conversationCard, editAlbumItem, hideAlbumItem, listAlbum, prepareAlbumImage, restoreAlbumItem, saveAlbum } from '../../api/album'
 import { useThemedConfirm } from '../ThemedConfirmDialog'
 
 export function AlbumIcon({ size = 20 }) {
@@ -34,6 +34,7 @@ export default function PhotoAlbum({ onClose, messages = [] }) {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const [draft, setDraft] = useState(null)
+  const [editing, setEditing] = useState(null)
   const [pickChat, setPickChat] = useState(false)
   const [selected, setSelected] = useState([])
   const [trashMode, setTrashMode] = useState(false)
@@ -67,13 +68,14 @@ export default function PhotoAlbum({ onClose, messages = [] }) {
     const close = event => {
       if (event.key !== 'Escape' || busy) return
       if (draft) setDraft(null)
+      else if (editing) setEditing(null)
       else if (pickChat) setPickChat(false)
       else if (detail) setDetail(false)
       else onClose()
     }
     window.addEventListener('keydown', close)
     return () => window.removeEventListener('keydown', close)
-  }, [detail, draft, pickChat, busy, onClose])
+  }, [detail, draft, editing, pickChat, busy, onClose])
 
   async function turn(direction) {
     if (busy || loading || detail || draft || pickChat) return
@@ -111,6 +113,15 @@ export default function PhotoAlbum({ onClose, messages = [] }) {
     } catch (e) { setError(e.message) }
     finally { setBusy(false) }
   }
+  // 改名字和说明：图片不动，改完留在这一页，不重新翻回第一张
+  async function keepEdit(event) {
+    event.preventDefault(); setBusy(true); setError('')
+    try {
+      const saved = await editAlbumItem(config, item.id, { title: editing.title.trim(), description: editing.description })
+      setItems(previous => previous.map(it => it.id === saved.id ? saved : it)); setEditing(null)
+    } catch (e) { setError(e.message) }
+    finally { setBusy(false) }
+  }
   async function remove() {
     if (!await confirm({ title: '移入回收站？', description: '30 天内可以恢复；到期后会自动彻底删除并释放空间。', confirmLabel: '移入回收站' })) return
     setBusy(true); setError('')
@@ -130,12 +141,17 @@ export default function PhotoAlbum({ onClose, messages = [] }) {
   return createPortal(<div className="photo-album-overlay" onClick={() => { if (!busy) onClose() }}>
     <section className="photo-album" role="dialog" aria-modal="true" aria-label="共同相册" onClick={e => e.stopPropagation()}>
       <header className="photo-album-head"><div><h2><AlbumIcon />{trashMode ? '回收站' : '相册'}</h2><p>{trashMode ? '软删除的照片保留 30 天' : '把想留下的这一刻，翻给你看'}</p></div><div className="photo-album-head-actions"><button className="photo-album-trash-toggle" onClick={() => { setDetail(false); setTrashMode(value => !value) }} disabled={busy}>{trashMode ? '返回相册' : '回收站'}</button><button onClick={onClose} disabled={busy} aria-label="关闭相册">×</button></div></header>
-      {error && <div className="photo-album-error" role="alert">{error}{!draft && !pickChat && <button onClick={refresh} disabled={busy || loading}>重试</button>}</div>}
+      {error && <div className="photo-album-error" role="alert">{error}{!draft && !editing && !pickChat && <button onClick={refresh} disabled={busy || loading}>重试</button>}</div>}
       {draft ? <form className="photo-album-editor" onSubmit={keepDraft}>
         <img src={draft.thumb_data} alt="待收藏图片" />
         <label>名字<input autoFocus maxLength={80} required value={draft.title} onChange={e => setDraft({ ...draft, title: e.target.value })} placeholder="给这一刻取个名字" /></label>
         <label>想记下的话<textarea maxLength={4000} rows={4} value={draft.description} onChange={e => setDraft({ ...draft, description: e.target.value })} placeholder="为什么想留下它？" /></label>
         <div className="photo-album-actions"><button type="button" onClick={() => setDraft(null)} disabled={busy}>返回</button><button type="submit" disabled={busy || !draft.title.trim()}>{busy ? '收藏中…' : '收入相册'}</button></div>
+      </form> : editing && item ? <form className="photo-album-editor" onSubmit={keepEdit}>
+        <div className="photo-album-thumb"><PrivateImage config={config} item={item} thumbnail /></div>
+        <label>名字<input autoFocus maxLength={80} required value={editing.title} onChange={e => setEditing({ ...editing, title: e.target.value })} /></label>
+        <label>想记下的话<textarea maxLength={4000} rows={6} value={editing.description} onChange={e => setEditing({ ...editing, description: e.target.value })} /></label>
+        <div className="photo-album-actions"><button type="button" onClick={() => setEditing(null)} disabled={busy}>不改了</button><button type="submit" disabled={busy || !editing.title.trim()}>{busy ? '保存中…' : '改好了'}</button></div>
       </form> : pickChat ? <div className="photo-album-chat-picker">
         <p>点图片收藏原图；勾选 1–8 条消息生成对话纪念卡。</p>
         <div className="photo-album-chat-list">{sources.length === 0 && <p>当前聊天还没有可收藏的消息。</p>}{sources.map(m => <div key={m.id}>
@@ -152,7 +168,7 @@ export default function PhotoAlbum({ onClose, messages = [] }) {
         <h3>{item.title}</h3><p>{item.description || '这一刻，无需多说。'}</p>
         <small>{trashMode ? `回收站还会保留 ${trashDaysLeft} 天` : `${item.author} 收藏 · ${new Date(item.created_at).toLocaleDateString('zh-CN')}`}</small>
         {item.source_url && /^https:\/\//i.test(item.source_url) && <a href={item.source_url} target="_blank" rel="noopener noreferrer">查看原始来源 ↗</a>}
-        {trashMode ? <button className="photo-album-restore" onClick={restore} disabled={busy}>恢复到相册</button> : <button className="photo-album-back" onClick={remove} disabled={busy}>移入回收站</button>}
+        {trashMode ? <button className="photo-album-restore" onClick={restore} disabled={busy}>恢复到相册</button> : <><button className="photo-album-back" onClick={() => { setError(''); setEditing({ title: item.title || '', description: item.description || '' }) }} disabled={busy}>改名字和说明</button><button className="photo-album-back" onClick={remove} disabled={busy}>移入回收站</button></>}
       </div> : <>
         <div className="photo-album-book" onTouchStart={e => { swipe.current = { x: e.touches[0].clientX, y: e.touches[0].clientY } }} onTouchCancel={() => { swipe.current = null }} onTouchEnd={e => {
           const start = swipe.current; swipe.current = null
