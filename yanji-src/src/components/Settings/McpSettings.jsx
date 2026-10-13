@@ -7,6 +7,7 @@ import {
 } from '../../api/mcp'
 import { showToast } from '../Toast'
 import { useThemedConfirm } from '../ThemedConfirmDialog'
+import { groupTools, packState, togglePack } from '../../utils/toolPacks'
 
 const EMPTY_SERVER = { name: '', url: '', authType: 'none', bearerToken: '', credentialMode: 'bearer', oauthClientId: '' }
 
@@ -65,6 +66,13 @@ function ServerCard({ server, backendConfig, selectedCount, onUpdate, onDelete, 
   const [toolsOpen, setToolsOpen] = useState(false)
   const toolTotal = server.tools?.length || 0
   const toolPicked = (server.tools || []).filter((tool) => tool.enabled).length
+  // 按用途分的包（1013）：点一下开或关一整包，省得一个个勾。包的状态是现算的，不另存
+  const packs = useMemo(() => groupTools(server.tools || []), [server.tools])
+  const flipPack = (pack) => {
+    const result = togglePack(server.tools || [], pack.names, { selectedCount, limit: MCP_EXTERNAL_TOOL_LIMIT, serverEnabled: server.enabled !== false })
+    if (result.blocked) { showToast(`名额不够，还差 ${result.blocked} 个；先关掉别的包再开「${pack.title}」`, 'error'); return }
+    onUpdate({ tools: result.tools })
+  }
   return (
     <div className="settings-card">
       <div className="card-row">
@@ -90,6 +98,11 @@ function ServerCard({ server, backendConfig, selectedCount, onUpdate, onDelete, 
           <span className="settings-card-title" style={{ margin: 0 }}>这个服务的工具</span>
           <span className="card-hint" style={{ marginLeft: 'auto' }}>已选 {toolPicked} / {toolTotal} · {toolsOpen ? '收起 ▴' : '展开 ▾'}</span>
         </button>
+        {toolsOpen && packs.length > 0 && <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, padding: '4px 0 10px' }}>
+          {packs.map((pack) => { const state = packState(server.tools, pack.names); return (
+            <button key={pack.id} type="button" className={`btn-sm ${state.open ? 'btn-primary' : 'btn-ghost'}`} aria-pressed={state.open} onClick={() => flipPack(pack)}>{pack.title} {state.on}/{state.total}</button>
+          ) })}
+        </div>}
         {toolsOpen && server.tools.map((tool) => <ToolRow key={tool.name} server={server} tool={tool} selectedCount={selectedCount} onUpdate={onUpdate} />)}
       </div>}
     </div>
