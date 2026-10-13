@@ -1,0 +1,262 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>相册</title>
+<!--
+  相册（1013）：和言叽里翻的是同一本，照片存在记忆库。这页能翻、看大图、改名字和说明、
+  从手机选照片存进去、丢回收站和捞回来。图片要带钥匙才读得到，所以不直接写 <img src>，
+  而是 fetch 成 blob 再贴上去；滚到眼前才去取。
+-->
+<style>
+  :root { --bg: #f6f2ea; --paper: #fbf8f2; --line: #e8e1d4; --text: #3b342c; --dim: #8a8073; --faint: #b3a99b; --accent: #8a6a4a; --danger: #a8574b; --shade: rgba(40,30,20,.55); }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #1d1b19; --paper: #25221f; --line: #36312c; --text: #e7dfd3; --dim: #a59a8b; --faint: #786e62; --accent: #c9a77c; --danger: #d98b7e; --shade: rgba(0,0,0,.7); }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font-family: 'Noto Serif SC', 'Songti SC', 'PingFang SC', system-ui, serif;
+    padding: max(18px, env(safe-area-inset-top)) 16px max(28px, env(safe-area-inset-bottom)); }
+  .wrap { max-width: 640px; margin: 0 auto; }
+  h1 { font-size: 20px; font-weight: 600; margin: 4px 0 6px; letter-spacing: .04em; }
+  .sub { font-size: 12.5px; color: var(--dim); line-height: 1.7; margin-bottom: 14px; }
+  .bar { display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap; }
+  button { font: inherit; font-size: 13.5px; color: var(--text); background: var(--paper); border: 1px solid var(--line); border-radius: 999px; padding: 8px 14px; min-height: 38px; cursor: pointer; }
+  button:active { opacity: .7; }
+  button:disabled { opacity: .45; }
+  button.main { background: var(--accent); border-color: var(--accent); color: var(--bg); }
+  button.danger { color: var(--danger); }
+  .grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
+  .card { background: var(--paper); border: 1px solid var(--line); border-radius: 12px; overflow: hidden; padding: 0; text-align: left; display: block; width: 100%; min-height: 0; }
+  .card .pic { aspect-ratio: 1 / 1; background: var(--line); display: flex; align-items: center; justify-content: center; color: var(--faint); font-size: 12px; }
+  .card .pic img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .card .cap { padding: 9px 11px 11px; }
+  .card .t { font-size: 14px; font-weight: 600; line-height: 1.45; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .card .m { font-size: 11px; color: var(--faint); margin-top: 3px; }
+  .note { text-align: center; color: var(--dim); font-size: 13.5px; line-height: 2; padding: 60px 10px; white-space: pre-line; }
+  .more { display: block; margin: 18px auto 0; }
+  .err { background: var(--paper); border: 1px solid var(--danger); color: var(--danger); border-radius: 10px; padding: 10px 12px; font-size: 13px; margin-bottom: 14px; line-height: 1.6; }
+
+  .sheet { position: fixed; inset: 0; background: var(--shade); display: none; align-items: flex-end; justify-content: center; z-index: 10; }
+  .sheet.on { display: flex; }
+  .panel { background: var(--bg); width: 100%; max-width: 640px; max-height: 94dvh; overflow-y: auto; overscroll-behavior: contain; border-radius: 18px 18px 0 0;
+    padding: 14px 16px max(20px, env(safe-area-inset-bottom)); }
+  .panel .top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+  .panel .big { background: var(--line); border-radius: 10px; min-height: 160px; display: flex; align-items: center; justify-content: center; color: var(--faint); font-size: 12.5px; overflow: hidden; }
+  .panel .big img { max-width: 100%; max-height: 62dvh; display: block; }
+  .panel h2 { font-size: 17px; margin: 14px 0 6px; font-weight: 600; line-height: 1.5; }
+  .panel .desc { font-size: 14.5px; line-height: 1.9; white-space: pre-wrap; word-break: break-word; }
+  .panel .meta { font-size: 11.5px; color: var(--faint); margin: 10px 0 14px; }
+  .panel .acts { display: flex; gap: 8px; flex-wrap: wrap; }
+  label { display: block; font-size: 12px; color: var(--dim); margin: 12px 0 0; }
+  input[type=text], textarea { display: block; width: 100%; margin-top: 6px; padding: 11px 12px; border: 1px solid var(--line); background: var(--paper); color: var(--text);
+    border-radius: 10px; font: inherit; font-size: 16px; resize: vertical; }
+  textarea { min-height: 130px; line-height: 1.7; }
+  .preview { max-width: 100%; max-height: 30dvh; display: block; margin: 0 auto; border-radius: 10px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1 id="title">相册</h1>
+  <div class="sub" id="sub">想留下的那些时候。和言叽里翻的是同一本。</div>
+  <div class="bar">
+    <button class="main" id="btn-pick">从手机选照片</button>
+    <button id="btn-trash">回收站</button>
+  </div>
+  <div id="err"></div>
+  <div class="grid" id="grid"></div>
+  <div class="note" id="note">正在翻开相册…</div>
+  <button class="more" id="btn-more" hidden>再往前翻</button>
+  <input id="file" type="file" accept="image/jpeg,image/png,image/webp,image/gif" hidden>
+</div>
+
+<div class="sheet" id="sheet"><div class="panel" id="panel"></div></div>
+
+<script>
+const AUTH = () => ({ Authorization: 'Bearer ' + (localStorage.getItem('raven-token') || '') })
+const $ = id => document.getElementById(id)
+const el = (tag, props = {}, ...kids) => { const n = Object.assign(document.createElement(tag), props); for (const k of kids) n.append(k); return n }
+
+let items = [], cursor = null, trash = false, busy = false, current = null
+const blobs = new Map()   // 'id:thumb' / 'id:image' → 取图中的 Promise<objectURL>，同一张不重复取
+
+async function api(path = '', options = {}) {
+  const r = await fetch('/raven/album' + path, { ...options, cache: 'no-store',
+    headers: { ...AUTH(), ...(options.body ? { 'Content-Type': 'application/json' } : {}) } })
+  if (r.status === 401) throw new Error('登录过期了，回归巢首页重新进一下')
+  if (!r.ok) {
+    let msg = ''
+    try { msg = (await r.json()).error || '' } catch {}
+    throw new Error(msg || '相册卡住了（' + r.status + '）')
+  }
+  return options.blob ? r.blob() : r.json()
+}
+function picture(id, kind) {
+  const key = id + ':' + kind + (trash ? ':t' : '')
+  if (!blobs.has(key)) {
+    blobs.set(key, api('/' + id + '/' + kind + (trash ? '?trash=1' : ''), { blob: true }).then(b => URL.createObjectURL(b))
+      .catch(e => { blobs.delete(key); throw e }))
+  }
+  return blobs.get(key)
+}
+function showError(msg) {
+  $('err').textContent = ''
+  if (msg) $('err').append(el('div', { className: 'err', textContent: msg }))
+}
+const day = iso => { const d = new Date(new Date(iso).getTime() + 8 * 3600e3); return `${d.getUTCFullYear()}.${String(d.getUTCMonth() + 1).padStart(2, '0')}.${String(d.getUTCDate()).padStart(2, '0')}` }
+const daysLeft = it => it.deleted_at ? Math.max(0, 30 - Math.floor((Date.now() - new Date(it.deleted_at).getTime()) / 86400000)) : 30
+
+// 滚到眼前才去取缩略图
+const watcher = new IntersectionObserver(entries => {
+  for (const e of entries) {
+    if (!e.isIntersecting) continue
+    watcher.unobserve(e.target)
+    const box = e.target
+    picture(box.dataset.id, 'thumb').then(url => { box.textContent = ''; box.append(el('img', { src: url, alt: '', decoding: 'async' })) })
+      .catch(() => { box.textContent = '图没取到' })
+  }
+}, { rootMargin: '300px' })
+
+function card(it) {
+  const pic = el('div', { className: 'pic', textContent: '…' }); pic.dataset.id = it.id
+  const c = el('button', { className: 'card' }, pic,
+    el('div', { className: 'cap' },
+      el('div', { className: 't', textContent: it.title || '没起名字' }),
+      el('div', { className: 'm', textContent: trash ? `还留 ${daysLeft(it)} 天` : `${it.author || ''} · ${day(it.created_at)}` })))
+  c.dataset.id = it.id
+  c.onclick = () => openDetail(it.id)
+  watcher.observe(pic)
+  return c
+}
+function paint() {
+  $('grid').textContent = ''
+  for (const it of items) $('grid').append(card(it))
+  $('note').hidden = items.length > 0
+  if (!items.length) $('note').textContent = trash ? '回收站是空的。' : '还没有照片。\n点上面「从手机选照片」存第一张。'
+  $('btn-more').hidden = !cursor
+}
+async function load(reset) {
+  if (busy) return
+  busy = true; showError('')
+  if (reset) { items = []; cursor = null; $('grid').textContent = ''; $('note').hidden = false; $('note').textContent = '正在翻开相册…'; $('btn-more').hidden = true }
+  try {
+    const r = await api('?limit=20' + (cursor ? '&before=' + cursor : '') + (trash ? '&trash=1' : ''))
+    items = items.concat(r.items || []); cursor = r.next_cursor || null
+    paint()
+  } catch (e) { showError(e.message); if (!items.length) $('note').textContent = '没能打开，退出去重新进一下。' }
+  finally { busy = false }
+}
+
+function closeSheet() { $('sheet').classList.remove('on'); $('panel').textContent = ''; current = null }
+$('sheet').onclick = e => { if (e.target === $('sheet') && !busy) closeSheet() }
+
+function openDetail(id) {
+  const it = items.find(x => x.id === id); if (!it) return
+  current = it
+  const big = el('div', { className: 'big', textContent: '照片展开中…' })
+  picture(it.id, 'image').then(url => { if (current !== it) return; big.textContent = ''; big.append(el('img', { src: url, alt: it.title || '' })) })
+    .catch(() => { if (current === it) big.textContent = '图没取到，关掉再点一次' })
+  const acts = el('div', { className: 'acts' })
+  if (trash) {
+    acts.append(el('button', { className: 'main', textContent: '捞回相册', onclick: () => act(() => api('/' + it.id + '/restore', { method: 'POST', body: '{}' }), it.id) }))
+  } else {
+    acts.append(el('button', { textContent: '改名字和说明', onclick: () => openEdit(it) }))
+    acts.append(el('button', { className: 'danger', textContent: '移入回收站', onclick: () => {
+      if (confirm('移入回收站？\n30 天内可以捞回来，到期才真的删掉。')) act(() => api('/' + it.id, { method: 'DELETE' }), it.id)
+    } }))
+  }
+  const p = $('panel'); p.textContent = ''
+  p.append(el('div', { className: 'top' }, el('span', { className: 'sub', textContent: trash ? '回收站' : '' }), el('button', { textContent: '关上', onclick: closeSheet })),
+    big, el('h2', { textContent: it.title || '没起名字' }),
+    el('div', { className: 'desc', textContent: it.description || '这一刻，无需多说。' }),
+    el('div', { className: 'meta', textContent: trash ? `回收站还会留 ${daysLeft(it)} 天` : `${it.author || ''} 收藏 · ${day(it.created_at)}` }),
+    acts)
+  $('sheet').classList.add('on')
+}
+// 丢回收站／捞回来：做完把这张从当前列表里拿掉
+async function act(fn, id) {
+  if (busy) return
+  busy = true
+  try { await fn(); items = items.filter(x => x.id !== id); closeSheet(); paint(); showError('') }
+  catch (e) { alert(e.message) }
+  finally { busy = false }
+}
+
+// 名字和说明的表单：改已有的和存新的共用
+function form({ heading, preview, title = '', description = '', okText, cancelText = '不改了', onSubmit, onCancel }) {
+  const t = el('input', { type: 'text', maxLength: 80, value: title, placeholder: '给这一刻取个名字' })
+  const d = el('textarea', { maxLength: 4000, value: description, placeholder: '为什么想留下它？' })
+  const ok = el('button', { className: 'main', textContent: okText })
+  const cancel = el('button', { textContent: cancelText, onclick: onCancel })
+  ok.onclick = async () => {
+    if (!t.value.trim()) { t.focus(); return }
+    if (busy) return
+    busy = true; ok.disabled = cancel.disabled = true; const old = ok.textContent; ok.textContent = '稍等…'
+    try { await onSubmit({ title: t.value.trim(), description: d.value }) }
+    catch (e) { alert(e.message); ok.disabled = cancel.disabled = false; ok.textContent = old }
+    finally { busy = false }
+  }
+  const p = $('panel'); p.textContent = ''
+  p.append(el('div', { className: 'top' }, el('span', { className: 'sub', textContent: heading }), el('span')))
+  if (preview) p.append(preview)
+  p.append(el('label', { textContent: '名字' }, t), el('label', { textContent: '想记下的话' }, d),
+    el('div', { className: 'acts', style: 'margin-top:16px' }, cancel, ok))
+  $('sheet').classList.add('on')
+}
+function openEdit(it) {
+  form({ heading: '改名字和说明（照片本身不动）', title: it.title || '', description: it.description || '', okText: '改好了',
+    onCancel: () => openDetail(it.id),
+    onSubmit: async body => {
+      const saved = await api('/' + it.id, { method: 'PATCH', body: JSON.stringify(body) })
+      items = items.map(x => x.id === saved.id ? saved : x)
+      const c = document.querySelector(`.card[data-id="${saved.id}"] .t`); if (c) c.textContent = saved.title || '没起名字'
+      busy = false; openDetail(saved.id)
+    } })
+}
+
+// 从手机选：先在本机缩到长边 1600 的 JPEG 再传，省流量也不超记忆库 4MB 的上限
+function shrink(file) {
+  return new Promise((resolve, reject) => {
+    if (!file.type.startsWith('image/') || file.type === 'image/svg+xml') return reject(new Error('请选照片或 PNG、JPEG、WebP 图片'))
+    const url = URL.createObjectURL(file); const img = new Image()
+    img.onload = () => {
+      try {
+        const ratio = Math.min(1, 1600 / Math.max(img.naturalWidth, img.naturalHeight))
+        const c = el('canvas', { width: Math.max(1, Math.round(img.naturalWidth * ratio)), height: Math.max(1, Math.round(img.naturalHeight * ratio)) })
+        const g = c.getContext('2d'); g.fillStyle = '#faf8f2'; g.fillRect(0, 0, c.width, c.height); g.drawImage(img, 0, 0, c.width, c.height)
+        resolve(c.toDataURL('image/jpeg', 0.86))
+      } catch (e) { reject(new Error('这张图处理不了，换一张试试')) }
+      finally { URL.revokeObjectURL(url) }
+    }
+    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('这张图读不出来，换一张试试')) }
+    img.src = url
+  })
+}
+$('btn-pick').onclick = () => $('file').click()
+$('file').onchange = async e => {
+  const file = e.target.files && e.target.files[0]; e.target.value = ''
+  if (!file) return
+  let data
+  try { data = await shrink(file) } catch (err) { showError(err.message); return }
+  form({ heading: '存一张新的', preview: el('img', { className: 'preview', src: data, alt: '' }), okText: '收进相册', cancelText: '算了',
+    onCancel: closeSheet,
+    onSubmit: async body => {
+      await api('', { method: 'POST', body: JSON.stringify({ ...body, author: '阿颖', source: 'upload', image_data: data }) })
+      closeSheet(); busy = false
+      if (trash) { trash = false; syncMode() }
+      await load(true)
+    } })
+}
+
+function syncMode() {
+  $('title').textContent = trash ? '回收站' : '相册'
+  $('sub').textContent = trash ? '丢进来的照片留 30 天，到期才真的删掉。' : '想留下的那些时候。和言叽里翻的是同一本。'
+  $('btn-trash').textContent = trash ? '回相册' : '回收站'
+  $('btn-pick').hidden = trash
+}
+$('btn-trash').onclick = () => { if (busy) return; trash = !trash; syncMode(); load(true) }
+$('btn-more').onclick = () => load(false)
+load(true)
+</script>
+</body>
+</html>

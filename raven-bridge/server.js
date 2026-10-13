@@ -1318,6 +1318,32 @@ const server = http.createServer((req, res) => {
     return
   }
 
+  // 相册（1013）：和言叽翻的是同一本，照片在记忆库。这里只做带钥匙的转发，请求体和图片都原样流过去，不在桥上攒内存
+  //   列表 GET /raven/album?before=&trash=1 ／ 存一张 POST /raven/album
+  //   单张 GET|PATCH|DELETE /raven/album/<id> ／ 图 GET /raven/album/<id>/image|thumb ／ 捞回 POST /raven/album/<id>/restore
+  const albumMatch = url.pathname.match(/^\/raven\/album(?:\/(\d+)(?:\/(image|thumb|restore))?)?$/)
+  if (albumMatch) {
+    if (!externalAuthed(req, url)) { res.writeHead(401, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ error: 'unauthorized' })); return }
+    const [, albumId, albumSub] = albumMatch
+    const m = req.method
+    const allowed = !albumId ? (m === 'GET' || m === 'POST')
+      : !albumSub ? (m === 'GET' || m === 'PATCH' || m === 'DELETE')
+      : albumSub === 'restore' ? m === 'POST' : m === 'GET'
+    if (!allowed) { res.writeHead(405, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ error: 'method not allowed' })); return }
+    const qs = new URLSearchParams()
+    for (const k of ['before', 'limit', 'trash']) if (url.searchParams.get(k)) qs.set(k, url.searchParams.get(k))
+    const headers = { Authorization: `Bearer ${MOON_TOKEN}` }
+    for (const h of ['content-type', 'content-length']) if (req.headers[h]) headers[h] = req.headers[h]
+    const up = http.request({ hostname: '127.0.0.1', port: 3210, method: m, headers,
+      path: '/moments/album' + (albumId ? '/' + albumId : '') + (albumSub ? '/' + albumSub : '') + (qs.toString() ? '?' + qs : '') }, r => {
+      res.writeHead(r.statusCode, { 'Content-Type': r.headers['content-type'] || 'application/json', 'Cache-Control': 'private, no-store', 'X-Content-Type-Options': 'nosniff' })
+      r.pipe(res)
+    })
+    up.on('error', () => { if (!res.headersSent) res.writeHead(502, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ error: '相册暂时打不开' })) })
+    req.pipe(up)
+    return
+  }
+
   // random memory proxy
   // 涟言的日记本（1002）。记忆库那边已经把封存页正文剥掉了，这里再剥一遍：两道锁，任何一道漏了都不出门
   if (req.method === 'GET' && url.pathname === '/raven/journal') {
