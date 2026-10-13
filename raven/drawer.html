@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>抽屉</title>
+<!--
+  抽屉（1013）：乌鸦悄悄留下的便签和像素小画。不推送、没有红点，她想起来再打开。
+  点子和像素画格式来自 nnkiirue99-maker/ai-companion-drawer（MIT），页面是自己写的。
+-->
+<style>
+  :root { --bg: #efe9df; --wood: #d9cbb6; --paper: #fbf8f1; --ink: #3a332b; --dim: #948a7c; --line: #e2d8c8; --accent: #b0705a; --shadow: rgba(70,50,30,.16); }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #1c1a18; --wood: #2a2622; --paper: #2b2824; --ink: #e6dfd3; --dim: #8f877b; --line: #3a352f; --accent: #d39a84; --shadow: rgba(0,0,0,.4); }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink);
+    font-family: 'LXGW WenKai', 'Noto Serif SC', 'Songti SC', 'PingFang SC', system-ui, sans-serif;
+    padding: max(18px, env(safe-area-inset-top)) 16px max(32px, env(safe-area-inset-bottom)); }
+  .wrap { max-width: 460px; margin: 0 auto; }
+  h1 { font-size: 17px; font-weight: 600; letter-spacing: 6px; text-align: center; margin: 4px 0 4px; }
+  .sub { text-align: center; color: var(--dim); font-size: 12px; margin-bottom: 20px; line-height: 1.7; }
+  .item { position: relative; background: var(--paper); border: 1px solid var(--line); border-radius: 4px 14px 6px 12px;
+    padding: 18px 18px 14px; margin: 0 0 18px; box-shadow: 0 6px 16px var(--shadow); }
+  .item:nth-child(odd) { transform: rotate(-.5deg); }
+  .item:nth-child(even) { transform: rotate(.45deg); }
+  .item.new::before { content: ''; position: absolute; top: 10px; right: 12px; width: 6px; height: 6px; border-radius: 50%; background: var(--accent); opacity: .7; }
+  .text { white-space: pre-wrap; word-break: break-word; font-size: 15px; line-height: 1.85; }
+  .pixel { display: flex; justify-content: center; padding: 6px 0 4px; }
+  .pixel canvas { image-rendering: pixelated; image-rendering: crisp-edges; max-width: 100%; height: auto; border-radius: 3px; }
+  .pixel + .text { margin-top: 12px; text-align: center; font-size: 14px; color: var(--ink); }
+  .when { margin-top: 12px; text-align: right; font-size: 11px; color: var(--dim); letter-spacing: .5px; }
+  .empty, .loading { text-align: center; color: var(--dim); font-size: 13.5px; line-height: 2; padding: 70px 10px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>抽屉</h1>
+  <div class="sub">他放在这儿的。不催你看，想起来了再开。</div>
+  <div id="list"><div class="loading">拉开抽屉…</div></div>
+</div>
+<script>
+const auth = () => ({ Authorization: 'Bearer ' + (localStorage.getItem('raven-token') || '') })
+const list = document.getElementById('list')
+
+function when(iso) {
+  const d = new Date(new Date(iso).getTime() + 8 * 3600e3)   // 北京时间
+  const p = n => String(n).padStart(2, '0')
+  return `${d.getUTCFullYear()}.${p(d.getUTCMonth() + 1)}.${p(d.getUTCDate())}　${p(d.getUTCHours())}:${p(d.getUTCMinutes())}`
+}
+
+// 像素画：一格画成一个色块，按整数倍放大到差不多 240px 宽；canvas 本身用整数像素，不会糊
+function drawPixel(px) {
+  const scale = Math.max(1, Math.floor(240 / Math.max(px.w, px.h)))
+  const c = document.createElement('canvas')
+  c.width = px.w * scale; c.height = px.h * scale
+  const g = c.getContext('2d')
+  for (let i = 0; i < px.grid.length; i++) {
+    const color = px.palette[px.grid[i]]
+    if (!color || color === 'transparent' || color === '#0000' || color === '#00000000') continue
+    g.fillStyle = color
+    g.fillRect((i % px.w) * scale, Math.floor(i / px.w) * scale, scale, scale)
+  }
+  return c
+}
+
+async function load() {
+  let items
+  try {
+    const r = await fetch('/raven/drawer', { headers: auth(), cache: 'no-store' })
+    if (!r.ok) throw new Error(r.status === 401 ? '登录过期了，回归巢首页重新进一下' : '抽屉卡住了（' + r.status + '）')
+    items = (await r.json()).items || []
+  } catch (e) {
+    list.innerHTML = ''; list.appendChild(Object.assign(document.createElement('div'), { className: 'empty', textContent: e.message || '抽屉打不开，等会儿再试' }))
+    return
+  }
+  list.innerHTML = ''
+  if (!items.length) {
+    list.appendChild(Object.assign(document.createElement('div'), { className: 'empty', textContent: '现在是空的。\n他哪天有想留下的，会放进来。' }))
+    list.firstChild.style.whiteSpace = 'pre-line'
+    return
+  }
+  const fresh = []
+  for (const it of items) {
+    const el = document.createElement('div'); el.className = 'item'
+    if (!it.seen_at) { el.classList.add('new'); fresh.push(it.id) }
+    if (it.kind === 'pixel' && it.pixel) {
+      const box = document.createElement('div'); box.className = 'pixel'
+      box.appendChild(drawPixel(it.pixel)); el.appendChild(box)
+    }
+    if (it.text) el.appendChild(Object.assign(document.createElement('div'), { className: 'text', textContent: it.text }))   // textContent：不把内容当 HTML
+    el.appendChild(Object.assign(document.createElement('div'), { className: 'when', textContent: when(it.created_at) }))
+    list.appendChild(el)
+  }
+  // 真的显示出来了才标已读
+  if (fresh.length) {
+    fetch('/raven/drawer/seen', { method: 'POST', headers: { 'Content-Type': 'application/json', ...auth() }, body: JSON.stringify({ ids: fresh }) }).catch(() => {})
+  }
+}
+load()
+</script>
+</body>
+</html>

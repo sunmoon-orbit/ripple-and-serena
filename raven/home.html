@@ -289,6 +289,10 @@ html, body { min-height: 100%; background: var(--bg); color: var(--text); font-f
   -webkit-tap-highlight-color: transparent;
 }
 .tool-card:active { transform: scale(0.95); background: var(--surface2); }
+/* 抽屉里有没看过的东西：图标慢慢呼吸，别的什么都不加 */
+.tool-card.breathing .tool-icon { color: var(--accent); animation: drawerBreath 3.2s ease-in-out infinite; }
+@keyframes drawerBreath { 0%, 100% { opacity: .45; transform: scale(.94); } 50% { opacity: 1; transform: scale(1.1); } }
+@media (prefers-reduced-motion: reduce) { .tool-card.breathing .tool-icon { animation: none; } }
 .tool-icon { margin-bottom: 6px; display: flex; justify-content: center; color: var(--text-dim); }
 .tool-name { font-size: 10px; color: var(--text-dim); }
 
@@ -548,6 +552,15 @@ html, body { min-height: 100%; background: var(--bg); color: var(--text); font-f
           </svg>
         </div>
         <div class="tool-name">日记</div>
+      </div>
+      <!-- 抽屉（1013）：他悄悄留的便签和小画。有没看过的，图标就轻轻呼吸；不出数字、不出红点 -->
+      <div class="tool-card" id="tool-drawer" onclick="openFrame('/raven/drawer.html','抽屉')">
+        <div class="tool-icon">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="3" y="5" width="18" height="14" rx="2"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="10" y1="8.5" x2="14" y2="8.5"/><line x1="10" y1="15.5" x2="14" y2="15.5"/>
+          </svg>
+        </div>
+        <div class="tool-name">抽屉</div>
       </div>
       <div class="tool-card" onclick="openFrame('/raven/rules.html','乌鸦的规矩')">
         <div class="tool-icon">
@@ -1049,7 +1062,18 @@ function openFrame(url, title) {
 function closeFrame() {
   document.getElementById('frame-overlay').classList.remove('open')
   document.getElementById('frame-iframe').src = 'about:blank'
+  checkDrawer()   // 刚看完抽屉回来，图标该安静了
 }
+// 抽屉里有没有没看过的：有就让图标呼吸。失败了不吭声，下回再问
+async function checkDrawer() {
+  try {
+    const r = await fetch('/raven/drawer/unseen', { headers: authHeaders(), cache: 'no-store' })
+    if (!r.ok) return
+    const { count } = await r.json()
+    document.getElementById('tool-drawer')?.classList.toggle('breathing', count > 0)
+  } catch {}
+}
+checkDrawer()
 function openExt() {
   window.open(currentFrameUrl, '_blank')
 }
@@ -1233,6 +1257,7 @@ document.addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'visible' && document.getElementById('app').classList.contains('shown')) {
     greet()
     loadStatus()
+    checkDrawer()
     // 从聊天或手机后台回来时，数据超过一分钟才静默更新。
     // 记忆不自动跳到下一条；只有手动点换一条才轮换。
     if (Date.now() - lastHomeRefreshAt > 60000) {

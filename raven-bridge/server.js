@@ -655,6 +655,31 @@ let appLatestCache = { at: 0, data: null }  // 归巢 APK 最新版本信息，�
 
 const RETRACTIONS_FILE = path.join(__dirname, 'retractions.json')
 function loadRetractions() { try { const a = JSON.parse(fs.readFileSync(RETRACTIONS_FILE, 'utf8')); return Array.isArray(a) ? a : [] } catch { return [] } }
+// ── 抽屉（1013）：我悄悄留给她的便签和像素小画。不推送、没有红点，首页那个图标轻轻呼吸，等她自己想起来打开。
+// 点子和像素画格式来自 nnkiirue99-maker/ai-companion-drawer（MIT）；咱们不需要它那套「回复里夹暗号再抠出来」，
+// 我直接带 X-Local-Token 往这儿写。东西放在仓库外面，这是私人的，别进公开仓库。
+const DRAWER_FILE = process.env.DRAWER_FILE || '/home/ripple/raven-drawer/drawer.json'
+const DRAWER_COLOR_RE = /^#[0-9a-fA-F]{3,4}$|^#[0-9a-fA-F]{6}$|^#[0-9a-fA-F]{8}$/
+function loadDrawer() { try { const a = JSON.parse(fs.readFileSync(DRAWER_FILE, 'utf8')); return Array.isArray(a) ? a : [] } catch { return [] } }
+function saveDrawer(items) {
+  fs.mkdirSync(path.dirname(DRAWER_FILE), { recursive: true })
+  const tmp = DRAWER_FILE + '.tmp'
+  fs.writeFileSync(tmp, JSON.stringify(items))
+  fs.renameSync(tmp, DRAWER_FILE)
+}
+// 像素画：w×h 最多 64×64；palette 是颜色表、第 0 个必须透明；grid 从左到右从上到下，每格是颜色表下标。
+// 格子数差不超过一行就补透明或裁掉；别的毛病直接报错（我自己写的，错了就该知道，不悄悄降级）。
+function normalizeDrawerPixel(d) {
+  if (!d || typeof d !== 'object') throw new Error('pixel 要是对象')
+  const { w, h, palette, grid } = d
+  if (!Number.isInteger(w) || !Number.isInteger(h) || w < 1 || h < 1 || w > 64 || h > 64) throw new Error('w、h 要是 1–64 的整数')
+  if (!Array.isArray(palette) || palette.length < 1 || palette.length > 256) throw new Error('palette 要有 1–256 个颜色')
+  if (!['#0000', '#00000000', 'transparent'].includes(palette[0])) throw new Error('palette 第 0 个必须是透明色')
+  if (palette.some(c => typeof c !== 'string' || (c !== 'transparent' && !DRAWER_COLOR_RE.test(c)))) throw new Error('palette 里有不认识的颜色')
+  if (!Array.isArray(grid) || !grid.length || Math.abs(grid.length - w * h) > w) throw new Error(`grid 要有 ${w * h} 格，现在是 ${Array.isArray(grid) ? grid.length : 0}`)
+  if (grid.some(i => !Number.isInteger(i) || i < 0 || i >= palette.length)) throw new Error('grid 里有超出颜色表的下标')
+  return { w, h, palette, grid: grid.concat(new Array(w * h).fill(0)).slice(0, w * h) }
+}
 const REACTIONS_FILE = path.join(__dirname, 'reactions.json')
 let lastUserReactKey = ''   // 她最近一条消息的贴表情 key（前端画气泡用的就是 sent 的 ts），给我用 user:latest
 function loadReactions() {
@@ -1561,6 +1586,53 @@ const server = http.createServer((req, res) => {
   // 长按贴表情（0930，思路参考 cute-chat-stickers，代码自写）：
   // 按「角色:时间戳」给一条消息挂表情，每人每条最多一个，再点同一个就摘掉。
   // 外网来的（她的浏览器/app，要 token）记在阿颖名下；本机带 X-Local-Token 的记在涟言名下。
+  // 抽屉：她读（外网要 token），我写（只收本机带钥匙的）
+  if (url.pathname === '/raven/drawer' && req.method === 'GET') {
+    if (!externalAuthed(req, url)) { res.writeHead(401); res.end('{}'); return }
+    const items = loadDrawer().slice().sort((a, b) => b.id - a.id)
+    res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' }); res.end(JSON.stringify({ items }))
+    return
+  }
+  if (url.pathname === '/raven/drawer/unseen' && req.method === 'GET') {
+    if (!externalAuthed(req, url)) { res.writeHead(401); res.end('{}'); return }
+    res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' })
+    res.end(JSON.stringify({ count: loadDrawer().filter(x => !x.seen_at).length }))
+    return
+  }
+  if ((url.pathname === '/raven/drawer' || url.pathname === '/raven/drawer/seen') && req.method === 'POST') {
+    const seen = url.pathname.endsWith('/seen')
+    // 标已读是她的页面做的；往里放东西只有我能做
+    if (seen ? !externalAuthed(req, url) : (isExternal(req) || !localWriteAuthed(req))) { res.writeHead(401); res.end('{}'); return }
+    let body = ''
+    req.on('data', d => { body += d; if (body.length > 200000) req.destroy() })
+    req.on('end', () => {
+      try {
+        const j = JSON.parse(body || '{}')
+        const items = loadDrawer()
+        if (seen) {
+          // 空列表不算「全部已读」：只标页面上真的显示出来的那几条
+          const ids = new Set((Array.isArray(j.ids) ? j.ids : []).map(Number))
+          let n = 0
+          for (const it of items) if (ids.has(it.id) && !it.seen_at) { it.seen_at = new Date().toISOString(); n++ }
+          if (n) saveDrawer(items)
+          res.writeHead(200, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ marked: n }))
+          return
+        }
+        const kind = j.kind === 'pixel' ? 'pixel' : 'text'
+        const item = { id: items.reduce((m, x) => Math.max(m, x.id), 0) + 1, kind, created_at: new Date().toISOString(), seen_at: null }
+        const text = String(j.text || '').trim()
+        if (text.length > 4000) throw new Error('太长了，便签不超过 4000 字')
+        if (kind === 'pixel') { item.pixel = normalizeDrawerPixel(j.pixel); if (text) item.text = text }   // 小画可以带一句话
+        else { if (!text) throw new Error('便签不能是空的'); item.text = text }
+        items.push(item)
+        saveDrawer(items)
+        res.writeHead(200, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ item }))
+      } catch (err) {
+        res.writeHead(400, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ error: err.message }))
+      }
+    })
+    return
+  }
   if (url.pathname === '/raven/reactions' && req.method === 'GET') {
     if (!externalAuthed(req, url)) { res.writeHead(401); res.end('{}'); return }
     res.writeHead(200, { 'Content-Type': 'application/json' }); res.end(JSON.stringify(loadReactions()))
