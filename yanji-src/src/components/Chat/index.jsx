@@ -2,7 +2,7 @@ import PickerSelect from '../PickerSelect'
 import { useState, useCallback, useRef, useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import { useShallow } from 'zustand/react/shallow'
-import { useStore, buildBackupJson, restoreFromBackupJson } from '../../store'
+import { useStore, buildBackupJson, restoreFromBackupJson, newestLocalMessageAt } from '../../store'
 import CrossingCallEntry from './CrossingCallEntry'
 import { contactAllowed, createContactGuard } from '../../utils/proactiveGates.mjs'
 async function readContactConfig() {
@@ -380,6 +380,8 @@ export default function Chat() {
   const bgFileRef = useRef(null)
   const importFileRef = useRef(null)
   const autoBackupBusyRef = useRef(false)
+  // 服务器拒收过一次（体积骤降，或这台设备比服务器旧）就别再每次切回前台都传一遍，说一次就够
+  const autoBackupRefusedRef = useRef(false)
 
   useEffect(() => {
     async function autoBackup() {
@@ -387,6 +389,7 @@ export default function Chat() {
       const backupMemory = initial.moonMemory || {}
       if (!backupMemory?.apiToken) return
       if (Date.now() - (initial.lastBackupAt || 0) < 24 * 60 * 60 * 1000) return
+      if (autoBackupRefusedRef.current) return
 
       // IndexedDB 没读完时快照没有聊天记录，抢跑会拿空壳覆盖服务器上的救命备份
       const deadline = Date.now() + 15000
@@ -413,6 +416,7 @@ export default function Chat() {
         if (r.status === 409) {
           // 体积骤降意味着聊天可能刚出事，静默会错过最后的止损窗口，这一类拒收必须喊出来
           const why = await r.json().catch(() => null)
+          autoBackupRefusedRef.current = true
           showToast(why?.error || '备份被拒收', 'error', 15000)
           return
         }
@@ -1529,11 +1533,27 @@ export default function Chat() {
     if (moonMemory?.apiToken) {
       try {
         const base = (moonMemory.baseUrl || 'https://memory.ravenlove.cc').replace(/\/$/, '')
-        const r = await fetch(`${base}/backup/yanji`, {
+        const send = (query = '') => fetch(`${base}/backup/yanji${query}`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${moonMemory.apiToken}` },
           body: raw,
         })
+        let r = await send()
+        if (r.status === 409) {
+          // 这台比服务器旧（1013）：多半是点错了设备。说清楚两边各到几点，她点头才用旧的盖新的
+          const why = await r.clone().json().catch(() => null)
+          if (why?.code === 'stale') {
+            if (!await confirmAction({
+              kicker: '这台比较旧',
+              title: '用这台设备的聊天盖掉服务器上的？',
+              description: why.error,
+              note: '如果是你在这台删了最近的消息，才需要继续。',
+              cancelLabel: '不传了',
+              confirmLabel: '还是用这台的',
+            })) return
+            r = await send('?allowOlder=1')
+          }
+        }
         if (!r.ok) {
           // 服务器会因为「体积骤降」拒收（409），那句话解释了到底出了什么事，
           // 只报一个状态码等于把唯一有用的信息扔了
@@ -1566,23 +1586,37 @@ export default function Chat() {
     setBgMenuOpen(false)
     const moonMemory = useStore.getState().moonMemory || {}
     if (!moonMemory?.apiToken) { showToast('请先在设置里配置拾羽记忆库连接', 'error'); return }
+    const base = (moonMemory.baseUrl || 'https://memory.ravenlove.cc').replace(/\/$/, '')
+    // 先问服务器那份到几点了，跟这台比一比再让她点头（1013：拉到过旧设备传上去的旧备份）
+    const when = (ms) => ms ? new Date(ms).toLocaleString('zh-CN', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false }) : '没有消息'
+    let description = '当前所有对话记录会被服务器备份覆盖。'
+    let note = '恢复后页面会自动刷新，请先确认当前内容已经妥善备份。'
+    try {
+      const info = await fetch(`${base}/backup/yanji/latest/info`, { headers: { Authorization: `Bearer ${moonMemory.apiToken}` }, signal: AbortSignal.timeout(8000) })
+      if (info.ok) {
+        const d = await info.json()
+        const here = newestLocalMessageAt()
+        description = `服务器上这份：最新一条消息到 ${when(d.newestMessageAt)}。\n这台设备上：最新一条消息到 ${when(here)}。`
+        if (d.newestMessageAt && here && d.newestMessageAt < here - 60000) note = '⚠️ 服务器上的比这台还旧。继续的话，这台上比较新的聊天会被盖掉。想保住它们，先在这台点「备份」。'
+        else note = '恢复后这台会变成和服务器那份一样，页面会自动刷新。'
+      }
+    } catch {}
     if (!await confirmAction({
       kicker: '覆盖提醒',
       title: '从服务器恢复？',
-      description: '当前所有对话记录会被服务器备份覆盖。',
-      note: '恢复后页面会自动刷新，请先确认当前内容已经妥善备份。',
+      description,
+      note,
       cancelLabel: '先不恢复',
       confirmLabel: '继续恢复',
     })) return
     try {
-      const base = (moonMemory.baseUrl || 'https://memory.ravenlove.cc').replace(/\/$/, '')
       const r = await fetch(`${base}/backup/yanji/latest`, {
         headers: { Authorization: `Bearer ${moonMemory.apiToken}` },
       })
       if (r.status === 404) { showToast('服务器上还没有备份', 'error'); return }
       if (!r.ok) throw new Error(`(${r.status})`)
       const text = await r.text()
-      await restoreFromBackupJson(text)
+      await restoreFromBackupJson(text, { fromServer: true })
       showToast('已从服务器恢复，正在刷新…', 'success')
       setTimeout(() => window.location.reload(), 800)
     } catch (e) {

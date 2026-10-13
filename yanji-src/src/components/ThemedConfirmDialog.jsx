@@ -50,7 +50,7 @@ export function ThemedConfirmDialog({
 
         <div className="retry-dialog-kicker">{kicker}</div>
         <h2 id={titleId}>{title}</h2>
-        {description && <p id={descriptionId}>{description}</p>}
+        {description && <p id={descriptionId} style={{ whiteSpace: 'pre-line' }}>{description}</p>}
 
         {note && (
           <div className="retry-dialog-note">

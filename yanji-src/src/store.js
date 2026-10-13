@@ -813,6 +813,16 @@ if (hasLegacyBig) {
 // 格式和搬家前的老 blob 完全一致——所以恢复时照旧写回 localStorage 再刷新就行，
 // 刷新后会走上面的「搬家」分支，自动把聊天记录塞回 IndexedDB。
 // 没读完聊天记录时返回 null，宁可不备份也不能导出一份空的把好备份覆盖掉。
+// 这台设备上最新一条聊天消息的时间（毫秒），没有就是 0。恢复前拿它跟服务器那份比一比
+export function newestLocalMessageAt() {
+  let newest = 0
+  for (const list of Object.values(useStore.getState().messagesByChatId || {})) {
+    if (!Array.isArray(list)) continue
+    for (const message of list) { const at = Number(message?.createdAt); if (Number.isFinite(at) && at > newest) newest = at }
+  }
+  return newest
+}
+
 export function buildBackupJson() {
   const state = useStore.getState()
   if (!state.bigReady) return null
@@ -825,8 +835,11 @@ export function buildBackupJson() {
 // 备份恢复用：不能再把整份 JSON 塞回 localStorage——备份体积迟早超过 5MB，
 // 那样恢复会当场 QuotaExceededError。拆开写：设置进 localStorage，聊天记录直接进 IndexedDB。
 // 调用方负责在 await 之后刷新页面。
-export async function restoreFromBackupJson(text) {
+// fromServer：这份就是服务器上最新的那一份。恢复完把「上次备份」记成现在，
+// 否则备份里带着的旧时间会让 24 小时那道闸立刻打开，把刚拉下来的东西原样再传回去（1013 平板连传三次）。
+export async function restoreFromBackupJson(text, { fromServer = false } = {}) {
   const parsed = JSON.parse(text) || {}
+  if (fromServer) parsed.lastBackupAt = Date.now()
   if (bigFailed) { localStorage.setItem(LOCAL_KEY, JSON.stringify(parsed)); return }
   await Promise.all(BIG_KEYS.map((k) => bigSet(k, parsed[k] && typeof parsed[k] === 'object' ? parsed[k] : {})))
   const settings = {}
