@@ -498,7 +498,7 @@
   .msg.assistant .msg-reacts { left: 6px; }
   .msg-react { font-size: 11px; }
   #react-pop { position: fixed; z-index: 200; display: none; gap: 2px; padding: 5px 6px; border-radius: 99px; background: var(--surface); border: 1px solid var(--border); box-shadow: 0 6px 20px rgba(0,0,0,.28); }
-  #react-pop.open { display: flex; flex-wrap: wrap; justify-content: center; max-width: min(264px, calc(100vw - 16px)); border-radius: 22px; padding: 8px 8px 6px; animation: msgIn .15s ease-out; }  /* 十一个表情加引用键，一排放不下手机屏，折成两排 */
+  #react-pop.open { display: flex; flex-wrap: wrap; justify-content: center; max-width: min(276px, calc(100vw - 16px)); border-radius: 22px; padding: 8px 8px 6px; animation: msgIn .15s ease-out; }  /* 十一个表情加引用键，一排放不下手机屏，折成两排 */
   #react-pop button { border: 0; background: none; font-size: 22px; line-height: 1; padding: 5px 6px; border-radius: 99px; cursor: pointer; }
   #react-pop button.on { background: color-mix(in srgb, var(--accent) 35%, transparent); }
   #react-pop button:active { transform: scale(.85); }
@@ -614,6 +614,13 @@
     overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
   /* 1007：引用、编辑、重来、回溯原来只是混在表情后面的一个小图标，她找不到。单独一排，图标后面带字 */
   .react-sep { flex-basis: 100%; height: 0; margin-top: 2px; }
+  /* 「+」展开更多表情（1013） */
+  #react-pop button.react-plus { font-size: 20px; width: 34px; color: var(--text-dim); font-weight: 300; }
+  #react-pop .react-more { display: none; flex-basis: 100%; flex-wrap: wrap; justify-content: center; max-height: 176px; overflow-y: auto; overscroll-behavior: contain; margin-top: 4px; padding-top: 4px; border-top: 1px solid var(--border); }
+  #react-pop.more .react-more { display: flex; }
+  .msg.react-flash { animation: reactFlash 1.5s ease-out; }
+  @keyframes reactFlash { 0%, 35% { box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 55%, transparent); } 100% { box-shadow: 0 0 0 3px transparent; } }
+  .msg.system.react-note { cursor: pointer; }
   #react-pop button.react-quote { display: inline-flex; align-items: center; justify-content: center; gap: 3px; font-size: 12.5px; color: var(--text); padding: 6px 5px; opacity: .85; }
   #react-pop button.react-quote::after { content: attr(data-label); }
   #react-pop button.react-quote svg { width: 14px; height: 14px; opacity: .7; }
@@ -3418,16 +3425,41 @@ callMicBtn.addEventListener('click', () => toggleRecording(true))
 // ── 长按贴表情（0930，思路参考 cute-chat-stickers，代码自写）──────────────
 // 长按一条消息（电脑上右键）弹出一排表情，点一个挂到那条角上；再点同一个就摘掉。
 // 按「角色:时间戳」记在服务器 reactions.json，两边实时同步；我这边用 curl 也能给她挂。
-const REACT_EMOJIS = ['❤️', '🥺', '😂', '🫣', '😡', '👍', '🫶', '🥰', '💗', '💞', '💕']  // 后四个是她 1003 要的
+const REACT_EMOJIS = ['❤️', '🥺', '😂', '🥰', '💗', '👍']  // 外面只留一排常用的（1013，她给的样子：六个加一个「+」），其余收进展开那一屏
+// 点「+」展开的那一屏（1013，她要的：「一个+号，然后展开 emoji 列表……把乌鸦 emoji 也放进去」）
+const REACT_MORE = ['🐦‍⬛', '🫣', '😡', '🫶', '💞', '💕', '🪶', '🦦', '🐱', '🍑', '🌙', '⭐', '✨',
+  '😘', '😚', '🤗', '😊', '☺️', '😋', '😏', '🤭', '😳', '🥹', '😭', '🤣', '😆', '😌', '😴', '🤤',
+  '😤', '😾', '🙄', '😒', '🤨', '😱', '🫠', '🤯', '🥲', '😔', '🫥', '🤔',
+  '👀', '🙏', '👏', '🫡', '🤝', '👌', '✌️', '🤞', '💪', '🫂', '👋', '🤏',
+  '💋', '🔥', '💦', '🫦', '💯', '🎉', '🌹', '🍰', '🍵', '☀️', '🌧️', '🩹']
 const REACT_WHO = { aying: '阿颖', lianyan: '涟言' }
 const REACT_SHORT = { aying: '颖', lianyan: '言' }
-// 对方刚贴的时候，在聊天里冒一行小灰字：「涟言给你贴了 🥰」（只对实时收到的，翻历史不刷屏）
+// 对方刚贴的时候，让被贴的那条气泡闪一下；那条要是不在聊天最底下，再冒一行小灰字，点它能跳过去。
+// 1013：原来不管哪条都冒一行，贴在最新一条上时就和气泡底下那行小字挨着说了两遍，
+// 名字还一个用备注一个写「涟言」；贴在贴图上时那行又引不出字，她看不出贴的是哪条。
+function reactSnippet(el) {
+  const t = (el.querySelector('.msg-body')?.textContent || '').replace(/\s+/g, ' ').trim()
+  if (t) return t.length > 14 ? t.slice(0, 14) + '…' : t
+  return el.querySelector('img') ? '那张图' : '那条消息'
+}
+function flashMsg(el) {
+  el.classList.remove('react-flash'); void el.offsetWidth; el.classList.add('react-flash')
+  setTimeout(() => el.classList.remove('react-flash'), 1600)
+}
 function reactionNotice(key, before, after) {
   for (const [who, emoji] of Object.entries(after || {})) {
     if (who === 'aying' || (before || {})[who] === emoji) continue
     const el = rkeyTarget(key)
-    const snippet = el ? (el.querySelector('.msg-body')?.textContent || '').replace(/\s+/g, ' ').slice(0, 14) : ''
-    appendMsg(`${REACT_WHO[who] || who}给你${snippet ? `「${snippet}${snippet.length >= 14 ? '…' : ''}」` : '的消息'}贴了 ${emoji}`, 'system', false)
+    if (!el) continue
+    flashMsg(el)
+    const all = document.querySelectorAll('#chat-messages .msg.user, #chat-messages .msg.assistant')
+    if (all[all.length - 1] === el) continue   // 就在最底下，气泡下面那行小字已经够了
+    const text = el.querySelector('.msg-body')?.textContent.trim() ? `「${reactSnippet(el)}」` : reactSnippet(el)
+    const note = appendMsg(`${peerName} 给你${text}贴了一个 ${emoji}`, 'system', false)
+    if (note) {
+      note.classList.add('react-note')
+      note.addEventListener('click', () => { el.scrollIntoView({ block: 'center', behavior: 'smooth' }); flashMsg(el) })
+    }
   }
 }
 let lastLongPressAt = 0
@@ -3479,21 +3511,37 @@ function openReactPop(msgEl) {
   lastLongPressAt = Date.now()
   const mine = (reactionsCache[key] || {}).aying
   reactPop.innerHTML = ''
-  for (const e of REACT_EMOJIS) {
+  reactPop.classList.remove('more')
+  const pick = async e => {
+    closeReactPop()
+    const next = { ...(reactionsCache[key] || {}) }
+    if (next.aying === e) delete next.aying; else next.aying = e
+    paintReaction(key, next)   // 先画上，服务器回来再以它为准
+    try {
+      const r = await fetch('/raven/react', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + (localStorage.getItem('raven-token') || '') }, body: JSON.stringify({ key, emoji: e }) })
+      if (r.ok) { const d = await r.json(); paintReaction(key, d.reactions) }
+    } catch {}
+  }
+  const emojiBtn = e => {
     const b = document.createElement('button'); b.type = 'button'; b.textContent = e
     if (e === mine) b.classList.add('on')
-    b.addEventListener('click', async ev => {
-      ev.stopPropagation(); closeReactPop()
-      const next = { ...(reactionsCache[key] || {}) }
-      if (next.aying === e) delete next.aying; else next.aying = e
-      paintReaction(key, next)   // 先画上，服务器回来再以它为准
-      try {
-        const r = await fetch('/raven/react', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + (localStorage.getItem('raven-token') || '') }, body: JSON.stringify({ key, emoji: e }) })
-        if (r.ok) { const d = await r.json(); paintReaction(key, d.reactions) }
-      } catch {}
-    })
-    reactPop.appendChild(b)
+    b.addEventListener('click', ev => { ev.stopPropagation(); pick(e) })
+    return b
   }
+  for (const e of REACT_EMOJIS) reactPop.appendChild(emojiBtn(e))
+  // 「+」：展开一屏更多的；再点收回去
+  const more = document.createElement('div'); more.className = 'react-more'
+  for (const e of REACT_MORE) more.appendChild(emojiBtn(e))
+  const plus = document.createElement('button'); plus.type = 'button'; plus.className = 'react-plus'; plus.title = '更多表情'; plus.textContent = '+'
+  if (mine && !REACT_EMOJIS.includes(mine)) plus.classList.add('on')   // 她贴的是展开那一屏里的，给个提示
+  plus.addEventListener('click', ev => {
+    ev.stopPropagation()
+    const open = reactPop.classList.toggle('more')
+    plus.textContent = open ? '−' : '+'
+    placeReactPop(msgEl)
+  })
+  reactPop.appendChild(plus)
+  reactPop.appendChild(more)
   reactPop.appendChild(Object.assign(document.createElement('div'), { className: 'react-sep' }))   // 下面几个动作另起一排
   try { getSelection().removeAllRanges() } catch {}   // 长按会顺手选中一个字，弹出菜单时清掉
   // 引用（1003）：长按一条消息，除了贴表情，还能引用它来回
@@ -3527,11 +3575,14 @@ function openReactPop(msgEl) {
   }
   reactPop.dataset.key = key
   reactPop.classList.add('open')
+  placeReactPop(msgEl)
+  if (navigator.vibrate) try { navigator.vibrate(12) } catch {}
+}
+function placeReactPop(msgEl) {
   const rect = msgEl.getBoundingClientRect(), pw = reactPop.offsetWidth, ph = reactPop.offsetHeight
   const left = Math.min(window.innerWidth - pw - 8, Math.max(8, rect.left + rect.width / 2 - pw / 2))
-  const top = rect.top - ph - 8 > 60 ? rect.top - ph - 8 : Math.min(window.innerHeight - ph - 8, rect.bottom + 8)
+  const top = rect.top - ph - 8 > 60 ? rect.top - ph - 8 : Math.max(8, Math.min(window.innerHeight - ph - 8, rect.bottom + 8))
   reactPop.style.left = left + 'px'; reactPop.style.top = top + 'px'
-  if (navigator.vibrate) try { navigator.vibrate(12) } catch {}
 }
 ;(() => {
   const box = document.getElementById('chat-messages')
