@@ -1183,6 +1183,40 @@
   .rvf-btns .rvf-play svg { width: 24px; height: 24px; }
   .rvf-btns .rvf-prev svg, .rvf-btns .rvf-next svg { width: 22px; height: 22px; }
 
+
+  /* 打码贴纸（1015，她在小红书看到别人家有）：贴纸都是不透明的整块，盖住就是真盖住，不像模糊、马赛克那样能还原 */
+  #chat-messages.mask-host { position: relative; }
+  #mask-layer { position: absolute; left: 0; top: 0; width: 100%; height: 0; overflow: visible; pointer-events: none; z-index: 6; }
+  .mask-st { position: absolute; pointer-events: auto; touch-action: none; user-select: none; -webkit-user-select: none; transform-origin: 50% 50%; }
+  .mask-st > img, .mask-st > .mask-shape { display: block; width: 100%; pointer-events: none; -webkit-user-drag: none; border-radius: 6px; }
+  .mask-st > img { height: auto; }
+  .mask-st > .mask-shape { height: 100%; }
+  #mask-layer.editing .mask-st.sel { outline: 1.5px dashed var(--accent); outline-offset: 3px; }
+  .mask-st .mask-x, .mask-st .mask-rot { display: none; position: absolute; width: 24px; height: 24px; border-radius: 50%; border: 0; padding: 0;
+    background: var(--bg); color: var(--accent); box-shadow: 0 1px 4px rgba(0,0,0,.25); font-size: 14px; line-height: 24px; text-align: center; touch-action: none; }
+  #mask-layer.editing .mask-st.sel .mask-x, #mask-layer.editing .mask-st.sel .mask-rot { display: block; }
+  .mask-st .mask-x { top: -14px; right: -14px; }
+  .mask-st .mask-rot { bottom: -14px; right: -14px; }
+  .mask-tape1 { background: repeating-linear-gradient(-45deg, #f6c9d2 0 8px, #fbe3e8 8px 16px); }
+  .mask-tape2 { background: radial-gradient(circle, #5b4a44 2.2px, transparent 2.6px) 0 0/12px 12px, #f7efe4; }
+  .mask-tape3 { background: linear-gradient(90deg, rgba(255,255,255,.55) 1px, transparent 1px) 0 0/10px 10px, linear-gradient(rgba(255,255,255,.55) 1px, transparent 1px) 0 0/10px 10px, #b9cde0; }
+  .mask-ink { background: #26252b; }
+  .mask-acc { background: var(--accent); }
+  #mask-tray { position: absolute; right: 8px; top: 12px; bottom: 116px; width: 64px; z-index: 1050; display: flex; flex-direction: column; gap: 8px;
+    padding: 8px 6px; border-radius: 22px; background: color-mix(in srgb, var(--bg) 82%, transparent); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+    box-shadow: 0 4px 18px rgba(0,0,0,.18); }
+  #mask-tray[hidden] { display: none; }
+  .mask-list { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; align-items: center; scrollbar-width: none; }
+  .mask-list::-webkit-scrollbar { display: none; }
+  .mask-it { width: 50px; height: 50px; flex: none; border-radius: 12px; border: 1px solid var(--border); background: var(--surface); padding: 5px; cursor: pointer;
+    display: flex; align-items: center; justify-content: center; }
+  .mask-it img { max-width: 100%; max-height: 100%; border-radius: 5px; pointer-events: none; }
+  .mask-it .mask-shape { width: 100%; height: 14px; border-radius: 3px; }
+  .mask-it .mask-shape.blk { height: 22px; }
+  .mask-tray-btn { flex: none; width: 50px; height: 34px; border-radius: 17px; border: 0; font-size: 12px; cursor: pointer; align-self: center; }
+  .mask-clear { background: var(--surface); color: var(--text-dim); border: 1px solid var(--border); }
+  .mask-done { background: var(--accent); color: var(--bg); }
+
   /* 听歌面板 */
   #rv-room { position: fixed; inset: 0; z-index: 1100; background: rgba(0,0,0,.35); display: flex; align-items: flex-end; justify-content: center; }
   #rv-room[hidden] { display: none; }
@@ -1398,6 +1432,11 @@
         <button class="rvf-next" type="button" aria-label="下一首" hidden><svg viewBox="0 0 24 24" fill="currentColor"><polygon points="5,4 15,12 5,20"/><rect x="16" y="4" width="3" height="16"/></svg></button>
       </div>
     </div>
+    <div id="mask-tray" hidden>
+      <div class="mask-list"></div>
+      <button type="button" class="mask-tray-btn mask-clear">撕掉</button>
+      <button type="button" class="mask-tray-btn mask-done">完成</button>
+    </div>
     <div id="rv-room" hidden>
       <div class="rvr-sheet">
         <div class="rvr-head"><span><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>听歌</span><button class="rvr-close" type="button">关掉</button></div>
@@ -1442,6 +1481,7 @@
       <div class="tool"><button id="theme-btn" title="切换主题" aria-label="切换主题"></button><span>主题</span></div>
       <div class="tool"><button id="palette-btn" type="button" aria-label="调色"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a9 9 0 1 0 0 18c1.1 0 1.8-.8 1.8-1.8 0-.5-.2-.9-.5-1.2-.3-.3-.5-.7-.5-1.2 0-1 .8-1.8 1.8-1.8H16a5 5 0 0 0 5-5c0-3.9-4-7-9-7z"/><circle cx="7.5" cy="11" r="1.2"/><circle cx="10.5" cy="7" r="1.2"/><circle cx="15" cy="7.5" r="1.2"/></svg></button><span>调色</span></div>
       <div class="tool"><button id="music-btn" type="button" aria-label="听歌"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg></button><span>听歌</span></div>
+      <div class="tool"><button id="mask-btn" type="button" aria-label="打码"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="8" width="17" height="8" rx="1.5" transform="rotate(-12 12 12)"/><path d="M8 9.5l-1.5 6M12 8.6l-1.5 6M16 7.8l-1.5 6"/></svg></button><span>打码</span></div>
       <div class="tool"><button id="shelf-btn" type="button" aria-label="贴图架"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M8.5 14.5c1 1.3 2.1 2 3.5 2s2.5-.7 3.5-2"/><circle cx="9" cy="10" r=".9" fill="currentColor"/><circle cx="15" cy="10" r=".9" fill="currentColor"/></svg></button><span>贴图架</span></div>
       <div class="tool"><button id="remark-btn" type="button" aria-label="备注"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M20.6 13.4l-7.2 7.2a2 2 0 01-2.8 0L3 13V3h10l7.6 7.6a2 2 0 010 2.8z"/><circle cx="7.5" cy="7.5" r="1.3"/></svg></button><span>备注</span></div>
       <div class="tool"><button id="cc-settings-open" title="CC 设置" aria-label="模型与 CLAUDE.md 设置" style="background:none;border:0;color:var(--text-dim);padding:5px;cursor:pointer">
@@ -2960,7 +3000,7 @@ function archiveTs(v) {
   return new Date(t).getTime()
 }
 async function loadOlder() {
-  if (older.busy || older.done) return
+  if (older.busy || older.done || window.rvMaskOn) return
   const box = document.getElementById('chat-messages'), hint = document.getElementById('older-hint')
   older.busy = true; hint.textContent = '翻存档中…'
   const auth = { headers: { Authorization: 'Bearer ' + (localStorage.getItem('raven-token') || '') } }
@@ -3654,7 +3694,128 @@ document.getElementById('attach-btn').addEventListener('click', e => {
   const menu = document.getElementById('attach-menu')
   menu.hidden = !menu.hidden
 })
+// ── 打码贴纸（1015）：加号抽屉「打码」。右边一排贴纸，点一下贴到屏幕正中，拖着挪，右下角那颗拧着转、拉大小，右上 × 撕掉。
+// 贴纸挂在消息列表里面，跟着消息一起滚，所以盖住哪句就一直盖着哪句。「完成」收起贴纸栏和虚线框，留下干净的画面给她截图；
+// 再点任何一张贴纸回到编辑。只活在这一页里，不存、不发，刷新就没了。贴的时候不往上翻存档，免得上面插进消息把贴纸错开。
+const maskBox = document.getElementById('chat-messages')
+const maskTray = document.getElementById('mask-tray')
+let maskLayer = null, maskSel = null, maskLoaded = false
+window.rvMaskOn = false
+const MASK_SHAPES = [
+  { cls: 'mask-ink', w: 150, h: 34, blk: true }, { cls: 'mask-acc', w: 150, h: 34, blk: true },
+  { cls: 'mask-tape1', w: 170, h: 30 }, { cls: 'mask-tape2', w: 170, h: 30 }, { cls: 'mask-tape3', w: 170, h: 30 },
+]
+const MASK_FIRST = ['love.png', 'xihuan.png', 'kaixin.png', 'liangjingjing.png', 'wuyu.png', 'ding.png', 'shinshi.png', 'shangban.png', 'qushi.png', 'crow_close.jpg', 'crow_sunset.jpg']
+function maskItem(inner, onPick) {
+  const b = document.createElement('button'); b.type = 'button'; b.className = 'mask-it'
+  b.appendChild(inner); b.addEventListener('click', e => { e.stopPropagation(); onPick() }); return b
+}
+function maskFillTray(files) {
+  const list = maskTray.querySelector('.mask-list'); list.innerHTML = ''
+  MASK_SHAPES.forEach(sh => {
+    const d = document.createElement('div'); d.className = 'mask-shape ' + sh.cls + (sh.blk ? ' blk' : '')
+    list.appendChild(maskItem(d, () => maskAdd({ shape: sh.cls, w: sh.w, h: sh.h })))
+  })
+  const seen = new Set(), order = [...MASK_FIRST.filter(f => files.includes(f)), ...files]
+  order.forEach(f => {
+    if (seen.has(f)) return; seen.add(f)
+    const img = document.createElement('img'); img.loading = 'lazy'; img.alt = ''; img.src = '/raven/stickers/' + stickerFile(f)
+    list.appendChild(maskItem(img, () => maskAdd({ file: f, w: 110 })))
+  })
+}
+function maskEnsure() {
+  if (maskLayer && maskLayer.isConnected) return
+  maskBox.classList.add('mask-host')
+  maskLayer = document.createElement('div'); maskLayer.id = 'mask-layer'
+  maskBox.appendChild(maskLayer)
+}
+function maskApply(el) {
+  const w = +el.dataset.w, h = el.dataset.h ? +el.dataset.h : null
+  el.style.left = el.dataset.x + 'px'; el.style.top = el.dataset.y + 'px'; el.style.width = w + 'px'
+  if (h) el.style.height = h + 'px'
+  el.style.transform = `rotate(${el.dataset.r || 0}deg)`
+}
+function maskSelect(el) {
+  if (maskSel) maskSel.classList.remove('sel')
+  maskSel = el; if (el) el.classList.add('sel')
+}
+function maskAdd(o) {
+  maskEnsure()
+  const el = document.createElement('div'); el.className = 'mask-st'
+  if (o.file) { const img = document.createElement('img'); img.src = '/raven/stickers/' + stickerFile(o.file); img.alt = ''; img.draggable = false; el.appendChild(img) }
+  else { const d = document.createElement('div'); d.className = 'mask-shape ' + o.shape; el.appendChild(d); el.dataset.h = o.h }
+  const x = document.createElement('button'); x.type = 'button'; x.className = 'mask-x'; x.textContent = '×'; x.setAttribute('aria-label', '撕掉这张')
+  const r = document.createElement('button'); r.type = 'button'; r.className = 'mask-rot'; r.textContent = '↻'; r.setAttribute('aria-label', '转一转、拉大小')
+  el.append(x, r)
+  const vw = maskBox.clientWidth - 72   // 右边让出贴纸栏
+  el.dataset.w = Math.min(o.w, vw - 20); el.dataset.r = (Math.random() * 10 - 5).toFixed(1)
+  el.dataset.x = Math.max(8, (vw - el.dataset.w) / 2)
+  el.dataset.y = maskBox.scrollTop + maskBox.clientHeight / 2 - 30
+  maskApply(el); maskLayer.appendChild(el); maskSelect(el)
+  x.addEventListener('pointerdown', e => e.stopPropagation())
+  x.addEventListener('click', e => { e.stopPropagation(); el.remove(); if (maskSel === el) maskSel = null })
+  r.addEventListener('pointerdown', e => maskTwist(e, el))
+  el.addEventListener('pointerdown', e => maskDrag(e, el))
+  el.addEventListener('contextmenu', e => { e.preventDefault(); e.stopPropagation() })
+  el.addEventListener('click', e => e.stopPropagation())
+}
+function maskDrag(e, el) {
+  e.stopPropagation()   // 别让底下气泡的长按菜单接到
+  if (!maskLayer.classList.contains('editing')) { e.preventDefault(); maskEdit(); maskSelect(el); return }
+  if (e.target.closest('.mask-x, .mask-rot')) return
+  e.preventDefault(); maskSelect(el)
+  const sx = e.clientX, sy = e.clientY, ox = +el.dataset.x, oy = +el.dataset.y
+  el.setPointerCapture(e.pointerId)
+  const mv = ev => { el.dataset.x = ox + ev.clientX - sx; el.dataset.y = oy + ev.clientY - sy; maskApply(el) }
+  const up = () => { el.removeEventListener('pointermove', mv); el.removeEventListener('pointerup', up); el.removeEventListener('pointercancel', up) }
+  el.addEventListener('pointermove', mv); el.addEventListener('pointerup', up); el.addEventListener('pointercancel', up)
+}
+function maskTwist(e, el) {
+  e.preventDefault(); e.stopPropagation(); maskSelect(el)
+  const h = e.currentTarget, rc = el.getBoundingClientRect(), cx = rc.left + rc.width / 2, cy = rc.top + rc.height / 2
+  const d0 = Math.hypot(e.clientX - cx, e.clientY - cy) || 1, a0 = Math.atan2(e.clientY - cy, e.clientX - cx)
+  const w0 = +el.dataset.w, h0 = el.dataset.h ? +el.dataset.h : null, r0 = +el.dataset.r || 0
+  const ow = w0, ox = +el.dataset.x, oy = +el.dataset.y
+  h.setPointerCapture(e.pointerId)
+  const mv = ev => {
+    const k = Math.max(0.3, Math.min(5, Math.hypot(ev.clientX - cx, ev.clientY - cy) / d0))
+    const nw = Math.max(30, w0 * k)
+    el.dataset.w = nw; if (h0) el.dataset.h = Math.max(12, h0 * k)
+    el.dataset.x = ox - (nw - ow) / 2                                       // 以中心为准放大，不往右下跑
+    if (h0) el.dataset.y = oy - (+el.dataset.h - h0) / 2
+    el.dataset.r = (r0 + (Math.atan2(ev.clientY - cy, ev.clientX - cx) - a0) * 180 / Math.PI).toFixed(1)
+    maskApply(el)
+  }
+  const up = () => { h.removeEventListener('pointermove', mv); h.removeEventListener('pointerup', up); h.removeEventListener('pointercancel', up) }
+  h.addEventListener('pointermove', mv); h.addEventListener('pointerup', up); h.addEventListener('pointercancel', up)
+}
+function maskEdit() {
+  maskEnsure(); window.rvMaskOn = true
+  maskLayer.classList.add('editing'); maskTray.hidden = false
+  if (!maskLoaded) {
+    maskLoaded = true; maskFillTray(STICKERS.map(x => typeof x === 'string' ? x : x.file))
+    fetch('/raven/stickers/index.json', { cache: 'no-store' }).then(r => r.ok ? r.json() : null)
+      .then(d => { if (d && Array.isArray(d.stickers)) maskFillTray(d.stickers.map(x => x.file)) }).catch(() => {})
+  }
+}
+function maskDone() {
+  maskTray.hidden = true; maskSelect(null)
+  if (maskLayer) maskLayer.classList.remove('editing')
+  if (!maskLayer || !maskLayer.children.length) maskClear()
+}
+function maskClear() {
+  maskTray.hidden = true; maskSel = null; window.rvMaskOn = false
+  if (maskLayer) maskLayer.remove(); maskLayer = null
+  maskBox.classList.remove('mask-host')
+}
+document.getElementById('mask-btn').addEventListener('click', () => { document.getElementById('attach-menu').hidden = true; maskEdit() })
+maskTray.querySelector('.mask-done').addEventListener('click', e => { e.stopPropagation(); maskDone() })
+maskTray.querySelector('.mask-clear').addEventListener('click', e => { e.stopPropagation(); maskClear() })
+maskTray.addEventListener('click', e => e.stopPropagation())
+maskBox.addEventListener('pointerdown', e => { if (maskLayer && maskLayer.classList.contains('editing') && !e.target.closest('.mask-st')) maskSelect(null) })
+
 // 抽屉里点格子的空白处、点字，都算点那颗按钮；点完抽屉收起
+
 document.getElementById('attach-menu').addEventListener('click', e => {
   e.stopPropagation()
   const tool = e.target.closest('.tool'); if (!tool) return
