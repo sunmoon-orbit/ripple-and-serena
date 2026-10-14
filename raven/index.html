@@ -1084,6 +1084,21 @@
     display: flex; align-items: center; justify-content: center;
   }
   .rv-music-play:active { transform: scale(0.92); }
+  /* 选项卡片（1014） */
+  .rv-ask { margin: 8px 0 2px; padding: 10px 12px 8px; border: 1px solid var(--border); border-radius: 14px; background: color-mix(in srgb, var(--surface) 88%, transparent); max-width: 360px; }
+  .ask-top { display: flex; align-items: center; gap: 6px; margin-bottom: 6px; }
+  .ask-nav { width: 26px; height: 26px; border-radius: 50%; border: 1px solid var(--border); background: none; color: var(--text); cursor: pointer; font-size: 15px; line-height: 1; }
+  .ask-nav:disabled { opacity: .3; }
+  .ask-pos { font-size: 12px; color: var(--text-dim); font-variant-numeric: tabular-nums; }
+  .ask-done { margin-left: auto; font-size: 11.5px; color: var(--accent); }
+  .ask-q { font-size: 14.5px; font-weight: 600; margin: 4px 2px 8px; line-height: 1.5; }
+  .ask-opt { display: flex; align-items: center; gap: 10px; width: 100%; text-align: left; background: none; border: 0; border-top: 1px solid var(--border); padding: 10px 2px; color: var(--text); font-size: 14px; cursor: pointer; font-family: inherit; line-height: 1.45; }
+  .ask-opt:disabled { cursor: default; opacity: .55; }
+  .ask-opt.on { color: var(--accent); font-weight: 600; opacity: 1; }
+  .ask-n { width: 22px; height: 22px; flex-shrink: 0; border-radius: 50%; background: var(--bg); color: var(--text-dim); font-size: 12px; display: flex; align-items: center; justify-content: center; }
+  .ask-opt.on .ask-n { background: var(--accent); color: var(--bg); }
+  .ask-own { margin-top: 2px; background: none; border: 0; border-top: 1px solid var(--border); width: 100%; text-align: left; padding: 9px 2px 3px; color: var(--text-dim); font-size: 13px; cursor: pointer; font-family: inherit; }
+  .rv-ask, .rv-ask * { -webkit-tap-highlight-color: transparent; }
   .rv-music, .rv-music *, #rv-player *, #rv-full *, #rv-room *, #rv-palette * { -webkit-tap-highlight-color: transparent; }
   .rv-music-play:focus { outline: none; }
 
@@ -2001,6 +2016,54 @@ function renderMusicCards(html, mine) {
     </div>`.replace(/\n\s*/g, '')   // 她的气泡是 pre-wrap，模板里的换行会撑出大片空白（1014 她截图）
   })
 }
+/* 选项卡片（1014，她要官端那种「我问、她点」的卡片）：
+   我在回复里写 [ask:问题|选项1|选项2|…]，一条里可以有好几个，合成一张「1 of N」翻页卡片。
+   她点一个选项就记下、翻到下一题；全答完自动发出去（一题就直接发那个选项，几题就一行一个「问题：答案」）。
+   「自己说」把问题放进输入框让她自己写。答过的记在本机，刷新还是「已回答」。 */
+function renderAskCards(html) {
+  const qs = []
+  html = html.replace(/\[ask:([^\]]+)\]/g, (_, inner) => {
+    const parts = inner.split('|').map(x => x.trim()).filter(Boolean)
+    if (parts.length < 2) return ''
+    qs.push({ q: parts[0], opts: parts.slice(1, 7) })
+    return qs.length === 1 ? '<div class="rv-ask" data-qs="__ASK__"></div>' : ''
+  })
+  return qs.length ? html.replace('__ASK__', encodeURIComponent(JSON.stringify(qs))) : html
+}
+const ASK_DONE_KEY = 'raven-ask-done'
+function askKey(qs) { let h = 0; const str = JSON.stringify(qs); for (let i = 0; i < str.length; i++) h = (h * 31 + str.charCodeAt(i)) | 0; return 'a' + (h >>> 0).toString(36) }
+function fillAskCards(root) {
+  root.querySelectorAll('.rv-ask').forEach(card => {
+    let qs; try { qs = JSON.parse(decodeURIComponent(card.dataset.qs || '')) } catch { return }
+    const key = askKey(qs)
+    const done = (() => { try { return JSON.parse(localStorage.getItem(ASK_DONE_KEY) || '{}')[key] } catch { return null } })()
+    const st = { i: 0, picks: done || new Array(qs.length).fill(null), sent: !!done }
+    const draw = () => {
+      const q = qs[st.i]
+      card.innerHTML = `<div class="ask-top"><button class="ask-nav" data-d="-1" ${st.i === 0 ? 'disabled' : ''}>‹</button><span class="ask-pos">${st.i + 1} of ${qs.length}</span><button class="ask-nav" data-d="1" ${st.i >= qs.length - 1 ? 'disabled' : ''}>›</button>${st.sent ? '<span class="ask-done">已回答</span>' : ''}</div>`
+        + `<div class="ask-q">${escHtml(q.q)}</div>`
+        + q.opts.map((o, k) => `<button class="ask-opt${st.picks[st.i] === o ? ' on' : ''}" data-k="${k}" ${st.sent ? 'disabled' : ''}><span class="ask-n">${k + 1}</span>${escHtml(o)}</button>`).join('')
+        + (st.sent ? '' : '<button class="ask-own">自己说…</button>')
+    }
+    card.onclick = e => {
+      e.stopPropagation()
+      const nav = e.target.closest('.ask-nav')
+      if (nav) { st.i = Math.max(0, Math.min(qs.length - 1, st.i + Number(nav.dataset.d))); return draw() }
+      if (st.sent) return
+      if (e.target.closest('.ask-own')) { insertAtCursor(qs.length > 1 ? `${qs[st.i].q}：` : ''); return }
+      const opt = e.target.closest('.ask-opt'); if (!opt) return
+      st.picks[st.i] = qs[st.i].opts[Number(opt.dataset.k)]
+      const next = st.picks.findIndex(x => x == null)
+      if (next === -1) {
+        st.sent = true
+        try { const all = JSON.parse(localStorage.getItem(ASK_DONE_KEY) || '{}'); all[key] = st.picks; localStorage.setItem(ASK_DONE_KEY, JSON.stringify(all)) } catch {}
+        sendMsg(qs.length === 1 ? st.picks[0] : qs.map((x, k) => `${x.q}：${st.picks[k]}`).join('\n'))
+      } else st.i = next
+      draw()
+    }
+    draw()
+  })
+}
 // 卡片里的图标在清洗之后再填：DOMPurify 会把里面的 svg 清掉（她 1014 截图：播放键是空圆、封面是空方块，点一下才出三角）
 function fillMusicIcons(root) {
   // 不看里面有没有东西，一律重画：清洗可能留下一个空壳 <svg>，不是空串（1014 第二次截图还是空的）
@@ -2520,9 +2583,10 @@ function appendMsg(text, role, save = true, ts = Date.now(), msgId = null, suppl
         `<img src="/raven/stickers/${stickerFile(name)}" style="max-width:220px;border-radius:8px;display:block;margin:4px 0;" alt="${name}">`)
       // 语气标签（[whispers]、[soft breath close to your ear]）给朗读用，气泡里画成淡色小字（1002）
       const withTags = withStickers.replace(VOICE_TAG_RE, (_, t) => `<span class="vtag">${t}</span>`)
-      const rendered = renderMusicCards(marked.parse(withTags))
+      const rendered = renderAskCards(renderMusicCards(marked.parse(withTags)))
       body.innerHTML = DOMPurify.sanitize(rendered, PURIFY_OPTS)
       fillMusicIcons(body)
+      fillAskCards(body)
       attachStickerFallback(body)
       enhanceCodeBlocks(body)
       if (aq) { const q = document.createElement('div'); q.className = 'quote-ref'; q.textContent = aq[1]; body.prepend(q) }
