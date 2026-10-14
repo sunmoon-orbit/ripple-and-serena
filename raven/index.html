@@ -1153,7 +1153,7 @@
   .rvf-artist { font-size: 13px; color: var(--text-dim); margin-top: 3px; text-align: center; }
   .rvf-lyrics { flex: 1; min-height: 0; align-self: stretch; overflow-y: auto; margin: 14px 0; text-align: center;
     -webkit-mask-image: linear-gradient(transparent, #000 18%, #000 82%, transparent); mask-image: linear-gradient(transparent, #000 18%, #000 82%, transparent); padding: 30% 0; }
-  .rvf-line { font-size: 14.5px; line-height: 1.6; padding: 5px 8px; color: var(--text-dim); cursor: pointer; transition: color .2s, transform .2s; }
+  .rvf-line { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; font-size: 14.5px; line-height: 1.6; padding: 5px 8px; color: var(--text-dim); cursor: pointer; transition: color .2s, transform .2s; }
   .rvf-line.on { color: var(--text); font-weight: 600; transform: scale(1.05); }
   .rvf-empty { color: var(--text-dim); font-size: 13px; padding-top: 30px; }
   .rvf-ctrl { align-self: stretch; display: flex; align-items: center; gap: 10px; font-size: 11.5px; color: var(--text-dim); font-variant-numeric: tabular-nums; }
@@ -1914,7 +1914,25 @@ function rvRenderFull() {
   f.querySelector('.rvf-play').onclick = () => { if (rvAudio && rvMusic.track) rvAudio.paused ? rvAudio.play() : rvAudio.pause() }
   f.querySelector('.rvf-prev').onclick = () => rvSkip(-1)
   f.querySelector('.rvf-next').onclick = () => rvSkip(1)
-  f.querySelector('.rvf-lyrics').addEventListener('click', e => {
+  // 点一句跳到那儿；长按一句 = 把这句歌词带回聊天框发给我（1014 她：「如果我遇到喜欢的歌词，可以跟你分享？」）
+  let pressTimer = null, pressed = false
+  const lyr = f.querySelector('.rvf-lyrics')
+  lyr.addEventListener('pointerdown', e => {
+    const line = e.target.closest('.rvf-line'); if (!line) return
+    pressed = false
+    pressTimer = setTimeout(() => {
+      pressed = true
+      const t = rvMusic.track || {}
+      rvCloseFull()
+      insertAtCursor(`「${line.textContent}」——《${t.name || ''}》${t.artist ? ' ' + t.artist : ''}`)
+      rvToast('歌词放进输入框了')
+    }, 550)
+  })
+  for (const ev of ['pointerup', 'pointercancel', 'pointerleave']) lyr.addEventListener(ev, () => clearTimeout(pressTimer))
+  lyr.addEventListener('scroll', () => clearTimeout(pressTimer), { passive: true })
+  lyr.addEventListener('contextmenu', e => { if (e.target.closest('.rvf-line')) e.preventDefault() })
+  lyr.addEventListener('click', e => {
+    if (pressed) { pressed = false; return }
     const line = e.target.closest('.rvf-line'); if (line && rvAudio) rvAudio.currentTime = +line.dataset.t
   })
   rvBindSeek(f.querySelector('.rv-seek'))
