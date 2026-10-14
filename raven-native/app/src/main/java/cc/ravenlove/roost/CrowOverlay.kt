@@ -6,7 +6,12 @@ import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.Color
 import android.graphics.PixelFormat
-import android.graphics.drawable.GradientDrawable
+import android.graphics.Canvas
+import android.graphics.ColorFilter
+import android.graphics.Paint
+import android.graphics.Path
+import android.graphics.RectF
+import android.graphics.drawable.Drawable
 import android.os.Handler
 import android.os.Looper
 import android.provider.Settings
@@ -79,12 +84,15 @@ class CrowOverlay private constructor(private val ctx: Context) {
             scaleType = ImageView.ScaleType.FIT_CENTER
         }
         // 像素图放大时不要糊：关掉 bitmap 过滤
+        // 歌词是乌鸦说的话（1015 第二版，她嫌灰玻璃板和乌鸦像两个不认识的东西）：奶白气泡、细黑边、左边小尖角指着嘴
         val tv = TextView(ctx).apply {
-            setTextColor(Color.WHITE); setTextSize(TypedValue.COMPLEX_UNIT_SP, 14f)
-            setShadowLayer(dp(3f), 0f, dp(1f), 0xCC000000.toInt())
+            setTextColor(0xFF2A2730.toInt()); setTextSize(TypedValue.COMPLEX_UNIT_SP, 14f)
             maxWidth = dp(230f).toInt(); maxLines = 2
-            setPadding(dp(10f).toInt(), dp(5f).toInt(), dp(10f).toInt(), dp(5f).toInt())
-            background = GradientDrawable().apply { cornerRadius = dp(14f); setColor(0x66000000) }
+            setPadding(dp(16f).toInt(), dp(6f).toInt(), dp(11f).toInt(), dp(7f).toInt())
+            background = BubbleDrawable(dp(1.5f), dp(7f), dp(12f))
+            layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply {
+                marginStart = -dp(6f).toInt(); bottomMargin = dp(18f).toInt()   // 贴近嘴边、比乌鸦身子略高
+            }
         }
         val ll = LinearLayout(ctx).apply {
             orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL
@@ -157,4 +165,27 @@ class CrowOverlay private constructor(private val ctx: Context) {
     }
 
     fun release() { detach() }
+}
+
+// 对话气泡：圆角矩形＋左边一个小尖角，奶白底、深色细边
+class BubbleDrawable(private val stroke: Float, private val tail: Float, private val radius: Float) : Drawable() {
+    private val fill = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = 0xF2F6F1E8.toInt(); style = Paint.Style.FILL }
+    private val line = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = 0xFF1D1D24.toInt(); style = Paint.Style.STROKE; strokeWidth = stroke; strokeJoin = Paint.Join.ROUND }
+    private val path = Path()
+    override fun draw(canvas: Canvas) {
+        val b = bounds; val h = stroke / 2
+        val r = RectF(b.left + tail + h, b.top + h, b.right - h, b.bottom - h)
+        val cy = r.top + minOf(r.height() / 2, radius + tail)
+        path.reset()
+        path.addRoundRect(r, radius, radius, Path.Direction.CW)
+        val t = Path().apply {
+            moveTo(r.left + stroke, cy - tail * 0.7f); lineTo(b.left + h, cy + tail * 0.2f); lineTo(r.left + stroke, cy + tail * 0.7f); close()
+        }
+        path.op(t, Path.Op.UNION)
+        canvas.drawPath(path, fill); canvas.drawPath(path, line)
+    }
+    override fun setAlpha(alpha: Int) { fill.alpha = alpha; line.alpha = alpha }
+    override fun setColorFilter(cf: ColorFilter?) { fill.colorFilter = cf; line.colorFilter = cf }
+    @Deprecated("Deprecated in Java")
+    override fun getOpacity() = android.graphics.PixelFormat.TRANSLUCENT
 }
