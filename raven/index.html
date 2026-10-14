@@ -1145,7 +1145,7 @@
     padding: calc(10px + env(safe-area-inset-top, 0px)) 20px calc(18px + env(safe-area-inset-bottom, 0px)); }
   #rv-full[hidden] { display: none; }
   .rvf-head { align-self: stretch; display: flex; align-items: center; justify-content: space-between; }
-  #rv-full { overflow: hidden; }
+  #rv-full { overflow: hidden; clip-path: inset(0); height: 100vh; height: 100dvh; }
   #rv-full > *:not(.rvf-bg):not(.rvf-veil):not(input) { position: relative; z-index: 1; }
   .rvf-bg { position: absolute; inset: -60px; z-index: 0; background: var(--bg) center / cover no-repeat; filter: blur(42px) saturate(1.25); transition: background-image .4s; }
   .rvf-veil { position: absolute; inset: 0; z-index: 0; background: color-mix(in srgb, var(--bg) 58%, transparent); }
@@ -1925,6 +1925,9 @@ function rvRenderFull() {
 }
 ;(function initRvFull() {
   const f = document.getElementById('rv-full'); if (!f) return
+  // 1014 她截图：全屏页上面被切掉一截、底下漏出一条。这几层原来放在聊天面板里面，
+  // 外面哪层带了 backdrop-filter／transform，fixed 就跟着那层走了。搬到 body 下面，按整个屏幕铺
+  for (const id of ['rv-full', 'rv-room', 'rv-palette']) { const el = document.getElementById(id); if (el) document.body.appendChild(el) }
   f.querySelector('.rvf-back').onclick = rvCloseFull
   f.querySelector('.rvf-play').onclick = () => { if (rvAudio && rvMusic.track) rvAudio.paused ? rvAudio.play() : rvAudio.pause() }
   f.querySelector('.rvf-prev').onclick = () => rvSkip(-1)
