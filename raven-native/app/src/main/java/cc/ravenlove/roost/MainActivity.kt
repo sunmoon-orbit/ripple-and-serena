@@ -24,6 +24,7 @@ import androidx.core.view.WindowInsetsCompat
 class MainActivity : AppCompatActivity() {
 
     private lateinit var webView: WebView
+    lateinit var mediaHelper: MediaNotificationHelper
     private lateinit var splash: FrameLayout
     private var fileCallback: ValueCallback<Array<Uri>>? = null
     private var pendingAudioPermission: PermissionRequest? = null
@@ -155,6 +156,13 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
+        // 通知栏播放器（1014）：按钮回调页面里的 window.__roostMediaAction
+        mediaHelper = MediaNotificationHelper(this)
+        mediaHelper.onAction = { action ->
+            runOnUiThread {
+                webView.evaluateJavascript("window.__roostMediaAction && window.__roostMediaAction('$action')", null)
+            }
+        }
         webView.addJavascriptInterface(WebBridge(this), "RoostNative")
         webView.loadUrl(ROOST_URL)
 
@@ -311,6 +319,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     override fun onDestroy() {
+        mediaHelper.release()
         webView.destroy()
         super.onDestroy()
     }

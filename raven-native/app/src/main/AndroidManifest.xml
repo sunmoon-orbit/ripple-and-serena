@@ -43,6 +43,11 @@
             </intent-filter>
         </service>
 
+        <!-- 通知栏播放器的按钮（1014） -->
+        <receiver
+            android:name=".MediaActionReceiver"
+            android:exported="false" />
+
         <!-- 通知栏直接回复 -->
         <receiver
             android:name=".QuickReplyReceiver"

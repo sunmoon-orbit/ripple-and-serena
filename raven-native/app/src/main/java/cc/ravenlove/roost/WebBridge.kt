@@ -51,4 +51,15 @@ class WebBridge(private val activity: MainActivity) {
     fun saveBase64File(fileName: String, mimeType: String, base64: String) {
         activity.saveBase64File(fileName, mimeType, base64)
     }
+
+    // 通知栏播放器（1014）：页面放歌时报状态进来；停了就清掉
+    @JavascriptInterface
+    fun updateNowPlaying(title: String, artist: String, coverUrl: String, playing: Boolean, posMs: Long, durationMs: Long) {
+        activity.runOnUiThread { activity.mediaHelper.update(title, artist, coverUrl, playing, posMs, durationMs) }
+    }
+
+    @JavascriptInterface
+    fun clearNowPlaying() {
+        activity.runOnUiThread { activity.mediaHelper.clear() }
+    }
 }

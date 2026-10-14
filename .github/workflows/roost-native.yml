@@ -50,6 +50,29 @@ jobs:
           echo "ROOST_KEYSTORE_ALIAS=yanji" >> "$GITHUB_ENV"
           echo "固定签名已启用（复用言叽 keystore）"
 
+      # 1014：新图标是画师只许自用的，不在仓库里。用仓库密钥 ROOST_BUILD_KEY 从自己服务器取，
+      # 盖到仓库里的旧乌鸦图标上再打包。没有这把钥匙就停下，不打出一个旧图标的包。
+      - name: Fetch private icons
+        env:
+          BUILD_KEY: ${{ secrets.ROOST_BUILD_KEY }}
+        run: |
+          if [ -z "$BUILD_KEY" ]; then
+            echo "::error::ROOST_BUILD_KEY 仓库密钥不存在，拿不到新图标，停下。"
+            exit 1
+          fi
+          mkdir -p /tmp/priv
+          curl -fsS --retry 3 -H "X-Roost-Build-Key: $BUILD_KEY" \
+            https://memory.ravenlove.cc/raven/build/private-icons.tgz -o /tmp/priv/icons.tgz
+          tar -xzf /tmp/priv/icons.tgz -C /tmp/priv
+          cp /tmp/priv/static/home-icon-crow-512.png raven/home-icon-crow-512.png
+          for d in /tmp/priv/native-res/drawable-*; do
+            mkdir -p "raven-native/app/src/main/res/$(basename "$d")"
+            cp "$d"/ic_notification.png "raven-native/app/src/main/res/$(basename "$d")/"
+          done
+          # 同名的矢量版和 PNG 版不能并存，留 PNG
+          rm -f raven-native/app/src/main/res/drawable/ic_notification.xml
+          echo "新图标就位"
+
       - name: Generate launcher icon
         run: |
           sudo apt-get update -qq && sudo apt-get install -y -qq imagemagick >/dev/null
@@ -65,41 +88,19 @@ jobs:
         working-directory: raven-native
         run: gradle assembleDebug --no-daemon --stacktrace 2>&1 | tee /tmp/build.log
 
-      - name: Upload build log on failure
+      # 1014：失败日志和包都传回自己服务器，不发公开 Release（包里有不能公开的图标）
+      - name: Send build log on failure
         if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: build-log
-          path: /tmp/build.log
+        env:
+          BUILD_KEY: ${{ secrets.ROOST_BUILD_KEY }}
+        run: |
+          [ -n "$BUILD_KEY" ] && [ -f /tmp/build.log ] && curl -fsS -X POST -H "X-Roost-Build-Key: $BUILD_KEY" \
+            --data-binary @/tmp/build.log "https://memory.ravenlove.cc/raven/build/upload?kind=log&run=${{ github.run_number }}" || true
 
-      # ⚠️ 正文里的「构建号: N」是版本检查的数据源：raven-bridge 的 /raven/app-latest
-      # 用正则从这里解析出最新版本号返回给 app。改这行格式会让版本检查静默失效。
-      - name: Publish to Release
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: roost-native-apk
-          name: 归巢原生版 APK
-          body: |
-            归巢 Android 原生版（Kotlin + WebView 壳）。
-
-            构建号: ${{ github.run_number }}
-
-            本次更新 见提交记录
-
-            为什么要装它：PWA 的推送归属会在 Chrome 和归巢之间摇摆（WebAPK 重铸），
-            原生壳走 FCM，图标和归属都稳定。
-
-            安装步骤：
-            1. 老归巢里点小房子 🏠 →「导出到文件」，先把聊天记录存出来
-            2. 下载 app-debug.apk 安装，需允许「未知来源」
-            3. 首次打开允许通知权限，输入密码
-            4. 点小房子 →「从文件导入」，把第 1 步的文件导进来
-
-            导出和安装谁先谁后都行：新 app 和旧 PWA 各存各的，旧的那份不会被覆盖。
-
-            打不开的话再考虑把「归巢」加进分应用代理名单——0726 实测**不加也能通**
-            （域名走 Cloudflare，不是直连服务器 IP），0701 那条「必须加名单」的结论已证伪。
-
-            以后更新：固定签名已启用，直接安装新包覆盖即可。
-            ⚠️ 千万别卸载、别点「清除数据」——聊天记录在 app 内部存储里，会清零。
-          files: raven-native/app/build/outputs/apk/debug/app-debug.apk
+      - name: Send APK to server
+        env:
+          BUILD_KEY: ${{ secrets.ROOST_BUILD_KEY }}
+        run: |
+          curl -fsS --retry 3 -X POST -H "X-Roost-Build-Key: $BUILD_KEY" -H "Content-Type: application/octet-stream" \
+            --data-binary @raven-native/app/build/outputs/apk/debug/app-debug.apk \
+            "https://memory.ravenlove.cc/raven/build/upload?kind=apk&run=${{ github.run_number }}"

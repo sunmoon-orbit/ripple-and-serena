@@ -2198,6 +2198,15 @@ const server = http.createServer((req, res) => {
   // 直连 api.github.com 会被墙，所以必须服务端转一手），构建号从 release 正文里解析。
   if (req.method === 'GET' && url.pathname === '/raven/app-latest') {
     const now = Date.now()
+    // 1014 起新包不再发 GitHub Release（图标不能公开），打包流程传回服务器后记在 latest.json；有就以它为准
+    try {
+      const local = JSON.parse(fs.readFileSync('/home/ripple/raven-private/builds/latest.json', 'utf8'))
+      if (local.versionCode > 0 && local.zip) {
+        res.writeHead(200, { 'Content-Type': 'application/json' })
+        res.end(JSON.stringify({ versionCode: local.versionCode, url: `https://memory.ravenlove.cc/raven/download/${local.zip}`, note: '通知栏能控制听歌了' }))
+        return
+      }
+    } catch {}
     if (appLatestCache.data && now - appLatestCache.at < 30 * 60 * 1000) {
       res.writeHead(200, { 'Content-Type': 'application/json' })
       res.end(JSON.stringify(appLatestCache.data))
@@ -2255,6 +2264,66 @@ const server = http.createServer((req, res) => {
       fs.createReadStream(abs).pipe(res)
     })
     return
+  }
+
+  // 归巢原生壳打包（1014）：新图标是画师只许自用的，不能进公开仓库、包也不能挂公开发布页。
+  // 所以 GitHub 打包时拿仓库密钥 ROOST_BUILD_KEY 来这儿取图标；包打好了传回这儿，不发 Release。
+  //   GET  /raven/build/private-icons.tgz   取图标（静态图标 + 通知小剪影）
+  //   POST /raven/build/upload?kind=apk|log&run=N   收包 / 收失败日志
+  // 钥匙只在 ~/.roost-build-key 和她的 GitHub 仓库密钥里
+  // 打包钥匙给她看一眼（1014）：她要把它填进 GitHub 仓库密钥。只给登录了归巢的她，不经聊天、不进存档
+  if (req.method === 'GET' && url.pathname === '/raven/buildkey') {
+    if (!externalAuthed(req, url)) { res.writeHead(401, { 'Content-Type': 'application/json' }); res.end('{"error":"unauthorized"}'); return }
+    let key = ''
+    try { key = fs.readFileSync('/home/ripple/.roost-build-key', 'utf8').trim() } catch {}
+    res.writeHead(key ? 200 : 404, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' })
+    res.end(JSON.stringify({ key }))
+    return
+  }
+  if (url.pathname.startsWith('/raven/build/')) {
+    let key = ''
+    try { key = fs.readFileSync('/home/ripple/.roost-build-key', 'utf8').trim() } catch {}
+    const got = String(req.headers['x-roost-build-key'] || '')
+    const ok = key.length >= 32 && got.length === key.length && crypto.timingSafeEqual(Buffer.from(got), Buffer.from(key))
+    if (!ok) { res.writeHead(401, { 'Content-Type': 'application/json' }); res.end('{"error":"unauthorized"}'); return }
+    if (req.method === 'GET' && url.pathname === '/raven/build/private-icons.tgz') {
+      const tar = require('child_process').spawn('tar', ['-czf', '-', '-C', '/home/ripple/raven-private', 'static/home-icon-crow-512.png', 'native-res'])
+      res.writeHead(200, { 'Content-Type': 'application/gzip', 'Cache-Control': 'no-store' })
+      tar.stdout.pipe(res)
+      tar.on('error', () => res.end())
+      return
+    }
+    if (req.method === 'POST' && url.pathname === '/raven/build/upload') {
+      const kind = url.searchParams.get('kind') === 'apk' ? 'apk' : 'log'
+      const run = String(parseInt(url.searchParams.get('run'), 10) || 0)
+      const limit = kind === 'apk' ? 80 * 1024 * 1024 : 5 * 1024 * 1024
+      const dir = '/home/ripple/raven-private/builds'
+      fs.mkdirSync(dir, { recursive: true })
+      const file = path.join(dir, `roost-${run}.${kind}${kind === 'log' ? '.txt' : ''}`)
+      const out = fs.createWriteStream(file + '.part')
+      let size = 0, aborted = false
+      req.on('data', d => { size += d.length; if (size > limit && !aborted) { aborted = true; req.destroy(); out.destroy(); fs.rm(file + '.part', () => {}) } })
+      req.pipe(out)
+      out.on('finish', () => {
+        if (aborted) return
+        fs.renameSync(file + '.part', file)
+        console.log(`[build] 收到 ${kind} 构建 ${run}，${size} 字节`)
+        if (kind === 'log') { res.writeHead(200, { 'Content-Type': 'application/json' }); res.end('{"ok":true}'); return }
+        // 包：装进 zip 放到下载目录（文件名带随机串，不在任何公开页面上列出），再记下最新版本号
+        const zipName = `roost-${run}-${crypto.randomBytes(6).toString('hex')}.zip`
+        const py = require('child_process').spawn('python3', ['-I', '-c',
+          'import sys,zipfile\nwith zipfile.ZipFile(sys.argv[2],"w",zipfile.ZIP_STORED) as z: z.write(sys.argv[1],"roost.apk")',
+          file, path.join(DOWNLOAD_DIR, zipName)])
+        py.on('close', code => {
+          if (code !== 0) { res.writeHead(500, { 'Content-Type': 'application/json' }); res.end('{"error":"zip failed"}'); return }
+          fs.writeFileSync(path.join(dir, 'latest.json'), JSON.stringify({ versionCode: Number(run), zip: zipName, at: new Date().toISOString() }))
+          appLatestCache = { at: 0, data: null }
+          res.writeHead(200, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ ok: true, zip: zipName }))
+        })
+      })
+      return
+    }
+    res.writeHead(404); res.end(); return
   }
 
   // APK 下载：/raven/download/<文件名>，目录在仓库外，不进 git。

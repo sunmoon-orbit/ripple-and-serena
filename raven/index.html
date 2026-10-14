@@ -1708,6 +1708,7 @@ function rvAudioEl() {
   rvAudio.addEventListener('loadedmetadata', rvTick)
   rvAudio.addEventListener('play', rvRenderBar)
   rvAudio.addEventListener('pause', rvRenderBar)
+  for (const ev of ['play', 'pause', 'loadedmetadata', 'seeked']) rvAudio.addEventListener(ev, rvNativeSync)
   rvAudio.addEventListener('ended', () => { if (rvMusic.idx < rvMusic.queue.length - 1) rvPlayAt(rvMusic.idx + 1) })
   if ('mediaSession' in navigator) {
     try {
@@ -1718,6 +1719,27 @@ function rvAudioEl() {
     } catch {}
   }
   return rvAudio
+}
+// 原生壳的通知栏播放器（1014）：有 RoostNative.updateNowPlaying 才报；旧版壳没有这个方法就什么都不做
+function rvNativeSync() {
+  const N = window.RoostNative
+  if (!N || typeof N.updateNowPlaying !== 'function') return
+  try {
+    const t = rvMusic.track
+    if (!t) { N.clearNowPlaying(); return }
+    const a = rvAudio
+    N.updateNowPlaying(t.name || '', t.artist || '涟言点的歌', t.cover || '', !!(a && !a.paused),
+      Math.round(((a && a.currentTime) || 0) * 1000), Math.round(((a && isFinite(a.duration) && a.duration) || 0) * 1000))
+  } catch {}
+}
+window.__roostMediaAction = (act) => {
+  const a = rvAudio
+  if (act === 'play') a && rvMusic.track && a.play().catch(() => {})
+  else if (act === 'pause') a && a.pause()
+  else if (act === 'next') rvSkip(1)
+  else if (act === 'prev') rvSkip(-1)
+  else if (act === 'stop') rvStop()
+  else if (act.startsWith('seek:') && a) a.currentTime = Number(act.slice(5)) / 1000
 }
 function rvSetQueue(list, idx = 0) { rvMusic.queue = list.slice(); return rvPlayAt(idx) }
 function rvEnqueue(t) {
@@ -1751,7 +1773,7 @@ function rvStop() {
   rvMusic.seq++
   if (rvAudio) { rvAudio.pause(); rvAudio.removeAttribute('src'); rvAudio.load() }
   rvMusic.queue = []; rvMusic.idx = -1; rvMusic.track = null; rvMusic.lyrics = []
-  rvRenderBar(); rvCloseFull()
+  rvRenderBar(); rvCloseFull(); rvNativeSync()
 }
 
 // ── 迷你播放条（在输入框上面占位）──
