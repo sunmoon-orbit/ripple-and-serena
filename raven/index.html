@@ -1618,11 +1618,11 @@ const PURIFY_OPTS = {
     'p', 'br', 'hr', 'span', 'div', 'img', 'a', 'em', 'strong', 'del', 'code', 'pre',
     'blockquote', 'ul', 'ol', 'li', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
     'table', 'thead', 'tbody', 'tr', 'th', 'td', 'sup', 'sub',
-    'svg', 'path', 'circle', 'button', 'audio',
+    'svg', 'path', 'circle', 'polygon', 'rect', 'button', 'audio',
   ],
   ALLOWED_ATTR: [
     'src', 'alt', 'title', 'href', 'target', 'rel', 'class', 'style', 'align', 'loading',
-    'data-name', 'data-artist', 'aria-label', 'viewBox', 'width', 'height', 'fill',
+    'data-name', 'data-artist', 'data-reason', 'aria-label', 'points', 'x', 'y', 'viewBox', 'width', 'height', 'fill',
     'stroke', 'stroke-width', 'stroke-linecap', 'stroke-linejoin', 'd', 'cx', 'cy', 'r',
     'controls', 'preload',
   ],
@@ -1890,15 +1890,15 @@ async function rvSavePick(t, reason) {
 }
 
 // 把渲染后 HTML 里的 [music:歌名|歌手|理由] 换成点歌卡片
-function renderMusicCards(html) {
+function renderMusicCards(html, mine) {
   return html.replace(/\[music:([^\]]+)\]/g, (_, inner) => {
     const [name, artist, reason] = inner.split('|').map(s => s.trim())
     if (!name) return ''
-    return `<div class="rv-music" data-name="${encodeURIComponent(name)}" data-artist="${encodeURIComponent(artist || '')}" data-reason="${encodeURIComponent(reason || '')}">
+    return `<div class="rv-music${mine ? ' rv-music-mine' : ''}" data-name="${encodeURIComponent(name)}" data-artist="${encodeURIComponent(artist || '')}" data-reason="${encodeURIComponent(reason || '')}">
       <div class="rv-music-cover">${MUSIC_NOTE_SVG}</div>
       <div class="rv-music-main">
         <div class="rv-music-title">${escHtml(name)}</div>
-        <div class="rv-music-artist">${escHtml(artist || '涟言点的歌')}</div>
+        <div class="rv-music-artist">${escHtml(artist || (mine ? '你点给他的' : '涟言点的歌'))}</div>
         ${reason ? `<div class="rv-music-reason">${escHtml(reason)}</div>` : ''}
       </div>
       <button class="rv-music-play" aria-label="播放">${PLAY_SVG}</button>
@@ -1912,7 +1912,7 @@ document.addEventListener('click', async (e) => {
   btn.innerHTML = '…'
   const t = await rvSetQueue([{ name, artist }], 0)
   btn.innerHTML = PLAY_SVG
-  if (t) rvSavePick(t, decodeURIComponent(card.dataset.reason || ''))
+  if (t && !card.classList.contains('rv-music-mine')) rvSavePick(t, decodeURIComponent(card.dataset.reason || ''))   // 她点给我的不进「涟言点的歌」
 })
 
 // ── 听歌面板 ──
@@ -2024,7 +2024,7 @@ function rvRenderRoom() {
       const t = rvRoom.results[i]
       if (act === 'play') { rvSetQueue([t], 0); room.hidden = true }
       else if (act === 'queue') rvEnqueue(t)
-      else if (act === 'share') { room.hidden = true; insertAtCursor(`🎵 点给你一首：《${t.name}》- ${t.artist}`) }
+      else if (act === 'share') { room.hidden = true; insertAtCursor(`[music:${t.name.replace(/[\[\]|]/g, ' ')}|${t.artist.replace(/[\[\]|]/g, ' ')}]`) }
       return
     }
     const list = rvRoom.tab === 'all' ? rvRoom.picks : rvRoom.songs
@@ -2420,7 +2420,7 @@ function appendMsg(text, role, save = true, ts = Date.now(), msgId = null, suppl
       // 1003 引用回复：第一行「> 引用：…」画成一小块引用，正文照常
       const qm = /^> 引用：([^\n]{1,200})\n?/.exec(text)
       const utext = qm ? text.slice(qm[0].length) : text   // 别改 text 本身，后面存历史还要用原文
-      if (/\[sticker:[^\]]+\]/.test(utext) || ATTACH_TEST_RE.test(utext)) {
+      if (/\[sticker:[^\]]+\]/.test(utext) || ATTACH_TEST_RE.test(utext) || /\[music:[^\]]+\]/.test(utext)) {
         if (STICKER_ONLY_RE.test(utext)) el.classList.add('sticker-msg')
         body.innerHTML = utext
           .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
@@ -2428,7 +2428,7 @@ function appendMsg(text, role, save = true, ts = Date.now(), msgId = null, suppl
             `<img src="/raven/stickers/${stickerFile(name)}" style="max-width:180px;border-radius:8px;display:block;margin:4px 0;" alt="${name}">`)
           .replace(ATTACH_TAG_RE, (_, p) => attachToHtml(p))
           .replace(/\n/g, '<br>')
-        body.innerHTML = DOMPurify.sanitize(body.innerHTML, PURIFY_OPTS)
+        body.innerHTML = DOMPurify.sanitize(renderMusicCards(body.innerHTML, true), PURIFY_OPTS)
         attachStickerFallback(body)
       } else {
         body.textContent = utext
