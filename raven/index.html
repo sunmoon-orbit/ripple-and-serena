@@ -1122,6 +1122,7 @@
   .rvp-artist { font-size: 11.5px; color: var(--text-dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .rvp-btn { width: 32px; height: 32px; flex-shrink: 0; border: none; background: none; cursor: pointer; color: var(--accent); display: flex; align-items: center; justify-content: center; }
   .rvp-btn[hidden] { display: none; }
+  .rvp-btn.dim, .rvf-btns button.dim { opacity: .3; }
   .rvp-close { color: var(--text-dim); }
 
   /* 全屏播放器 + 歌词 */
@@ -1786,12 +1787,14 @@ function rvRenderBar() {
   p.classList.toggle('show', !!t)
   document.body.classList.toggle('rv-playing', !!t)
   if (!t) return
-  const multi = rvMusic.queue.length > 1
   p.querySelector('.rvp-cover').innerHTML = t.cover ? `<img src="${escHtml(t.cover)}" alt="">` : '♪'
   p.querySelector('.rvp-title').textContent = rvMusic.loading ? `${t.name}（找音源中…）` : t.name
   p.querySelector('.rvp-artist').textContent = t.artist || '涟言点的歌'
-  p.querySelector('.rvp-prev').hidden = !multi
-  p.querySelector('.rvp-next').hidden = !multi
+  // 1014 她要：上一首下一首一直在，到头了就变淡
+  p.querySelector('.rvp-prev').hidden = false
+  p.querySelector('.rvp-next').hidden = false
+  p.querySelector('.rvp-prev').classList.toggle('dim', rvMusic.idx <= 0)
+  p.querySelector('.rvp-next').classList.toggle('dim', rvMusic.idx >= rvMusic.queue.length - 1)
   const playing = rvAudio && !rvAudio.paused
   p.querySelector('.rvp-toggle').innerHTML = playing ? PAUSE_SVG : PLAY_SVG
   const fp = document.querySelector('#rv-full .rvf-play'); if (fp) fp.innerHTML = playing ? PAUSE_SVG : PLAY_SVG
@@ -1843,9 +1846,10 @@ function rvRenderFull() {
   f.querySelector('.rvf-title').textContent = t.name
   f.querySelector('.rvf-artist').textContent = t.artist || '涟言点的歌'
   f.querySelector('.rvf-pos').textContent = rvMusic.queue.length > 1 ? `播放队列 ${rvMusic.idx + 1} / ${rvMusic.queue.length}` : '当前播放'
-  const multi = rvMusic.queue.length > 1
-  f.querySelector('.rvf-prev').hidden = !multi
-  f.querySelector('.rvf-next').hidden = !multi
+  f.querySelector('.rvf-prev').hidden = false
+  f.querySelector('.rvf-next').hidden = false
+  f.querySelector('.rvf-prev').classList.toggle('dim', rvMusic.idx <= 0)
+  f.querySelector('.rvf-next').classList.toggle('dim', rvMusic.idx >= rvMusic.queue.length - 1)
   const box = f.querySelector('.rvf-lyrics')
   box.dataset.active = ''
   box.innerHTML = rvMusic.loading ? '<div class="rvf-empty">找音源中…</div>'
@@ -1920,6 +1924,12 @@ document.addEventListener('click', async (e) => {
   const card = btn.closest('.rv-music'); if (!card) return
   const name = decodeURIComponent(card.dataset.name || ''), artist = decodeURIComponent(card.dataset.artist || '')
   btn.innerHTML = '…'
+  // 1014：单放一首没法切歌（她要上一首下一首），后面接上「涟言点的歌」整本，放完这首接着往下
+  mApi('/picks').then(list => {
+    if (!Array.isArray(list) || rvMusic.queue[0]?.name !== name) return
+    const rest = list.filter(p => p.name !== name).map(pickToTrack)
+    rvMusic.queue = [rvMusic.queue[0], ...rest]; rvRenderBar(); rvRenderFull()
+  }).catch(() => {})
   const t = await rvSetQueue([{ name, artist }], 0)
   btn.innerHTML = PLAY_SVG
   if (t && t.cover) card.querySelector('.rv-music-cover').innerHTML = `<img src="${escHtml(t.cover)}" alt="">`
