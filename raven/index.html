@@ -1911,8 +1911,9 @@ function renderMusicCards(html, mine) {
 }
 // 卡片里的图标在清洗之后再填：DOMPurify 会把里面的 svg 清掉（她 1014 截图：播放键是空圆、封面是空方块，点一下才出三角）
 function fillMusicIcons(root) {
-  root.querySelectorAll('.rv-music-play').forEach(b => { if (!b.innerHTML.trim()) b.innerHTML = PLAY_SVG })
-  root.querySelectorAll('.rv-music-cover').forEach(c => { if (!c.innerHTML.trim()) c.innerHTML = MUSIC_NOTE_SVG })
+  // 不看里面有没有东西，一律重画：清洗可能留下一个空壳 <svg>，不是空串（1014 第二次截图还是空的）
+  root.querySelectorAll('.rv-music-play').forEach(b => { b.innerHTML = PLAY_SVG })
+  root.querySelectorAll('.rv-music-cover').forEach(c => { c.innerHTML = MUSIC_NOTE_SVG })
 }
 document.addEventListener('click', async (e) => {
   const btn = e.target.closest('.rv-music-play'); if (!btn) return
