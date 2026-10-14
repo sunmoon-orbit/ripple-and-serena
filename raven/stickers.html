@@ -39,7 +39,8 @@
 <body>
 <div class="wrap">
   <button class="btn go" id="pick" type="button">＋ 选图片加进来</button>
-  <input type="file" id="files" accept="image/*" multiple hidden>
+  <!-- 不带 multiple（1015）：原生壳选图只认单张（parseResult 不读 ClipData），带了 multiple 选完什么都收不到 -->
+  <input type="file" id="files" accept="image/*" hidden>
   <div class="tip">名字写它在说什么，比如「委屈巴巴」「摸摸头」；图上有字就直接写那行字。动图会原样保留。你加的图先是你自己的；他看过以后想用，会自己收进他的库，收了的那张下面会写「他收了」。</div>
   <div id="queue"></div>
 
