@@ -18,6 +18,7 @@ export default function MusicRoom({ onClose }) {
   const [playlists, setPlaylists] = useState([])
   const [activeTab, setActiveTab] = useState('search') // 'search' | 'all' | playlist id
   const [playlistSongs, setPlaylistSongs] = useState([])
+  const [herPicks, setHerPicks] = useState([])   // 1014：她点给我的
   const [loading, setLoading] = useState(true)
   const [showNewPl, setShowNewPl] = useState(false)
   const [newPlName, setNewPlName] = useState('')
@@ -27,20 +28,22 @@ export default function MusicRoom({ onClose }) {
     if (!token) { setLoading(false); return }
     setLoading(true)
     try {
-      const [r1, r2] = await Promise.all([
+      const [r1, r2, r3] = await Promise.all([
         fetch(`${base}/music/picks`, { headers: auth }),
         fetch(`${base}/music/playlists`, { headers: auth }),
+        fetch(`${base}/music/picks?by=${encodeURIComponent('阿颖')}`, { headers: auth }),
       ])
       setPicks(r1.ok ? await r1.json() : [])
       setPlaylists(r2.ok ? await r2.json() : [])
-    } catch { setPicks([]); setPlaylists([]) }
+      setHerPicks(r3.ok ? await r3.json() : [])
+    } catch { setPicks([]); setPlaylists([]); setHerPicks([]) }
     setLoading(false)
   }, [base, token])
 
   useEffect(() => { load() }, [load])
 
   useEffect(() => {
-    if (activeTab === 'all' || activeTab === 'search' || !token) return
+    if (activeTab === 'all' || activeTab === 'hers' || activeTab === 'search' || !token) return
     fetch(`${base}/music/playlists/${activeTab}/songs`, { headers: auth })
       .then(r => r.ok ? r.json() : []).then(setPlaylistSongs).catch(() => setPlaylistSongs([]))
   }, [activeTab, base, token])
@@ -51,7 +54,10 @@ export default function MusicRoom({ onClose }) {
         method: 'PATCH', headers: { ...auth, 'Content-Type': 'application/json' },
         body: JSON.stringify({ liked: p.liked ? 0 : 1 }),
       })
-      if (r.ok) setPicks((list) => list.map((x) => x.id === p.id ? { ...x, liked: p.liked ? 0 : 1 } : x))
+      if (r.ok) {
+        const flip = (list) => list.map((x) => x.id === p.id ? { ...x, liked: p.liked ? 0 : 1 } : x)
+        setPicks(flip); setHerPicks(flip)
+      }
     } catch { showToast('操作失败', 'error') }
   }
 
@@ -66,6 +72,7 @@ export default function MusicRoom({ onClose }) {
     try {
       await fetch(`${base}/music/picks/${id}`, { method: 'DELETE', headers: auth })
       setPicks((list) => list.filter((x) => x.id !== id))
+      setHerPicks((list) => list.filter((x) => x.id !== id))
     } catch { showToast('删除失败', 'error') }
   }
 
@@ -124,7 +131,8 @@ export default function MusicRoom({ onClose }) {
     } catch { showToast('移除失败', 'error') }
   }
 
-  const displayList = activeTab === 'all' ? picks : playlistSongs
+  const isPickList = activeTab === 'all' || activeTab === 'hers'   // 两本点歌记录玩法一样
+  const displayList = activeTab === 'all' ? picks : activeTab === 'hers' ? herPicks : playlistSongs
 
   function renderCard(p, isList) {
     return (
@@ -139,7 +147,7 @@ export default function MusicRoom({ onClose }) {
           {p.reason && <div className="mpick-reason">{p.reason}</div>}
           <div className="mpick-date">{(p.created_at || '').slice(0, 10)}</div>
         </div>
-        {activeTab === 'all' && playlists.length > 0 && (
+        {isPickList && playlists.length > 0 && (
           <div className="mpick-addto-wrap">
             <button className="mpick-addto" onClick={() => setAddingTo(addingTo === p.id ? null : p.id)} aria-label="加入歌单">
               <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
@@ -153,7 +161,7 @@ export default function MusicRoom({ onClose }) {
             )}
           </div>
         )}
-        {activeTab === 'all' ? (
+        {isPickList ? (
           <>
             <button className={'mpick-heart' + (p.liked ? ' on' : '')} onClick={() => toggleLike(p)} aria-label="收藏">
               <svg viewBox="0 0 24 24" width="15" height="15" fill={p.liked ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2"><path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.6l-1-1a5.5 5.5 0 0 0-7.8 7.8l1 1L12 21l7.8-7.6 1-1a5.5 5.5 0 0 0 0-7.8z"/></svg>
@@ -181,6 +189,7 @@ export default function MusicRoom({ onClose }) {
         <div className="mpick-tabs">
           <button className={'mpick-tab' + (activeTab === 'search' ? ' active' : '')} onClick={() => setActiveTab('search')}>选歌</button>
           <button className={'mpick-tab' + (activeTab === 'all' ? ' active' : '')} onClick={() => setActiveTab('all')}>全部</button>
+          <button className={'mpick-tab' + (activeTab === 'hers' ? ' active' : '')} onClick={() => setActiveTab('hers')}>我点的</button>
           {playlists.map(pl => (
             <button key={pl.id} className={'mpick-tab' + (activeTab === pl.id ? ' active' : '')} onClick={() => setActiveTab(pl.id)}>
               {pl.name} <span className="mpick-tab-count">{pl.song_count || 0}</span>
@@ -205,15 +214,15 @@ export default function MusicRoom({ onClose }) {
           ) : loading ? (
             <div className="games-empty">载入中…</div>
           ) : displayList.length === 0 ? (
-            <div className="games-empty">{activeTab === 'all' ? '还没有点过歌。等我某个瞬间想到一首合适的，会放进来的。' : '歌单是空的，去「全部」里把喜欢的歌加进来吧'}</div>
+            <div className="games-empty">{activeTab === 'hers' ? '还没点过。在「选歌」里点「点给 TA」，会记在这里。' : activeTab === 'all' ? '还没有点过歌。等我某个瞬间想到一首合适的，会放进来的。' : '歌单是空的，去「全部」里把喜欢的歌加进来吧'}</div>
           ) : (
             <>
-              {activeTab !== 'all' && displayList.length > 1 && (
+              {!isPickList && displayList.length > 1 && (
                 <button className="mpick-play-all" onClick={() => replay(displayList[0], displayList)}>
                   播放全部（{displayList.length} 首）
                 </button>
               )}
-              {displayList.map(p => renderCard(p, activeTab !== 'all'))}
+              {displayList.map(p => renderCard(p, !isPickList))}
             </>
           )}
         </div>

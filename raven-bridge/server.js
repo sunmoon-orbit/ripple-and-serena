@@ -1368,7 +1368,9 @@ const server = http.createServer((req, res) => {
     if (Number(req.headers['content-length'] || 0) > 20000) { res.writeHead(413, { 'Content-Type': 'application/json' }); res.end('{"error":"too large"}'); return }
     const headers = { Authorization: `Bearer ${MOON_TOKEN}` }
     for (const h of ['content-type', 'content-length']) if (req.headers[h]) headers[h] = req.headers[h]
-    const up = http.request({ hostname: '127.0.0.1', port: 3210, method: m, headers, path: '/music' + p }, r => {
+    const by = url.searchParams.get('by')   // 1014：按谁点的取（阿颖／all），只放这一个参数过去
+    const q = by && ['阿颖', 'all'].includes(by) ? '?by=' + encodeURIComponent(by) : ''
+    const up = http.request({ hostname: '127.0.0.1', port: 3210, method: m, headers, path: '/music' + p + q }, r => {
       res.writeHead(r.statusCode, { 'Content-Type': r.headers['content-type'] || 'application/json', 'Cache-Control': 'private, no-store', 'X-Content-Type-Options': 'nosniff' })
       r.pipe(res)
     })

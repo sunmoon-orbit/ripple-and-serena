@@ -2101,7 +2101,7 @@ document.addEventListener('click', async (e) => {
 })
 
 // ── 听歌面板 ──
-const rvRoom = { tab: 'search', picks: [], playlists: [], songs: [], results: [], addingTo: null, loaded: false }
+const rvRoom = { tab: 'search', picks: [], hers: [], playlists: [], songs: [], results: [], addingTo: null, loaded: false }
 function rvOpenRoom() {
   document.getElementById('attach-menu').hidden = true
   document.getElementById('rv-room').hidden = false
@@ -2110,8 +2110,8 @@ function rvOpenRoom() {
 }
 async function rvLoadRoom() {
   try {
-    const [picks, pls] = await Promise.all([mApi('/picks'), mApi('/playlists')])
-    rvRoom.picks = Array.isArray(picks) ? picks : []; rvRoom.playlists = Array.isArray(pls) ? pls : []
+    const [picks, pls, hers] = await Promise.all([mApi('/picks'), mApi('/playlists'), mApi('/picks?by=' + encodeURIComponent('阿颖'))])
+    rvRoom.picks = Array.isArray(picks) ? picks : []; rvRoom.playlists = Array.isArray(pls) ? pls : []; rvRoom.hers = Array.isArray(hers) ? hers : []
   } catch { rvRoom.error = true }
   rvRoom.loaded = true
   rvRenderRoom()
@@ -2127,6 +2127,7 @@ function rvRenderRoom() {
   const tabs = room.querySelector('.rvr-tabs')
   tabs.innerHTML = `<button data-tab="search" class="${rvRoom.tab === 'search' ? 'on' : ''}">选歌</button>`
     + `<button data-tab="all" class="${rvRoom.tab === 'all' ? 'on' : ''}">涟言点的歌</button>`
+    + `<button data-tab="hers" class="${rvRoom.tab === 'hers' ? 'on' : ''}">我点给他的</button>`
     + rvRoom.playlists.map(pl => `<button data-tab="${pl.id}" class="${rvRoom.tab === pl.id ? 'on' : ''}">${escHtml(pl.name)} <small>${pl.song_count || 0}</small></button>`).join('')
     + '<button data-tab="new" class="rvr-new" aria-label="新建歌单">＋</button>'
   const body = room.querySelector('.rvr-body')
@@ -2140,13 +2141,14 @@ function rvRenderRoom() {
         </div>`).join('')
     return
   }
-  const isAll = rvRoom.tab === 'all'
-  const list = isAll ? rvRoom.picks : rvRoom.songs
+  const isHers = rvRoom.tab === 'hers'
+  const isAll = rvRoom.tab === 'all' || isHers   // 她点的那本和我那本一样的玩法：能收藏、能删、能加进歌单
+  const list = isHers ? rvRoom.hers : rvRoom.tab === 'all' ? rvRoom.picks : rvRoom.songs
   if (!rvRoom.loaded) { body.innerHTML = '<div class="rvr-empty">载入中…</div>'; return }
   if (rvRoom.error) { body.innerHTML = '<div class="rvr-empty">记忆库那边没连上，等会儿再试</div>'; return }
   let html = ''
   if (!isAll) html += `<div class="rvr-pl-bar">${list.length > 1 ? `<button class="rvr-playall">播放全部（${list.length} 首）</button>` : ''}<button class="rvr-pl-del">删除歌单</button></div>`
-  if (!list.length) html += `<div class="rvr-empty">${isAll ? '还没有点过歌。等我某个瞬间想到一首合适的，会放进来的。' : '歌单是空的，去「涟言点的歌」里点 ＋ 把歌加进来'}</div>`
+  if (!list.length) html += `<div class="rvr-empty">${isHers ? '还没点过。在「选歌」里点「点给他」，或者长按歌词分享，都会记在这儿。' : isAll ? '还没有点过歌。等我某个瞬间想到一首合适的，会放进来的。' : '歌单是空的，去「涟言点的歌」里点 ＋ 把歌加进来'}</div>`
   html += list.map((p, i) => `<div class="rvr-pick" data-i="${i}">
       <button class="rvr-pplay" data-act="play" aria-label="播放">${PLAY_SVG}</button>
       <div class="rvr-pmain" data-act="play"><div class="rvr-ptitle">${escHtml(p.name)}${p.artist ? `<span> · ${escHtml(p.artist)}</span>` : ''}</div>
@@ -2212,7 +2214,7 @@ function rvRenderRoom() {
       else if (act === 'share') { room.hidden = true; insertAtCursor(`[music:${t.name.replace(/[\[\]|]/g, ' ')}|${t.artist.replace(/[\[\]|]/g, ' ')}]`) }
       return
     }
-    const list = rvRoom.tab === 'all' ? rvRoom.picks : rvRoom.songs
+    const list = rvRoom.tab === 'hers' ? rvRoom.hers : rvRoom.tab === 'all' ? rvRoom.picks : rvRoom.songs
     const p = list[i]; if (!p) return
     if (act === 'play') { rvSetQueue(list.map(pickToTrack), i); room.hidden = true }
     else if (act === 'addto') { rvRoom.addingTo = rvRoom.addingTo === p.id ? null : p.id; rvRenderRoom() }
@@ -2221,7 +2223,7 @@ function rvRenderRoom() {
       rvRenderRoom()
     } else if (act === 'del') {
       if (!confirm(`把《${p.name}》从点歌记录里删掉？`)) return
-      try { await mApi(`/picks/${p.id}`, { method: 'DELETE' }); rvRoom.picks.splice(i, 1) } catch { rvToast('没删成') }
+      try { await mApi(`/picks/${p.id}`, { method: 'DELETE' }); list.splice(i, 1) } catch { rvToast('没删成') }
       rvRenderRoom()
     } else if (act === 'unlist') {
       try { await mApi(`/playlists/${rvRoom.tab}/songs/${p.id}`, { method: 'DELETE' }); rvRoom.songs.splice(i, 1); const pl = rvRoom.playlists.find(x => x.id === rvRoom.tab); if (pl) pl.song_count = Math.max(0, (pl.song_count || 1) - 1) } catch { rvToast('没拿掉') }
@@ -3037,6 +3039,11 @@ function sendMsg(overrideText) {
     text = text ? `${text}\n${paths}` : paths
     pendingFiles = []
     renderAttachPreview()
+  }
+  // 1014：她点给我的歌（[music:歌名|歌手]）记进「阿颖点的歌」
+  for (const m of String(text || '').matchAll(/\[music:([^\]]+)\]/g)) {
+    const [name, artist] = m[1].split('|').map(x => x.trim())
+    if (name) mApi('/picks', { method: 'POST', body: { name, artist: artist || '', picked_by: '阿颖' } }).catch(() => {})
   }
   const cid = 'c' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8)
   const payload = { type: 'send', text, cid, token: localStorage.getItem('raven-token') || '' }

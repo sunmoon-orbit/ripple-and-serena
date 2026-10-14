@@ -4,6 +4,8 @@ import { enqueueTrack, getState, playTrack, setQueue } from '../../utils/player'
 import { queueMusicShare } from '../../utils/musicShare'
 import { useStore } from '../../store'
 import { showToast } from '../Toast'
+import { useToolMemory } from './ToolMemory'
+import { toolFetch } from '../../api/toolFetch.mjs'
 
 function artistName(value) {
   return Array.isArray(value) ? value.join(' / ') : (value || '')
@@ -29,6 +31,7 @@ export default function SongSearch({ onDone }) {
   const [loading, setLoading] = useState(false)
   const [busyId, setBusyId] = useState('')
   const [alsoPlay, setAlsoPlay] = useState(false)
+  const moonMemory = useToolMemory()
   const requestRef = useRef(0)
 
   async function search(event) {
@@ -76,6 +79,15 @@ export default function SongSearch({ onDone }) {
     }
     const target = activePanel === 'crossing' ? 'crossing' : 'chat'
     queueMusicShare(target, shared)
+    // 1014：她点给我的歌记进记忆库「阿颖点的歌」（和归巢同一本），不混进「涟言点的歌」
+    if (moonMemory?.apiToken) {
+      const base = (moonMemory.baseUrl || 'https://memory.ravenlove.cc').replace(/\/$/, '')
+      toolFetch(`${base}/music/picks`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${moonMemory.apiToken}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ source: shared.source, track_id: shared.id, name: shared.name, artist: shared.artist, pic_id: shared.pic_id, lyric_id: shared.lyric_id, picked_by: '阿颖' }),
+      }).catch(() => {})
+    }
     if (activePanel !== target) setActivePanel(target, 'music-share')
     showToast(target === 'crossing' ? '点歌已送往当前 Agent 会话' : '点歌已送往当前 Murmur 对话', 'info')
     onDone?.()
