@@ -1145,11 +1145,11 @@
     padding: calc(10px + env(safe-area-inset-top, 0px)) 20px calc(18px + env(safe-area-inset-bottom, 0px)); }
   #rv-full[hidden] { display: none; }
   .rvf-head { align-self: stretch; display: flex; align-items: center; justify-content: space-between; }
-  #rv-full { overflow: hidden; clip-path: inset(0); height: 100vh; height: 100dvh; }
+  #rv-full { overflow: hidden; clip-path: inset(0); }
   #rv-full > *:not(.rvf-bg):not(.rvf-veil):not(input) { position: relative; z-index: 1; }
-  .rvf-bg { position: absolute; inset: -60px; z-index: 0; background: var(--bg) center / cover no-repeat; filter: blur(42px) saturate(1.25); transition: background-image .4s; }
+  .rvf-bg { position: absolute; inset: 0; transform: scale(1.25); z-index: 0; background: var(--bg) center / cover no-repeat; filter: blur(42px) saturate(1.25); transition: background-image .4s; }
   .rvf-veil { position: absolute; inset: 0; z-index: 0; background: color-mix(in srgb, var(--bg) 58%, transparent); }
-  #rv-full.custom-bg .rvf-bg { inset: 0; filter: none; }
+  #rv-full.custom-bg .rvf-bg { transform: none; filter: none; }
   #rv-full.custom-bg .rvf-veil { background: color-mix(in srgb, var(--bg) 42%, transparent); }
   .rvf-bgbtn { background: color-mix(in srgb, var(--surface) 70%, transparent); border: 1px solid var(--border); color: var(--text); border-radius: 999px; padding: 5px 12px; font-size: 12.5px; cursor: pointer; font-family: inherit; }
   .rvf-duo { display: flex; align-items: center; gap: 14px; margin-top: 10px; }
@@ -1894,8 +1894,18 @@ function rvBindSeek(input) {
 // ── 全屏：封面 + 滚动歌词 ──
 function rvOpenFull() {
   const f = document.getElementById('rv-full'); if (!f || !rvMusic.track) return
-  f.hidden = false; rvRenderFull(); rvTick()
+  f.hidden = false; rvFitFull(); rvRenderFull(); rvTick()
 }
+// 1014 第二张截图还是上面切一截、底下空一条：整页往上错了一截，像是可视区和页面区没对齐
+// （刚收过键盘时安卓 WebView 常这样）。打开时把它钉在「眼睛看得见的那块」上，可视区变了再钉一次
+function rvFitFull() {
+  const f = document.getElementById('rv-full'); if (!f || f.hidden) return
+  const vv = window.visualViewport
+  if (window.scrollY) window.scrollTo(0, 0)
+  if (vv) { f.style.top = vv.offsetTop + 'px'; f.style.height = vv.height + 'px'; f.style.bottom = 'auto' }
+}
+window.visualViewport?.addEventListener('resize', rvFitFull)
+window.visualViewport?.addEventListener('scroll', rvFitFull)
 function rvCloseFull() { const f = document.getElementById('rv-full'); if (f) f.hidden = true }
 function rvRenderFull() {
   const f = document.getElementById('rv-full'); if (!f || f.hidden) return
