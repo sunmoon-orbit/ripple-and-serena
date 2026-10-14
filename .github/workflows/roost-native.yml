@@ -50,7 +50,7 @@ jobs:
           echo "ROOST_KEYSTORE_ALIAS=yanji" >> "$GITHUB_ENV"
           echo "固定签名已启用（复用言叽 keystore）"
 
-      # 1014：新图标是画师只许自用的，不在仓库里。用仓库密钥 ROOST_BUILD_KEY 从自己服务器取，
+      # 1014：新图标是画师只许自用的，不在仓库里（她 19:40 填好了仓库密钥）。用仓库密钥 ROOST_BUILD_KEY 从自己服务器取，
       # 盖到仓库里的旧乌鸦图标上再打包。没有这把钥匙就停下，不打出一个旧图标的包。
       - name: Fetch private icons
         env:
