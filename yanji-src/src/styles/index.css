@@ -6131,3 +6131,24 @@ body.mp-active .scroll-bottom-btn { bottom: 139px; }
 }
 @media (prefers-reduced-motion: reduce) { .picker-backdrop, .picker-sheet { animation: none; } }
 .crossing-controls .picker-trigger { padding: 0 10px; font-size: 13px; }
+
+/* 1014：思考块和附件／诊断小卡片自己垫一层底。
+   她把气泡调得很透、背景是照片时，这两块原来几乎没底，字又是 text-mid／text-muted，
+   壁纸一透上来就看不清（她截图里那张窗户）。底色跟主题的 --card 走，不跟气泡透明度走；
+   字统一提到 text 这一档。放在文件最后，压过前面同等写法的旧颜色。 */
+.thinking-block,
+.bubble-attach-chip {
+  background: rgba(255,255,255,0.86);
+  background: color-mix(in srgb, var(--card) 86%, transparent);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+.thinking-block summary,
+.thinking-summary,
+.bubble-attach-name,
+.bubble-attach-toggle,
+.thinking-caret { color: var(--text-mid); }
+.thinking-content,
+.bubble-attach-content,
+.bubble-attach-content pre { color: var(--text); }
+
