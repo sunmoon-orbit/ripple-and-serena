@@ -38,6 +38,22 @@ test('输入框里正打着字不算交上去的话', () => {
   assert.equal(authStateFromCapture(cap).broken, true)
 })
 
+test('探三次都不通就不再探，一直拦到屏幕上有新动静', () => {
+  const gate = createAuthGate()
+  const m = 60000
+  gate.observe(true, 0)
+  assert.equal(gate.observe(true, 3 * m).probe, true); gate.probed(3 * m)
+  assert.equal(gate.observe(true, 9 * m).probe, true); gate.probed(9 * m)
+  assert.equal(gate.observe(true, 21 * m).probe, true); gate.probed(21 * m)
+  assert.equal(gate.gaveUp(), true)
+  for (const t of [33, 60, 600, 60 * 24 * 30]) assert.deepEqual(gate.observe(true, t * m), { blocked: true, probe: false })
+  assert.equal(gate.minutesUntilProbe(700 * m), 0)
+  assert.deepEqual(gate.observe(false, 701 * m), { blocked: false, probe: false })
+  assert.equal(gate.gaveUp(), false)
+  gate.observe(true, 710 * m)
+  assert.equal(gate.observe(true, 713 * m).probe, true)   // 下一次卡住重新从三分钟数起
+})
+
 test('保质期：卡住先拦，三分钟后放一条探针，探不通就 6、12 分钟地退避；好了就清零', () => {
   const gate = createAuthGate()
   const m = 60000

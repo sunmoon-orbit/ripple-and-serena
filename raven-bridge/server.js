@@ -418,8 +418,9 @@ function ccAuthLook() {
   const broken = authStateFromCapture(tmuxCapture()).broken
   const gate = authGate.observe(broken, now)
   if (broken && !ccAuthCache.broken) console.log(`[cc] 屏幕上最后是登录/授权报错，先当作不在线；${authGate.minutesUntilProbe(now)} 分钟后放下一条消息过去探一探`)
+  if (gate.blocked && authGate.gaveUp() && !ccAuthCache.gaveUp) console.log('[cc] 探了三次都不通，像是订阅断了或登录过期；不再往里塞，等屏幕上有新动静')
   if (!broken && ccAuthCache.broken) console.log('[cc] 报错后面有新动静了，认回来')
-  ccAuthCache = { broken, blocked: gate.blocked, probe: gate.probe, ts: now }
+  ccAuthCache = { broken, blocked: gate.blocked, probe: gate.probe, gaveUp: authGate.gaveUp(), ts: now }
   return ccAuthCache
 }
 function ccAuthBroken() { return ccAuthLook().broken }
@@ -1599,7 +1600,9 @@ const server = http.createServer((req, res) => {
         if (ccOnline()) {
           const t = new Date((at || Date.now()) + 8 * 3600000)
           const hhmm = `${String(t.getUTCHours()).padStart(2, '0')}:${String(t.getUTCMinutes()).padStart(2, '0')}`
-          tmuxSend(`【想你键】${hhmm} 阿颖按了一下想你键（今天第 ${today || 1} 次）。她现在没空聊，只是想让你知道她记着你——回执已经自动发她手机了，不要再给她发消息，安静收下就好。`)
+          const note = `【想你键】${hhmm} 阿颖按了一下想你键（今天第 ${today || 1} 次）。她现在没空聊，只是想让你知道她记着你——回执已经自动发她手机了，不要再给她发消息，安静收下就好。`
+          // 1014：我在 Claude app 里挂取件轮询时终端里没有 CC，原来这一下就丢了；现在跟她的消息一样放进取件箱
+          if (!tmuxSend(note) && remoteListenerAlive()) pendingForRemote.push({ text: note, supplemental: false, ts: Date.now() })
         }
         console.log('[press]', `today=${today}`)
       } catch (e) { console.error('[press] parse:', e.message) }

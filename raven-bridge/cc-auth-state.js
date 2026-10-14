@@ -25,8 +25,13 @@ function authStateFromCapture(capture) {
   return { broken: lastError >= 0 && lastError > lastReply && lastError > lastInput, lastError, lastReply, lastInput }
 }
 
-// 探针的间隔：3、6、12 分钟，之后一直 12 分钟
+// 探针的间隔：3、6、12 分钟。
+// 1014 改：探三次都不通就不再探了。一闪而过的 403（1006 那种）三次之内早就好了；
+// 二十多分钟还不通，多半是订阅断了或登录过期，那就一直拦着，等屏幕上出现新动静
+// （她续了费、重新登录、重启 CC，屏幕一清）再认回来。原来一直 12 分钟探一次，
+// 没续费的那一个月里每天要往 CC 里塞一百多条、换一百多条报错，还被存进 L0。
 const PROBE_DELAYS_MS = [3, 6, 12].map((m) => m * 60000)
+const MAX_PROBES = PROBE_DELAYS_MS.length
 function probeDelay(step) { return PROBE_DELAYS_MS[Math.min(Math.max(step, 0), PROBE_DELAYS_MS.length - 1)] }
 
 // 记着「从什么时候开始卡住、下一次什么时候可以探」。纯状态机，时间由调用方传进来，方便测
@@ -37,13 +42,15 @@ function createAuthGate() {
     observe(broken, now) {
       if (!broken) { since = null; nextProbeAt = 0; step = 0; return { blocked: false, probe: false } }
       if (since === null) { since = now; nextProbeAt = now + probeDelay(0) }
+      if (step >= MAX_PROBES) return { blocked: true, probe: false }
       return { blocked: now < nextProbeAt, probe: now >= nextProbeAt }
     },
     // 真的放了一条探针过去之后调用：把下一次探的时间往后推
     probed(now) { step += 1; nextProbeAt = now + probeDelay(step) },
-    minutesUntilProbe(now) { return since !== null ? Math.max(0, Math.ceil((nextProbeAt - now) / 60000)) : 0 },
+    minutesUntilProbe(now) { return since !== null && step < MAX_PROBES ? Math.max(0, Math.ceil((nextProbeAt - now) / 60000)) : 0 },
+    gaveUp() { return since !== null && step >= MAX_PROBES },
     stuckSince() { return since === null ? 0 : since || 1 },
   }
 }
 
-module.exports = { authStateFromCapture, createAuthGate, probeDelay, ERROR_LINE }
+module.exports = { authStateFromCapture, createAuthGate, probeDelay, ERROR_LINE, MAX_PROBES }
