@@ -692,6 +692,7 @@
   }
 
   /* scroll-to-bottom */
+  body.rv-playing #scroll-btn { bottom: 124px; }   /* 播放条在输入框上面占了一行，滚到底按钮跟着抬高，别盖住切歌键（1014） */
   #scroll-btn {
     position: absolute; bottom: 68px; right: 14px;
     width: 32px; height: 32px; border-radius: 50%;
@@ -1781,6 +1782,7 @@ function rvRenderBar() {
   const p = document.getElementById('rv-player'); if (!p) return
   const t = rvMusic.track
   p.classList.toggle('show', !!t)
+  document.body.classList.toggle('rv-playing', !!t)
   if (!t) return
   const multi = rvMusic.queue.length > 1
   p.querySelector('.rvp-cover').innerHTML = t.cover ? `<img src="${escHtml(t.cover)}" alt="">` : '♪'
@@ -1902,7 +1904,7 @@ function renderMusicCards(html, mine) {
         ${reason ? `<div class="rv-music-reason">${escHtml(reason)}</div>` : ''}
       </div>
       <button class="rv-music-play" aria-label="播放">${PLAY_SVG}</button>
-    </div>`
+    </div>`.replace(/\n\s*/g, '')   // 她的气泡是 pre-wrap，模板里的换行会撑出大片空白（1014 她截图）
   })
 }
 document.addEventListener('click', async (e) => {
@@ -1912,6 +1914,7 @@ document.addEventListener('click', async (e) => {
   btn.innerHTML = '…'
   const t = await rvSetQueue([{ name, artist }], 0)
   btn.innerHTML = PLAY_SVG
+  if (t && t.cover) card.querySelector('.rv-music-cover').innerHTML = `<img src="${escHtml(t.cover)}" alt="">`
   if (t && !card.classList.contains('rv-music-mine')) rvSavePick(t, decodeURIComponent(card.dataset.reason || ''))   // 她点给我的不进「涟言点的歌」
 })
 
