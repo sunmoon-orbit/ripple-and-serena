@@ -1084,6 +1084,25 @@
   }
   .rv-music-play:active { transform: scale(0.92); }
 
+  /* 我的调色盘（1014） */
+  #rv-palette { position: fixed; inset: 0; z-index: 1100; display: flex; align-items: flex-end; justify-content: center; background: rgba(0,0,0,.18); }
+  #rv-palette[hidden] { display: none; }
+  .pal-sheet { width: 100%; max-width: 520px; background: var(--bg); color: var(--text); border-radius: 18px 18px 0 0; padding: 16px 16px calc(16px + env(safe-area-inset-bottom, 0px)); box-shadow: 0 -8px 30px rgba(0,0,0,.25); }
+  .pal-head b { display: block; font-size: 15px; }
+  .pal-head span { font-size: 12px; color: var(--text-dim); }
+  .pal-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px 14px; margin: 14px 0; }
+  .pal-field { display: flex; flex-direction: column; gap: 5px; font-size: 12.5px; color: var(--text-dim); }
+  .pal-row { display: flex; align-items: center; gap: 8px; }
+  .pal-row input[type=color] { width: 40px; height: 34px; padding: 0; border: 1px solid var(--border); border-radius: 9px; background: none; cursor: pointer; flex-shrink: 0; }
+  .pal-row input[type=text] { flex: 1; min-width: 0; border: 1px solid var(--border); background: var(--surface); color: var(--text); border-radius: 9px; padding: 7px 9px; font-size: 13px; font-family: ui-monospace, monospace; }
+  .pal-preview { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .pal-b { padding: 9px 12px; font-size: 13px; text-align: center; border-radius: 12px; }
+  .pal-b-user { background: var(--bubble-user-bg); color: var(--bubble-user-text); border: 1px solid var(--bubble-user-border); }
+  .pal-b-ai { background: var(--bubble-assistant-bg); color: var(--bubble-assistant-text); border: 1px solid var(--bubble-assistant-border); }
+  .pal-acts { display: flex; gap: 8px; margin-top: 14px; }
+  .pal-acts button { border: 1px solid var(--border); background: var(--surface); color: var(--text); border-radius: 10px; padding: 9px 12px; font-size: 13px; cursor: pointer; font-family: inherit; }
+  .pal-acts .pal-reset { margin-right: auto; color: var(--text-dim); font-size: 12px; }
+  .pal-acts .pal-save { background: var(--accent); color: var(--bg); border-color: var(--accent); }
   /* 迷你播放条（1014）：放在输入框上面、跟着版面走，不再盖住输入框 */
   #rv-player { display: none; margin: 0 10px 6px; border: 1px solid var(--border); border-radius: 14px; overflow: hidden;
     background: color-mix(in srgb, var(--surface) 92%, transparent); -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px); }
@@ -1345,6 +1364,14 @@
         <div class="rvr-body"></div>
       </div>
     </div>
+    <div id="rv-palette" hidden>
+      <div class="pal-sheet">
+        <div class="pal-head"><b>我的调色盘</b><span>改一下就能看见，只存在这台设备上</span></div>
+        <div class="pal-grid"></div>
+        <div class="pal-preview"><div class="pal-b pal-b-user">这是你</div><div class="pal-b pal-b-ai">这是我</div></div>
+        <div class="pal-acts"><button type="button" class="pal-reset">从现在的主题重新取色</button><button type="button" class="pal-cancel">算了</button><button type="button" class="pal-save">用这套</button></div>
+      </div>
+    </div>
     <div id="attach-preview"></div>
     <!-- 加号抽屉（1007）：原来只有照片、文件两行；现在顶栏那几个工具也搬下来，一格一格的，像微信。
          格子里的按钮还是原来那几个 id，各自的点击照旧，只是换了地方。 -->
@@ -1372,6 +1399,7 @@
         </svg>
       </button><span>背景</span></div>
       <div class="tool"><button id="theme-btn" title="切换主题" aria-label="切换主题"></button><span>主题</span></div>
+      <div class="tool"><button id="palette-btn" type="button" aria-label="调色"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a9 9 0 1 0 0 18c1.1 0 1.8-.8 1.8-1.8 0-.5-.2-.9-.5-1.2-.3-.3-.5-.7-.5-1.2 0-1 .8-1.8 1.8-1.8H16a5 5 0 0 0 5-5c0-3.9-4-7-9-7z"/><circle cx="7.5" cy="11" r="1.2"/><circle cx="10.5" cy="7" r="1.2"/><circle cx="15" cy="7.5" r="1.2"/></svg></button><span>调色</span></div>
       <div class="tool"><button id="music-btn" type="button" aria-label="听歌"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg></button><span>听歌</span></div>
       <div class="tool"><button id="shelf-btn" type="button" aria-label="贴图架"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M8.5 14.5c1 1.3 2.1 2 3.5 2s2.5-.7 3.5-2"/><circle cx="9" cy="10" r=".9" fill="currentColor"/><circle cx="15" cy="10" r=".9" fill="currentColor"/></svg></button><span>贴图架</span></div>
       <div class="tool"><button id="remark-btn" type="button" aria-label="备注"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M20.6 13.4l-7.2 7.2a2 2 0 01-2.8 0L3 13V3h10l7.6 7.6a2 2 0 010 2.8z"/><circle cx="7.5" cy="7.5" r="1.3"/></svg></button><span>备注</span></div>
@@ -4389,29 +4417,135 @@ document.getElementById('notes-clear').addEventListener('click', () => {
   setTimeout(() => { notesSaved.textContent = '' }, 1500)
 })
 
+// --- 我的调色盘（1014，从言叽搬来）：五个颜色推出整套主题，只存这台设备 ---
+// 选了「我的调色」以后，主题按钮照样能轮换；轮回到「我的调色」就用这五个颜色
+const PAL_KEY = 'raven-custom-theme'
+const PAL_FIELDS = [
+  ['background', '页面底色'], ['accent', '强调色'], ['userBubble', '我的气泡'], ['assistantBubble', '他的气泡'], ['text', '正文文字'],
+]
+const PAL_VARS = ['--bg', '--surface', '--border', '--text', '--text-dim', '--accent', '--terminal-bg', '--terminal-text',
+  '--bubble-user-bg', '--bubble-user-text', '--bubble-user-border', '--bubble-user-shadow', '--bubble-user-link', '--bubble-user-code', '--bubble-user-selection',
+  '--bubble-assistant-bg', '--bubble-assistant-text', '--bubble-assistant-border', '--bubble-assistant-shadow', '--bubble-assistant-link', '--bubble-assistant-code', '--bubble-assistant-selection']
+const palHex = v => /^#[0-9a-f]{6}$/i.test(v || '') ? v.toLowerCase() : null
+const palRgb = h => [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16))
+const palToHex = c => '#' + c.map(x => Math.round(Math.max(0, Math.min(255, x))).toString(16).padStart(2, '0')).join('')
+const palMix = (a, b, t) => a.map((x, i) => x + (b[i] - x) * t)
+const palLum = c => { const [r, g, b] = c.map(x => { x /= 255; return x <= 0.03928 ? x / 12.92 : ((x + 0.055) / 1.055) ** 2.4 }); return 0.2126 * r + 0.7152 * g + 0.0722 * b }
+const palReadable = c => palLum(c) > 0.42 ? '#2c2830' : '#f6f2ee'
+// 第一次打开时，从眼下这套主题里取色当起点，不从一套陌生的颜色开始
+function palFromCurrent() {
+  const cs = getComputedStyle(document.documentElement)
+  const probe = document.createElement('i'); document.body.appendChild(probe)
+  const toHex = (v, fb) => {
+    probe.style.color = ''; probe.style.color = (v || '').trim()
+    const m = getComputedStyle(probe).color.match(/\d+(\.\d+)?/g)
+    return m && probe.style.color ? palToHex(m.slice(0, 3).map(Number)) : fb
+  }
+  const firstColor = v => ((v || '').match(/#[0-9a-f]{3,8}|rgba?\([^)]*\)/i) || [''])[0]
+  const out = {
+    background: toHex(cs.getPropertyValue('--bg'), '#1a1a1f'),
+    accent: toHex(cs.getPropertyValue('--accent'), '#b39c78'),
+    userBubble: toHex(firstColor(cs.getPropertyValue('--bubble-user-bg')), '#5c4c48'),
+    assistantBubble: toHex(firstColor(cs.getPropertyValue('--bubble-assistant-bg')), '#34384a'),
+    text: toHex(cs.getPropertyValue('--text'), '#e8e6e3'),
+  }
+  probe.remove()
+  return out
+}
+function palLoad() { try { const v = JSON.parse(localStorage.getItem(PAL_KEY) || 'null'); if (v && palHex(v.background)) return v } catch {} return null }
+function palApply(cfg) {
+  const root = document.documentElement
+  if (!cfg) { PAL_VARS.forEach(k => root.style.removeProperty(k)); return }
+  const bg = palRgb(cfg.background), ac = palRgb(cfg.accent), us = palRgb(cfg.userBubble), as = palRgb(cfg.assistantBubble), tx = palRgb(cfg.text)
+  const dark = palLum(bg) < 0.25
+  const t = tx.join(',')
+  const v = {
+    '--bg': palToHex(bg), '--surface': palToHex(palMix(bg, tx, dark ? 0.07 : 0.05)), '--border': `rgba(${t},.14)`,
+    '--text': palToHex(tx), '--text-dim': palToHex(palMix(tx, bg, 0.45)), '--accent': palToHex(ac),
+    '--terminal-bg': palToHex(palMix(bg, tx, 0.05)), '--terminal-text': palToHex(tx),
+    '--bubble-user-bg': `linear-gradient(140deg, ${palToHex(us)}, ${palToHex(palMix(us, ac, 0.22))})`,
+    '--bubble-user-text': palReadable(us), '--bubble-user-border': palToHex(palMix(us, tx, 0.1)),
+    '--bubble-user-shadow': `0 2px 10px rgba(0,0,0,${dark ? .22 : .08})`, '--bubble-user-link': palReadable(us),
+    '--bubble-user-code': 'rgba(0,0,0,.1)', '--bubble-user-selection': 'rgba(255,255,255,.4)',
+    '--bubble-assistant-bg': `rgba(${as.join(',')},.94)`, '--bubble-assistant-text': palReadable(as),
+    '--bubble-assistant-border': palToHex(palMix(as, tx, 0.1)), '--bubble-assistant-shadow': `0 2px 12px rgba(0,0,0,${dark ? .26 : .07})`,
+    '--bubble-assistant-link': palToHex(palLum(as) > 0.42 ? palMix(ac, [0, 0, 0], 0.25) : palMix(ac, [255, 255, 255], 0.2)),
+    '--bubble-assistant-code': 'rgba(0,0,0,.1)', '--bubble-assistant-selection': `rgba(${ac.join(',')},.35)`,
+  }
+  Object.entries(v).forEach(([k, val]) => root.style.setProperty(k, val))
+  document.querySelector('meta[name="theme-color"]').setAttribute('content', cfg.background)
+}
+let palDraft = null
+function palOpen() {
+  document.getElementById('attach-menu').hidden = true
+  palDraft = { ...(palLoad() || palFromCurrent()) }
+  const box = document.getElementById('rv-palette')
+  box.querySelector('.pal-grid').innerHTML = PAL_FIELDS.map(([k, label]) => `<label class="pal-field"><span>${label}</span>
+    <span class="pal-row"><input type="color" data-k="${k}" value="${palDraft[k]}"><input type="text" data-k="${k}" value="${palDraft[k]}" maxlength="7" spellcheck="false"></span></label>`).join('')
+  box.hidden = false
+  palApply(palDraft); document.documentElement.setAttribute('data-theme', 'custom')
+}
+function palClose(keep) {
+  document.getElementById('rv-palette').hidden = true
+  if (!keep) applyTheme(currentTheme)   // 没按「用这套」就退回原来的主题
+}
+;(function initPalette() {
+  const box = document.getElementById('rv-palette'); if (!box) return
+  box.addEventListener('input', e => {
+    const k = e.target.dataset.k; if (!k) return
+    const val = palHex(e.target.value.startsWith('#') ? e.target.value : '#' + e.target.value)
+    if (!val) return
+    palDraft[k] = val
+    box.querySelectorAll(`[data-k="${k}"]`).forEach(el => { if (el !== e.target) el.value = val })
+    palApply(palDraft)
+  })
+  box.querySelector('.pal-cancel').onclick = () => palClose(false)
+  box.querySelector('.pal-reset').onclick = () => {
+    try { localStorage.removeItem(PAL_KEY) } catch {}
+    palApply(null); document.documentElement.setAttribute('data-theme', currentTheme === 'dark' || currentTheme === 'custom' ? '' : currentTheme)
+    palDraft = palFromCurrent(); palOpen()
+  }
+  box.querySelector('.pal-save').onclick = () => {
+    try { localStorage.setItem(PAL_KEY, JSON.stringify(palDraft)) } catch {}
+    palClose(true); applyTheme('custom')
+  }
+  box.addEventListener('click', e => { if (e.target === box) palClose(false) })
+  document.getElementById('palette-btn').addEventListener('click', palOpen)
+})()
+
 // --- theme ---
-const THEMES = ['dark', 'pink', 'babyangel', 'sakura', 'lavender', 'sage', 'mist', 'apricot']
+// 1014：多了一个「custom」＝她的调色盘（见上面）。没存过调色盘时轮换跳过它
+const THEMES = ['dark', 'pink', 'babyangel', 'sakura', 'lavender', 'sage', 'mist', 'apricot', 'custom']
 const THEME_COLORS = { dark: '#1a1a1f', pink: '#f3f0f1', lavender: '#f2f0f4', sage: '#f1f2ee', mist: '#eff1f1', apricot: '#f7f1ec', babyangel: '#f6f9fe', sakura: '#f5f2f4' }
-const THEME_NAMES = { dark: '深夜', pink: '淡紫余白', lavender: '干燥薰衣草', sage: '灰鼠尾草', mist: '静寂', apricot: '焦糖奶油', babyangel: '粉蓝', sakura: '樱花灰' }
+const THEME_NAMES = { dark: '深夜', pink: '淡紫余白', lavender: '干燥薰衣草', sage: '灰鼠尾草', mist: '静寂', apricot: '焦糖奶油', babyangel: '粉蓝', sakura: '樱花灰', custom: '我的调色' }
 
 let currentTheme = localStorage.getItem('raven-theme') || 'dark'
 
+const themeColor = t => t === 'custom' ? ((palLoad() || {}).background || '#1a1a1f') : THEME_COLORS[t]
+function nextTheme(t) {
+  let i = THEMES.indexOf(t)
+  for (let n = 0; n < THEMES.length; n++) {
+    i = (i + 1) % THEMES.length
+    if (THEMES[i] !== 'custom' || palLoad()) return THEMES[i]
+  }
+  return 'dark'
+}
 function applyTheme(t) {
-  if (!THEMES.includes(t)) t = 'dark'
+  if (!THEMES.includes(t) || (t === 'custom' && !palLoad())) t = 'dark'
   currentTheme = t
   document.documentElement.setAttribute('data-theme', t === 'dark' ? '' : t)
-  document.querySelector('meta[name="theme-color"]').setAttribute('content', THEME_COLORS[t])
+  palApply(t === 'custom' ? palLoad() : null)
+  document.querySelector('meta[name="theme-color"]').setAttribute('content', themeColor(t))
   const btn = document.getElementById('theme-btn')
-  const next = THEMES[(THEMES.indexOf(t) + 1) % THEMES.length]
-  btn.style.background = THEME_COLORS[next]
+  const next = nextTheme(t)
+  btn.style.background = themeColor(next)
   btn.title = `当前${THEME_NAMES[t]}，切换${THEME_NAMES[next]}`
   btn.setAttribute('aria-label', btn.title)
   localStorage.setItem('raven-theme', t)
 }
 
 document.getElementById('theme-btn').addEventListener('click', () => {
-  const next = THEMES[(THEMES.indexOf(currentTheme) + 1) % THEMES.length]
-  applyTheme(next)
+  applyTheme(nextTheme(currentTheme))
 })
 
 applyTheme(currentTheme)
