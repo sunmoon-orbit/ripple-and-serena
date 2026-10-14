@@ -1145,7 +1145,10 @@
     padding: calc(10px + env(safe-area-inset-top, 0px)) 20px calc(18px + env(safe-area-inset-bottom, 0px)); }
   #rv-full[hidden] { display: none; }
   .rvf-head { align-self: stretch; display: flex; align-items: center; justify-content: space-between; }
-  #rv-full { overflow: hidden; clip-path: inset(0); }
+  #rv-full { overflow: hidden; }
+  #app.rv-full-open { display: flex !important; }
+  #app.rv-full-open > *:not(#rv-full) { display: none !important; }
+  #app.rv-full-open > #rv-full { position: relative; inset: auto; flex: 1; min-height: 0; width: 100%; }
   #rv-full > *:not(.rvf-bg):not(.rvf-veil):not(input) { position: relative; z-index: 1; }
   .rvf-bg { position: absolute; inset: 0; transform: scale(1.25); z-index: 0; background: var(--bg) center / cover no-repeat; filter: blur(42px) saturate(1.25); transition: background-image .4s; }
   .rvf-veil { position: absolute; inset: 0; z-index: 0; background: color-mix(in srgb, var(--bg) 58%, transparent); }
@@ -1894,19 +1897,22 @@ function rvBindSeek(input) {
 // ── 全屏：封面 + 滚动歌词 ──
 function rvOpenFull() {
   const f = document.getElementById('rv-full'); if (!f || !rvMusic.track) return
-  f.hidden = false; rvFitFull(); rvRenderFull(); rvTick()
+  // 1014 第三版：前两版让它浮在页面上面（fixed），在她手机上两次都往上错一截、底下漏一条，原因没查清。
+  // 这版不浮了：打开时把 #app 里别的几块藏起来，它自己进 #app 的正常排版，跟聊天页一样大，聊天页在她手机上一直是对的
+  const app = document.getElementById('app')
+  if (f.parentNode !== app) app.appendChild(f)
+  app.classList.add('rv-full-open')
+  f.hidden = false; rvRenderFull(); rvTick()
+  // 安卓返回键 = 收起，不是退出聊天
+  if (!history.state || !history.state.rvFull) history.pushState({ rvFull: 1 }, '')
 }
-// 1014 第二张截图还是上面切一截、底下空一条：整页往上错了一截，像是可视区和页面区没对齐
-// （刚收过键盘时安卓 WebView 常这样）。打开时把它钉在「眼睛看得见的那块」上，可视区变了再钉一次
-function rvFitFull() {
+window.addEventListener('popstate', () => { const f = document.getElementById('rv-full'); if (f && !f.hidden) rvCloseFull(true) })
+function rvCloseFull(fromBack) {
   const f = document.getElementById('rv-full'); if (!f || f.hidden) return
-  const vv = window.visualViewport
-  if (window.scrollY) window.scrollTo(0, 0)
-  if (vv) { f.style.top = vv.offsetTop + 'px'; f.style.height = vv.height + 'px'; f.style.bottom = 'auto' }
+  f.hidden = true
+  document.getElementById('app').classList.remove('rv-full-open')
+  if (!fromBack && history.state && history.state.rvFull) history.back()
 }
-window.visualViewport?.addEventListener('resize', rvFitFull)
-window.visualViewport?.addEventListener('scroll', rvFitFull)
-function rvCloseFull() { const f = document.getElementById('rv-full'); if (f) f.hidden = true }
 function rvRenderFull() {
   const f = document.getElementById('rv-full'); if (!f || f.hidden) return
   const t = rvMusic.track; if (!t) return rvCloseFull()
@@ -1937,8 +1943,8 @@ function rvRenderFull() {
   const f = document.getElementById('rv-full'); if (!f) return
   // 1014 她截图：全屏页上面被切掉一截、底下漏出一条。这几层原来放在聊天面板里面，
   // 外面哪层带了 backdrop-filter／transform，fixed 就跟着那层走了。搬到 body 下面，按整个屏幕铺
-  for (const id of ['rv-full', 'rv-room', 'rv-palette']) { const el = document.getElementById(id); if (el) document.body.appendChild(el) }
-  f.querySelector('.rvf-back').onclick = rvCloseFull
+  for (const id of ['rv-room', 'rv-palette']) { const el = document.getElementById(id); if (el) document.body.appendChild(el) }
+  f.querySelector('.rvf-back').onclick = () => rvCloseFull()
   f.querySelector('.rvf-play').onclick = () => { if (rvAudio && rvMusic.track) rvAudio.paused ? rvAudio.play() : rvAudio.pause() }
   f.querySelector('.rvf-prev').onclick = () => rvSkip(-1)
   f.querySelector('.rvf-next').onclick = () => rvSkip(1)
