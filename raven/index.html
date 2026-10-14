@@ -1084,6 +1084,8 @@
     display: flex; align-items: center; justify-content: center;
   }
   .rv-music-play:active { transform: scale(0.92); }
+  .rv-music, .rv-music *, #rv-player *, #rv-full *, #rv-room *, #rv-palette * { -webkit-tap-highlight-color: transparent; }
+  .rv-music-play:focus { outline: none; }
 
   /* 我的调色盘（1014） */
   #rv-palette { position: fixed; inset: 0; z-index: 1100; display: flex; align-items: flex-end; justify-content: center; background: rgba(0,0,0,.18); }
@@ -1907,6 +1909,11 @@ function renderMusicCards(html, mine) {
     </div>`.replace(/\n\s*/g, '')   // 她的气泡是 pre-wrap，模板里的换行会撑出大片空白（1014 她截图）
   })
 }
+// 卡片里的图标在清洗之后再填：DOMPurify 会把里面的 svg 清掉（她 1014 截图：播放键是空圆、封面是空方块，点一下才出三角）
+function fillMusicIcons(root) {
+  root.querySelectorAll('.rv-music-play').forEach(b => { if (!b.innerHTML.trim()) b.innerHTML = PLAY_SVG })
+  root.querySelectorAll('.rv-music-cover').forEach(c => { if (!c.innerHTML.trim()) c.innerHTML = MUSIC_NOTE_SVG })
+}
 document.addEventListener('click', async (e) => {
   const btn = e.target.closest('.rv-music-play'); if (!btn) return
   const card = btn.closest('.rv-music'); if (!card) return
@@ -2416,6 +2423,7 @@ function appendMsg(text, role, save = true, ts = Date.now(), msgId = null, suppl
       const withTags = withStickers.replace(VOICE_TAG_RE, (_, t) => `<span class="vtag">${t}</span>`)
       const rendered = renderMusicCards(marked.parse(withTags))
       body.innerHTML = DOMPurify.sanitize(rendered, PURIFY_OPTS)
+      fillMusicIcons(body)
       attachStickerFallback(body)
       enhanceCodeBlocks(body)
       if (aq) { const q = document.createElement('div'); q.className = 'quote-ref'; q.textContent = aq[1]; body.prepend(q) }
@@ -2432,6 +2440,7 @@ function appendMsg(text, role, save = true, ts = Date.now(), msgId = null, suppl
           .replace(ATTACH_TAG_RE, (_, p) => attachToHtml(p))
           .replace(/\n/g, '<br>')
         body.innerHTML = DOMPurify.sanitize(renderMusicCards(body.innerHTML, true), PURIFY_OPTS)
+        fillMusicIcons(body)
         attachStickerFallback(body)
       } else {
         body.textContent = utext
