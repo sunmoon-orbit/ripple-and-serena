@@ -1345,6 +1345,38 @@ const server = http.createServer((req, res) => {
     return
   }
 
+  // 听歌（1014）：「涟言点给你的歌」和歌单在记忆库，跟言叽是同一份。这里按名单放行方法和路径，带钥匙转发
+  //   GET|POST /raven/music/picks ／ PATCH /raven/music/picks/<id>/like ／ DELETE /raven/music/picks/<id>
+  //   GET|POST /raven/music/playlists ／ PUT|DELETE /raven/music/playlists/<id>
+  //   GET|POST /raven/music/playlists/<id>/songs ／ DELETE /raven/music/playlists/<id>/songs/<pickId>
+  if (url.pathname.startsWith('/raven/music/')) {
+    if (!externalAuthed(req, url)) { res.writeHead(401, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ error: 'unauthorized' })); return }
+    const p = url.pathname.slice('/raven/music'.length)
+    const m = req.method
+    const rules = [
+      [/^\/picks$/, ['GET', 'POST']],
+      [/^\/picks\/\d+\/like$/, ['PATCH']],
+      [/^\/picks\/\d+$/, ['DELETE']],
+      [/^\/playlists$/, ['GET', 'POST']],
+      [/^\/playlists\/\d+$/, ['PUT', 'DELETE']],
+      [/^\/playlists\/\d+\/songs$/, ['GET', 'POST']],
+      [/^\/playlists\/\d+\/songs\/\d+$/, ['DELETE']],
+    ]
+    const rule = rules.find(([re]) => re.test(p))
+    if (!rule) { res.writeHead(404, { 'Content-Type': 'application/json' }); res.end('{"error":"not found"}'); return }
+    if (!rule[1].includes(m)) { res.writeHead(405, { 'Content-Type': 'application/json' }); res.end('{"error":"method not allowed"}'); return }
+    if (Number(req.headers['content-length'] || 0) > 20000) { res.writeHead(413, { 'Content-Type': 'application/json' }); res.end('{"error":"too large"}'); return }
+    const headers = { Authorization: `Bearer ${MOON_TOKEN}` }
+    for (const h of ['content-type', 'content-length']) if (req.headers[h]) headers[h] = req.headers[h]
+    const up = http.request({ hostname: '127.0.0.1', port: 3210, method: m, headers, path: '/music' + p }, r => {
+      res.writeHead(r.statusCode, { 'Content-Type': r.headers['content-type'] || 'application/json', 'Cache-Control': 'private, no-store', 'X-Content-Type-Options': 'nosniff' })
+      r.pipe(res)
+    })
+    up.on('error', () => { if (!res.headersSent) res.writeHead(502, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ error: '听歌暂时打不开' })) })
+    req.pipe(up)
+    return
+  }
+
   // random memory proxy
   // 涟言的日记本（1002）。记忆库那边已经把封存页正文剥掉了，这里再剥一遍：两道锁，任何一道漏了都不出门
   if (req.method === 'GET' && url.pathname === '/raven/journal') {
