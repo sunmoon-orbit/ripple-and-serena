@@ -10,6 +10,7 @@ import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.os.Environment
+import android.provider.Settings
 import android.view.View
 import android.webkit.*
 import android.widget.FrameLayout
@@ -138,6 +139,16 @@ class MainActivity : AppCompatActivity() {
                 """.trimIndent()
                 runOnUiThread { webView.evaluateJavascript(js, null) }
                 return@setDownloadListener
+            }
+            // 外站链接和打包下载点（/raven/download/）交给浏览器（1014 她说系统下载器慢、看不到进度，1015 做）；
+            // 浏览器开不了再退回系统下载器。别的站内文件照旧走系统下载器
+            val u = Uri.parse(url)
+            if (u.host != "memory.ravenlove.cc" || (u.path ?: "").startsWith("/raven/download/")) {
+                try {
+                    startActivity(Intent(Intent.ACTION_VIEW, u).addCategory(Intent.CATEGORY_BROWSABLE))
+                    Toast.makeText(this, "交给浏览器下载了", Toast.LENGTH_SHORT).show()
+                    return@setDownloadListener
+                } catch (_: Exception) {}
             }
             try {
                 val request = DownloadManager.Request(Uri.parse(url)).apply {
@@ -321,7 +332,31 @@ class MainActivity : AppCompatActivity() {
         else super.onBackPressed()
     }
 
+    // 回到归巢就收起桌面小乌鸦，离开了再放出来
+    override fun onStart() { super.onStart(); CrowOverlay.get(this).setForeground(true) }
+    override fun onStop() { super.onStop(); CrowOverlay.get(this).setForeground(false) }
+
+    // 桌面小乌鸦的设置（1015）：两个开关；开小乌鸦时没有悬浮窗权限就先去系统设置里给
+    fun openCrowSettings() {
+        val crow = CrowOverlay.get(this)
+        val checked = booleanArrayOf(crow.enabled, mediaHelper.chipEnabled)
+        AlertDialog.Builder(this)
+            .setTitle("桌面小乌鸦")
+            .setMultiChoiceItems(arrayOf("离开归巢时，屏幕边上蹲一只小乌鸦（放歌时带歌词）", "状态栏歌词胶囊（试验，系统不一定肯显示）"), checked) { _, i, v -> checked[i] = v }
+            .setPositiveButton("好") { _, _ ->
+                crow.enabled = checked[0]
+                mediaHelper.chipEnabled = checked[1]
+                if (checked[0] && !crow.canDraw()) {
+                    Toast.makeText(this, "要先允许「显示在其他应用上层」", Toast.LENGTH_LONG).show()
+                    try { startActivity(Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:$packageName"))) } catch (_: Exception) {}
+                }
+            }
+            .setNegativeButton("算了", null)
+            .show()
+    }
+
     override fun onDestroy() {
+        CrowOverlay.get(this).release()
         mediaHelper.release()
         webView.destroy()
         super.onDestroy()

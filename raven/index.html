@@ -631,6 +631,7 @@
   #attach-menu[hidden] { display: none; }
   @keyframes drawer-up { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
   #attach-menu .tool { display: flex; flex-direction: column; align-items: center; gap: 6px; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+  #attach-menu .tool[hidden] { display: none; }
   #attach-menu .tool > span { font-size: 11.5px; color: var(--text-dim); }
   #attach-menu .tool > button { width: 50px !important; height: 50px !important; padding: 0 !important; display: flex !important; align-items: center; justify-content: center; border-radius: 15px !important; border: 1px solid color-mix(in srgb, var(--border) 70%, transparent) !important; background-color: color-mix(in srgb, var(--bg) 60%, transparent); color: var(--text) !important; opacity: 1 !important; cursor: pointer; }
   #attach-menu .tool > button svg { width: 22px; height: 22px; }
@@ -1481,6 +1482,7 @@
       <div class="tool"><button id="theme-btn" title="切换主题" aria-label="切换主题"></button><span>主题</span></div>
       <div class="tool"><button id="palette-btn" type="button" aria-label="调色"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a9 9 0 1 0 0 18c1.1 0 1.8-.8 1.8-1.8 0-.5-.2-.9-.5-1.2-.3-.3-.5-.7-.5-1.2 0-1 .8-1.8 1.8-1.8H16a5 5 0 0 0 5-5c0-3.9-4-7-9-7z"/><circle cx="7.5" cy="11" r="1.2"/><circle cx="10.5" cy="7" r="1.2"/><circle cx="15" cy="7.5" r="1.2"/></svg></button><span>调色</span></div>
       <div class="tool"><button id="music-btn" type="button" aria-label="听歌"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg></button><span>听歌</span></div>
+      <div class="tool" id="crow-tool" hidden><button id="crow-btn" type="button" aria-label="桌面小乌鸦"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 11l3-1.5c1-2.5 3-3.5 5-3.5 3 0 5 2 5 5 0 1.5 1.5 3 3 4l-6 0-2 3-1.5 0 .5-3c-3 0-5-1.5-7-4z"/><circle cx="10.5" cy="9" r=".8" fill="currentColor"/></svg></button><span>小乌鸦</span></div>
       <div class="tool"><button id="mask-btn" type="button" aria-label="打码"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="8" width="17" height="8" rx="1.5" transform="rotate(-12 12 12)"/><path d="M8 9.5l-1.5 6M12 8.6l-1.5 6M16 7.8l-1.5 6"/></svg></button><span>打码</span></div>
       <div class="tool"><button id="shelf-btn" type="button" aria-label="贴图架"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M8.5 14.5c1 1.3 2.1 2 3.5 2s2.5-.7 3.5-2"/><circle cx="9" cy="10" r=".9" fill="currentColor"/><circle cx="15" cy="10" r=".9" fill="currentColor"/></svg></button><span>贴图架</span></div>
       <div class="tool"><button id="remark-btn" type="button" aria-label="备注"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M20.6 13.4l-7.2 7.2a2 2 0 01-2.8 0L3 13V3h10l7.6 7.6a2 2 0 010 2.8z"/><circle cx="7.5" cy="7.5" r="1.3"/></svg></button><span>备注</span></div>
@@ -1812,6 +1814,31 @@ function rvNativeSync() {
     N.updateNowPlaying(t.name || '', t.artist || '涟言点的歌', t.cover || '', !!(a && !a.paused),
       Math.round(((a && a.currentTime) || 0) * 1000), Math.round(((a && isFinite(a.duration) && a.duration) || 0) * 1000))
   } catch {}
+  rvCrowSync()
+}
+// 桌面小乌鸦（1015，壳第 11 版起）：归巢退到后台时屏幕边上那只像素乌鸦。
+// 我在回她 → 低头写字；在放歌 → 听歌晃脑袋；放的是她点给我的歌 → 戴礼帽昂首；都没有 → 打盹。旧壳没有 crowState 就什么都不做
+const rvCrow = { st: '', line: null, hers: null }
+function rvIsHers(t) {
+  if (!rvCrow.hers) {
+    rvCrow.hers = new Set()
+    mApi('/picks?by=' + encodeURIComponent('阿颖')).then(l => { (l || []).forEach(p => rvCrow.hers.add(p.name)); rvCrowSync() }).catch(() => {})
+  }
+  return !!(t && rvCrow.hers.has(t.name))
+}
+function rvCrowSync() {
+  const N = window.RoostNative
+  if (!N || typeof N.crowState !== 'function') return
+  const a = rvAudio, t = rvMusic.track
+  const st = document.getElementById('thinking')?.classList.contains('busy') ? 'write'
+    : t && a && !a.paused ? (rvIsHers(t) ? 'proudhat' : 'listen') : 'doze'
+  if (st !== rvCrow.st) { rvCrow.st = st; try { N.crowState(st) } catch {} }
+}
+function rvCrowLyric(line) {
+  const N = window.RoostNative
+  if (!N || typeof N.crowLyric !== 'function' || line === rvCrow.line) return
+  rvCrow.line = line
+  try { N.crowLyric(line) } catch {}
 }
 window.__roostMediaAction = (act) => {
   const a = rvAudio
@@ -1854,7 +1881,7 @@ function rvStop() {
   rvMusic.seq++
   if (rvAudio) { rvAudio.pause(); rvAudio.removeAttribute('src'); rvAudio.load() }
   rvMusic.queue = []; rvMusic.idx = -1; rvMusic.track = null; rvMusic.lyrics = []
-  rvRenderBar(); rvCloseFull(); rvNativeSync()
+  rvRenderBar(); rvCloseFull(); rvNativeSync(); rvCrowLyric('')
 }
 
 // ── 迷你播放条（在输入框上面占位）──
@@ -1905,12 +1932,13 @@ function rvTick() {
   const pct = a.duration ? (a.currentTime / a.duration * 100) : 0
   document.querySelectorAll('.rv-seek-fill').forEach(el => { el.style.width = pct + '%' })
   document.querySelectorAll('.rv-seek').forEach(el => { el.max = a.duration || 0; if (!el.dataset.drag) el.value = a.currentTime || 0 })
+  let idx = -1
+  for (let i = 0; i < rvMusic.lyrics.length; i++) { if (rvMusic.lyrics[i].t <= a.currentTime + 0.25) idx = i; else break }
+  rvCrowLyric(idx >= 0 && !a.paused ? (rvMusic.lyrics[idx].text || '') : '')   // 桌面歌词、通知栏那行字跟着这一句走
   const full = document.getElementById('rv-full')
   if (full && !full.hidden) {
     full.querySelector('.rvf-cur').textContent = fmtDur(a.currentTime)
     full.querySelector('.rvf-dur').textContent = fmtDur(a.duration)
-    let idx = -1
-    for (let i = 0; i < rvMusic.lyrics.length; i++) { if (rvMusic.lyrics[i].t <= a.currentTime + 0.25) idx = i; else break }
     const box = full.querySelector('.rvf-lyrics')
     if (box.dataset.active !== String(idx)) {
       box.dataset.active = idx
@@ -3464,6 +3492,7 @@ function setBusy(active) {
   el.classList.toggle('busy', active)
   const btn = document.getElementById('interrupt-btn')
   if (active) btn.disabled = false
+  rvCrowSync()
 }
 
 document.getElementById('interrupt-btn').addEventListener('click', async event => {
@@ -3807,6 +3836,11 @@ function maskClear() {
   maskTray.hidden = true; maskSel = null; window.rvMaskOn = false
   if (maskLayer) maskLayer.remove(); maskLayer = null
   maskBox.classList.remove('mask-host')
+}
+// 小乌鸦的开关在壳里（原生弹窗），只有新壳才露这一格
+if (window.RoostNative && typeof window.RoostNative.openCrowSettings === 'function') {
+  document.getElementById('crow-tool').hidden = false
+  document.getElementById('crow-btn').addEventListener('click', () => { document.getElementById('attach-menu').hidden = true; try { window.RoostNative.openCrowSettings() } catch {} })
 }
 document.getElementById('mask-btn').addEventListener('click', () => { document.getElementById('attach-menu').hidden = true; maskEdit() })
 maskTray.querySelector('.mask-done').addEventListener('click', e => { e.stopPropagation(); maskDone() })

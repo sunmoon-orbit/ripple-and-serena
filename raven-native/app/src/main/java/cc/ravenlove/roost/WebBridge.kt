@@ -62,4 +62,19 @@ class WebBridge(private val activity: MainActivity) {
     fun clearNowPlaying() {
         activity.runOnUiThread { activity.mediaHelper.clear() }
     }
+
+    // 桌面小乌鸦＋歌词（1015）：页面报状态和当前这句歌词；设置走原生弹窗
+    @JavascriptInterface
+    fun crowState(state: String) { activity.runOnUiThread { CrowOverlay.get(activity).setState(state) } }
+
+    @JavascriptInterface
+    fun crowLyric(line: String) {
+        activity.runOnUiThread {
+            CrowOverlay.get(activity).setLyric(line)
+            activity.mediaHelper.setLyric(line)
+        }
+    }
+
+    @JavascriptInterface
+    fun openCrowSettings() { activity.runOnUiThread { activity.openCrowSettings() } }
 }

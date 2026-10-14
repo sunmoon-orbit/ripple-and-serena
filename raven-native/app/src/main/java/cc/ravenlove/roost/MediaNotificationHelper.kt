@@ -7,6 +7,7 @@ import android.content.Context
 import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.os.Bundle
 import android.support.v4.media.MediaMetadataCompat
 import android.support.v4.media.session.MediaSessionCompat
 import android.support.v4.media.session.PlaybackStateCompat
@@ -24,6 +25,9 @@ class MediaNotificationHelper(private val context: Context) {
     companion object {
         private const val CHANNEL_ID = "roost_media"
         private const val NOTIFICATION_ID = 7
+        // 歌词胶囊（1015，试验）：另一条普通通知，带安卓 16「实时更新」的申请，系统肯的话会挂成状态栏上的小胶囊
+        private const val LYRIC_CHANNEL_ID = "roost_lyric"
+        private const val LYRIC_NOTIFICATION_ID = 8
         const val ACTION_PLAY = "cc.ravenlove.roost.MEDIA_PLAY"
         const val ACTION_PAUSE = "cc.ravenlove.roost.MEDIA_PAUSE"
         const val ACTION_STOP = "cc.ravenlove.roost.MEDIA_STOP"
@@ -40,6 +44,11 @@ class MediaNotificationHelper(private val context: Context) {
     private var lastTitle = ""
     private var lastArtist = ""
     private var lastPlaying = false
+    private var lastLyric = ""
+    private val prefs = context.getSharedPreferences("roost_crow", Context.MODE_PRIVATE)
+    var chipEnabled: Boolean
+        get() = prefs.getBoolean("chip", false)
+        set(v) { prefs.edit().putBoolean("chip", v).apply(); if (!v) nm.cancel(LYRIC_NOTIFICATION_ID) else showLyricChip() }
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
 
     var onAction: ((String) -> Unit)? = null
@@ -73,6 +82,7 @@ class MediaNotificationHelper(private val context: Context) {
         )
         setMetadata(durationMs)
         showNotification()
+        showLyricChip()
 
         if (coverUrl.isNotEmpty() && coverUrl != lastCoverUrl) {
             lastCoverUrl = coverUrl
@@ -91,10 +101,46 @@ class MediaNotificationHelper(private val context: Context) {
         }
     }
 
+    // 当前这一句歌词（1015）：通知栏那行字跟着走，顺带塞进 ticker——有的系统会把 ticker 放到状态栏上
+    fun setLyric(line: String) {
+        if (line == lastLyric) return
+        lastLyric = line
+        if (lastTitle.isNotEmpty()) showNotification()
+        showLyricChip()
+    }
+
+    private fun showLyricChip() {
+        if (!chipEnabled || !lastPlaying || lastLyric.isBlank()) { nm.cancel(LYRIC_NOTIFICATION_ID); return }
+        val contentIntent = PendingIntent.getActivity(
+            context, 7002,
+            Intent(context, MainActivity::class.java).apply { flags = Intent.FLAG_ACTIVITY_SINGLE_TOP },
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+        val extras = Bundle().apply {
+            putBoolean("android.requestPromotedOngoing", true)      // Notification.EXTRA_REQUEST_PROMOTED_ONGOING（API 36）
+            putCharSequence("android.shortCriticalText", lastLyric.take(8))  // 胶囊里放得下的那几个字
+        }
+        val n = NotificationCompat.Builder(context, LYRIC_CHANNEL_ID)
+            .setSmallIcon(R.drawable.ic_notification)
+            .setContentTitle(lastLyric)
+            .setContentText(listOf(lastTitle, lastArtist).filter { it.isNotEmpty() }.joinToString(" · "))
+            .setTicker(lastLyric)
+            .setContentIntent(contentIntent)
+            .setOngoing(true)
+            .setOnlyAlertOnce(true)
+            .setSilent(true)
+            .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
+            .addExtras(extras)
+            .build()
+        nm.notify(LYRIC_NOTIFICATION_ID, n)
+    }
+
     fun dispatch(action: String) { onAction?.invoke(action) }
 
     fun clear() {
         nm.cancel(NOTIFICATION_ID)
+        nm.cancel(LYRIC_NOTIFICATION_ID)
+        lastLyric = ""
         session.setPlaybackState(PlaybackStateCompat.Builder().setState(PlaybackStateCompat.STATE_NONE, 0, 0f).build())
     }
 
@@ -123,6 +169,10 @@ class MediaNotificationHelper(private val context: Context) {
             setShowBadge(false)
         }
         nm.createNotificationChannel(ch)
+        nm.createNotificationChannel(NotificationChannel(LYRIC_CHANNEL_ID, "歌词胶囊", NotificationManager.IMPORTANCE_DEFAULT).apply {
+            description = "试验：放歌时把当前歌词挂到状态栏"
+            setShowBadge(false); setSound(null, null); enableVibration(false)
+        })
     }
 
     private fun showNotification() {
@@ -138,7 +188,9 @@ class MediaNotificationHelper(private val context: Context) {
         val notification = NotificationCompat.Builder(context, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_notification)
             .setContentTitle(lastTitle)
-            .setContentText(lastArtist)
+            .setContentText(if (lastLyric.isNotBlank()) lastLyric else lastArtist)
+            .setSubText(if (lastLyric.isNotBlank()) lastArtist else null)
+            .setTicker(lastLyric.ifBlank { null })
             .setContentIntent(contentIntent)
             .setLargeIcon(coverBitmap)
             .addAction(NotificationCompat.Action(android.R.drawable.ic_media_previous, "上一首", pending(ACTION_PREV)))
