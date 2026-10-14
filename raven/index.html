@@ -1169,7 +1169,7 @@
   .rvf-cover svg { width: 70px; height: 70px; }
   .rvf-title { font-size: 18px; font-weight: 600; text-align: center; }
   .rvf-artist { font-size: 13px; color: var(--text-dim); margin-top: 3px; text-align: center; }
-  .rvf-lyrics { flex: 1; min-height: 0; align-self: stretch; overflow-y: auto; margin: 14px 0; text-align: center;
+  .rvf-lyrics { position: relative; flex: 1; min-height: 0; align-self: stretch; overflow-y: auto; margin: 14px 0; text-align: center;
     -webkit-mask-image: linear-gradient(transparent, #000 18%, #000 82%, transparent); mask-image: linear-gradient(transparent, #000 18%, #000 82%, transparent); padding: 30% 0; }
   .rvf-line { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; font-size: 14.5px; line-height: 1.6; padding: 5px 8px; color: var(--text-dim); cursor: pointer; transition: color .2s, transform .2s; }
   .rvf-line.on { color: var(--text); font-weight: 600; transform: scale(1.05); }
@@ -1876,7 +1876,8 @@ function rvTick() {
       box.dataset.active = idx
       box.querySelectorAll('.rvf-line.on').forEach(el => el.classList.remove('on'))
       const el = box.querySelector(`[data-li="${idx}"]`)
-      if (el) { el.classList.add('on'); el.scrollIntoView({ behavior: 'smooth', block: 'center' }) }
+      // ⚠️ 别用 scrollIntoView：它会把外面所有能滚的层一起推，整页被顶上去（1014 她三张截图「一开始播放就被弹上去」，前两版错修成了定位问题）
+      if (el) { el.classList.add('on'); box.scrollTo({ top: el.offsetTop - box.clientHeight / 2 + el.offsetHeight / 2, behavior: 'smooth' }) }
     }
   }
 }
@@ -1902,6 +1903,7 @@ function rvOpenFull() {
   const app = document.getElementById('app')
   if (f.parentNode !== app) app.appendChild(f)
   app.classList.add('rv-full-open')
+  for (const el of [document.scrollingElement, document.body, app]) if (el && el.scrollTop) el.scrollTop = 0
   f.hidden = false; rvRenderFull(); rvTick()
   // 安卓返回键 = 收起，不是退出聊天
   if (!history.state || !history.state.rvFull) history.pushState({ rvFull: 1 }, '')
