@@ -4,7 +4,7 @@ import { formatTime } from '../../utils'
 import { applyDecayAndGet, getEmotionState, POSITIVE_SLOTS, NEGATIVE_SLOTS, SLOT_LABELS } from '../../utils/emotion'
 import { useThemedConfirm } from '../ThemedConfirmDialog'
 
-export default function ConversationList({ onClose, onOpenCrossing, onStartCall, onOpenGames, onOpenMusic, onOpenWheel, onOpenFate, onOpenTarot, onOpenFortune, onOpenChecklist, onOpenHealth, onOpenPeriod, onOpenAlbum, onOpenIdleJournal, onOpenBoard, onOpenWallet, onOpenCalls }) {
+export default function ConversationList({ onClose, onOpenCrossing, onStartCall, onOpenGames, onOpenMusic, onOpenDraw, onOpenWheel, onOpenFate, onOpenTarot, onOpenFortune, onOpenChecklist, onOpenHealth, onOpenPeriod, onOpenAlbum, onOpenIdleJournal, onOpenBoard, onOpenWallet, onOpenCalls }) {
   const confirmAction = useThemedConfirm()
   const chats = useStore((s) => s.chats)
   const connections = useStore((s) => s.connections)
@@ -294,6 +294,12 @@ export default function ConversationList({ onClose, onOpenCrossing, onStartCall,
                 <path d="M9 18V5l12-2v13" /><circle cx="6" cy="18" r="3" /><circle cx="18" cy="16" r="3" />
               </svg>
               <span>涟言点的歌</span>
+            </button>
+            <button className="sb-tool-item" onClick={() => { onClose?.(); onOpenDraw?.() }}>
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M12 19l7-7 3 3-7 7-3-3z" /><path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z" /><circle cx="11" cy="11" r="2" />
+              </svg>
+              <span>画图</span>
             </button>
             {randomTool === 'wheel' ? (
               <button className="sb-tool-item" onClick={() => { onClose?.(); onOpenWheel?.() }}>

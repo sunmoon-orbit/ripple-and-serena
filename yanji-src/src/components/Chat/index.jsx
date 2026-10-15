@@ -41,6 +41,7 @@ import ChatInput from './ChatInput'
 import VoiceCall from './VoiceCall'
 import GamesRoom from './GamesRoom'
 import MusicRoom from './MusicRoom'
+import DrawStudio from './DrawStudio'
 import FortuneWheel from './FortuneWheel'
 import FateDeck from './FateDeck'
 import Tarot from './Tarot'
@@ -305,6 +306,7 @@ export default function Chat() {
   const callMarkerRef = useRef(null)
   const [gamesOpen, setGamesOpen] = useState(false)
   const [musicOpen, setMusicOpen] = useState(false)
+  const [drawOpen, setDrawOpen] = useState(false)   // 1015 画图窗口
   const [wheelOpen, setWheelOpen] = useState(false)
   const [fateOpen, setFateOpen] = useState(false)
   const [tarotOpen, setTarotOpen] = useState(false)
@@ -1806,7 +1808,7 @@ export default function Chat() {
     <div className="chat-panel">
       {/* Sidebar */}
       <div className={'chat-sidebar' + (sidebarOpen ? ' open' : '')}>
-        <ConversationList onClose={() => setSidebarOpen(false)} onOpenCrossing={() => setActivePanel('crossing')} onStartCall={dialCall} onOpenGames={() => setGamesOpen(true)} onOpenMusic={() => setMusicOpen(true)} onOpenWheel={() => setWheelOpen(true)} onOpenFate={() => setFateOpen(true)} onOpenTarot={() => setTarotOpen(true)} onOpenFortune={() => setFortuneOpen(true)} onOpenChecklist={() => setChecklistOpen(true)} onOpenHealth={() => setHealthOpen(true)} onOpenWallet={() => setWalletOpen(true)} onOpenPeriod={() => setPeriodOpen(true)} onOpenAlbum={() => setAlbumOpen(true)} onOpenIdleJournal={() => setIdleJournalOpen(true)} onOpenBoard={() => setBoardOpen(true)} onOpenCalls={() => setCallsOpen(true)} />
+        <ConversationList onClose={() => setSidebarOpen(false)} onOpenCrossing={() => setActivePanel('crossing')} onStartCall={dialCall} onOpenGames={() => setGamesOpen(true)} onOpenMusic={() => setMusicOpen(true)} onOpenDraw={() => setDrawOpen(true)} onOpenWheel={() => setWheelOpen(true)} onOpenFate={() => setFateOpen(true)} onOpenTarot={() => setTarotOpen(true)} onOpenFortune={() => setFortuneOpen(true)} onOpenChecklist={() => setChecklistOpen(true)} onOpenHealth={() => setHealthOpen(true)} onOpenWallet={() => setWalletOpen(true)} onOpenPeriod={() => setPeriodOpen(true)} onOpenAlbum={() => setAlbumOpen(true)} onOpenIdleJournal={() => setIdleJournalOpen(true)} onOpenBoard={() => setBoardOpen(true)} onOpenCalls={() => setCallsOpen(true)} />
       </div>
       {sidebarOpen && <div className="sidebar-backdrop" onClick={() => setSidebarOpen(false)} />}
 
@@ -2009,6 +2011,7 @@ export default function Chat() {
       )}
       {egg && <CompletionEgg svg={egg} onDone={() => setEgg(null)} />}
       {musicOpen && <MusicRoom onClose={() => setMusicOpen(false)} />}
+      {drawOpen && <DrawStudio onClose={() => setDrawOpen(false)} onSendToChat={(src) => setPendingImages((p) => [...p, src])} />}
       {wheelOpen && <FortuneWheel onClose={() => setWheelOpen(false)} />}
       {fateOpen && <FateDeck onClose={() => setFateOpen(false)} onSend={handleSend} />}
       {tarotOpen && <Tarot onClose={() => setTarotOpen(false)} onSend={handleSend} />}
