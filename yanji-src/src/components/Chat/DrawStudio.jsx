@@ -20,7 +20,7 @@ const MAX_HIST = 24
 const SIZES = [['1024x1024', '方'], ['1024x1536', '竖'], ['1536x1024', '横'], ['auto', '自动']]
 const QUALITIES = [['auto', '自动'], ['low', '省钱'], ['medium', '中'], ['high', '精细']]
 
-const BLANK = { connId: '', baseUrl: '', apiKey: '', model: '', size: '1024x1024', quality: 'auto', transparent: false, stream: true }
+const BLANK = { connId: '', baseUrl: '', apiKey: '', model: '', size: '1024x1024', quality: 'auto', transparent: false, stream: false }
 const DEFAULT_URLS = { openai: 'https://api.openai.com/v1', deepseek: 'https://api.deepseek.com/v1' }
 function loadConf() {
   try { return { ...BLANK, ...JSON.parse(localStorage.getItem(CONF_KEY) || '{}') } } catch { return { ...BLANK } }
@@ -144,7 +144,7 @@ export default function DrawStudio({ onClose, onSendToChat }) {
       const sec = Math.round((Date.now() - t0) / 1000)
       const msg = String(e?.message || e)
       setErr(/Failed to fetch|NetworkError|Load failed|network/i.test(msg)
-        ? `第 ${sec} 秒连接被掐断了，没拿到图。多半是中转站那头的超时（一百秒左右会掐），不是你的网。可以试试「中」档或者小一点的尺寸。`
+        ? `第 ${sec} 秒连接断了，没拿到图（中转站那头断开的，不是你的网）。${conf.stream ? '可以先把「边画边传」去掉再试；' : ''}也可以换「中」档或者小一点的尺寸。`
         : `第 ${sec} 秒失败：${msg}`)
     } finally {
       clearInterval(timer.current); setBusy(false)
@@ -225,7 +225,7 @@ export default function DrawStudio({ onClose, onSendToChat }) {
             <div className="draw-seg">{QUALITIES.map(([v, l]) => <button key={v} className={conf.quality === v ? 'on' : ''} onClick={() => patch({ quality: v })}>{l}</button>)}</div>
             <label className="draw-check"><input type="checkbox" checked={conf.transparent} onChange={e => patch({ transparent: e.target.checked })} />透明底（做贴纸）</label>
           </div>
-          <label className="draw-check"><input type="checkbox" checked={conf.stream} onChange={e => patch({ stream: e.target.checked })} />边画边传（防中转站超时掐断；不支持会自动退回）</label>
+          <label className="draw-check"><input type="checkbox" checked={conf.stream} onChange={e => patch({ stream: e.target.checked })} />边画边传（试验：有的中转站会因此断开，出问题就别勾）</label>
           <button className="draw-go" disabled={busy} onClick={draw}>{busy ? `在画… ${elapsed} 秒` : '画'}</button>
           {err && <div className="draw-err" onClick={() => setErr('')}>{err}<small>点一下收起</small></div>}
           {busy && partial && <div className="draw-view"><img src={partial} alt="半成品" /><div className="draw-view-prompt">半成品，还在画…</div></div>}
