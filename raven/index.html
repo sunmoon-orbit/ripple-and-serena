@@ -2912,8 +2912,16 @@ function insertNotice(n) {
   if (box.querySelector(`.chat-notice[data-ts="${n.ts}"]`)) return
   const el = document.createElement('div'); el.className = 'chat-notice'; el.dataset.ts = n.ts; el.textContent = n.text
   // 按时间插到它后面第一条消息的前面；没有更晚的就放最后
-  const later = [...box.querySelectorAll('.msg[data-rkey]')].find(m => Number(m.dataset.rkey.split(':')[1]) > n.ts)
+  const msgs = [...box.querySelectorAll('.msg[data-rkey]')], tsOf = m => Number(m.dataset.rkey.split(':')[1])
+  const later = msgs.find(m => tsOf(m) > n.ts)
+  // 比眼前最早那条消息还早的先不放（1015 她截图：十几行改备注的小字全挤在最上面，因为它们发生在已载入的消息之前）。
+  // 往上翻存档补了更早的消息以后，placeNotices 会把它们放回该在的地方
+  if (later && !msgs.some(m => tsOf(m) <= n.ts)) return
   box.insertBefore(el, later ? (later.closest('.msg-wrap') || later) : document.getElementById('thinking'))
+}
+function placeNotices() {
+  document.querySelectorAll('#chat-messages .chat-notice').forEach(el => el.remove())
+  loadNotices().forEach(insertNotice)
 }
 function addNotice(text, ts = Date.now()) {
   const all = loadNotices(); if (all.some(x => x.ts === ts)) return
@@ -3086,7 +3094,7 @@ async function loadOlder() {
       const n = m.role === 'user' ? splitUserSegments(m.text).length : 1
       for (let j = 0; j < n; j++) box.insertBefore(frag[i++], anchor)
     }
-    paintAllReactions(); applyRetractions()
+    paintAllReactions(); applyRetractions(); placeNotices()
     box.scrollTop += box.scrollHeight - before   // 补上去的东西把页面撑高了，眼前这条别跳
     hint.textContent = '↑ 更早的消息'
   } catch (e) {
