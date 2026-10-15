@@ -490,6 +490,8 @@
 
   /* timestamp + copy */
   .msg-meta { display: flex; justify-content: flex-end; align-items: center; gap: 8px; margin-top: 5px; }
+  /* 1015 她截图：气泡字下面空一大截——时间、复制、朗读这一行平时是透明的但照样占位置。没点开就收起来，点开（或正在朗读）才撑开 */
+  .msg:not(.show-meta) .msg-meta:not(:has(.playing, .loading)) { max-height: 0; margin-top: 0; overflow: hidden; }
   /* 长按贴表情（0930） */
   /* 贴表情（1013 再改）：0930 是压在角上的小圆片加「颖／言」字，1007 她嫌乱改成气泡下一行小字，
      1013 她要回角上的小圆片，但只放 emoji、不带字：「在气泡左下角或右下角加一个 emoji 那种」。
