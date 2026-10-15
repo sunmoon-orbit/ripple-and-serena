@@ -1162,6 +1162,15 @@
   .rvf-av { width: 46px; height: 46px; border-radius: 50%; object-fit: cover; border: 2px solid color-mix(in srgb, var(--bg) 70%, transparent); background: var(--surface); }
   .rvf-heart { color: var(--accent); font-size: 18px; transition: transform .15s; }
   #rv-full.playing .rvf-heart { animation: rvf-beat 1.1s ease-in-out infinite; }
+  /* 头像两种摆法（1015 她要的）：默认中间一颗心；点一下头像换成「靠在一起」——两个头像叠一点、往中间歪，心缩成小的挂在交界处 */
+  .rvf-duo { cursor: pointer; -webkit-tap-highlight-color: transparent; position: relative; transition: gap .25s; }
+  .rvf-duo .rvf-av { transition: transform .25s, margin .25s; }
+  .rvf-duo.lean { gap: 0; }
+  .rvf-duo.lean .rvf-her { transform: rotate(-6deg); margin-right: -12px; z-index: 1; position: relative; }
+  .rvf-duo.lean .rvf-me { transform: rotate(6deg); position: relative; z-index: 2; }
+  .rvf-duo.lean .rvf-heart { position: absolute; left: 50%; bottom: -6px; transform: translateX(-50%); font-size: 13px; z-index: 3; text-shadow: 0 0 4px var(--bg); }
+  #rv-full.playing .rvf-duo.lean .rvf-heart { animation: rvf-beat-lean 1.1s ease-in-out infinite; }
+  @keyframes rvf-beat-lean { 0%, 100% { transform: translateX(-50%) scale(1); } 50% { transform: translateX(-50%) scale(1.25); } }
   @keyframes rvf-beat { 0%, 100% { transform: scale(1); } 15% { transform: scale(1.3); } 30% { transform: scale(1); } 45% { transform: scale(1.18); } }
   .rvf-together { font-size: 12px; color: var(--text-dim); margin-top: 6px; }
   .rvf-back { background: none; border: 0; color: var(--text); padding: 6px; cursor: pointer; }
@@ -1995,6 +2004,7 @@ function rvRenderFull() {
   f.querySelector('.rvf-bgbtn').textContent = customBg ? '用封面' : '背景'
   f.querySelector('.rvf-her').src = localStorage.getItem('serena-avatar') || '/raven/avatar-serena.svg'
   f.querySelector('.rvf-me').src = localStorage.getItem('raven-avatar') || '/raven/avatar-ripple.svg'
+  f.querySelector('.rvf-duo').classList.toggle('lean', (() => { try { return localStorage.getItem('rvf-duo-mode') === 'lean' } catch { return false } })())
   rvTogetherText()
   f.querySelector('.rvf-cover').innerHTML = t.cover ? `<img src="${escHtml(t.cover)}" alt="">` : MUSIC_NOTE_SVG
   f.querySelector('.rvf-title').textContent = t.name
@@ -2043,6 +2053,11 @@ function rvRenderFull() {
   })
   rvBindSeek(f.querySelector('.rv-seek'))
   const file = f.querySelector('.rvf-bgfile')
+  f.querySelector('.rvf-duo').onclick = (e) => {   // 点头像换摆法：中间一颗心 ↔ 靠在一起
+    const duo = e.currentTarget, lean = !duo.classList.contains('lean')
+    duo.classList.toggle('lean', lean)
+    try { localStorage.setItem('rvf-duo-mode', lean ? 'lean' : 'heart') } catch {}
+  }
   f.querySelector('.rvf-bgbtn').onclick = () => {
     let has = ''; try { has = localStorage.getItem(RVF_BG_KEY) || '' } catch {}
     if (has) { try { localStorage.removeItem(RVF_BG_KEY) } catch {} ; rvRenderFull(); return }
