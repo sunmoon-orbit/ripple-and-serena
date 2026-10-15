@@ -358,7 +358,7 @@
   .msg-avatar:hover { border-color: rgba(179,156,120,.55); }
 
   .msg {
-    max-width: 85%; padding: 9px 13px; border-radius: 14px;
+    max-width: 85%; padding: 9px 13px; border-radius: var(--bubble-radius, 14px);   /* 圆方滑块（1015）调的就是它 */
     font-size: 14px; line-height: 1.55; word-break: break-word;
     animation: msgIn .18s ease-out; position: relative;
   }
@@ -366,7 +366,7 @@
     align-self: flex-end;
     background: var(--bubble-user-bg);
     color: var(--bubble-user-text);
-    border-bottom-right-radius: 4px;
+    border-bottom-right-radius: min(4px, var(--bubble-radius, 14px));
     border: 1px solid var(--bubble-user-border);
     box-shadow: var(--bubble-user-shadow);
     backdrop-filter: blur(8px);
@@ -377,7 +377,7 @@
     background: var(--bubble-assistant-bg);
     color: var(--bubble-assistant-text);
     border: 1px solid var(--bubble-assistant-border);
-    border-bottom-left-radius: 4px;
+    border-bottom-left-radius: min(4px, var(--bubble-radius, 14px));
     box-shadow: var(--bubble-assistant-shadow);
     backdrop-filter: blur(8px);
     -webkit-backdrop-filter: blur(8px);
@@ -1117,7 +1117,9 @@
   .pal-row input[type=color] { width: 40px; height: 34px; padding: 0; border: 1px solid var(--border); border-radius: 9px; background: none; cursor: pointer; flex-shrink: 0; }
   .pal-row input[type=text] { flex: 1; min-width: 0; border: 1px solid var(--border); background: var(--surface); color: var(--text); border-radius: 9px; padding: 7px 9px; font-size: 13px; font-family: ui-monospace, monospace; }
   .pal-preview { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-  .pal-b { padding: 9px 12px; font-size: 13px; text-align: center; border-radius: 12px; }
+  .pal-b { padding: 9px 12px; font-size: 13px; text-align: center; border-radius: var(--bubble-radius, 14px); }
+  .pal-radius { display: flex; align-items: center; gap: 10px; margin: 0 0 12px; font-size: 12.5px; color: var(--text-dim); }
+  .pal-radius input { flex: 1; accent-color: var(--accent); }
   .pal-b-user { background: var(--bubble-user-bg); color: var(--bubble-user-text); border: 1px solid var(--bubble-user-border); }
   .pal-b-ai { background: var(--bubble-assistant-bg); color: var(--bubble-assistant-text); border: 1px solid var(--bubble-assistant-border); }
   .pal-acts { display: flex; gap: 8px; margin-top: 14px; }
@@ -1460,6 +1462,7 @@
       <div class="pal-sheet">
         <div class="pal-head"><b>我的调色盘</b><span>改一下就能看见，只存在这台设备上</span></div>
         <div class="pal-grid"></div>
+        <label class="pal-radius"><span>方</span><input type="range" class="pal-radius-in" min="0" max="24" step="1"><span>圆</span></label>
         <div class="pal-preview"><div class="pal-b pal-b-user">这是你</div><div class="pal-b pal-b-ai">这是我</div></div>
         <div class="pal-acts"><button type="button" class="pal-reset">从现在的主题重新取色</button><button type="button" class="pal-cancel">算了</button><button type="button" class="pal-save">用这套</button></div>
       </div>
@@ -4865,6 +4868,7 @@ document.getElementById('notes-clear').addEventListener('click', () => {
 // --- 我的调色盘（1014，从言叽搬来）：五个颜色推出整套主题，只存这台设备 ---
 // 选了「我的调色」以后，主题按钮照样能轮换；轮回到「我的调色」就用这五个颜色
 const PAL_KEY = 'raven-custom-theme'
+try { const r = localStorage.getItem('raven-bubble-radius'); if (r !== null) document.documentElement.style.setProperty('--bubble-radius', r + 'px') } catch {}
 const PAL_FIELDS = [
   ['background', '页面底色'], ['accent', '强调色'], ['userBubble', '我的气泡'], ['assistantBubble', '他的气泡'], ['text', '正文文字'],
 ]
@@ -4927,6 +4931,7 @@ function palOpen() {
   const box = document.getElementById('rv-palette')
   box.querySelector('.pal-grid').innerHTML = PAL_FIELDS.map(([k, label]) => `<label class="pal-field"><span>${label}</span>
     <span class="pal-row"><input type="color" data-k="${k}" value="${palDraft[k]}"><input type="text" data-k="${k}" value="${palDraft[k]}" maxlength="7" spellcheck="false"></span></label>`).join('')
+  box.querySelector('.pal-radius-in').value = (() => { try { return localStorage.getItem('raven-bubble-radius') || 14 } catch { return 14 } })()
   box.hidden = false
   palApply(palDraft); document.documentElement.setAttribute('data-theme', 'custom')
 }
@@ -4943,6 +4948,12 @@ function palClose(keep) {
     palDraft[k] = val
     box.querySelectorAll(`[data-k="${k}"]`).forEach(el => { if (el !== e.target) el.value = val })
     palApply(palDraft)
+  })
+  // 气泡圆方（1015 她要的滑块）：跟颜色分开存，换哪套主题都管用；拖的时候就生效
+  const rIn = box.querySelector('.pal-radius-in')
+  rIn.addEventListener('input', () => {
+    document.documentElement.style.setProperty('--bubble-radius', rIn.value + 'px')
+    try { localStorage.setItem('raven-bubble-radius', rIn.value) } catch {}
   })
   box.querySelector('.pal-cancel').onclick = () => palClose(false)
   box.querySelector('.pal-reset').onclick = () => {
