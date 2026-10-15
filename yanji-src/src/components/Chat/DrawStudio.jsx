@@ -1,10 +1,13 @@
 // 画图窗口（1015，她想用 GPT 的新画图模型自己画表情包，「这样子的话，发表情包之类就不会夹带私货了」）。
 // 单独一个窗口而不是插在聊天里：来回改的试错不冲聊天；每画一张都花钱，这里看得见画了几张；成品再一键发到聊天／存相册／存手机。
-// 接口走 OpenAI 兼容的 /v1/images/generations，地址、钥匙、模型名都她自己填（官方或中转站都行），不写死模型。
+// 接口走 OpenAI 兼容的 /v1/images/generations。钥匙直接从 Hollow 里已有的 API 连接挑一个（她的主意：几家中转站质量不一，能换着用），
+// 也留着「自己填」；模型名可以拉列表挑，不写死。
 // 设置存本机 localStorage；画过的图存 IndexedDB（bigStore），只留最近 24 张。
 import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useToolMemory } from './ToolMemory'
+import { useStore } from '../../store'
+import PickerSelect from '../PickerSelect'
 import { showToast } from '../Toast'
 import { bigGet, bigSet } from '../../utils/bigStore'
 import { downloadBlob } from '../../utils/download'
@@ -17,10 +20,12 @@ const MAX_HIST = 24
 const SIZES = [['1024x1024', '方'], ['1024x1536', '竖'], ['1536x1024', '横'], ['auto', '自动']]
 const QUALITIES = [['auto', '自动'], ['low', '省钱'], ['medium', '中'], ['high', '精细']]
 
+const BLANK = { connId: '', baseUrl: '', apiKey: '', model: '', size: '1024x1024', quality: 'auto', transparent: false }
+const DEFAULT_URLS = { openai: 'https://api.openai.com/v1', deepseek: 'https://api.deepseek.com/v1' }
 function loadConf() {
-  try { return { baseUrl: '', apiKey: '', model: '', size: '1024x1024', quality: 'auto', transparent: false, ...JSON.parse(localStorage.getItem(CONF_KEY) || '{}') } }
-  catch { return { baseUrl: '', apiKey: '', model: '', size: '1024x1024', quality: 'auto', transparent: false } }
+  try { return { ...BLANK, ...JSON.parse(localStorage.getItem(CONF_KEY) || '{}') } } catch { return { ...BLANK } }
 }
+const IMAGE_MODEL = /image|dall|flux|kolors|sdxl|stable|imagen|seedream|midjourney|mj|banana/i
 function monthKey() { const d = new Date(); return `${d.getFullYear()}-${d.getMonth() + 1}` }
 function loadCount() {
   try { const c = JSON.parse(localStorage.getItem(COUNT_KEY) || '{}'); return c.month === monthKey() ? c.n || 0 : 0 } catch { return 0 }
@@ -42,8 +47,15 @@ async function dataUrlToBlob(u) { return await (await fetch(u)).blob() }
 
 export default function DrawStudio({ onClose, onSendToChat }) {
   const moonMemory = useToolMemory()
+  const connections = useStore(s => s.connections) || []
   const [conf, setConf] = useState(loadConf)
-  const [showConf, setShowConf] = useState(() => !loadConf().apiKey)
+  const conn = connections.find(c => c.id === conf.connId) || null
+  // 真正用的地址和钥匙：挑了连接就用连接的，没挑就用自己填的
+  const base = conn ? (conn.baseUrl || DEFAULT_URLS[conn.provider] || '') : conf.baseUrl
+  const key = conn ? conn.apiKey : conf.apiKey
+  const [showConf, setShowConf] = useState(() => { const c = loadConf(); return !c.model || (!c.connId && !c.apiKey) })
+  const [models, setModels] = useState([])
+  const [fetching, setFetching] = useState(false)
   const [prompt, setPrompt] = useState('')
   const [busy, setBusy] = useState(false)
   const [elapsed, setElapsed] = useState(0)
@@ -60,7 +72,7 @@ export default function DrawStudio({ onClose, onSendToChat }) {
   async function draw() {
     const text = prompt.trim()
     if (!text) { showToast('先写想画什么', 'error'); return }
-    if (!conf.apiKey || !conf.model) { setShowConf(true); showToast('先填钥匙和模型名', 'error'); return }
+    if (!key || !conf.model) { setShowConf(true); showToast('先挑连接（或填钥匙）和模型名', 'error'); return }
     setBusy(true); setElapsed(0)
     const t0 = Date.now(); timer.current = setInterval(() => setElapsed(Math.round((Date.now() - t0) / 1000)), 1000)
     try {
@@ -68,9 +80,9 @@ export default function DrawStudio({ onClose, onSendToChat }) {
       if (conf.size !== 'auto') body.size = conf.size
       if (conf.quality !== 'auto') body.quality = conf.quality
       if (conf.transparent) body.background = 'transparent'
-      const r = await fetch(endpoint(conf.baseUrl), {
+      const r = await fetch(endpoint(base), {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${conf.apiKey.trim()}` },
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${String(key).trim()}` },
         body: JSON.stringify(body),
       })
       const raw = await r.text()
@@ -92,6 +104,21 @@ export default function DrawStudio({ onClose, onSendToChat }) {
     } finally {
       clearInterval(timer.current); setBusy(false)
     }
+  }
+
+  // 拉这个连接能用的模型，画图的排前面
+  async function fetchModels() {
+    if (!key) { showToast('先挑连接或填钥匙', 'error'); return }
+    setFetching(true)
+    try {
+      const b = (base || 'https://api.openai.com').trim().replace(/\/+$/, '')
+      const r = await fetch(`${/\/v1$/.test(b) ? b : b + '/v1'}/models`, { headers: { Authorization: `Bearer ${String(key).trim()}` } })
+      if (!r.ok) throw new Error(`HTTP ${r.status}`)
+      const ids = ((await r.json()).data || []).map(m => m.id).filter(Boolean)
+      const img = ids.filter(i => IMAGE_MODEL.test(i)).sort(), rest = ids.filter(i => !IMAGE_MODEL.test(i)).sort()
+      setModels([...img, ...rest])
+      showToast(img.length ? `找到 ${img.length} 个像是画图的模型` : '没认出画图模型，列表里自己挑', img.length ? 'success' : 'error')
+    } catch (e) { showToast('拉不到模型：' + e.message, 'error') } finally { setFetching(false) }
   }
 
   async function toAlbum(e) {
@@ -120,14 +147,29 @@ export default function DrawStudio({ onClose, onSendToChat }) {
 
         <div className="draw-body">
           <button className="draw-conf-toggle" onClick={() => setShowConf(v => !v)}>
-            {showConf ? '收起设置' : `设置 · ${conf.model || '还没填模型'}`}<span>这个月画了 {count} 张</span>
+            {showConf ? '收起设置' : `${conn ? (conn.name || conn.provider) : '自己填的'} · ${conf.model || '还没填模型'}`}<span>这个月画了 {count} 张</span>
           </button>
           {showConf && (
             <div className="draw-conf">
-              <label>接口地址<input value={conf.baseUrl} onChange={e => patch({ baseUrl: e.target.value })} placeholder="空着就是 OpenAI 官方；中转站填它给的地址" autoComplete="off" /></label>
-              <label>钥匙<input type="password" value={conf.apiKey} onChange={e => patch({ apiKey: e.target.value })} placeholder="sk-…" autoComplete="off" /></label>
-              <label>模型名<input value={conf.model} onChange={e => patch({ model: e.target.value })} placeholder="比如 gpt-image-1，照你那边的写" autoComplete="off" /></label>
-              <small>只存在这台手机上。每画一张都按次扣钱，「省钱」那档最便宜。</small>
+              <label>用哪个连接
+                <PickerSelect value={conf.connId} onChange={e => { patch({ connId: e.target.value }); setModels([]) }}>
+                  <option value="">自己填地址和钥匙</option>
+                  {connections.map(c => <option key={c.id} value={c.id}>{c.name || c.provider || '未命名'}{c.baseUrl ? ` · ${c.baseUrl.replace(/^https?:\/\//, '').split('/')[0]}` : ''}</option>)}
+                </PickerSelect>
+              </label>
+              {!conn && <>
+                <label>接口地址<input value={conf.baseUrl} onChange={e => patch({ baseUrl: e.target.value })} placeholder="空着就是 OpenAI 官方；中转站填它给的地址" autoComplete="off" /></label>
+                <label>钥匙<input type="password" value={conf.apiKey} onChange={e => patch({ apiKey: e.target.value })} placeholder="sk-…" autoComplete="off" /></label>
+              </>}
+              <label>模型名
+                <div className="draw-model-row">
+                  <input list="draw-models" value={conf.model} onChange={e => patch({ model: e.target.value })} placeholder="比如 gpt-image-1，照你那边的写" autoComplete="off" />
+                  <button type="button" onClick={fetchModels} disabled={fetching}>{fetching ? '拉取中' : '拉列表'}</button>
+                </div>
+                <datalist id="draw-models">{models.map(m => <option key={m} value={m} />)}</datalist>
+              </label>
+              {models.length > 0 && <div className="draw-model-chips">{models.filter(m => IMAGE_MODEL.test(m)).slice(0, 12).map(m => <button key={m} type="button" className={conf.model === m ? 'on' : ''} onClick={() => patch({ model: m })}>{m}</button>)}</div>}
+              <small>连接就是 Hollow 里存的那些，钥匙不另存。每画一张都按次扣钱，「省钱」那档最便宜。</small>
             </div>
           )}
 
