@@ -91,7 +91,8 @@ class CrowOverlay private constructor(private val ctx: Context) {
             setPadding(dp(16f).toInt(), dp(6f).toInt(), dp(11f).toInt(), dp(7f).toInt())
             background = BubbleDrawable(dp(1.5f), dp(7f), dp(12f))
             layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply {
-                marginStart = -dp(6f).toInt(); bottomMargin = dp(18f).toInt()   // 贴近嘴边、比乌鸦身子略高
+                // 贴近嘴边、顶着行首放（1015 第三版）：原来居中＋bottomMargin，两行歌词时 LinearLayout 算出负的 top，气泡头被砍掉一截
+                marginStart = -dp(6f).toInt(); gravity = Gravity.TOP
             }
         }
         val ll = LinearLayout(ctx).apply {
