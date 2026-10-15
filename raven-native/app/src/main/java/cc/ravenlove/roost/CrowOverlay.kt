@@ -58,7 +58,7 @@ class CrowOverlay private constructor(private val ctx: Context) {
     fun canDraw(): Boolean = Settings.canDrawOverlays(ctx)
 
     fun setForeground(fg: Boolean) { foreground = fg; refresh() }
-    fun setState(s: String) { if (s != state) { state = s; render() } }
+    fun setState(s: String) { if (s != state) { state = s; render(); kickBob() } }
     fun setLyric(l: String) { if (l != lyric) { lyric = l; render() } }
 
     private fun dp(v: Float) = TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, v, ctx.resources.displayMetrics)
@@ -125,7 +125,7 @@ class CrowOverlay private constructor(private val ctx: Context) {
         }
         try { wm.addView(ll, lp) } catch (_: Exception) { return }
         root = ll; img = iv; txt = tv; params = lp
-        ui.post(bobber)
+        kickBob()
     }
 
     private fun detach() {
@@ -144,12 +144,17 @@ class CrowOverlay private constructor(private val ctx: Context) {
         }, 450)
     }
 
-    // 听歌的时候脑袋一点一点；别的时候不动
+    // 听歌的时候脑袋一点一点；别的时候不动，计时器也停掉（1015 她手机电掉得快，先把这个白醒的去了）
+    private fun dancing() = state == "listen" || state == "proudhat"
+    private fun kickBob() {
+        ui.removeCallbacks(bobber)
+        if (root != null && dancing()) ui.post(bobber) else { bob = false; img?.translationY = 0f }
+    }
     private val bobber = object : Runnable {
         override fun run() {
             val iv = img ?: return
-            val dancing = state == "listen" || state == "proudhat"
-            bob = dancing && !bob
+            if (!dancing()) { bob = false; iv.translationY = 0f; return }
+            bob = !bob
             iv.translationY = if (bob) dp(2f) else 0f
             ui.postDelayed(this, 480)
         }
