@@ -104,7 +104,22 @@ function externalAuthed(req, url) {
   if (!isExternal(req)) return true    // 本机直连放行
   const h = req.headers.authorization || ''
   const t = h.startsWith('Bearer ') ? h.slice(7) : (url.searchParams.get('token') || '')
-  return tokenIsValid(t)
+  const ok = tokenIsValid(t)
+  if (ok) noteHerIp(req)
+  return ok
+}
+// 她现在从哪个出口上网（1015）：带着归巢钥匙进来的就是她。~/bin/ip-watch.py 每天拿它去查欺诈分，
+// 她担心「网络质量下降了，但是我没发现」。只记最近一个地址和时间，换了才写盘，最多十分钟写一次
+const HER_IP_FILE = path.join(os.homedir(), '.raven-her-ip.json')
+let herIpLast = { ip: '', at: 0 }
+function noteHerIp(req) {
+  // 前面隔着 Cloudflare：X-Forwarded-For 第一个是它的边缘节点（162.158.… 那种），真地址在 CF-Connecting-IP
+  const ip = String(req.headers['cf-connecting-ip'] || req.headers['x-forwarded-for'] || '').split(',')[0].trim()
+  if (!ip) return
+  const now = Date.now()
+  if (ip === herIpLast.ip && now - herIpLast.at < 10 * 60 * 1000) return
+  herIpLast = { ip, at: now }
+  fs.writeFile(HER_IP_FILE, JSON.stringify({ ip, at: new Date(now).toISOString() }), () => {})
 }
 
 function moonAuthed(req) {
