@@ -20,7 +20,7 @@ const MAX_HIST = 24
 const SIZES = [['1024x1024', '方'], ['1024x1536', '竖'], ['1536x1024', '横'], ['auto', '自动']]
 const QUALITIES = [['auto', '自动'], ['low', '省钱'], ['medium', '中'], ['high', '精细']]
 
-const BLANK = { connId: '', baseUrl: '', apiKey: '', model: '', size: '1024x1024', quality: 'auto', transparent: false }
+const BLANK = { connId: '', baseUrl: '', apiKey: '', model: '', size: '1024x1024', quality: 'auto', transparent: false, stream: true }
 const DEFAULT_URLS = { openai: 'https://api.openai.com/v1', deepseek: 'https://api.deepseek.com/v1' }
 function loadConf() {
   try { return { ...BLANK, ...JSON.parse(localStorage.getItem(CONF_KEY) || '{}') } } catch { return { ...BLANK } }
@@ -62,6 +62,8 @@ export default function DrawStudio({ onClose, onSendToChat }) {
   const [hist, setHist] = useState([])
   const [count, setCount] = useState(loadCount)
   const [view, setView] = useState(null)   // 点开大图的那一张
+  const [err, setErr] = useState('')        // 报错留在窗口里，不再红框一闪就没（1015 她：「突然闪了一个红框，然后啥也没输出」）
+  const [partial, setPartial] = useState('') // 边画边传时的半成品
   const timer = useRef(null)
 
   useEffect(() => { bigGet(HIST_KEY).then(h => setHist(Array.isArray(h) ? h : [])).catch(() => {}) }, [])
@@ -69,38 +71,81 @@ export default function DrawStudio({ onClose, onSendToChat }) {
   const patch = (p) => setConf(c => { const n = { ...c, ...p }; try { localStorage.setItem(CONF_KEY, JSON.stringify(n)) } catch {}; return n })
   const saveHist = (h) => { setHist(h); bigSet(HIST_KEY, h).catch(() => {}) }
 
+  // 发一次请求。stream=true 时让它边画边传半成品（partial_images），连接一直有动静，
+  // 就不会被中转站前面的 Cloudflare 一百秒没回话就掐断（1015 第一次画了九十多秒被掐，没扣费）。
+  // 中转站不支持流式、直接回一整个 JSON 的，也照常接住。
+  async function request(body) {
+    const r = await fetch(endpoint(base), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${String(key).trim()}` },
+      body: JSON.stringify(body),
+    })
+    const ct = r.headers.get('content-type') || ''
+    if (!r.ok) {
+      const raw = await r.text(); let d = null; try { d = JSON.parse(raw) } catch {}
+      const e = new Error(d?.error?.message ? `${d.error.message}${d.error.code ? `（${d.error.code}）` : ''}` : (raw.slice(0, 300) || `HTTP ${r.status}`))
+      e.status = r.status; throw e
+    }
+    if (!ct.includes('event-stream')) {
+      const d = await r.json(); const item = d?.data?.[0]
+      if (item?.b64_json) return { dataUrl: `data:image/png;base64,${item.b64_json}`, usage: d.usage || null }
+      if (item?.url) { try { return { dataUrl: await toDataUrl(await (await fetch(item.url)).blob()), usage: d.usage || null } } catch { return { dataUrl: item.url, usage: d.usage || null } } }
+      throw new Error('接口回来了，但里面没有图')
+    }
+    const reader = r.body.getReader(), dec = new TextDecoder()
+    let buf = '', done = null
+    for (;;) {
+      const { value, done: end } = await reader.read()
+      if (end) break
+      buf += dec.decode(value, { stream: true })
+      let i
+      while ((i = buf.indexOf('\n')) >= 0) {
+        const line = buf.slice(0, i).trim(); buf = buf.slice(i + 1)
+        if (!line.startsWith('data:')) continue
+        const payload = line.slice(5).trim(); if (!payload || payload === '[DONE]') continue
+        let ev; try { ev = JSON.parse(payload) } catch { continue }
+        if (ev.error) throw new Error(ev.error.message || JSON.stringify(ev.error))
+        const b64 = ev.b64_json || ev.data?.[0]?.b64_json
+        if (!b64) continue
+        const url = `data:image/png;base64,${b64}`
+        if (/partial/.test(ev.type || '')) setPartial(url)
+        else done = { dataUrl: url, usage: ev.usage || null }
+      }
+    }
+    if (!done) throw new Error('流传完了，但没收到最终的图')
+    return done
+  }
+
   async function draw() {
     const text = prompt.trim()
-    if (!text) { showToast('先写想画什么', 'error'); return }
-    if (!key || !conf.model) { setShowConf(true); showToast('先挑连接（或填钥匙）和模型名', 'error'); return }
-    setBusy(true); setElapsed(0)
+    if (!text) { setErr('先写想画什么'); return }
+    if (!key || !conf.model) { setShowConf(true); setErr('先挑连接（或填钥匙）和模型名'); return }
+    setBusy(true); setElapsed(0); setErr(''); setPartial('')
     const t0 = Date.now(); timer.current = setInterval(() => setElapsed(Math.round((Date.now() - t0) / 1000)), 1000)
+    const body = { model: conf.model.trim(), prompt: text, n: 1 }
+    if (conf.size !== 'auto') body.size = conf.size
+    if (conf.quality !== 'auto') body.quality = conf.quality
+    if (conf.transparent) body.background = 'transparent'
     try {
-      const body = { model: conf.model.trim(), prompt: text, n: 1 }
-      if (conf.size !== 'auto') body.size = conf.size
-      if (conf.quality !== 'auto') body.quality = conf.quality
-      if (conf.transparent) body.background = 'transparent'
-      const r = await fetch(endpoint(base), {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${String(key).trim()}` },
-        body: JSON.stringify(body),
-      })
-      const raw = await r.text()
-      let d = null; try { d = JSON.parse(raw) } catch {}
-      if (!r.ok) throw new Error(d?.error?.message || raw.slice(0, 200) || `HTTP ${r.status}`)
-      const item = d?.data?.[0]
-      let dataUrl = ''
-      if (item?.b64_json) dataUrl = `data:image/png;base64,${item.b64_json}`
-      else if (item?.url) {
-        try { dataUrl = await toDataUrl(await (await fetch(item.url)).blob()) } catch { dataUrl = item.url }   // 拿不到就先存地址（中转站给的链接可能会过期）
-      }
-      if (!dataUrl) throw new Error('接口回来了，但里面没有图')
-      const entry = { id: Date.now(), prompt: text, model: body.model, size: conf.size, dataUrl, at: new Date().toISOString(), usage: d?.usage || null }
+      let res
+      if (conf.stream) {
+        try { res = await request({ ...body, stream: true, partial_images: 2 }) }
+        catch (e) {
+          // 中转站不认 stream／partial_images 这类参数时会立刻回 4xx：退回不流式再来一次
+          if (e.status >= 400 && e.status < 500 && /stream|partial|param|unknown|unsupported|不支持/i.test(e.message)) res = await request(body)
+          else throw e
+        }
+      } else res = await request(body)
+      const entry = { id: Date.now(), prompt: text, model: body.model, size: conf.size, dataUrl: res.dataUrl, at: new Date().toISOString(), usage: res.usage }
       saveHist([entry, ...hist].slice(0, MAX_HIST))
       setCount(bumpCount())
-      setView(entry)
+      setView(entry); setPartial('')
     } catch (e) {
-      showToast('没画出来：' + (e.message || e), 'error')
+      const sec = Math.round((Date.now() - t0) / 1000)
+      const msg = String(e?.message || e)
+      setErr(/Failed to fetch|NetworkError|Load failed|network/i.test(msg)
+        ? `第 ${sec} 秒连接被掐断了，没拿到图。多半是中转站那头的超时（一百秒左右会掐），不是你的网。可以试试「中」档或者小一点的尺寸。`
+        : `第 ${sec} 秒失败：${msg}`)
     } finally {
       clearInterval(timer.current); setBusy(false)
     }
@@ -180,7 +225,10 @@ export default function DrawStudio({ onClose, onSendToChat }) {
             <div className="draw-seg">{QUALITIES.map(([v, l]) => <button key={v} className={conf.quality === v ? 'on' : ''} onClick={() => patch({ quality: v })}>{l}</button>)}</div>
             <label className="draw-check"><input type="checkbox" checked={conf.transparent} onChange={e => patch({ transparent: e.target.checked })} />透明底（做贴纸）</label>
           </div>
+          <label className="draw-check"><input type="checkbox" checked={conf.stream} onChange={e => patch({ stream: e.target.checked })} />边画边传（防中转站超时掐断；不支持会自动退回）</label>
           <button className="draw-go" disabled={busy} onClick={draw}>{busy ? `在画… ${elapsed} 秒` : '画'}</button>
+          {err && <div className="draw-err" onClick={() => setErr('')}>{err}<small>点一下收起</small></div>}
+          {busy && partial && <div className="draw-view"><img src={partial} alt="半成品" /><div className="draw-view-prompt">半成品，还在画…</div></div>}
 
           {view && (
             <div className="draw-view">
