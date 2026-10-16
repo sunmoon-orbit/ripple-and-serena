@@ -65,6 +65,7 @@ export default function DrawStudio({ onClose, onSendToChat }) {
   const [err, setErr] = useState('')        // 报错留在窗口里，不再红框一闪就没（1015 她：「突然闪了一个红框，然后啥也没输出」）
   const [partial, setPartial] = useState('') // 边画边传时的半成品
   const timer = useRef(null)
+  const ctrl = useRef(null)   // 停掉卡住的请求（1016 第一张等了四百秒还没出来，只能干等）
 
   useEffect(() => { bigGet(HIST_KEY).then(h => setHist(Array.isArray(h) ? h : [])).catch(() => {}) }, [])
   useEffect(() => () => clearInterval(timer.current), [])
@@ -79,6 +80,7 @@ export default function DrawStudio({ onClose, onSendToChat }) {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${String(key).trim()}` },
       body: JSON.stringify(body),
+      signal: ctrl.current?.signal,
     })
     const ct = r.headers.get('content-type') || ''
     if (!r.ok) {
@@ -121,6 +123,7 @@ export default function DrawStudio({ onClose, onSendToChat }) {
     if (!text) { setErr('先写想画什么'); return }
     if (!key || !conf.model) { setShowConf(true); setErr('先挑连接（或填钥匙）和模型名'); return }
     setBusy(true); setElapsed(0); setErr(''); setPartial('')
+    ctrl.current = new AbortController()
     const t0 = Date.now(); timer.current = setInterval(() => setElapsed(Math.round((Date.now() - t0) / 1000)), 1000)
     const body = { model: conf.model.trim(), prompt: text, n: 1 }
     if (conf.size !== 'auto') body.size = conf.size
@@ -143,6 +146,7 @@ export default function DrawStudio({ onClose, onSendToChat }) {
     } catch (e) {
       const sec = Math.round((Date.now() - t0) / 1000)
       const msg = String(e?.message || e)
+      if (e?.name === 'AbortError') { setErr(`第 ${sec} 秒你停掉了。中转站那头可能还在画，扣没扣钱去它后台看一眼再重画。`); return }
       setErr(/Failed to fetch|NetworkError|Load failed|network/i.test(msg)
         ? `第 ${sec} 秒连接断了，没拿到图（中转站那头断开的，不是你的网）。${conf.stream ? '可以先把「边画边传」去掉再试；' : ''}也可以换「中」档或者小一点的尺寸。`
         : `第 ${sec} 秒失败：${msg}`)
@@ -227,6 +231,8 @@ export default function DrawStudio({ onClose, onSendToChat }) {
           </div>
           <label className="draw-check"><input type="checkbox" checked={conf.stream} onChange={e => patch({ stream: e.target.checked })} />边画边传（试验：有的中转站会因此断开，出问题就别勾）</label>
           <button className="draw-go" disabled={busy} onClick={draw}>{busy ? `在画… ${elapsed} 秒` : '画'}</button>
+          {busy && <button className="draw-stop" onClick={() => ctrl.current?.abort()}>停</button>}
+          {busy && elapsed >= 180 && <div className="draw-slow">超过三分钟了，平常一两分钟就出来，多半是中转站卡住了，可以停掉重来。</div>}
           {err && <div className="draw-err" onClick={() => setErr('')}>{err}<small>点一下收起</small></div>}
           {busy && partial && <div className="draw-view"><img src={partial} alt="半成品" /><div className="draw-view-prompt">半成品，还在画…</div></div>}
 
