@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useStore } from './store'
 import Splash from './components/Splash'
 import PasswordGate from './components/PasswordGate'
@@ -30,6 +30,10 @@ export default function App() {
   const [splashGone, setSplashGone] = useState(false) // 开屏完全卸载
   const [gateVisible, setGateVisible] = useState(false) // 开屏开始晕开时，门在底下浮现
   const [unlocked, setUnlocked] = useState(false)
+  // 回调要稳定：原来每次渲染都是新函数，开屏的计时器跟着重来一轮，
+  // 开屏晚好几秒才真正卸掉，正好赶上她在密码框里打第一个字（1016 她说输入法会被弹回去）
+  const onSplashLeave = useCallback(() => setGateVisible(true), [])
+  const onSplashDone = useCallback(() => setSplashGone(true), [])
 
   useEffect(() => {
     const bg = { light: '#ECEEF4', blossom: '#F9F0F3', midnight: '#151B29', dawn: '#F7F2EA' }
@@ -44,7 +48,7 @@ export default function App() {
   if (!unlocked) return (
     <>
       {gateVisible && <PasswordGate onUnlock={() => setUnlocked(true)} />}
-      {!splashGone && <Splash onLeave={() => setGateVisible(true)} onDone={() => setSplashGone(true)} />}
+      {!splashGone && <Splash onLeave={onSplashLeave} onDone={onSplashDone} />}
     </>
   )
 

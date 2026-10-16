@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import { useStore, hashPassword } from '../store'
 import { loginZhaohua } from '../api'
 import Feather from './Feather'
@@ -17,6 +17,13 @@ export default function PasswordGate({ onUnlock }) {
   const [pw2, setPw2] = useState('')
   const [err, setErr] = useState('')
   const [out, setOut] = useState(false) // 解锁淡出中
+  const typedAt = useRef(0)
+  // 兜底（1016）：刚打完字、又不是她自己点别处，焦点却丢了——立刻拿回来，输入法就不会缩回去
+  const keepFocus = (e) => {
+    const el = e.currentTarget
+    if (out || e.relatedTarget || Date.now() - typedAt.current > 1500) return
+    setTimeout(() => { if (document.activeElement !== el && document.visibilityState === 'visible') el.focus() }, 0)
+  }
 
   function pass() {
     setOut(true)
@@ -65,7 +72,8 @@ export default function PasswordGate({ onUnlock }) {
             className="ink-input" type="password"
             value={pw} autoFocus
             placeholder={IS_ZHAOHUA ? '昭华访问密码' : isSetup ? '设置访问密码' : '···'}
-            onChange={(e) => { setPw(e.target.value); setErr('') }}
+            onChange={(e) => { typedAt.current = Date.now(); setPw(e.target.value); setErr('') }}
+            onBlur={keepFocus}
             onKeyDown={(e) => e.key === 'Enter' && (isSetup ? null : submit())}
           />
         </div>
