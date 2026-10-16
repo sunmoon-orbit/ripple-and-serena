@@ -108,7 +108,8 @@ function makeRedactor(rules) {
     /^[\x20-\x7e]+$/.test(r.from) ? new RegExp(`(?<![A-Za-z0-9])${esc(r.from)}(?![A-Za-z0-9])`, 'gi') : new RegExp(esc(r.from), 'g'),
     String(r.to || ''),
   ])
-  list.push([/(?<![A-Za-z0-9+/])1[3-9]\d{9}(?![A-Za-z0-9+/])/g, '[手机号]'], [/(?<![A-Za-z0-9+/])\d{17}[\dXx](?![A-Za-z0-9+/])/g, '[证件号]'])
+  list.push([/(?<![A-Za-z0-9+/])1[3-9]\d{9}(?![A-Za-z0-9+/])/g, '[手机号]'], [/(?<![A-Za-z0-9+/])\d{17}[\dXx](?![A-Za-z0-9+/])/g, '[证件号]'],
+    [/(?<![\d.])(?:\d{1,3}\.){3}\d{1,3}(?![\d.])/g, '[IP]'], [/[A-Za-z0-9._%+-]+@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)*\.[A-Za-z]{2,}/g, '[邮箱]'])
   const one = t => list.reduce((acc, [re, to]) => acc.replace(re, to), t)
   return msgs => msgs.map(m => typeof m.content === 'string' ? { ...m, content: one(m.content) } : m)
 }
