@@ -88,10 +88,35 @@ function fetchProviders(token) {
   })
 }
 
+// 出门脱敏（1016）：跟言叽共用记忆库上那张替换表。做梦、闲时、主动开口这些都会把记忆喂给外面的模型，
+// 发出去之前一样把真名这类词换掉；手机号、身份证号直接抹。拉不到表就只抹号码，不耽误发。
+function fetchRedactRules(token) {
+  return new Promise((resolve) => {
+    const req = http.get({ hostname: '127.0.0.1', port: 3210, path: '/privacy/redact', headers: { Authorization: `Bearer ${token}` } }, res => {
+      let d = ''
+      res.on('data', c => d += c)
+      res.on('end', () => { try { resolve(JSON.parse(d).rules || []) } catch { resolve([]) } })
+    })
+    req.on('error', () => resolve([]))
+    req.setTimeout(5000, () => { req.destroy(); resolve([]) })
+  })
+}
+
+function makeRedactor(rules) {
+  const esc = s => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  const list = rules.filter(r => r && r.from).sort((a, b) => b.from.length - a.from.length).map(r => [
+    /^[\x20-\x7e]+$/.test(r.from) ? new RegExp(`(?<![A-Za-z0-9])${esc(r.from)}(?![A-Za-z0-9])`, 'gi') : new RegExp(esc(r.from), 'g'),
+    String(r.to || ''),
+  ])
+  list.push([/(?<![A-Za-z0-9+/])1[3-9]\d{9}(?![A-Za-z0-9+/])/g, '[手机号]'], [/(?<![A-Za-z0-9+/])\d{17}[\dXx](?![A-Za-z0-9+/])/g, '[证件号]'])
+  const one = t => list.reduce((acc, [re, to]) => acc.replace(re, to), t)
+  return msgs => msgs.map(m => typeof m.content === 'string' ? { ...m, content: one(m.content) } : m)
+}
+
 async function llmComplete(prompt, { maxTokens = 300, temperature = 1.0, messages, timeoutMs } = {}) {
   const env = readEnv()
   const providers = await fetchProviders(env.MOON_API_TOKEN)
-  const msgs = messages || [{ role: 'user', content: prompt }]
+  const msgs = makeRedactor(await fetchRedactRules(env.MOON_API_TOKEN))(messages || [{ role: 'user', content: prompt }])
   const errors = []
   for (let i = 0; i < providers.length; i++) {
     const p = providers[i]
