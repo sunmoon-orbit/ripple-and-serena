@@ -11,6 +11,7 @@ import { DELAY_MODES } from '../../utils/replyDelay'
 import { DEFAULT_RINGTONE_ID, RINGTONES, playRingtone } from '../../utils/ringtones'
 import { squareDownscale } from '../../utils/squareDownscale'
 import McpSettings from './McpSettings'
+import PrivacySettings from './PrivacySettings'
 import { useThemedConfirm } from '../ThemedConfirmDialog'
 import { agentRevision } from '../Crossing/authorization.mjs'
 
@@ -1012,6 +1013,11 @@ export default function Settings() {
         )}
 
         {/* ── Moon Memory ──────────────────────────────────────── */}
+        {tab === 'moon' && (
+          <Section title="隐私">
+            <PrivacySettings />
+          </Section>
+        )}
         {tab === 'moon' && (
           <Section title="拾羽记忆库">
             <div className="settings-card">

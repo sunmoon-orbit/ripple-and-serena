@@ -3,6 +3,10 @@ import ReactDOM from 'react-dom/client'
 import App from './App'
 import { ThemedConfirmProvider } from './components/ThemedConfirmDialog'
 import './styles/index.css'
+import { installPrivacyShield } from './utils/privacyShield'
+
+// 发往中转站的请求先过替换表（1016）
+installPrivacyShield()
 
 // 原生壳已经用 WindowInsets 给 WebView 避开了系统栏；标记出来，避免页面组件
 // 再叠加一遍 CSS safe-area，造成阅读器顶部/底部出现异常大块留白。
