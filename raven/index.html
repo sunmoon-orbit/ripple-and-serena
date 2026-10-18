@@ -672,6 +672,22 @@
   /* sticker picker */
   #sticker-btn { background: none; border: none; cursor: pointer; padding: 6px; color: var(--text-dim); font-size: 18px; flex-shrink: 0; align-self: flex-end; line-height: 1; }
   #sticker-btn:active { transform: scale(.9); }
+  #note-btn { background: none; border: none; cursor: pointer; padding: 6px 4px; color: var(--text-dim); flex-shrink: 0; align-self: flex-end; line-height: 0; touch-action: none; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
+  #note-btn.rec { color: var(--accent); transform: scale(1.15); }
+  #note-btn.busy { opacity: .45; }
+  #note-rec { position: fixed; left: 50%; bottom: 96px; transform: translateX(-50%); z-index: 60; display: flex; align-items: center; gap: 10px; padding: 10px 18px; border-radius: 99px; background: var(--card, #222); color: var(--text); box-shadow: 0 6px 24px rgba(0,0,0,.25); font-size: 14px; pointer-events: none; white-space: nowrap; }
+  #note-rec[hidden] { display: none; }
+  #note-rec .note-dot { width: 9px; height: 9px; border-radius: 50%; background: #e0524a; animation: noteBlink 1s infinite; }
+  #note-rec.cancel { background: #b9483f; color: #fff; }
+  #note-rec #note-time { font-variant-numeric: tabular-nums; font-weight: 600; }
+  @keyframes noteBlink { 50% { opacity: .25; } }
+  .vnote-bar { display: flex; align-items: center; gap: 8px; border: 0; background: none; color: inherit; font: inherit; padding: 2px 0; cursor: pointer; min-width: 90px; }
+  .vnote-ico { width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center; background: color-mix(in srgb, currentColor 16%, transparent); font-size: 11px; flex-shrink: 0; }
+  .vnote-wave { flex: 1; height: 14px; background: repeating-linear-gradient(90deg, currentColor 0 2px, transparent 2px 5px); opacity: .35; border-radius: 2px; mask: linear-gradient(90deg, #000 0 100%); }
+  .vnote-bar.playing .vnote-wave { opacity: .8; animation: noteBlink 1.2s infinite; }
+  .vnote-sec { font-size: 12.5px; opacity: .75; font-variant-numeric: tabular-nums; }
+  .vnote-text { margin-top: 6px; font-size: 13.5px; opacity: .85; white-space: pre-wrap; }
+  .vnote-heard { margin-top: 3px; font-size: 11.5px; opacity: .55; }
   #sticker-picker {
     display: none; position: absolute; bottom: 62px; left: 0; right: 0;
     background: var(--surface); border: 1px solid var(--border); border-radius: 12px;
@@ -1531,6 +1547,8 @@
       <input type="file" id="image-input" style="display:none" accept="image/*">
       <input type="file" id="file-input" style="display:none">
       <button id="sticker-btn" aria-label="贴图">🐦</button>
+      <!-- 1018：按住说话的语音条（她：「我们归巢还没有我发语音的功能！」） -->
+      <button id="note-btn" type="button" aria-label="按住说话"><svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg></button>
       <textarea id="chat-input" rows="1" placeholder="发消息给 Ripple…"></textarea>
       <button id="send-btn">
         <svg viewBox="0 0 24 24"><path d="M2 21l21-9L2 3v7l15 2-15 2z"/></svg>
@@ -2669,6 +2687,33 @@ imageViewerImg.addEventListener('dblclick', event => {
 const STICKER_ONLY_RE = /^\s*(?:(?:\[sticker:[^\]]+\]|!\[[^\]]*\]\([^)\s]+\))\s*)+$/
 // 像言叽那样：她用空行隔开的几段，画成几条气泡（0926）。
 // 发出去仍是一条——拆成几次 tmux 输入会把正在干活的我打断好几次。代码块不拆。
+// 她的语音条（1018）：【语音条·8秒】转出来的字 / 〔机器听到：…〕 / [附件: 录音]，画成能点着播的一条，字放在下面
+const VNOTE_RE = /^【语音条·(\d+)秒】([\s\S]*?)(?:\n〔机器听到：([^〕]*)〕)?\n\[附件:\s*([^\]]+)\]\s*$/
+function buildVoiceNote(sec, text, heard, path) {
+  const wrap = document.createElement('div'); wrap.className = 'vnote'
+  const bar = document.createElement('button'); bar.type = 'button'; bar.className = 'vnote-bar'
+  bar.style.width = Math.min(230, 90 + sec * 5) + 'px'
+  const ico = Object.assign(document.createElement('span'), { className: 'vnote-ico', textContent: '▶' })
+  bar.append(ico, Object.assign(document.createElement('span'), { className: 'vnote-wave' }), Object.assign(document.createElement('span'), { className: 'vnote-sec', textContent: sec + '″' }))
+  const name = path.split('/').pop()
+  let audio = null
+  bar.addEventListener('click', e => {
+    e.stopPropagation()
+    if (!audio) {
+      audio = new Audio(`/raven/uploads/${encodeURIComponent(name)}?token=${encodeURIComponent(localStorage.getItem('raven-token') || '')}`)
+      const off = () => { bar.classList.remove('playing'); ico.textContent = '▶' }
+      audio.addEventListener('ended', off); audio.addEventListener('pause', off)
+      audio.addEventListener('error', () => { off(); ico.textContent = '!' })
+    }
+    if (audio.paused) { if (stopActiveTts) stopActiveTts(); audio.play().then(() => { bar.classList.add('playing'); ico.textContent = '❚❚' }).catch(() => { ico.textContent = '!' }) }
+    else audio.pause()
+  })
+  wrap.appendChild(bar)
+  if (text) wrap.appendChild(Object.assign(document.createElement('div'), { className: 'vnote-text', textContent: text }))
+  if (heard) wrap.appendChild(Object.assign(document.createElement('div'), { className: 'vnote-heard', textContent: '听到：' + heard }))
+  return wrap
+}
+
 function splitUserSegments(text) {
   if (!text || text.includes('```')) return [text]
   const segs = text.split(/\n[ \t]*\n/).map(s => s.trim()).filter(Boolean)
@@ -2721,7 +2766,10 @@ function appendMsg(text, role, save = true, ts = Date.now(), msgId = null, suppl
       // 1003 引用回复：第一行「> 引用：…」画成一小块引用，正文照常
       const qm = /^> 引用：([^\n]{1,200})\n?/.exec(text)
       const utext = qm ? text.slice(qm[0].length) : text   // 别改 text 本身，后面存历史还要用原文
-      if (/\[sticker:[^\]]+\]/.test(utext) || ATTACH_TEST_RE.test(utext) || /\[music:[^\]]+\]/.test(utext)) {
+      const vn = VNOTE_RE.exec(utext)
+      if (vn) {
+        body.appendChild(buildVoiceNote(+vn[1], vn[2].trim(), vn[3] || '', vn[4].trim()))
+      } else if (/\[sticker:[^\]]+\]/.test(utext) || ATTACH_TEST_RE.test(utext) || /\[music:[^\]]+\]/.test(utext)) {
         if (STICKER_ONLY_RE.test(utext)) el.classList.add('sticker-msg')
         body.innerHTML = utext
           .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
@@ -4261,6 +4309,90 @@ function toggleRecording(forCall = false) {
   startRecording(forCall)
 }
 
+// ── 按住说话的语音条（1018）──────────────────────────────────────────
+// 按住录、松手发、往上滑取消；最长 60 秒自动发。录音存进归巢的上传目录（能回放），同时送去转写：
+// 转出来的字、模型听出的语气和声音事件（笑声、哭声、咳嗽……）一起写进消息，我那边看得到。
+// 降噪关掉：她要我听得见水声这类背景音，降噪会把它们当噪音抹掉。
+const noteBtn = document.getElementById('note-btn')
+const noteRec = document.getElementById('note-rec')
+let note = null
+async function noteStart(y) {
+  if (note || mediaRecorder || voiceStarting) return
+  if (!navigator.mediaDevices?.getUserMedia || !window.MediaRecorder) { showVoiceError('当前浏览器不支持录音'); return }
+  if (stopActiveTts) stopActiveTts()
+  const n = note = { chunks: [], y0: y, armed: false, released: false, cancel: false }
+  noteBtn.classList.add('rec')
+  let stream
+  try { stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: false, autoGainControl: true, channelCount: 1 } }) }
+  catch (e) { note = null; noteBtn.classList.remove('rec'); showVoiceError('麦克风打不开：' + (e.message || e.name || '请检查权限')); return }
+  // 第一次用会先弹权限框，等她点完允许手早松开了：这一下只当是授权，不录
+  if (n.released) { stream.getTracks().forEach(t => t.stop()); note = null; noteBtn.classList.remove('rec'); return }
+  n.stream = stream
+  try { n.rec = new MediaRecorder(stream) }
+  catch (e) { stream.getTracks().forEach(t => t.stop()); note = null; noteBtn.classList.remove('rec'); showVoiceError('无法开始录音：' + (e.message || e.name)); return }
+  n.rec.ondataavailable = e => { if (e.data && e.data.size) n.chunks.push(e.data) }
+  n.rec.onstop = () => noteFinish(n)
+  n.rec.start(); n.t0 = Date.now()
+  noteRec.hidden = false; noteRec.classList.remove('cancel')
+  document.getElementById('note-hint').textContent = '松开发送 · 上滑取消'
+  noteTick(n); n.timer = setInterval(() => noteTick(n), 250)
+}
+function noteTick(n) {
+  const s = Math.floor((Date.now() - n.t0) / 1000)
+  document.getElementById('note-time').textContent = `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`
+  if (s >= 60) noteStop(false)
+}
+function noteStop(cancel) {
+  const n = note; if (!n) return
+  n.released = true; if (cancel) n.cancel = true
+  if (n.rec && n.rec.state === 'recording') n.rec.stop()
+}
+async function noteFinish(n) {
+  clearInterval(n.timer)
+  n.stream.getTracks().forEach(t => t.stop())
+  noteRec.hidden = true; noteBtn.classList.remove('rec')
+  if (note === n) note = null
+  const secs = (Date.now() - n.t0) / 1000
+  if (n.cancel) return
+  if (secs < 1) { showVoiceError('太短了，按住久一点再松手'); return }
+  const type = n.rec.mimeType || 'audio/webm'
+  const ext = /mp4/.test(type) ? 'm4a' : /ogg/.test(type) ? 'ogg' : 'webm'
+  const blob = new Blob(n.chunks, { type })
+  const auth = { Authorization: 'Bearer ' + (localStorage.getItem('raven-token') || '') }
+  const up = new FormData(); up.append('file', blob, `voice.${ext}`)
+  const st = new FormData(); st.append('audio', blob, `audio.${ext}`)
+  noteBtn.classList.add('busy')
+  try {
+    const [u, t] = await Promise.all([
+      fetch(UPLOAD_URL, { method: 'POST', headers: auth, body: up }).then(r => r.json()),
+      fetch('/raven/stt', { method: 'POST', headers: auth, body: st }).then(r => r.ok ? r.json() : {}).catch(() => ({})),
+    ])
+    if (!u || !u.path) throw new Error('录音没传上去')
+    const heard = [...new Set([t.tone && `语气${t.tone}`, ...(t.events || [])].filter(Boolean))]
+    const words = String(t.text || '').trim() || '（没转出字）'
+    sendMsg(`【语音条·${Math.max(1, Math.round(secs))}秒】${words}` + (heard.length ? `\n〔机器听到：${heard.join('、')}〕` : '') + `\n[附件: ${u.path}]`)
+  } catch (e) {
+    showVoiceError('语音条没发出去：' + (e.message || '再试一次'))
+  } finally { noteBtn.classList.remove('busy') }
+}
+noteBtn.addEventListener('pointerdown', e => {
+  if (e.button > 0) return
+  e.preventDefault()
+  try { noteBtn.setPointerCapture(e.pointerId) } catch {}
+  noteStart(e.clientY)
+})
+noteBtn.addEventListener('pointermove', e => {
+  if (!note) return
+  const armed = note.y0 - e.clientY > 70
+  if (armed === note.armed) return
+  note.armed = armed
+  noteRec.classList.toggle('cancel', armed)
+  document.getElementById('note-hint').textContent = armed ? '松开取消' : '松开发送 · 上滑取消'
+})
+noteBtn.addEventListener('pointerup', () => { if (note) noteStop(note.armed) })
+noteBtn.addEventListener('pointercancel', () => { if (note) noteStop(true) })
+noteBtn.addEventListener('contextmenu', e => e.preventDefault())
+
 function sendCallText() {
   const input = document.getElementById('call-text-input')
   const text = input.value.trim()
@@ -5392,5 +5524,6 @@ document.getElementById('perm-modal').addEventListener('click', e => {
   <p id="cc-settings-status" role="status" aria-live="polite"></p>
 </dialog>
 <script src="/raven/cc-settings.js?v=20261004-official"></script>
+<div id="note-rec" hidden><span class="note-dot"></span><span id="note-time">0:00</span><span id="note-hint">松开发送 · 上滑取消</span></div>
 </body>
 </html>

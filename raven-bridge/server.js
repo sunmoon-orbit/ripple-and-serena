@@ -263,7 +263,7 @@ const LEGACY_UPLOAD_DIR = '/tmp/raven-uploads'  // 老消息里的附件回看�
 const DOWNLOAD_DIR = '/home/ripple/raven-downloads'
 const MIME = {
   // 语音消息（0927）：我能发 [附件: xxx.mp3] 给她
-  '.mp3': 'audio/mpeg', '.m4a': 'audio/mp4', '.wav': 'audio/wav', '.ogg': 'audio/ogg',
+  '.mp3': 'audio/mpeg', '.m4a': 'audio/mp4', '.wav': 'audio/wav', '.ogg': 'audio/ogg', '.webm': 'audio/webm',   // webm：她按住说话录的语音条（1018）
   '.html': 'text/html; charset=utf-8',
   '.js':   'application/javascript',
   '.css':  'text/css',
