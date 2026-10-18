@@ -629,6 +629,9 @@
   #react-pop button.react-plus { font-size: 20px; width: 34px; color: var(--text-dim); font-weight: 300; }
   #react-pop .react-more { display: none; flex-basis: 100%; flex-wrap: wrap; justify-content: center; max-height: 176px; overflow-y: auto; overscroll-behavior: contain; margin-top: 4px; padding-top: 4px; border-top: 1px solid var(--border); }
   #react-pop.more .react-more { display: flex; }
+  #react-pop .react-custom { flex-basis: 100%; display: flex; gap: 6px; padding: 2px 4px 6px; }
+  #react-pop .react-custom input { flex: 1; min-width: 0; font-size: 18px; padding: 4px 8px; border-radius: 10px; border: 1px solid var(--border); background: transparent; color: var(--text); }
+  #react-pop .react-custom button { width: auto; font-size: 13px; padding: 0 10px; color: var(--text-dim); }
   .msg.react-flash { animation: reactFlash 1.5s ease-out; }
   @keyframes reactFlash { 0%, 35% { box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 55%, transparent); } 100% { box-shadow: 0 0 0 3px transparent; } }
   .msg.system.react-note { cursor: pointer; }
@@ -4395,6 +4398,26 @@ function openReactPop(msgEl) {
   for (const e of REACT_EMOJIS) reactPop.appendChild(emojiBtn(e))
   // 「+」：展开一屏更多的；再点收回去
   const more = document.createElement('div'); more.className = 'react-more'
+  // 自己输一个（1018 她说「为什么你有好多我没有的 emoji」）：键盘里有的都能贴，用过的记在最前面
+  const custom = document.createElement('div'); custom.className = 'react-custom'
+  const cin = Object.assign(document.createElement('input'), { type: 'text', placeholder: '自己输一个', maxLength: 16 })
+  const cgo = Object.assign(document.createElement('button'), { type: 'button', textContent: '贴' })
+  const goCustom = () => {
+    const e = [...cin.value.trim()].slice(0, 8).join('')
+    if (!e) return cin.focus()
+    try {
+      const used = (JSON.parse(localStorage.getItem('raven-react-custom') || '[]')).filter(x => x !== e)
+      localStorage.setItem('raven-react-custom', JSON.stringify([e, ...used].slice(0, 12)))
+    } catch {}
+    pick(e)
+  }
+  cin.addEventListener('click', ev => ev.stopPropagation())
+  cin.addEventListener('keydown', ev => { if (ev.key === 'Enter') { ev.preventDefault(); goCustom() } })
+  cgo.addEventListener('click', ev => { ev.stopPropagation(); goCustom() })
+  custom.append(cin, cgo); more.appendChild(custom)
+  let usedCustom = []
+  try { usedCustom = JSON.parse(localStorage.getItem('raven-react-custom') || '[]') } catch {}
+  for (const e of usedCustom) if (!REACT_EMOJIS.includes(e) && !REACT_MORE.includes(e)) more.appendChild(emojiBtn(e))
   for (const e of REACT_MORE) more.appendChild(emojiBtn(e))
   const plus = document.createElement('button'); plus.type = 'button'; plus.className = 'react-plus'; plus.title = '更多表情'; plus.textContent = '+'
   if (mine && !REACT_EMOJIS.includes(mine)) plus.classList.add('on')   // 她贴的是展开那一屏里的，给个提示
@@ -4462,7 +4485,7 @@ function placeReactPop(msgEl) {
   box.addEventListener('touchmove', e => { if (timer && Math.hypot(e.touches[0].clientX - sx, e.touches[0].clientY - sy) > 8) cancel() }, { passive: true })
   box.addEventListener('touchend', cancel, { passive: true })
   box.addEventListener('touchcancel', cancel, { passive: true })
-  box.addEventListener('scroll', () => { cancel(); closeReactPop() }, { passive: true })
+  box.addEventListener('scroll', () => { cancel(); if (!reactPop.contains(document.activeElement)) closeReactPop() }, { passive: true })   // 在自定义框里打字时键盘弹起会顺带滚一下，别因此关掉
   // 电脑：右键
   box.addEventListener('contextmenu', e => {
     const msgEl = e.target.closest('.msg.user, .msg.assistant'); if (!msgEl || e.target.closest('a, img')) return
