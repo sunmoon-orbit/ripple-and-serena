@@ -394,7 +394,7 @@
   /* markdown */
   .msg-body p { margin-bottom: 6px; }
   .msg-body p:last-child { margin-bottom: 0; }
-  .msg-body strong { font-weight: 600; }
+  .msg-body strong { font-weight: 700; }
   .msg-body em { font-style: italic; }
   .msg-body code {
     background: rgba(0,0,0,.3); padding: 1px 5px;
@@ -479,7 +479,13 @@
   .attach-chip { display: inline-block; padding: 2px 8px; margin: 2px 0; font-size: 12px; border-radius: 6px; background: rgba(150,140,180,0.15); border: 1px solid rgba(150,140,180,0.25); word-break: break-all; }
   .msg-body ul, .msg-body ol { padding-left: 18px; margin: 4px 0; }
   .msg-body li { margin-bottom: 2px; }
-  .msg-body h1, .msg-body h2, .msg-body h3 { font-size: 15px; font-weight: 600; margin: 8px 0 4px; }
+  /* 标题要看得出是标题（1018 她要的）：原来全是 15px，跟正文 14px 几乎一样 */
+  .msg-body h1, .msg-body h2, .msg-body h3, .msg-body h4 { font-weight: 700; line-height: 1.35; margin: 10px 0 5px; }
+  .msg-body h1 { font-size: 19px; }
+  .msg-body h2 { font-size: 17px; }
+  .msg-body h3 { font-size: 15.5px; }
+  .msg-body h4 { font-size: 14.5px; }
+  .msg-body > :first-child { margin-top: 0; }
   .msg-body blockquote { border-left: 3px solid var(--border); padding-left: 10px; color: var(--text-dim); margin: 4px 0; }
   .msg-body a { color: var(--accent); text-decoration: none; }
   .msg.user .msg-body a { color: var(--bubble-user-link); text-decoration: underline; text-underline-offset: 2px; }
@@ -1702,6 +1708,13 @@
 <script src="https://cdn.jsdelivr.net/npm/dompurify@3.2.6/dist/purify.min.js" integrity="sha384-JEyTNhjM6R1ElGoJns4U2Ln4ofPcqzSsynQkmEc/KGy6336qAZl70tDLufbkla+3" crossorigin="anonymous"></script>
 <script>
 marked.use({ breaks: true, gfm: true })
+// 中文里的加粗常常没生效（1018 她说「**文本**放大字体之类的没有显」）：CommonMark 的规矩是
+// 收尾的 ** 前面是标点、后面紧跟汉字时不算收尾，「**注意：**后面」就原样露出星号。
+// 交给 marked 之前，先把代码以外的 **…** 直接换成 <strong>
+function cjkBold(text) {
+  return String(text).split(/(```[\s\S]*?```|`[^`\n]*`)/).map((seg, i) =>
+    i % 2 ? seg : seg.replace(/\*\*(?=\S)([^*\n]+?)\*\*/g, '<strong>$1</strong>')).join('')
+}
 
 // 纯英文小写词组成的方括号 = 语气标签；后面紧跟 ( 的是 markdown 链接，不算。
 // 放在这么前面：历史消息在脚本顶层就开始渲染，定义在后面会撞 TDZ
@@ -2694,7 +2707,7 @@ function appendMsg(text, role, save = true, ts = Date.now(), msgId = null, suppl
         `<img src="/raven/stickers/${stickerFile(name)}" style="max-width:220px;border-radius:8px;display:block;margin:4px 0;" alt="${name}">`)
       // 语气标签（[whispers]、[soft breath close to your ear]）给朗读用，气泡里画成淡色小字（1002）
       const withTags = withStickers.replace(VOICE_TAG_RE, (_, t) => `<span class="vtag">${t}</span>`)
-      const rendered = renderAskCards(renderMusicCards(marked.parse(withTags)))
+      const rendered = renderAskCards(renderMusicCards(marked.parse(cjkBold(withTags))))
       body.innerHTML = DOMPurify.sanitize(rendered, PURIFY_OPTS)
       fillMusicIcons(body)
       fillAskCards(body)
@@ -3253,7 +3266,7 @@ async function openArchiveDay(id, date) {
       const body = document.createElement('div'); body.className = 'dr-body'
       // 贴图和 markdown 照聊天里的样子画；正文先过 DOMPurify
       const withSt = String(m.content || '').replace(/\[sticker:([^\]]+)\]/g, (_, n) => `![](/raven/stickers/${stickerFile(n)})`)
-      body.innerHTML = DOMPurify.sanitize(marked.parse(withSt), PURIFY_OPTS)
+      body.innerHTML = DOMPurify.sanitize(marked.parse(cjkBold(withSt)), PURIFY_OPTS)
       body.querySelectorAll('img').forEach(img => { img.style.maxWidth = '140px'; img.style.borderRadius = '8px' })
       row.append(who, body); list.appendChild(row)
     }
