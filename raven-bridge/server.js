@@ -1080,7 +1080,7 @@ const server = http.createServer((req, res) => {
     })
     return
   }
-  const TOKEN_REQUIRED = ['/raven/status', '/raven/last-thinking', '/raven/memory-random', '/raven/journal', '/raven/journal/unlock', '/raven/journal/write', '/raven/journal/attempts', '/raven/journal/reveal', '/raven/cards/unseen', '/raven/cards/seen', '/raven/archive/days', '/raven/archive/day', '/raven/receipt', '/raven/translate-thinking', '/raven/on-this-day', '/raven/memory-count', '/raven/activity', '/raven/upload', '/raven/push/subscribe', '/raven/push/unsubscribe', '/raven/usage']
+  const TOKEN_REQUIRED = ['/raven/status', '/raven/last-thinking', '/raven/memory-random', '/raven/journal', '/raven/journal/unlock', '/raven/journal/write', '/raven/journal/attempts', '/raven/journal/reveal', '/raven/cards/unseen', '/raven/cards/seen', '/raven/archive/days', '/raven/archive/day', '/raven/receipt', '/raven/translate-thinking', '/raven/on-this-day', '/raven/echo', '/raven/memory-count', '/raven/activity', '/raven/upload', '/raven/push/subscribe', '/raven/push/unsubscribe', '/raven/usage']
   if (TOKEN_REQUIRED.includes(url.pathname) && !externalAuthed(req, url)) {
     res.writeHead(401, { 'Content-Type': 'application/json' })
     res.end(JSON.stringify({ error: 'unauthorized' }))
@@ -1578,6 +1578,15 @@ const server = http.createServer((req, res) => {
         res.writeHead(200, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' })
         res.end(JSON.stringify(data))
       })
+      .catch(() => { res.writeHead(500); res.end('{}') })
+    return
+  }
+
+  // 回声（1018）：往年／几个月前今天的一小段原话，moon 那边挑好、同一天固定一段
+  if (req.method === 'GET' && url.pathname === '/raven/echo') {
+    const date = url.searchParams.get('date')
+    moonGet(/^\d{4}-\d{2}-\d{2}$/.test(date || '') ? `/memories/echo?date=${date}` : '/memories/echo')
+      .then(data => { res.writeHead(200, { 'Content-Type': 'application/json' }); res.end(JSON.stringify(data)) })
       .catch(() => { res.writeHead(500); res.end('{}') })
     return
   }

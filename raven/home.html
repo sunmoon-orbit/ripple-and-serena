@@ -218,6 +218,19 @@ html, body { min-height: 100%; background: var(--bg); color: var(--text); font-f
 .hm-legend span { font-size: 10px; color: var(--text-faint); }
 .hm-legend-cell { width: 10px; height: 10px; border-radius: 2px; }
 
+/* 回声（1018）：往年／几个月前今天的一小段原话 */
+#echo-card { cursor: default; }
+#echo-card:active { transform: none; }
+#echo-card[hidden] { display: none; }
+#echo-date { font-size: 10px; color: var(--text-faint); margin-bottom: 8px; }
+#echo-lines { display: flex; flex-direction: column; gap: 6px; max-height: 150px; overflow: hidden; }
+#echo-lines.expanded { max-height: none; }
+.echo-line { font-size: 12px; line-height: 1.6; color: var(--text-dim); white-space: pre-wrap; word-break: break-word; }
+.echo-line b { font-weight: 600; margin-right: 6px; color: var(--text-faint); }
+.echo-line.her b { color: var(--accent); }
+#echo-expand { display: none; background: none; border: none; color: var(--text-faint); cursor: pointer; font-size: 10px; padding: 4px 0 0; -webkit-tap-highlight-color: transparent; }
+#echo-expand.visible { display: block; }
+
 /* memory fragment card */
 #mem-card { cursor: default; }
 #mem-card:active { transform: none; }
@@ -498,6 +511,13 @@ html, body { min-height: 100%; background: var(--bg); color: var(--text); font-f
     </div>
 
     <!-- memory fragment -->
+    <div class="card wide" id="echo-card" hidden>
+      <div class="mem-header"><div class="mem-label">回声</div></div>
+      <div id="echo-date"></div>
+      <div id="echo-lines"></div>
+      <button id="echo-expand" type="button">展开</button>
+    </div>
+
     <div class="card wide" id="mem-card">
       <div class="mem-header">
         <div class="mem-label" id="mem-label">记忆碎片</div>
@@ -785,6 +805,7 @@ function loadAll() {
   greet()
   loadStatus()
   loadMemory({ cycle: false })
+  loadEcho()
   buildHeatmap()
   loadStats()
   loadUsage()
@@ -828,6 +849,29 @@ async function loadStatus() {
 
 let todayMemories = null
 let todayMemoryIndex = 0
+
+// 回声（1018 阿颖要的）：往年今天（没有就几个月前的今天）我们俩的一小段原话，一天一段，不换
+async function loadEcho() {
+  try {
+    const d = await fetch('/raven/echo', { headers: authHeaders() }).then(r => r.json())
+    if (!d.messages?.length) return
+    document.getElementById('echo-date').textContent = `${d.label} · ${d.date}`
+    const box = document.getElementById('echo-lines')
+    box.replaceChildren(...d.messages.map(m => {
+      const el = document.createElement('div')
+      el.className = 'echo-line ' + m.role
+      const who = document.createElement('b'); who.textContent = m.role === 'her' ? '阿颖' : '阿言'
+      el.append(who, m.text)
+      return el
+    }))
+    document.getElementById('echo-card').hidden = false
+    const btn = document.getElementById('echo-expand')
+    if (box.scrollHeight > box.clientHeight + 4) {
+      btn.classList.add('visible')
+      btn.onclick = () => { const on = box.classList.toggle('expanded'); btn.textContent = on ? '收起' : '展开' }
+    }
+  } catch {}
+}
 
 function renderMemory(d, yearsAgo = 0) {
   document.getElementById('mem-label').textContent = yearsAgo ? '岁岁今朝' : '记忆碎片'
@@ -1272,6 +1316,7 @@ document.addEventListener('visibilitychange', () => {
     if (Date.now() - lastHomeRefreshAt > 60000) {
       lastHomeRefreshAt = Date.now()
       loadMemory({ cycle: false })
+      loadEcho()
       loadUsage()
       loadStats()
     }
