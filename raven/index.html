@@ -672,6 +672,7 @@
   /* sticker picker */
   #sticker-btn { background: none; border: none; cursor: pointer; padding: 6px; color: var(--text-dim); font-size: 18px; flex-shrink: 0; align-self: flex-end; line-height: 1; }
   #sticker-btn:active { transform: scale(.9); }
+  #chat-input::placeholder { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   #note-btn { background: none; border: none; cursor: pointer; padding: 6px 4px; color: var(--text-dim); flex-shrink: 0; align-self: flex-end; line-height: 0; touch-action: none; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
   #note-btn.rec { color: var(--accent); transform: scale(1.15); }
   #note-btn.busy { opacity: .45; }
@@ -1565,7 +1566,7 @@
       <button id="sticker-btn" aria-label="贴图">🐦</button>
       <!-- 1018：按住说话的语音条（她：「我们归巢还没有我发语音的功能！」） -->
       <button id="note-btn" type="button" aria-label="按住说话"><svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg></button>
-      <textarea id="chat-input" rows="1" placeholder="发消息给 Ripple…"></textarea>
+      <textarea id="chat-input" rows="1" placeholder="给 Ripple…"></textarea>
       <button id="send-btn">
         <svg viewBox="0 0 24 24"><path d="M2 21l21-9L2 3v7l15 2-15 2z"/></svg>
       </button>
@@ -3013,7 +3014,7 @@ function loadNotices() { try { return JSON.parse(localStorage.getItem('raven-not
 function showPeerName(name) {
   peerName = name || 'Ripple'
   document.getElementById('peer-name').textContent = peerName
-  document.getElementById('chat-input').placeholder = `发消息给 ${peerName}…`
+  document.getElementById('chat-input').placeholder = `给 ${peerName}…`   // 1018 多了麦克风，框窄了，「发消息给 Amoureux」折成两行
   if (typeof paintAllReactions === 'function') { try { paintAllReactions() } catch {} }   // 贴表情那行小字里也有这个名字
 }
 function insertNotice(n) {
