@@ -689,6 +689,14 @@
   .vnote-wave { flex: 1; height: 14px; background: repeating-linear-gradient(90deg, currentColor 0 2px, transparent 2px 5px); opacity: .35; border-radius: 2px; mask: linear-gradient(90deg, #000 0 100%); }
   .vnote-bar.playing .vnote-wave { opacity: .8; animation: noteBlink 1.2s infinite; }
   .vnote-sec { font-size: 12.5px; opacity: .75; font-variant-numeric: tabular-nums; }
+  #note-prev { display: flex; align-items: center; gap: 10px; padding: 8px 12px; margin: 0 8px 6px; border-radius: 14px; background: color-mix(in srgb, var(--accent) 14%, transparent); font-size: 13.5px; }
+  #note-prev[hidden] { display: none; }
+  #note-prev button { border: 0; border-radius: 99px; padding: 6px 12px; font: inherit; cursor: pointer; }
+  #note-prev .np-play { background: color-mix(in srgb, currentColor 14%, transparent); color: inherit; flex-shrink: 0; font-variant-numeric: tabular-nums; }
+  #note-prev .np-text { flex: 1; min-width: 0; opacity: .8; overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+  #note-prev .np-btns { display: flex; gap: 6px; flex-shrink: 0; }
+  #note-prev .np-del { background: none; color: inherit; opacity: .7; }
+  #note-prev .np-send { background: var(--accent); color: #fff; }
   .vnote-row { display: flex; align-items: center; gap: 8px; }
   .vnote-toggle { border: 0; background: color-mix(in srgb, currentColor 12%, transparent); color: inherit; font-size: 11.5px; padding: 3px 8px; border-radius: 99px; opacity: .7; cursor: pointer; flex-shrink: 0; }
   .vnote-extra[hidden] { display: none; }
@@ -1545,6 +1553,7 @@
     </div>
     <div id="sticker-picker"></div>
     <div id="note-rec" hidden><span class="note-dot"></span><span id="note-time">0:00</span><span id="note-hint">松开发送 · 上滑取消</span><button id="note-x" type="button" aria-label="取消">✕</button></div>
+    <div id="note-prev" hidden></div>
     <div id="chat-input-row">
       <button id="attach-btn" aria-label="更多">
         <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
@@ -4374,22 +4383,48 @@ async function noteFinish(n) {
   const type = n.rec.mimeType || 'audio/webm'
   const ext = /mp4/.test(type) ? 'm4a' : /ogg/.test(type) ? 'ogg' : 'webm'
   const blob = new Blob(n.chunks, { type })
-  const auth = { Authorization: 'Bearer ' + (localStorage.getItem('raven-token') || '') }
+  const sec = Math.max(1, Math.round(secs))
+  // 转写先跑起来：点着录的那种发之前要给她看（1018 她问「发送语音前有预览吗」）；按住的照旧松手就发
+  const stt = (() => {
+    const st = new FormData(); st.append('audio', blob, `audio.${ext}`)
+    return fetch('/raven/stt', { method: 'POST', headers: noteAuth(), body: st }).then(r => r.ok ? r.json() : {}).catch(() => ({}))
+  })()
+  if (n.tap) notePreview(blob, ext, sec, stt)
+  else noteSend(blob, ext, sec, stt)
+}
+function noteAuth() { return { Authorization: 'Bearer ' + (localStorage.getItem('raven-token') || '') } }
+async function noteSend(blob, ext, sec, stt) {
   const up = new FormData(); up.append('file', blob, `voice.${ext}`)
-  const st = new FormData(); st.append('audio', blob, `audio.${ext}`)
   noteBtn.classList.add('busy')
   try {
-    const [u, t] = await Promise.all([
-      fetch(UPLOAD_URL, { method: 'POST', headers: auth, body: up }).then(r => r.json()),
-      fetch('/raven/stt', { method: 'POST', headers: auth, body: st }).then(r => r.ok ? r.json() : {}).catch(() => ({})),
-    ])
+    const [u, t] = await Promise.all([fetch(UPLOAD_URL, { method: 'POST', headers: noteAuth(), body: up }).then(r => r.json()), stt])
     if (!u || !u.path) throw new Error('录音没传上去')
     const heard = [...new Set([t.tone && `语气${t.tone}`, ...(t.events || [])].filter(Boolean))]
     const words = String(t.text || '').trim() || '（没转出字）'
-    sendMsg(`【语音条·${Math.max(1, Math.round(secs))}秒】${words}` + (heard.length ? `\n〔机器听到：${heard.join('、')}〕` : '') + `\n[附件: ${u.path}]`)
+    sendMsg(`【语音条·${sec}秒】${words}` + (heard.length ? `\n〔机器听到：${heard.join('、')}〕` : '') + `\n[附件: ${u.path}]`)
   } catch (e) {
     showVoiceError('语音条没发出去：' + (e.message || '再试一次'))
   } finally { noteBtn.classList.remove('busy') }
+}
+// 预览：能回放、看转出来的字，再决定发还是扔
+function notePreview(blob, ext, sec, stt) {
+  const box = document.getElementById('note-prev')
+  const url = URL.createObjectURL(blob)
+  const audio = new Audio(url)
+  box.innerHTML = ''
+  const play = Object.assign(document.createElement('button'), { type: 'button', className: 'np-play', textContent: '▶ ' + sec + '″' })
+  const txt = Object.assign(document.createElement('div'), { className: 'np-text', textContent: '正在转文字…' })
+  const del = Object.assign(document.createElement('button'), { type: 'button', className: 'np-del', textContent: '删掉' })
+  const go = Object.assign(document.createElement('button'), { type: 'button', className: 'np-send', textContent: '发送' })
+  const close = () => { audio.pause(); URL.revokeObjectURL(url); box.hidden = true; box.innerHTML = '' }
+  audio.addEventListener('ended', () => { play.textContent = '▶ ' + sec + '″' })
+  play.addEventListener('click', () => { if (audio.paused) { audio.currentTime = 0; audio.play().then(() => { play.textContent = '❚❚ ' + sec + '″' }).catch(() => {}) } else { audio.pause(); play.textContent = '▶ ' + sec + '″' } })
+  del.addEventListener('click', close)
+  go.addEventListener('click', () => { close(); noteSend(blob, ext, sec, stt) })
+  stt.then(t => { if (!box.hidden) txt.textContent = String(t.text || '').trim() || '（没转出字，录音照样能发）' })
+  const btns = document.createElement('div'); btns.className = 'np-btns'; btns.append(del, go)
+  box.append(play, txt, btns)
+  box.hidden = false
 }
 // 1018 她一上来是「点」不是「按住」：点一下太快，录音还没开就松手了，什么也没发。
 // 所以两种都认：按住＝松手发；轻点一下＝开始录，再点一下发，点浮条上的 ✕ 取消
@@ -4414,7 +4449,7 @@ noteBtn.addEventListener('pointerup', () => {
   if (!note.armed && Date.now() - (note.tDown || 0) < 400) {
     note.tap = true
     noteRec.classList.add('tap')
-    document.getElementById('note-hint').textContent = '在录 · 再点麦克风发送'
+    document.getElementById('note-hint').textContent = '在录 · 再点麦克风停下预览'
     return
   }
   noteStop(note.armed)
