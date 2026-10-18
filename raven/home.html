@@ -512,7 +512,7 @@ html, body { min-height: 100%; background: var(--bg); color: var(--text); font-f
 
     <!-- memory fragment -->
     <div class="card wide" id="echo-card" hidden>
-      <div class="mem-header"><div class="mem-label">回声</div></div>
+      <div class="mem-header"><div class="mem-label">涟漪</div></div>
       <div id="echo-date"></div>
       <div id="echo-lines"></div>
       <button id="echo-expand" type="button">展开</button>
@@ -850,7 +850,7 @@ async function loadStatus() {
 let todayMemories = null
 let todayMemoryIndex = 0
 
-// 回声（1018 阿颖要的）：往年今天（没有就几个月前的今天）我们俩的一小段原话，一天一段，不换
+// 涟漪（原叫回声，1018 阿颖要的，她说别照抄糯叽机的名字）：往年今天（没有就几个月前的今天）我们俩的一小段原话，一天一段，不换
 async function loadEcho() {
   try {
     const d = await fetch('/raven/echo', { headers: authHeaders() }).then(r => r.json())
