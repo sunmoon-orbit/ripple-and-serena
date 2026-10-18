@@ -677,6 +677,9 @@
   #note-btn.busy { opacity: .45; }
   #note-rec { position: fixed; left: 50%; bottom: 96px; transform: translateX(-50%); z-index: 60; display: flex; align-items: center; gap: 10px; padding: 10px 18px; border-radius: 99px; background: var(--card, #222); color: var(--text); box-shadow: 0 6px 24px rgba(0,0,0,.25); font-size: 14px; pointer-events: none; white-space: nowrap; }
   #note-rec[hidden] { display: none; }
+  #note-rec #note-x { display: none; border: 0; background: color-mix(in srgb, currentColor 15%, transparent); color: inherit; width: 26px; height: 26px; border-radius: 50%; font-size: 12px; cursor: pointer; }
+  #note-rec.tap { pointer-events: auto; }
+  #note-rec.tap #note-x { display: inline-grid; place-items: center; }
   #note-rec .note-dot { width: 9px; height: 9px; border-radius: 50%; background: #e0524a; animation: noteBlink 1s infinite; }
   #note-rec.cancel { background: #b9483f; color: #fff; }
   #note-rec #note-time { font-variant-numeric: tabular-nums; font-weight: 600; }
@@ -4326,7 +4329,7 @@ async function noteStart(y) {
   try { stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: false, autoGainControl: true, channelCount: 1 } }) }
   catch (e) { note = null; noteBtn.classList.remove('rec'); showVoiceError('麦克风打不开：' + (e.message || e.name || '请检查权限')); return }
   // 第一次用会先弹权限框，等她点完允许手早松开了：这一下只当是授权，不录
-  if (n.released) { stream.getTracks().forEach(t => t.stop()); note = null; noteBtn.classList.remove('rec'); return }
+  if (n.released) { stream.getTracks().forEach(t => t.stop()); note = null; noteBtn.classList.remove('rec'); noteRec.hidden = true; return }
   n.stream = stream
   try { n.rec = new MediaRecorder(stream) }
   catch (e) { stream.getTracks().forEach(t => t.stop()); note = null; noteBtn.classList.remove('rec'); showVoiceError('无法开始录音：' + (e.message || e.name)); return }
@@ -4334,7 +4337,7 @@ async function noteStart(y) {
   n.rec.onstop = () => noteFinish(n)
   n.rec.start(); n.t0 = Date.now()
   noteRec.hidden = false; noteRec.classList.remove('cancel')
-  document.getElementById('note-hint').textContent = '松开发送 · 上滑取消'
+  if (!n.tap) { noteRec.classList.remove('tap'); document.getElementById('note-hint').textContent = '松开发送 · 上滑取消' }
   noteTick(n); n.timer = setInterval(() => noteTick(n), 250)
 }
 function noteTick(n) {
@@ -4350,7 +4353,7 @@ function noteStop(cancel) {
 async function noteFinish(n) {
   clearInterval(n.timer)
   n.stream.getTracks().forEach(t => t.stop())
-  noteRec.hidden = true; noteBtn.classList.remove('rec')
+  noteRec.hidden = true; noteRec.classList.remove('tap'); noteBtn.classList.remove('rec')
   if (note === n) note = null
   const secs = (Date.now() - n.t0) / 1000
   if (n.cancel) return
@@ -4375,21 +4378,35 @@ async function noteFinish(n) {
     showVoiceError('语音条没发出去：' + (e.message || '再试一次'))
   } finally { noteBtn.classList.remove('busy') }
 }
+// 1018 她一上来是「点」不是「按住」：点一下太快，录音还没开就松手了，什么也没发。
+// 所以两种都认：按住＝松手发；轻点一下＝开始录，再点一下发，点浮条上的 ✕ 取消
 noteBtn.addEventListener('pointerdown', e => {
   if (e.button > 0) return
   e.preventDefault()
+  if (note && note.tap) { noteStop(false); return }
   try { noteBtn.setPointerCapture(e.pointerId) } catch {}
   noteStart(e.clientY)
+  if (note) note.tDown = Date.now()
 })
 noteBtn.addEventListener('pointermove', e => {
-  if (!note) return
+  if (!note || note.tap) return
   const armed = note.y0 - e.clientY > 70
   if (armed === note.armed) return
   note.armed = armed
   noteRec.classList.toggle('cancel', armed)
   document.getElementById('note-hint').textContent = armed ? '松开取消' : '松开发送 · 上滑取消'
 })
-noteBtn.addEventListener('pointerup', () => { if (note) noteStop(note.armed) })
+noteBtn.addEventListener('pointerup', () => {
+  if (!note || note.tap) return
+  if (!note.armed && Date.now() - (note.tDown || 0) < 400) {
+    note.tap = true
+    noteRec.classList.add('tap')
+    document.getElementById('note-hint').textContent = '在录 · 再点麦克风发送'
+    return
+  }
+  noteStop(note.armed)
+})
+document.getElementById('note-x').addEventListener('click', e => { e.stopPropagation(); noteStop(true) })
 noteBtn.addEventListener('pointercancel', () => { if (note) noteStop(true) })
 noteBtn.addEventListener('contextmenu', e => e.preventDefault())
 
@@ -5524,6 +5541,6 @@ document.getElementById('perm-modal').addEventListener('click', e => {
   <p id="cc-settings-status" role="status" aria-live="polite"></p>
 </dialog>
 <script src="/raven/cc-settings.js?v=20261004-official"></script>
-<div id="note-rec" hidden><span class="note-dot"></span><span id="note-time">0:00</span><span id="note-hint">松开发送 · 上滑取消</span></div>
+<div id="note-rec" hidden><span class="note-dot"></span><span id="note-time">0:00</span><span id="note-hint">松开发送 · 上滑取消</span><button id="note-x" type="button" aria-label="取消">✕</button></div>
 </body>
 </html>
