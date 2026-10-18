@@ -219,14 +219,15 @@ html, body { min-height: 100%; background: var(--bg); color: var(--text); font-f
 .hm-legend-cell { width: 10px; height: 10px; border-radius: 2px; }
 
 /* 回声（1018）：往年／几个月前今天的一小段原话 */
-#echo-card { cursor: default; }
-#echo-card:active { transform: none; }
-#echo-card[hidden] { display: none; }
+.mem-tabs { display: flex; gap: 14px; align-items: baseline; }
+.mem-tab { background: none; border: none; padding: 0; cursor: pointer; opacity: .45; -webkit-tap-highlight-color: transparent; font-family: inherit; }
+.mem-tab.on { opacity: 1; }
+.mem-tab[hidden], #echo-pane[hidden], #mem-pane[hidden], #mem-refresh[hidden] { display: none; }
 #echo-date { font-size: 10px; color: var(--text-faint); margin-bottom: 8px; }
 #echo-lines { display: flex; flex-direction: column; gap: 6px; max-height: 150px; overflow: hidden; }
 #echo-lines.expanded { max-height: none; }
 .echo-line { font-size: 12px; line-height: 1.6; color: var(--text-dim); white-space: pre-wrap; word-break: break-word; }
-.echo-line b { font-weight: 600; margin-right: 6px; color: var(--text-faint); }
+.echo-line b { font-weight: 600; margin-right: 6px; color: var(--text-dim); }
 .echo-line.her b { color: var(--accent); }
 #echo-expand { display: none; background: none; border: none; color: var(--text-faint); cursor: pointer; font-size: 10px; padding: 4px 0 0; -webkit-tap-highlight-color: transparent; }
 #echo-expand.visible { display: block; }
@@ -511,22 +512,26 @@ html, body { min-height: 100%; background: var(--bg); color: var(--text); font-f
     </div>
 
     <!-- memory fragment -->
-    <div class="card wide" id="echo-card" hidden>
-      <div class="mem-header"><div class="mem-label">涟漪</div></div>
-      <div id="echo-date"></div>
-      <div id="echo-lines"></div>
-      <button id="echo-expand" type="button">展开</button>
-    </div>
-
+    <!-- 记忆碎片和涟漪共用一张卡，顶上点名字切换（1019 她嫌首页太长） -->
     <div class="card wide" id="mem-card">
       <div class="mem-header">
-        <div class="mem-label" id="mem-label">记忆碎片</div>
+        <div class="mem-tabs">
+          <button class="mem-tab mem-label on" id="tab-mem" type="button" onclick="memTab('mem')">记忆碎片</button>
+          <button class="mem-tab mem-label" id="tab-echo" type="button" onclick="memTab('echo')" hidden>涟漪</button>
+        </div>
         <button id="mem-refresh" onclick="loadMemory()" title="换一条">↻</button>
       </div>
-      <div id="mem-date">—</div>
-      <div id="mem-content">加载中…</div>
-      <button id="mem-expand" type="button" onclick="toggleMemory()">展开</button>
-      <div id="mem-tags"></div>
+      <div id="mem-pane">
+        <div id="mem-date">—</div>
+        <div id="mem-content">加载中…</div>
+        <button id="mem-expand" type="button" onclick="toggleMemory()">展开</button>
+        <div id="mem-tags"></div>
+      </div>
+      <div id="echo-pane" hidden>
+        <div id="echo-date"></div>
+        <div id="echo-lines"></div>
+        <button id="echo-expand" type="button">展开</button>
+      </div>
     </div>
 
     <!-- 额度：涟言（Claude 订阅 + 上下文余量）和曜 · Codex 还剩多少 -->
@@ -851,6 +856,15 @@ let todayMemories = null
 let todayMemoryIndex = 0
 
 // 涟漪（原叫回声，1018 阿颖要的，她说别照抄糯叽机的名字）：往年今天（没有就几个月前的今天）我们俩的一小段原话，一天一段，不换
+function memTab(which, { save = true } = {}) {
+  const echo = which === 'echo' && !document.getElementById('tab-echo').hidden
+  document.getElementById('echo-pane').hidden = !echo
+  document.getElementById('mem-pane').hidden = echo
+  document.getElementById('mem-refresh').hidden = echo
+  document.getElementById('tab-echo').classList.toggle('on', echo)
+  document.getElementById('tab-mem').classList.toggle('on', !echo)
+  if (save) try { localStorage.setItem('raven-home-memtab', echo ? 'echo' : 'mem') } catch {}
+}
 async function loadEcho() {
   try {
     const d = await fetch('/raven/echo', { headers: authHeaders() }).then(r => r.json())
@@ -864,8 +878,11 @@ async function loadEcho() {
       el.append(who, m.text)
       return el
     }))
-    document.getElementById('echo-card').hidden = false
+    document.getElementById('tab-echo').hidden = false
+    let pref = null; try { pref = localStorage.getItem('raven-home-memtab') } catch {}
+    memTab(pref || 'echo', { save: false })
     const btn = document.getElementById('echo-expand')
+    box.classList.remove('expanded'); btn.textContent = '展开'; btn.classList.remove('visible')
     if (box.scrollHeight > box.clientHeight + 4) {
       btn.classList.add('visible')
       btn.onclick = () => { const on = box.classList.toggle('expanded'); btn.textContent = on ? '收起' : '展开' }
@@ -874,7 +891,7 @@ async function loadEcho() {
 }
 
 function renderMemory(d, yearsAgo = 0) {
-  document.getElementById('mem-label').textContent = yearsAgo ? '岁岁今朝' : '记忆碎片'
+  document.getElementById('tab-mem').textContent = yearsAgo ? '岁岁今朝' : '记忆碎片'
   const date = d.created_at ? new Date(d.created_at).toLocaleDateString('zh-CN', { year: 'numeric', month: 'long', day: 'numeric' }) : ''
   document.getElementById('mem-date').textContent = yearsAgo ? `${yearsAgo} 年前的今天${date ? ' · ' + date : ''}` : date
 
