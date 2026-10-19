@@ -77,4 +77,8 @@ class WebBridge(private val activity: MainActivity) {
 
     @JavascriptInterface
     fun openCrowSettings() { activity.runOnUiThread { activity.openCrowSettings() } }
+
+    // 阿言叫你起床（1019）：聊天里的闹钟卡点一下，往系统时钟写一个闹钟，铃声是我的声音
+    @JavascriptInterface
+    fun setAlarm(hour: Int, minute: Int, message: String): String = RavenAlarm.set(activity, hour, minute, message)
 }

@@ -1128,6 +1128,14 @@
   }
   .rv-music-play:active { transform: scale(0.92); }
   /* 选项卡片（1014） */
+  /* 闹钟卡（1019）：[alarm:13:30|一句话]，点一下壳往系统时钟写闹钟，铃声是我的声音 */
+  .rv-alarm { margin: 8px 0 2px; padding: 12px 14px; border: 1px solid var(--border); border-radius: 14px; background: color-mix(in srgb, var(--surface) 88%, transparent); max-width: 300px; display: flex; align-items: center; gap: 12px; }
+  .rv-alarm-time { font-size: 28px; font-weight: 600; font-variant-numeric: tabular-nums; letter-spacing: 1px; line-height: 1; }
+  .rv-alarm-main { flex: 1; min-width: 0; }
+  .rv-alarm-msg { font-size: 12.5px; color: var(--text-dim); margin-top: 4px; line-height: 1.4; }
+  .rv-alarm-btn { flex-shrink: 0; border: 0; border-radius: 999px; padding: 7px 13px; background: var(--accent); color: var(--bg); font-size: 13px; font-family: inherit; cursor: pointer; }
+  .rv-alarm-btn:disabled { background: none; color: var(--accent); padding: 7px 4px; cursor: default; }
+  .rv-alarm-tip { font-size: 11.5px; color: var(--text-dim); margin-top: 4px; }
   .rv-ask { margin: 8px 0 2px; padding: 10px 12px 8px; border: 1px solid var(--border); border-radius: 14px; background: color-mix(in srgb, var(--surface) 88%, transparent); max-width: 360px; }
   .ask-top { display: flex; align-items: center; gap: 6px; margin-bottom: 6px; }
   .ask-nav { width: 26px; height: 26px; border-radius: 50%; border: 1px solid var(--border); background: none; color: var(--text); cursor: pointer; font-size: 15px; line-height: 1; }
@@ -2190,6 +2198,36 @@ function renderAskCards(html) {
   })
   return qs.length ? html.replace('__ASK__', encodeURIComponent(JSON.stringify(qs))) : html
 }
+// 闹钟卡（1019 她要的「说一句几点叫我」）：我在回复里写 [alarm:13:30|午睡起来啦]，她点「设好」，
+// 原生壳 RoostNative.setAlarm 往系统时钟写闹钟；网页版和旧壳没有这个口子，就照实说要新壳。
+function renderAlarmCards(html) {
+  return html.replace(/\[alarm:(\d{1,2})[:：](\d{2})(?:\|([^\]]*))?\]/g, (_, h, m, msg) => {
+    if (+h > 23 || +m > 59) return _
+    return `<div class="rv-alarm" data-h="${+h}" data-m="${+m}" data-msg="${encodeURIComponent((msg || '').trim())}"></div>`
+  })
+}
+const ALARM_DONE_KEY = 'raven-alarm-done'
+function fillAlarmCards(root, msgKey) {
+  root.querySelectorAll('.rv-alarm').forEach((card, idx) => {
+    const h = +card.dataset.h, m = +card.dataset.m, msg = decodeURIComponent(card.dataset.msg || '') || '阿言叫你起床'
+    const hh = String(h).padStart(2, '0') + ':' + String(m).padStart(2, '0')
+    const key = `${msgKey || ''}#${idx}#${hh}`
+    let done = false; try { done = !!JSON.parse(localStorage.getItem(ALARM_DONE_KEY) || '{}')[key] } catch {}
+    const N = window.RoostNative, can = !!(N && typeof N.setAlarm === 'function')
+    card.innerHTML = `<div class="rv-alarm-main"><div class="rv-alarm-time">${hh}</div><div class="rv-alarm-msg">${escHtml(msg)}</div>`
+      + (can ? '' : '<div class="rv-alarm-tip">要在新版归巢 app 里点才能设</div>') + '</div>'
+      + `<button class="rv-alarm-btn" ${done || !can ? 'disabled' : ''}>${done ? '已设好 ✓' : '设好'}</button>`
+    const btn = card.querySelector('.rv-alarm-btn')
+    btn.onclick = e => {
+      e.stopPropagation()
+      let r = ''; try { r = String(N.setAlarm(h, m, msg)) } catch (err) { r = err.message || '设不上' }
+      if (!r.startsWith('ok')) { card.querySelector('.rv-alarm-msg').textContent = '没设上：' + r; return }
+      try { const all = JSON.parse(localStorage.getItem(ALARM_DONE_KEY) || '{}'); all[key] = Date.now(); localStorage.setItem(ALARM_DONE_KEY, JSON.stringify(all)) } catch {}
+      btn.disabled = true; btn.textContent = '已设好 ✓'
+      if (r === 'ok-no-tone') card.querySelector('.rv-alarm-msg').textContent = msg + '（这台手机铃声要自己在时钟里选「阿言叫你起床」）'
+    }
+  })
+}
 const ASK_DONE_KEY = 'raven-ask-done'
 function askKey(qs) { let h = 0; const str = JSON.stringify(qs); for (let i = 0; i < str.length; i++) h = (h * 31 + str.charCodeAt(i)) | 0; return 'a' + (h >>> 0).toString(36) }
 function fillAskCards(root) {
@@ -2781,10 +2819,11 @@ function appendMsg(text, role, save = true, ts = Date.now(), msgId = null, suppl
         `<img src="/raven/stickers/${stickerFile(name)}" style="max-width:220px;border-radius:8px;display:block;margin:4px 0;" alt="${name}">`)
       // 语气标签（[whispers]、[soft breath close to your ear]）给朗读用，气泡里画成淡色小字（1002）
       const withTags = withStickers.replace(VOICE_TAG_RE, (_, t) => `<span class="vtag">${t}</span>`)
-      const rendered = renderAskCards(renderMusicCards(marked.parse(cjkBold(withTags))))
+      const rendered = renderAlarmCards(renderAskCards(renderMusicCards(marked.parse(cjkBold(withTags)))))
       body.innerHTML = DOMPurify.sanitize(rendered, PURIFY_OPTS)
       fillMusicIcons(body)
       fillAskCards(body)
+      fillAlarmCards(body, String(msgId || ts))
       attachStickerFallback(body)
       enhanceCodeBlocks(body)
       if (aq) { const q = document.createElement('div'); q.className = 'quote-ref'; q.textContent = aq[1]; body.prepend(q) }
