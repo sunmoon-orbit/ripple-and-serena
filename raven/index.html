@@ -2208,6 +2208,20 @@ function renderAlarmCards(html) {
   })
 }
 const ALARM_DONE_KEY = 'raven-alarm-done'
+function addAlarmCancel(card, h, m, key) {
+  const N = window.RoostNative
+  if (!N || typeof N.cancelAlarm !== 'function' || card.querySelector('.rv-alarm-cancel')) return
+  const c = document.createElement('button')
+  c.className = 'rv-alarm-tip rv-alarm-fs rv-alarm-cancel'; c.textContent = '取消这个闹钟'
+  c.onclick = ev => {
+    ev.stopPropagation()
+    try { N.cancelAlarm(h, m) } catch {}
+    try { const all = JSON.parse(localStorage.getItem(ALARM_DONE_KEY) || '{}'); delete all[key]; localStorage.setItem(ALARM_DONE_KEY, JSON.stringify(all)) } catch {}
+    const b = card.querySelector('.rv-alarm-btn'); b.disabled = false; b.textContent = '设好'
+    c.remove()
+  }
+  card.querySelector('.rv-alarm-main').appendChild(c)
+}
 function fillAlarmCards(root, msgKey) {
   root.querySelectorAll('.rv-alarm').forEach((card, idx) => {
     const h = +card.dataset.h, m = +card.dataset.m, msg = decodeURIComponent(card.dataset.msg || '') || '阿言叫你起床'
@@ -2219,12 +2233,15 @@ function fillAlarmCards(root, msgKey) {
       + (can ? '' : '<div class="rv-alarm-tip">要在新版归巢 app 里点才能设</div>') + '</div>'
       + `<button class="rv-alarm-btn" ${done || !can ? 'disabled' : ''}>${done ? '已设好 ✓' : '设好'}</button>`
     const btn = card.querySelector('.rv-alarm-btn')
+    if (done && can) addAlarmCancel(card, h, m, key)
     btn.onclick = e => {
       e.stopPropagation()
+      try { if (typeof N.setAlarmAvatar === 'function') N.setAlarmAvatar(localStorage.getItem('raven-avatar') || '') } catch {}
       let r = ''; try { r = String(N.setAlarm(h, m, msg)) } catch (err) { r = err.message || '设不上' }
       if (!r.startsWith('ok')) { card.querySelector('.rv-alarm-msg').textContent = '没设上：' + r; return }
       try { const all = JSON.parse(localStorage.getItem(ALARM_DONE_KEY) || '{}'); all[key] = Date.now(); localStorage.setItem(ALARM_DONE_KEY, JSON.stringify(all)) } catch {}
       btn.disabled = true; btn.textContent = '已设好 ✓'
+      addAlarmCancel(card, h, m, key)
       if (r === 'ok-nofs' && typeof N.openAlarmFullScreenSettings === 'function') {
         const tip = document.createElement('button')
         tip.className = 'rv-alarm-tip rv-alarm-fs'; tip.textContent = '锁屏时弹不出整页：点这里开「全屏通知」'

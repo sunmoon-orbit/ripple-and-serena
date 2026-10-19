@@ -59,6 +59,22 @@ object RavenAlarm {
         }
     }
 
+    // 闹钟页上的头像：页面把她在归巢给我设的头像（data: URL）送进来，存一份本地文件，响的时候不用网
+    fun saveAvatar(ctx: Context, dataUrl: String) {
+        val f = java.io.File(ctx.filesDir, "alarm_avatar.img")
+        if (!dataUrl.startsWith("data:image")) { f.delete(); return }
+        try { f.writeBytes(android.util.Base64.decode(dataUrl.substringAfter(","), android.util.Base64.DEFAULT)) } catch (_: Exception) {}
+    }
+
+    fun cancel(ctx: Context, hour: Int, minute: Int): String {
+        val id = hour * 60 + minute
+        val pi = PendingIntent.getBroadcast(ctx, id, Intent(ctx, AlarmReceiver::class.java),
+            PendingIntent.FLAG_NO_CREATE or PendingIntent.FLAG_IMMUTABLE)
+        if (pi != null) { ctx.getSystemService(AlarmManager::class.java).cancel(pi); pi.cancel() }
+        forget(ctx, id)
+        return "ok"
+    }
+
     fun snooze(ctx: Context, msg: String) {
         try { schedule(ctx, SNOOZE_ID, System.currentTimeMillis() + 10 * 60_000L, msg) } catch (_: Exception) {}
     }

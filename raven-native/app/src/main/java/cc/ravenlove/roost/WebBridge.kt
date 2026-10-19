@@ -84,4 +84,10 @@ class WebBridge(private val activity: MainActivity) {
 
     @JavascriptInterface
     fun openAlarmFullScreenSettings() { activity.runOnUiThread { RavenAlarm.openFullScreenSettings(activity) } }
+
+    @JavascriptInterface
+    fun setAlarmAvatar(dataUrl: String) { RavenAlarm.saveAvatar(activity, dataUrl) }
+
+    @JavascriptInterface
+    fun cancelAlarm(hour: Int, minute: Int): String = RavenAlarm.cancel(activity, hour, minute)
 }
