@@ -15,7 +15,7 @@ import android.widget.Toast
 // 那也没关系，「阿言叫你起床」已经在铃声列表里，手动选一次就行。
 object RavenAlarm {
     // 换了铃声就改这个名字，旧手机上会新拷一份，不跟旧的混
-    private const val RINGTONE_NAME = "阿言叫你起床-1.mp3"
+    private const val RINGTONE_NAME = "阿言叫你起床-2.mp3"
 
     private fun ringtoneUri(a: Activity): Uri? {
         if (Build.VERSION.SDK_INT < 29) return null
