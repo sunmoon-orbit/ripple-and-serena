@@ -2199,7 +2199,7 @@ function renderAskCards(html) {
   return qs.length ? html.replace('__ASK__', encodeURIComponent(JSON.stringify(qs))) : html
 }
 // 闹钟卡（1019 她要的「说一句几点叫我」）：我在回复里写 [alarm:13:30|午睡起来啦]，她点「设好」，
-// 原生壳 RoostNative.setAlarm 往系统时钟写闹钟；网页版和旧壳没有这个口子，就照实说要新壳。
+// 原生壳 RoostNative.setAlarm 让归巢自己到点响（放我的声音、全屏弹出）；网页版和旧壳没有这个口子，就照实说要新壳。
 function renderAlarmCards(html) {
   return html.replace(/\[alarm:(\d{1,2})[:：](\d{2})(?:\|([^\]]*))?\]/g, (_, h, m, msg) => {
     if (+h > 23 || +m > 59) return _
@@ -2224,7 +2224,6 @@ function fillAlarmCards(root, msgKey) {
       if (!r.startsWith('ok')) { card.querySelector('.rv-alarm-msg').textContent = '没设上：' + r; return }
       try { const all = JSON.parse(localStorage.getItem(ALARM_DONE_KEY) || '{}'); all[key] = Date.now(); localStorage.setItem(ALARM_DONE_KEY, JSON.stringify(all)) } catch {}
       btn.disabled = true; btn.textContent = '已设好 ✓'
-      if (r === 'ok-no-tone') card.querySelector('.rv-alarm-msg').textContent = msg + '（这台手机铃声要自己在时钟里选「阿言叫你起床」）'
     }
   })
 }
