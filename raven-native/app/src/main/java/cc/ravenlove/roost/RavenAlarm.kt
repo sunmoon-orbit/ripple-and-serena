@@ -30,7 +30,7 @@ object RavenAlarm {
             schedule(ctx, id, cal.timeInMillis, msg)
             ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
                 .putString(id.toString(), JSONObject().put("at", cal.timeInMillis).put("msg", msg).toString()).apply()
-            "ok"
+            if (canFullScreen(ctx)) "ok" else "ok-nofs"
         } catch (e: SecurityException) {
             "系统不让定准点闹钟，要在设置里给归巢开「闹钟和提醒」权限"
         } catch (e: Exception) { e.message ?: "设不上" }
@@ -43,6 +43,20 @@ object RavenAlarm {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
         val show = PendingIntent.getActivity(ctx, id, Intent(ctx, MainActivity::class.java), PendingIntent.FLAG_IMMUTABLE)
         am.setAlarmClock(AlarmManager.AlarmClockInfo(at, show), fire)
+    }
+
+    // 安卓 14 起「全屏通知」要单独给；没给的话闹钟照响、照有通知按钮，只是锁屏上不弹整页（1019 她测出来的）
+    fun canFullScreen(ctx: Context): Boolean =
+        if (android.os.Build.VERSION.SDK_INT >= 34) ctx.getSystemService(android.app.NotificationManager::class.java).canUseFullScreenIntent() else true
+
+    fun openFullScreenSettings(ctx: Context) {
+        val i = if (android.os.Build.VERSION.SDK_INT >= 34)
+            Intent(android.provider.Settings.ACTION_MANAGE_APP_USE_FULL_SCREEN_INTENT, android.net.Uri.parse("package:" + ctx.packageName))
+        else Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS, android.net.Uri.parse("package:" + ctx.packageName))
+        i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        try { ctx.startActivity(i) } catch (_: Exception) {
+            ctx.startActivity(Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS, android.net.Uri.parse("package:" + ctx.packageName)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+        }
     }
 
     fun snooze(ctx: Context, msg: String) {
