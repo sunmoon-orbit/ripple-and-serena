@@ -4,50 +4,48 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, viewport-fit=cover">
 <title>水底 · 归巢</title>
-<meta name="theme-color" content="#0b2a33">
+<meta name="theme-color" content="#030a18">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400;1,400&display=swap" rel="stylesheet">
-<!-- 1020：她在推特刷到「丁达尔效应＋彩窗、光跟着陀螺仪转」的在一起天数页，想要一个。
-     教堂换成了水底（我们的名字是涟漪里来的，首页开屏也是一池水，这里就是那池水的底）：
-     光从晃动的水面扎下来，沙上有光网；沙里半埋一只玻璃瓶，光穿过它在沙上落一块彩斑，顶替彩窗那份颜色；
-     一根黑羽毛慢慢往下沉。光用 WebGL 画（低分辨率再拉伸，软的东西不怕糊），水草、瓶子、羽毛、泡泡用 2D 画在上面。
-     歪手机＝太阳换角度；电脑上拖动/移鼠标代替。 -->
+<!-- 1020：她在推特刷到「丁达尔效应＋彩窗、光跟着陀螺仪转」的在一起天数页，想要一个。教堂换成了水底
+     （名字是涟漪里来的，首页开屏也是一池水，这里就是那池水的底）。
+     第二版（她看了第一版：「太平面了……光瓶子羽毛都停留在表面」「丁达尔是光的形状吗？咱们的光完全没有形状」，发了四张参考）：
+     - 水调暗成深蓝，亮的只有水面一个口子和从那儿扎下来的光柱（一主两副），柱子外面是黑的
+     - 光柱里挤满往下飘的亮晶晶（偶尔一颗金的），柱子外只有零星几颗
+     - 光落到哪儿哪儿才亮：沙上只在光柱落地那块有光网；瓶子、羽毛、鱼进了光才被照亮，背光一侧有影子
+     - 前后拉开：左下一块黑石头当前景、近处水草深而大、远处水草和鱼影淡而小；歪手机近的挪得多远的挪得少
+     光柱的几何 JS 和着色器各算一份（shaft），改一边要改另一边。 -->
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; }
-:root { --bg: #0b2a33; --text: #eef6f4; --dim: rgba(220,240,236,.62); }
+:root { --bg: #030a18; --text: #eef4ff; --dim: rgba(210,225,250,.6); }
 html, body { height: 100%; background: var(--bg); overflow: hidden; color: var(--text); }
 body { font-family: -apple-system, 'PingFang SC', 'Noto Sans SC', sans-serif; touch-action: none; user-select: none; -webkit-user-select: none; }
 canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
 #gl { z-index: 0; }
 #fg { z-index: 1; }
-#count {
-  position: fixed; left: 0; right: 0; top: 17vh; z-index: 2; text-align: center; pointer-events: none;
-  transition: opacity 1.2s;
-}
+#count { position: fixed; left: 0; right: 0; top: 19vh; z-index: 2; text-align: center; pointer-events: none; }
 #num {
   font-family: 'Lora', Georgia, 'Noto Serif SC', serif; font-size: clamp(64px, 22vw, 120px); line-height: 1;
-  font-variant-numeric: tabular-nums; letter-spacing: 2px; color: #f4fbf9;
+  font-variant-numeric: tabular-nums; letter-spacing: 2px; color: #f4f8ff;
 }
 #sub1 { font-family: 'Lora', Georgia, serif; font-style: italic; font-size: 17px; color: var(--dim); margin-top: 8px; }
-#sub2 { font-size: 10px; letter-spacing: 3px; color: rgba(220,240,236,.42); margin-top: 18px; text-transform: uppercase; }
+#sub2 { font-size: 10px; letter-spacing: 3px; color: rgba(210,225,250,.38); margin-top: 18px; text-transform: uppercase; }
 #back {
   position: fixed; z-index: 3; left: 12px; top: calc(env(safe-area-inset-top, 0px) + 12px);
   width: 40px; height: 40px; border-radius: 50%; border: 0; background: rgba(255,255,255,.08);
   color: var(--text); display: flex; align-items: center; justify-content: center; cursor: pointer;
-  -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px);
 }
 #hint {
   position: fixed; z-index: 2; left: 0; right: 0; bottom: calc(env(safe-area-inset-bottom, 0px) + 22px);
-  text-align: center; font-size: 12px; color: rgba(220,240,236,.45); letter-spacing: 1px; transition: opacity 1.5s; pointer-events: none;
+  text-align: center; font-size: 12px; color: rgba(210,225,250,.45); letter-spacing: 1px; transition: opacity 1.5s; pointer-events: none;
 }
-#nogl { position: fixed; inset: 0; display: none; align-items: center; justify-content: center; z-index: 1;
-  background: linear-gradient(#2f7d86, #0b2a33 70%); }
+#nogl { position: fixed; inset: 0; display: none; z-index: 0; background: radial-gradient(ellipse at 50% 0%, #2a5d9a 0%, #071733 45%, #030a18 80%); }
 </style>
 </head>
 <body>
 <canvas id="gl"></canvas>
-<canvas id="fg"></canvas>
 <div id="nogl"></div>
+<canvas id="fg"></canvas>
 <div id="count">
   <div id="num">—</div>
   <div id="sub1">days together</div>
@@ -63,16 +61,38 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
 const DAYS = Math.floor((Date.now() - new Date('2025-10-10T00:00:00+08:00')) / 86400000) + 1
 document.getElementById('num').textContent = DAYS
 
+// ---------- 光柱几何（JS 版，和着色器里的 shaft() 一致） ----------
+// 坐标：P = (x*aspect, y)，y 向上，0 在底 1 在顶。光从水面上的口子 A 往 D 方向扎下去，越往下越宽、越淡。
+const FLOOR = x => 0.13 + 0.018 * Math.sin(x * 3.1 + 0.4) + 0.009 * Math.sin(x * 8.3 + 1.7)
+function beams(sun, a) {
+  const lean = -(sun - 0.5) * 0.95
+  const D = norm([lean, -1])
+  return [
+    { A: [sun * a, 1.03], D, w0: 0.055, k: 0.20, s: 1.0 },
+    { A: [(sun - 0.30) * a, 1.03], D: norm([lean * 1.15 - 0.05, -1]), w0: 0.025, k: 0.11, s: 0.38 },
+    { A: [(sun + 0.27) * a, 1.03], D: norm([lean * 0.85 + 0.06, -1]), w0: 0.02, k: 0.10, s: 0.30 },
+  ]
+}
+function norm(v) { const l = Math.hypot(v[0], v[1]); return [v[0] / l, v[1] / l] }
+function sstep(e0, e1, x) { const t = Math.max(0, Math.min(1, (x - e0) / (e1 - e0))); return t * t * (3 - 2 * t) }
+function shaftAt(px, py, b) {
+  const rx = px - b.A[0], ry = py - b.A[1]
+  const s = rx * b.D[0] + ry * b.D[1], pp = rx * -b.D[1] + ry * b.D[0]
+  const w = b.w0 + Math.max(0, s) * b.k
+  return sstep(w, w * 0.25, Math.abs(pp)) * sstep(0, 0.05, s) * Math.exp(-s * 0.85) * b.s
+}
+function lightAt(x, y, B, a) { let l = 0; for (const b of B) l += shaftAt(x * a, y, b); return Math.min(1.2, l) }
+
 // ---------- 光：WebGL ----------
-const gl = document.getElementById('gl').getContext('webgl', { antialias: false, premultipliedAlpha: false })
+const glc = document.getElementById('gl')
+const gl = glc.getContext('webgl', { antialias: false, premultipliedAlpha: false })
 const VS = `attribute vec2 p; void main(){ gl_Position = vec4(p, 0., 1.); }`
 const FS = `
 precision highp float;
-uniform vec2 R; uniform float T; uniform float SUN; uniform float BX;
-float floorY(float x){ return 0.21 + 0.025*sin(x*3.1+0.4) + 0.012*sin(x*8.3+1.7); }
+uniform vec2 R; uniform float T; uniform float SUN; uniform float BX; uniform float BL;
+float floorY(float x){ return 0.13 + 0.018*sin(x*3.1+0.4) + 0.009*sin(x*8.3+1.7); }
 float h1(float n){ return fract(sin(n)*43758.5453); }
 float n1(float x){ float i=floor(x), f=fract(x); f=f*f*(3.-2.*f); return mix(h1(i), h1(i+1.), f); }
-// 光网（经典的迭代式焦散，亮线）
 float caustic(vec2 uv, float t){
   vec2 p = mod(uv*6.2831, 6.2831) - 250.0;
   vec2 i = p; float c = 1.0; float inten = .005;
@@ -84,184 +104,296 @@ float caustic(vec2 uv, float t){
   c /= 4.0; c = 1.17 - pow(c, 1.4);
   return clamp(pow(abs(c), 8.0), 0., 1.);
 }
+// 一根光柱：亮度＋柱内一条条细纹
+float shaft(vec2 P, vec2 A, vec2 D, float w0, float k, float t, out float streak){
+  vec2 r = P - A; float s = dot(r, D); float pp = dot(r, vec2(-D.y, D.x));
+  float w = w0 + max(s, 0.)*k;
+  float m = smoothstep(w, w*0.25, abs(pp)) * smoothstep(0., 0.05, s) * exp(-s*0.85);
+  streak = 0.55 + 0.75*n1(pp/w*7.0 + t*0.25) * n1(pp/w*3.0 - t*0.17 + 9.0);
+  return m;
+}
 void main(){
   vec2 uv = gl_FragCoord.xy / R;
   float a = R.x / R.y;
+  vec2 P = vec2(uv.x*a, uv.y);
   float t = T;
-  // 水色：上浅下深
-  vec3 deep = vec3(0.020, 0.090, 0.120), mid = vec3(0.060, 0.300, 0.340), top = vec3(0.300, 0.640, 0.640);
-  vec3 col = mix(deep, mid, smoothstep(0.0, 0.75, uv.y));
-  col = mix(col, top, smoothstep(0.70, 1.0, uv.y));
-  // 光柱：从水面上方的太阳射下来，角度跟着 SUN
-  vec2 S = vec2(SUN, 1.35);
-  vec2 d = vec2((uv.x - S.x)*a, uv.y - S.y);
-  float ang = atan(d.x, -d.y);
-  float r = n1(ang*38.0 + t*0.35) * n1(ang*17.0 - t*0.22 + 4.0);
-  r = pow(r, 2.2) * 2.2;
-  float depth = 1.0 - uv.y;
+  // 深水：几乎黑的藏青，越往上越带一点蓝
+  vec3 col = mix(vec3(0.004, 0.012, 0.035), vec3(0.020, 0.060, 0.150), smoothstep(0.05, 1.0, uv.y));
+  // 三根光柱
+  float lean = -(SUN - 0.5)*0.95;
+  vec2 D0 = normalize(vec2(lean, -1.)), D1 = normalize(vec2(lean*1.15 - 0.05, -1.)), D2 = normalize(vec2(lean*0.85 + 0.06, -1.));
+  float st0, st1, st2;
+  float b0 = shaft(P, vec2(SUN*a, 1.03), D0, 0.055, 0.20, t, st0);
+  float b1 = shaft(P, vec2((SUN-0.30)*a, 1.03), D1, 0.025, 0.11, t+3., st1) * 0.38;
+  float b2 = shaft(P, vec2((SUN+0.27)*a, 1.03), D2, 0.02, 0.10, t+7., st2) * 0.30;
   float fy = floorY(uv.x);
-  float ray = r * exp(-depth*1.6) * smoothstep(fy - 0.02, fy + 0.25, uv.y);
-  col += vec3(0.70, 0.95, 0.90) * ray * 0.55;
-  // 水面：从下往上看，一层晃动的亮
-  float surf = smoothstep(0.90, 1.0, uv.y);
-  float sc = caustic(vec2(uv.x*a*1.6 + SUN*0.6, uv.y*5.0), t*0.5);
-  col += vec3(0.75, 0.95, 0.92) * surf * (0.35 + sc*0.9);
-  // 沙地
+  float above = smoothstep(fy - 0.01, fy + 0.04, uv.y);
+  float beam = (b0*st0 + b1*st1 + b2*st2) * above;
+  col += vec3(0.38, 0.62, 1.00) * beam * 0.62;
+  col += vec3(0.85, 0.93, 1.00) * pow(b0, 3.0) * 0.30 * above;   // 主光柱芯子发白
+  // 水面：大部分是暗的波纹，只有光口那一块亮成一团
+  float surf = smoothstep(0.88, 1.0, uv.y);
+  float sc = caustic(vec2(uv.x*a*1.4 + SUN*0.5, uv.y*4.0), t*0.5);
+  vec2 hole = vec2((uv.x - SUN)*a, (uv.y - 1.0)*1.6);
+  float glow = exp(-dot(hole, hole)*30.0);
+  col += vec3(0.20, 0.35, 0.65) * surf * (0.12 + sc*0.35);
+  col += vec3(0.75, 0.88, 1.00) * glow * (0.9 + sc*0.6);
+  // 沙地：本身很暗；光柱落地的那一块才有光网
   if (uv.y < fy) {
-    float sd = (fy - uv.y) / fy;            // 0 在沙线，1 在最底
-    vec3 sand = mix(vec3(0.52, 0.56, 0.48), vec3(0.17, 0.24, 0.24), smoothstep(0.0, 1.0, sd));
-    sand *= 0.62 + 0.10*n1(uv.x*a*90.0 + uv.y*40.0);
-    // 沙上的光网：近大远小（越往下越近）
-    vec2 cu = vec2(uv.x*a*(1.6 + sd*0.8) + (SUN-0.5)*0.9, (fy - uv.y)*(3.2 + sd*1.5));
+    float sd = (fy - uv.y) / fy;
+    vec3 sand = mix(vec3(0.075, 0.090, 0.130), vec3(0.015, 0.020, 0.040), sd);
+    sand *= 0.85 + 0.15*n1(uv.x*a*90.0 + uv.y*40.0);
+    float yy = fy + 0.01;
+    float s0, s1, s2;
+    float lit = shaft(vec2(P.x, yy), vec2(SUN*a, 1.03), D0, 0.055, 0.20, t, s0)
+              + 0.38*shaft(vec2(P.x, yy), vec2((SUN-0.30)*a, 1.03), D1, 0.025, 0.11, t, s1)
+              + 0.30*shaft(vec2(P.x, yy), vec2((SUN+0.27)*a, 1.03), D2, 0.02, 0.10, t, s2);
+    lit *= 2.6;
+    vec2 cu = vec2(uv.x*a*(1.8 + sd*0.8) + (SUN-0.5)*0.9, (fy - uv.y)*(3.6 + sd*1.5));
     float c = caustic(cu, t*0.55);
-    float lit = 0.55 + 0.45*smoothstep(0.9, 0.0, abs(uv.x - SUN));
-    sand += vec3(0.80, 0.95, 0.85) * c * (1.0 - sd*0.7) * lit * 0.75;
-    // 瓶子透下来的彩斑：落在瓶子背着太阳的那一侧
-    float sx = BX + (BX - SUN)*0.22;
-    vec2 q = vec2((uv.x - sx)*a/0.085, (uv.y - (floorY(BX) - 0.035))/0.022);
-    float spot = exp(-dot(q, q));
-    vec3 hue = 0.5 + 0.5*cos(6.2831*(q.x*0.28 + vec3(0.0, 0.33, 0.67)) + t*0.4);
-    sand += mix(vec3(0.45, 0.85, 0.55), hue, 0.65) * spot * (0.55 + 0.35*c);
+    sand += vec3(0.45, 0.65, 0.95) * lit * (0.25 + c*1.1) * (1.0 - sd*0.6);
+    // 瓶子透下来的彩斑：只在瓶子被光照到时出现，落在背光一侧
+    float sx = BX + (BX - SUN)*0.18;
+    vec2 q = vec2((uv.x - sx)*a/0.075, (uv.y - (floorY(BX) - 0.03))/0.02);
+    float spot = exp(-dot(q, q)) * BL;
+    vec3 hue = 0.5 + 0.5*cos(6.2831*(q.x*0.25 + vec3(0.0, 0.33, 0.67)) + t*0.4);
+    sand += mix(vec3(0.45, 0.85, 0.75), hue, 0.7) * spot * 0.9;
     col = mix(col, sand, smoothstep(0.0, 0.006, fy - uv.y));
   }
-  // 暗角
-  vec2 v = uv - 0.5; col *= 1.0 - dot(v, v)*0.75;
+  // 远处一层薄雾：靠中下方，给前后拉开一点距离
+  col += vec3(0.02, 0.05, 0.11) * exp(-pow((uv.y - 0.35)*3.0, 2.0)) * 0.6;
+  vec2 v = uv - vec2(0.5, 0.55); col *= 1.0 - dot(v, v)*0.9;
   gl_FragColor = vec4(col, 1.0);
 }`
 
-let prog, U = {}
-function initGL() {
-  if (!gl) return false
+let U = {}, glOK = false
+try {
+  if (!gl) throw new Error('no webgl')
   const sh = (type, src) => { const s = gl.createShader(type); gl.shaderSource(s, src); gl.compileShader(s); if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(s)); return s }
-  prog = gl.createProgram()
+  const prog = gl.createProgram()
   gl.attachShader(prog, sh(gl.VERTEX_SHADER, VS)); gl.attachShader(prog, sh(gl.FRAGMENT_SHADER, FS))
-  gl.linkProgram(prog); gl.useProgram(prog)
+  gl.linkProgram(prog); if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(prog))
+  gl.useProgram(prog)
   const b = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, b)
   gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 3, -1, -1, 3]), gl.STATIC_DRAW)
   const loc = gl.getAttribLocation(prog, 'p'); gl.enableVertexAttribArray(loc); gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0)
-  for (const k of ['R', 'T', 'SUN', 'BX']) U[k] = gl.getUniformLocation(prog, k)
-  return true
-}
-let glOK = false
-try { glOK = initGL() } catch (e) { console.warn(e) }
-if (!glOK) document.getElementById('nogl').style.display = 'flex'
+  for (const k of ['R', 'T', 'SUN', 'BX', 'BL']) U[k] = gl.getUniformLocation(prog, k)
+  glOK = true
+} catch (e) { console.warn(e); document.getElementById('nogl').style.display = 'block' }
 
-// ---------- 前景：水草、瓶子、羽毛、泡泡、浮尘 ----------
+// ---------- 前景 ----------
 const fg = document.getElementById('fg'), ctx = fg.getContext('2d')
-let W = 0, H = 0, DPR = 1
-const BX = 0.70                       // 瓶子在屏幕横向的位置（和着色器共用）
-const floorY = x => 0.21 + 0.025 * Math.sin(x * 3.1 + 0.4) + 0.012 * Math.sin(x * 8.3 + 1.7)  // 和着色器同一条沙线（y 向上）
-const sy = x => H * (1 - floorY(x))   // 换成屏幕坐标
+let W = 0, H = 0, DPR = 1, AS = 1
+const BX = 0.63
+const X = x => x * W, Y = y => H * (1 - y)          // y 向上 → 屏幕
 function resize() {
   DPR = Math.min(2, window.devicePixelRatio || 1)
-  W = innerWidth; H = innerHeight
+  W = innerWidth; H = innerHeight; AS = W / H
   fg.width = W * DPR; fg.height = H * DPR; ctx.setTransform(DPR, 0, 0, DPR, 0, 0)
-  const g = document.getElementById('gl'), s = 0.55   // 光低分辨率画再拉伸：软的，省电
-  g.width = Math.round(W * s * DPR); g.height = Math.round(H * s * DPR)
-  if (glOK) gl.viewport(0, 0, g.width, g.height)
+  const s = 0.55
+  glc.width = Math.round(W * s * DPR); glc.height = Math.round(H * s * DPR)
+  if (glOK) gl.viewport(0, 0, glc.width, glc.height)
 }
 addEventListener('resize', resize); resize()
 
+// 水草：软带子。depth 0 = 最近（深、大、挪得多），1 = 最远（淡、小、挪得少）
 const weeds = [
-  { x: 0.08, h: 0.34, w: 13, n: 3, ph: 0.0 }, { x: 0.16, h: 0.22, w: 9, n: 2, ph: 1.3 },
-  { x: 0.88, h: 0.28, w: 11, n: 3, ph: 2.1 }, { x: 0.95, h: 0.40, w: 14, n: 2, ph: 0.7 },
-  { x: 0.52, h: 0.12, w: 7, n: 2, ph: 3.0 },
+  { x: 0.30, h: 0.16, w: 7, depth: 1, ph: 0.3 }, { x: 0.45, h: 0.12, w: 6, depth: 1, ph: 2.2 }, { x: 0.78, h: 0.14, w: 6, depth: 1, ph: 1.1 },
+  { x: 0.86, h: 0.30, w: 15, depth: 0.35, ph: 0.7 }, { x: 0.92, h: 0.42, w: 18, depth: 0.2, ph: 2.6 }, { x: 0.81, h: 0.22, w: 12, depth: 0.35, ph: 4.0 },
 ]
-function drawWeed(wd, t, sun) {
-  const bx = wd.x * W, by = sy(wd.x) + 6
-  for (let k = 0; k < wd.n; k++) {
-    const off = (k - (wd.n - 1) / 2) * wd.w * 0.9
-    const len = H * wd.h * (1 - k * 0.12)
-    const sway = Math.sin(t * 0.7 + wd.ph + k) * 18 + (sun - 0.5) * 10
-    ctx.beginPath()
-    ctx.moveTo(bx + off - wd.w / 2, by)
-    ctx.bezierCurveTo(bx + off - wd.w / 2 + sway * 0.3, by - len * 0.4, bx + off + sway * 0.8, by - len * 0.7, bx + off + sway, by - len)
-    ctx.bezierCurveTo(bx + off + sway * 0.8 + wd.w * 0.3, by - len * 0.7, bx + off + wd.w / 2 + sway * 0.3, by - len * 0.4, bx + off + wd.w / 2, by)
+function weedColor(depth, a) { // 远的偏环境蓝、淡；近的几乎黑
+  const r = 4 + depth * 22, g = 12 + depth * 38, b = 22 + depth * 70
+  return `rgba(${r | 0},${g | 0},${b | 0},${a})`
+}
+function drawWeed(wd, t, par) {
+  const bx = X(wd.x) + par * (1 - wd.depth) * 34, by = Y(FLOOR(wd.x)) + 4
+  const len = H * wd.h, N = 14
+  for (let blade = 0; blade < 2; blade++) {
+    const off = (blade - 0.5) * wd.w * 1.1, L = len * (blade ? 0.78 : 1), ph = wd.ph + blade * 1.7
+    const left = [], right = []
+    for (let i = 0; i <= N; i++) {
+      const u = i / N
+      const sway = Math.sin(t * 0.8 + ph + u * 2.6) * 22 * u * u + Math.sin(t * 0.37 + ph) * 8 * u
+      const cx = bx + off + sway, cy = by - L * u
+      const hw = wd.w * 0.5 * (1 - u * 0.85) * (0.8 + 0.2 * Math.sin(u * 9 + ph))
+      left.push([cx - hw, cy]); right.push([cx + hw, cy])
+    }
+    ctx.beginPath(); ctx.moveTo(left[0][0], left[0][1])
+    for (const p of left) ctx.lineTo(p[0], p[1])
+    for (let i = right.length - 1; i >= 0; i--) ctx.lineTo(right[i][0], right[i][1])
     ctx.closePath()
-    const g = ctx.createLinearGradient(0, by - len, 0, by)
-    g.addColorStop(0, 'rgba(10,45,48,.55)'); g.addColorStop(1, 'rgba(4,20,24,.92)')
+    const g = ctx.createLinearGradient(0, by - L, 0, by)
+    g.addColorStop(0, weedColor(wd.depth, 0.55)); g.addColorStop(1, weedColor(wd.depth * 0.6, 0.95))
     ctx.fillStyle = g; ctx.fill()
   }
 }
-function drawBottle(t, sun) {
-  // 半埋在沙里、躺着歪一点的玻璃瓶，里面卷着一张纸条
-  const x = BX * W, y = sy(BX) + 4, L = Math.min(W, H) * 0.20, R = L * 0.24
-  ctx.save(); ctx.translate(x, y); ctx.rotate(-0.22)
+
+// 前景石头：左下角一大块黑，边上一点点冷光
+function drawRock(par) {
+  const o = par * 46
+  ctx.save(); ctx.translate(o, 0)
+  ctx.beginPath()
+  ctx.moveTo(-60, H)
+  ctx.lineTo(-60, H * 0.52)
+  ctx.bezierCurveTo(W * 0.06, H * 0.50, W * 0.12, H * 0.60, W * 0.17, H * 0.66)
+  ctx.bezierCurveTo(W * 0.24, H * 0.74, W * 0.22, H * 0.82, W * 0.33, H * 0.88)
+  ctx.bezierCurveTo(W * 0.40, H * 0.92, W * 0.44, H * 0.97, W * 0.46, H)
+  ctx.closePath()
+  ctx.fillStyle = '#01040b'; ctx.fill()
+  ctx.strokeStyle = 'rgba(90,130,200,.16)'; ctx.lineWidth = 2; ctx.stroke()
+  ctx.restore()
+}
+
+// 远处的鱼影：小、淡，慢慢横着游过去
+const fish = Array.from({ length: 6 }, (_, i) => ({ x: Math.random(), y: 0.45 + Math.random() * 0.3, s: 0.5 + Math.random() * 0.6, v: 0.012 + Math.random() * 0.01, dir: i % 2 ? 1 : -1, ph: Math.random() * 6 }))
+function drawFish(f, t, dt, B, par) {
+  f.x += f.v * f.dir * dt
+  if (f.x > 1.15) f.x = -0.15; if (f.x < -0.15) f.x = 1.15
+  const x = X(f.x) + par * 10, y = Y(f.y + Math.sin(t * 0.5 + f.ph) * 0.008), L = 26 * f.s
+  const lit = lightAt(f.x, f.y, B, AS)
+  ctx.save(); ctx.translate(x, y); ctx.scale(f.dir, 1)
+  ctx.beginPath()
+  ctx.moveTo(L * 0.5, 0)
+  ctx.quadraticCurveTo(L * 0.1, -L * 0.22, -L * 0.3, -L * 0.04)
+  ctx.lineTo(-L * 0.52, -L * 0.18 + Math.sin(t * 6 + f.ph) * 2); ctx.lineTo(-L * 0.46, 0); ctx.lineTo(-L * 0.52, L * 0.18 + Math.sin(t * 6 + f.ph) * 2)
+  ctx.lineTo(-L * 0.3, L * 0.04)
+  ctx.quadraticCurveTo(L * 0.1, L * 0.22, L * 0.5, 0)
+  ctx.fillStyle = `rgba(${(10 + lit * 60) | 0},${(25 + lit * 80) | 0},${(55 + lit * 120) | 0},${(0.45 + lit * 0.3).toFixed(2)})`
+  ctx.fill(); ctx.restore()
+}
+
+// 瓶子：躺在沙上；进了光才亮，背光一侧拖影子
+function drawBottle(t, B, sun, par) {
+  const bx = BX + par * 0.012
+  const x = X(bx), y = Y(FLOOR(BX)) - 2, L = Math.min(W, H) * 0.19, R = L * 0.22
+  const lit = Math.min(1, lightAt(BX, FLOOR(BX) + 0.03, B, AS) * 1.6)
+  // 影子：往背着光的那边拖
+  const sdx = (BX - sun) * L * 1.2
+  ctx.save(); ctx.translate(x + sdx * 0.5, y + R * 0.8)
+  const sg = ctx.createRadialGradient(0, 0, 2, 0, 0, L * 0.7)
+  sg.addColorStop(0, `rgba(0,0,6,${(0.35 + lit * 0.35).toFixed(2)})`); sg.addColorStop(1, 'rgba(0,0,6,0)')
+  ctx.scale(1 + Math.abs(sdx) / L, 0.18); ctx.fillStyle = sg; ctx.beginPath(); ctx.arc(0, 0, L * 0.7, 0, Math.PI * 2); ctx.fill()
+  ctx.restore()
+  ctx.save(); ctx.translate(x, y); ctx.rotate(-0.12)
   const body = new Path2D()
   body.moveTo(-L / 2, -R); body.lineTo(L * 0.22, -R)
   body.quadraticCurveTo(L * 0.34, -R, L * 0.38, -R * 0.45); body.lineTo(L / 2, -R * 0.40)
   body.lineTo(L / 2, R * 0.40); body.lineTo(L * 0.38, R * 0.45)
   body.quadraticCurveTo(L * 0.34, R, L * 0.22, R); body.lineTo(-L / 2, R)
   body.quadraticCurveTo(-L / 2 - R * 0.5, 0, -L / 2, -R); body.closePath()
-  ctx.fillStyle = 'rgba(150,215,190,.16)'; ctx.fill(body)
-  ctx.strokeStyle = 'rgba(200,245,230,.38)'; ctx.lineWidth = 1.2; ctx.stroke(body)
-  // 纸条
-  ctx.fillStyle = 'rgba(238,226,196,.72)'
-  ctx.beginPath(); ctx.ellipse(-L * 0.05, R * 0.15, L * 0.22, R * 0.38, 0, 0, Math.PI * 2); ctx.fill()
-  ctx.strokeStyle = 'rgba(160,60,50,.7)'; ctx.lineWidth = 1.6   // 红绳
-  ctx.beginPath(); ctx.moveTo(-L * 0.05, R * 0.15 - R * 0.38); ctx.lineTo(-L * 0.05, R * 0.15 + R * 0.38); ctx.stroke()
-  // 软木塞
-  ctx.fillStyle = 'rgba(140,100,64,.9)'; ctx.fillRect(L / 2 - 1, -R * 0.36, R * 0.42, R * 0.72)
-  // 高光跟着太阳挪
-  const hx = -L * 0.3 + (sun - 0.5) * L * 0.5
-  const hg = ctx.createLinearGradient(hx - 14, 0, hx + 14, 0)
-  hg.addColorStop(0, 'rgba(255,255,255,0)'); hg.addColorStop(.5, 'rgba(255,255,255,.42)'); hg.addColorStop(1, 'rgba(255,255,255,0)')
-  ctx.fillStyle = hg; ctx.fillRect(hx - 14, -R * 0.85, 28, R * 0.35)
+  // 玻璃：暗处几乎看不见，光里透出青绿
+  const bg = ctx.createLinearGradient(0, -R, 0, R)
+  bg.addColorStop(0, `rgba(${(60 + lit * 120) | 0},${(110 + lit * 130) | 0},${(140 + lit * 100) | 0},${(0.10 + lit * 0.22).toFixed(2)})`)
+  bg.addColorStop(1, `rgba(10,30,50,${(0.25 + lit * 0.1).toFixed(2)})`)
+  ctx.fillStyle = bg; ctx.fill(body)
+  ctx.strokeStyle = `rgba(170,215,255,${(0.10 + lit * 0.45).toFixed(2)})`; ctx.lineWidth = 1.2; ctx.stroke(body)
+  // 纸条＋红绳
+  ctx.fillStyle = `rgba(${(90 + lit * 150) | 0},${(85 + lit * 140) | 0},${(80 + lit * 110) | 0},.85)`
+  ctx.beginPath(); ctx.ellipse(-L * 0.06, R * 0.18, L * 0.22, R * 0.36, 0, 0, Math.PI * 2); ctx.fill()
+  ctx.strokeStyle = `rgba(${(90 + lit * 90) | 0},30,30,.8)`; ctx.lineWidth = 1.6
+  ctx.beginPath(); ctx.moveTo(-L * 0.06, R * 0.18 - R * 0.36); ctx.lineTo(-L * 0.06, R * 0.18 + R * 0.36); ctx.stroke()
+  ctx.fillStyle = `rgba(${(50 + lit * 90) | 0},${(35 + lit * 60) | 0},${(25 + lit * 40) | 0},.95)`; ctx.fillRect(L / 2 - 1, -R * 0.36, R * 0.42, R * 0.72)
+  // 受光那一侧的高光
+  if (lit > 0.05) {
+    const hx = (sun - BX) * L * 1.2
+    const hg = ctx.createLinearGradient(hx - 18, 0, hx + 18, 0)
+    hg.addColorStop(0, 'rgba(255,255,255,0)'); hg.addColorStop(.5, `rgba(235,245,255,${(lit * 0.7).toFixed(2)})`); hg.addColorStop(1, 'rgba(255,255,255,0)')
+    ctx.fillStyle = hg; ctx.fillRect(hx - 18, -R * 0.82, 36, R * 0.3)
+  }
   ctx.restore()
-  // 沙把瓶子下半截埋住
-  ctx.fillStyle = 'rgba(70,82,70,.55)'
-  ctx.beginPath(); ctx.ellipse(x - L * 0.1, y + R * 0.55, L * 0.62, R * 0.5, -0.05, 0, Math.PI); ctx.fill()
 }
 
-// 羽毛：从上面慢慢晃着沉下去，落到沙上躺一会儿，再从头来
-const feather = { x: 0.32, y: -0.1, rot: 0, rest: 0 }
+// 羽毛：一根羽轴、两边一排排羽枝（左宽右窄、有两处分叉），慢慢晃着沉下去，进光时边上泛蓝紫
+const feather = { x: 0.40, y: 1.08, rot: 0.4, rest: 0 }
 function stepFeather(dt, t) {
-  const f = feather
-  const ground = 1 - floorY(f.x) - 0.012
-  if (f.y < ground) {
-    f.y += dt * 0.018
-    f.x += Math.sin(t * 0.9) * dt * 0.012
-    f.rot = Math.sin(t * 0.9) * 0.6 + 0.4
-  } else if ((f.rest += dt) > 14) { Object.assign(feather, { x: 0.2 + Math.random() * 0.4, y: -0.1, rest: 0 }) }
+  const f = feather, ground = FLOOR(f.x) + 0.012
+  if (f.y > ground) {
+    f.y -= dt * 0.016
+    f.x += Math.sin(t * 0.8) * dt * 0.014
+    f.rot = 0.5 + Math.sin(t * 0.8) * 0.55
+  } else { f.rot += (1.35 - f.rot) * Math.min(1, dt * 2); if ((f.rest += dt) > 14) Object.assign(f, { x: 0.25 + Math.random() * 0.35, y: 1.08, rest: 0 }) }
 }
-function drawFeather() {
-  const f = feather, L = Math.min(W, H) * 0.12
-  ctx.save(); ctx.translate(f.x * W, f.y * H); ctx.rotate(f.rot)
-  ctx.beginPath(); ctx.moveTo(0, -L / 2)
-  ctx.quadraticCurveTo(L * 0.2, -L * 0.1, L * 0.05, L * 0.42)
-  ctx.lineTo(-0.5, L * 0.42)
-  ctx.quadraticCurveTo(-L * 0.18, -L * 0.05, 0, -L / 2)
-  ctx.fillStyle = 'rgba(14,16,24,.92)'; ctx.fill()
-  ctx.strokeStyle = 'rgba(120,140,190,.35)'; ctx.lineWidth = 1   // 乌鸦羽毛那点蓝紫的光
-  ctx.beginPath(); ctx.moveTo(0, -L / 2); ctx.quadraticCurveTo(L * 0.03, 0, 0, L * 0.6); ctx.stroke()
+function drawFeather(B) {
+  const f = feather, L = Math.min(W, H) * 0.15
+  const lit = Math.min(1, lightAt(f.x, f.y, B, AS) * 1.5)
+  ctx.save(); ctx.translate(X(f.x), Y(f.y)); ctx.rotate(f.rot)
+  ctx.lineCap = 'round'
+  const N = 26
+  for (let i = 0; i < N; i++) {
+    const u = i / (N - 1)                               // 0 根 → 1 尖
+    const py = L * 0.5 - u * L                          // 羽轴从下往上
+    const bend = Math.sin(u * Math.PI) * L * 0.04
+    const prof = Math.sin(Math.min(1, u * 1.25) * Math.PI) * (u < 0.12 ? u / 0.12 : 1)
+    const gapL = (u > 0.42 && u < 0.47) ? 0.35 : 1, gapR = (u > 0.66 && u < 0.71) ? 0.3 : 1   // 分叉
+    const lw = L * 0.20 * prof * gapL, rw = L * 0.11 * prof * gapR
+    ctx.strokeStyle = `rgba(${(12 + lit * 40) | 0},${(14 + lit * 40) | 0},${(24 + lit * 70) | 0},.92)`
+    ctx.lineWidth = L * 0.035
+    ctx.beginPath(); ctx.moveTo(bend, py); ctx.quadraticCurveTo(bend - lw * 0.6, py - L * 0.02, bend - lw, py - L * 0.07); ctx.stroke()
+    ctx.beginPath(); ctx.moveTo(bend, py); ctx.quadraticCurveTo(bend + rw * 0.6, py - L * 0.02, bend + rw, py - L * 0.06); ctx.stroke()
+  }
+  // 羽轴＋受光的边
+  ctx.strokeStyle = `rgba(${(60 + lit * 140) | 0},${(70 + lit * 130) | 0},${(110 + lit * 140) | 0},${(0.35 + lit * 0.5).toFixed(2)})`
+  ctx.lineWidth = 1.3
+  ctx.beginPath(); ctx.moveTo(0, L * 0.62); ctx.quadraticCurveTo(L * 0.04, 0, 0, -L * 0.5); ctx.stroke()
   ctx.restore()
 }
 
+// 亮晶晶：大多数生在光柱里、慢慢往下飘；柱子外面也有，但暗得几乎看不见
+const SPARK_N = 320
+const sparks = Array.from({ length: SPARK_N }, () => spawnSpark({}, true))
+function spawnSpark(p, anyY) {
+  p.x = Math.random(); p.y = anyY ? 0.1 + Math.random() * 0.92 : 1.0 + Math.random() * 0.05
+  p.r = Math.random() < 0.1 ? 1.6 + Math.random() * 1.4 : 0.5 + Math.random() * 1.0
+  p.v = 0.006 + Math.random() * 0.018; p.ph = Math.random() * 6.28; p.gold = Math.random() < 0.06
+  return p
+}
+let B0 = beams(0.5, AS)
+function placeInBeam(p) {
+  // 让一大半的颗粒落在主光柱里：沿着光柱随机取一点
+  const b = B0[Math.random() < 0.8 ? 0 : 1 + (Math.random() < 0.5 ? 1 : 0)]
+  const s = Math.random() * 1.0, w = b.w0 + s * b.k
+  const pp = (Math.random() + Math.random() - 1) * w
+  const px = b.A[0] + b.D[0] * s - b.D[1] * pp, py = b.A[1] + b.D[1] * s + b.D[0] * pp
+  p.x = px / AS; p.y = py
+}
+for (const p of sparks) if (Math.random() < 0.7) placeInBeam(p)
+function drawSparks(t, dt, B) {
+  ctx.globalCompositeOperation = 'lighter'
+  for (const p of sparks) {
+    p.y -= p.v * dt; p.x += Math.sin(t * 0.4 + p.ph) * 0.0008
+    if (p.y < FLOOR(p.x) + 0.01 || p.x < -0.05 || p.x > 1.05) { spawnSpark(p, false); if (Math.random() < 0.75) placeInBeam(p) }
+    const L = lightAt(p.x, p.y, B, AS)
+    const tw = 0.55 + 0.45 * Math.sin(t * (1.5 + p.r) + p.ph * 3)
+    const a = (0.04 + L * 0.95) * tw
+    if (a < 0.02) continue
+    const x = X(p.x), y = Y(p.y)
+    ctx.fillStyle = p.gold ? `rgba(255,214,150,${a.toFixed(3)})` : `rgba(205,228,255,${a.toFixed(3)})`
+    ctx.beginPath(); ctx.arc(x, y, p.r, 0, Math.PI * 2); ctx.fill()
+    if (p.r > 1.6 && L > 0.3) {  // 大颗的带一点光晕和十字闪
+      ctx.fillStyle = p.gold ? `rgba(255,200,120,${(a * 0.18).toFixed(3)})` : `rgba(160,200,255,${(a * 0.18).toFixed(3)})`
+      ctx.beginPath(); ctx.arc(x, y, p.r * 4, 0, Math.PI * 2); ctx.fill()
+      ctx.fillRect(x - p.r * 5, y - 0.4, p.r * 10, 0.8); ctx.fillRect(x - 0.4, y - p.r * 5, 0.8, p.r * 10)
+    }
+  }
+  ctx.globalCompositeOperation = 'source-over'
+}
+
+// 气泡：偶尔从水草根和瓶口冒
 const bubbles = []
 function stepBubbles(dt) {
-  if (Math.random() < dt * 0.6) {
-    const src = Math.random() < 0.5 ? weeds[Math.floor(Math.random() * weeds.length)].x : BX + 0.05
-    bubbles.push({ x: src * W, y: sy(src) - 10, r: 1.5 + Math.random() * 3.5, ph: Math.random() * 6 })
+  if (Math.random() < dt * 0.4) {
+    const src = Math.random() < 0.6 ? weeds[3 + Math.floor(Math.random() * 3)].x : BX + 0.09
+    bubbles.push({ x: src, y: FLOOR(src) + 0.02, r: 1.5 + Math.random() * 3, ph: Math.random() * 6 })
   }
-  for (const b of bubbles) { b.y -= dt * (28 + b.r * 9); b.ph += dt * 3 }
-  while (bubbles.length && bubbles[0].y < H * 0.04) bubbles.shift()
+  for (const b of bubbles) { b.y += dt * (0.03 + b.r * 0.006); b.ph += dt * 3 }
+  while (bubbles.length && bubbles[0].y > 0.97) bubbles.shift()
 }
-function drawBubbles() {
+function drawBubbles(B) {
   for (const b of bubbles) {
-    const x = b.x + Math.sin(b.ph) * 3
-    ctx.beginPath(); ctx.arc(x, b.y, b.r, 0, Math.PI * 2)
-    ctx.strokeStyle = 'rgba(220,250,245,.55)'; ctx.lineWidth = 1; ctx.stroke()
-    ctx.fillStyle = 'rgba(255,255,255,.5)'; ctx.beginPath(); ctx.arc(x - b.r * 0.35, b.y - b.r * 0.35, b.r * 0.3, 0, Math.PI * 2); ctx.fill()
-  }
-}
-// 浮尘：光柱里的小颗粒
-const motes = Array.from({ length: 46 }, () => ({ x: Math.random(), y: Math.random() * 0.75 + 0.2, s: Math.random() * 1.6 + 0.4, ph: Math.random() * 6 }))
-function drawMotes(t) {
-  for (const m of motes) {
-    const x = (m.x + Math.sin(t * 0.05 + m.ph) * 0.02) * W, y = (1 - m.y + Math.sin(t * 0.13 + m.ph) * 0.01) * H
-    const a = 0.18 + 0.22 * (0.5 + 0.5 * Math.sin(t * 0.8 + m.ph * 3))
-    ctx.fillStyle = `rgba(230,255,245,${a.toFixed(3)})`
-    ctx.beginPath(); ctx.arc(x, y, m.s, 0, Math.PI * 2); ctx.fill()
+    const L = lightAt(b.x, b.y, B, AS)
+    const x = X(b.x) + Math.sin(b.ph) * 3, y = Y(b.y)
+    ctx.beginPath(); ctx.arc(x, y, b.r, 0, Math.PI * 2)
+    ctx.strokeStyle = `rgba(200,225,255,${(0.18 + L * 0.6).toFixed(2)})`; ctx.lineWidth = 1; ctx.stroke()
   }
 }
 
@@ -269,13 +401,12 @@ function drawMotes(t) {
 let target = 0.5, sun = 0.5, tilted = false
 addEventListener('deviceorientation', e => {
   if (e.gamma == null) return
-  target = 0.5 + Math.max(-1, Math.min(1, e.gamma / 40)) * 0.42
+  target = 0.5 + Math.max(-1, Math.min(1, e.gamma / 40)) * 0.40
   if (Math.abs(e.gamma) > 6 && !tilted) { tilted = true; document.getElementById('hint').style.opacity = 0 }
 })
-addEventListener('pointermove', e => { if (e.pointerType === 'mouse' || e.buttons) target = 0.08 + 0.84 * (e.clientX / W) })
+addEventListener('pointermove', e => { if (e.pointerType === 'mouse' || e.buttons) target = 0.1 + 0.8 * (e.clientX / W) })
 setTimeout(() => { document.getElementById('hint').style.opacity = 0 }, 6000)
 
-// 数字：光柱靠近正上方时亮一点（和 SUN 离中间多远挂钩），再叠一点慢呼吸
 const numEl = document.getElementById('num')
 let last = performance.now(), t0 = last, running = true
 document.addEventListener('visibilitychange', () => { running = !document.hidden; if (running) { last = performance.now(); requestAnimationFrame(frame) } })
@@ -284,19 +415,28 @@ function frame(now) {
   const dt = Math.min(0.05, (now - last) / 1000); last = now
   const t = (now - t0) / 1000
   sun += (target - sun) * Math.min(1, dt * 3)
+  const par = (sun - 0.5) * 2          // -1..1，视差用
+  const B = beams(sun, AS); B0 = B
+  const BL = Math.min(1, lightAt(BX, FLOOR(BX) + 0.03, B, AS) * 1.6)
   if (glOK) {
-    gl.uniform2f(U.R, gl.canvas.width, gl.canvas.height); gl.uniform1f(U.T, t)
-    gl.uniform1f(U.SUN, sun); gl.uniform1f(U.BX, BX)
+    gl.uniform2f(U.R, glc.width, glc.height); gl.uniform1f(U.T, t)
+    gl.uniform1f(U.SUN, sun); gl.uniform1f(U.BX, BX); gl.uniform1f(U.BL, BL)
     gl.drawArrays(gl.TRIANGLES, 0, 3)
   }
   ctx.clearRect(0, 0, W, H)
-  drawMotes(t)
-  for (const w of weeds) drawWeed(w, t, sun)
-  drawBottle(t, sun)
-  stepFeather(dt, t); drawFeather()
-  stepBubbles(dt); drawBubbles()
-  const glow = 0.35 + 0.45 * (1 - Math.min(1, Math.abs(sun - 0.5) * 2.4)) + 0.2 * Math.sin(t * 0.6)
-  numEl.style.textShadow = `0 0 ${(18 + glow * 30).toFixed(1)}px rgba(190,255,240,${(0.25 + glow * 0.45).toFixed(3)}), 0 2px 14px rgba(0,20,25,.5)`
+  for (const w of weeds) if (w.depth === 1) drawWeed(w, t, par)       // 远处
+  for (const f of fish) drawFish(f, t, dt, B, par)
+  drawSparks(t, dt, B)
+  drawBottle(t, B, sun, par)
+  stepFeather(dt, t); drawFeather(B)
+  stepBubbles(dt); drawBubbles(B)
+  for (const w of weeds) if (w.depth < 1) drawWeed(w, t, par)         // 近处
+  drawRock(par)
+  // 数字：被光柱扫到时亮
+  const L = Math.min(1, lightAt(0.5, 0.72, B, AS) * 1.4)
+  const g = 0.25 + L * 0.75
+  numEl.style.textShadow = `0 0 ${(14 + g * 34).toFixed(1)}px rgba(160,200,255,${(0.15 + g * 0.5).toFixed(3)}), 0 2px 14px rgba(0,5,20,.6)`
+  numEl.style.opacity = (0.72 + g * 0.28).toFixed(3)
   requestAnimationFrame(frame)
 }
 requestAnimationFrame(frame)
