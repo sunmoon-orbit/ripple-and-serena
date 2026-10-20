@@ -157,7 +157,7 @@ void main(){
     vec2 q = vec2((uv.x - sx)*a/0.075, (uv.y - (floorY(BX) - 0.03))/0.02);
     float spot = exp(-dot(q, q)) * BL;
     vec3 hue = 0.5 + 0.5*cos(6.2831*(q.x*0.25 + vec3(0.0, 0.33, 0.67)) + t*0.4);
-    sand += mix(vec3(0.45, 0.85, 0.75), hue, 0.7) * spot * 0.9;
+    sand += mix(vec3(0.40, 0.70, 0.80), hue, 0.22) * spot * 0.45;   // 1020 她：「打到水底的光有点太彩了」，彩虹压淡成一点青绿
     col = mix(col, sand, smoothstep(0.0, 0.006, fy - uv.y));
   }
   // 远处一层薄雾：靠中下方，给前后拉开一点距离
@@ -194,7 +194,7 @@ function resize() {
   glc.width = Math.round(W * s * DPR); glc.height = Math.round(H * s * DPR)
   if (glOK) gl.viewport(0, 0, glc.width, glc.height)
 }
-addEventListener('resize', resize); resize()
+addEventListener('resize', () => { resize(); rockTex = null }); resize()
 
 // 水草：软带子。depth 0 = 最近（深、大、挪得多），1 = 最远（淡、小、挪得少）
 const weeds = [
@@ -225,22 +225,85 @@ function drawWeed(wd, t, par) {
     const g = ctx.createLinearGradient(0, by - L, 0, by)
     g.addColorStop(0, weedColor(wd.depth, 0.55)); g.addColorStop(1, weedColor(wd.depth * 0.6, 0.95))
     ctx.fillStyle = g; ctx.fill()
+    if (wd.depth === 1) continue
+    // 质感（她 1020：「海草和石头的质感都可以再添加一下」）：中间一条叶脉；朝光那条边一道亮边，亮多少看那儿的光
+    const mid = left.map((p, i) => [(p[0] + right[i][0]) / 2, p[1]])
+    ctx.strokeStyle = weedColor(Math.min(1, wd.depth + 0.35), 0.5); ctx.lineWidth = 1
+    ctx.beginPath(); mid.forEach((p, i) => i ? ctx.lineTo(...p) : ctx.moveTo(...p)); ctx.stroke()
+    const edge = sunNow < wd.x ? left : right
+    for (let i = 1; i < edge.length; i++) {
+      const u = i / N, lt = lightAt(wd.x, FLOOR(wd.x) + wd.h * u, B_now, AS)
+      const al = 0.06 + lt * 0.55
+      ctx.strokeStyle = `rgba(120,170,240,${al.toFixed(3)})`; ctx.lineWidth = 1.2
+      ctx.beginPath(); ctx.moveTo(...edge[i - 1]); ctx.lineTo(...edge[i]); ctx.stroke()
+    }
+    // 几处斑点（叶子上附着的东西）
+    ctx.fillStyle = weedColor(Math.min(1, wd.depth + 0.25), 0.35)
+    for (let i = 3; i < N; i += 4) { const p = mid[i]; ctx.beginPath(); ctx.ellipse(p[0] + ((i * 7) % 5 - 2), p[1], 1.3, 2.2, 0, 0, Math.PI * 2); ctx.fill() }
   }
 }
+let sunNow = 0.5, B_now = null
 
 // 前景石头：左下角一大块黑，边上一点点冷光
-function drawRock(par) {
+function rockPath() {
+  const p = new Path2D()
+  p.moveTo(-60, H); p.lineTo(-60, H * 0.52)
+  p.bezierCurveTo(W * 0.06, H * 0.50, W * 0.12, H * 0.60, W * 0.17, H * 0.66)
+  p.bezierCurveTo(W * 0.24, H * 0.74, W * 0.22, H * 0.82, W * 0.33, H * 0.88)
+  p.bezierCurveTo(W * 0.40, H * 0.92, W * 0.44, H * 0.97, W * 0.46, H)
+  p.closePath(); return p
+}
+// 石头的纹理只画一次存起来（斑驳、几道裂缝、几块稍亮的面），每帧贴上去
+let rockTex = null
+function buildRock() {
+  rockTex = document.createElement('canvas'); rockTex.width = W * DPR; rockTex.height = H * DPR
+  const c = rockTex.getContext('2d'); c.setTransform(DPR, 0, 0, DPR, 0, 0)
+  const path = rockPath()
+  c.fillStyle = '#02060f'; c.fill(path)
+  c.save(); c.clip(path)
+  let seed = 7; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647
+  for (let i = 0; i < 260; i++) {               // 斑驳
+    const x = rnd() * W * 0.5, y = H * 0.48 + rnd() * H * 0.55, r = 4 + rnd() * 26
+    const g = c.createRadialGradient(x, y, 0, x, y, r)
+    const l = rnd() < 0.5 ? '18,30,52' : '0,2,6'
+    g.addColorStop(0, `rgba(${l},${(0.25 + rnd() * 0.35).toFixed(2)})`); g.addColorStop(1, `rgba(${l},0)`)
+    c.fillStyle = g; c.beginPath(); c.arc(x, y, r, 0, Math.PI * 2); c.fill()
+  }
+  for (let i = 0; i < 7; i++) {                  // 稍亮的面：朝上的斜面
+    const x = rnd() * W * 0.3, y = H * 0.56 + rnd() * H * 0.4
+    c.fillStyle = `rgba(30,50,85,${(0.12 + rnd() * 0.12).toFixed(2)})`
+    c.beginPath(); c.moveTo(x, y); c.lineTo(x + 20 + rnd() * 40, y - 6 - rnd() * 14); c.lineTo(x + 30 + rnd() * 40, y + 10 + rnd() * 20); c.lineTo(x + rnd() * 10, y + 16 + rnd() * 20); c.closePath(); c.fill()
+  }
+  c.strokeStyle = 'rgba(0,0,0,.75)'; c.lineCap = 'round'   // 裂缝
+  for (let i = 0; i < 6; i++) {
+    let x = rnd() * W * 0.25, y = H * 0.58 + rnd() * H * 0.35
+    c.lineWidth = 0.8 + rnd() * 1.4; c.beginPath(); c.moveTo(x, y)
+    for (let j = 0; j < 5; j++) { x += 6 + rnd() * 16; y += (rnd() - 0.3) * 18; c.lineTo(x, y) }
+    c.stroke()
+  }
+  for (let i = 0; i < 90; i++) {                  // 细小的颗粒
+    c.fillStyle = `rgba(60,90,140,${(0.08 + rnd() * 0.15).toFixed(2)})`
+    c.fillRect(rnd() * W * 0.45, H * 0.5 + rnd() * H * 0.5, 1 + rnd(), 1 + rnd())
+  }
+  c.restore()
+  // 石头上长的几簇小水草
+  for (let i = 0; i < 4; i++) {
+    const u = 0.15 + i * 0.2, bx = W * (0.04 + u * 0.36), by = H * (0.52 + u * 0.42) + 3
+    for (let k = 0; k < 5; k++) {
+      c.strokeStyle = `rgba(14,40,46,${(0.7 + rnd() * 0.3).toFixed(2)})`; c.lineWidth = 1.4
+      c.beginPath(); c.moveTo(bx + k * 2, by); c.quadraticCurveTo(bx + k * 2 + (rnd() - 0.5) * 10, by - 8 - rnd() * 8, bx + k * 3 + (rnd() - 0.5) * 12, by - 14 - rnd() * 12); c.stroke()
+    }
+  }
+}
+function drawRock(par, B) {
   const o = par * 46
+  if (!rockTex) buildRock()   // 换尺寸时 resize 那边会清掉
   ctx.save(); ctx.translate(o, 0)
-  ctx.beginPath()
-  ctx.moveTo(-60, H)
-  ctx.lineTo(-60, H * 0.52)
-  ctx.bezierCurveTo(W * 0.06, H * 0.50, W * 0.12, H * 0.60, W * 0.17, H * 0.66)
-  ctx.bezierCurveTo(W * 0.24, H * 0.74, W * 0.22, H * 0.82, W * 0.33, H * 0.88)
-  ctx.bezierCurveTo(W * 0.40, H * 0.92, W * 0.44, H * 0.97, W * 0.46, H)
-  ctx.closePath()
-  ctx.fillStyle = '#01040b'; ctx.fill()
-  ctx.strokeStyle = 'rgba(90,130,200,.16)'; ctx.lineWidth = 2; ctx.stroke()
+  ctx.drawImage(rockTex, 0, 0, W, H)
+  // 朝光的那条边：一道冷光，光柱扫过来时更亮
+  const lt = Math.min(1, lightAt(0.2, 0.36, B, AS) * 2)
+  ctx.strokeStyle = `rgba(110,160,235,${(0.12 + lt * 0.4).toFixed(3)})`; ctx.lineWidth = 2.2
+  ctx.stroke(rockPath())
   ctx.restore()
 }
 
@@ -275,31 +338,59 @@ function drawBottle(t, B, sun, par) {
   ctx.scale(1 + Math.abs(sdx) / L, 0.18); ctx.fillStyle = sg; ctx.beginPath(); ctx.arc(0, 0, L * 0.7, 0, Math.PI * 2); ctx.fill()
   ctx.restore()
   ctx.save(); ctx.translate(x, y); ctx.rotate(-0.12)
+  // 圆筒感（1020 她：「瓶子还是太平了」）：横截面上两边玻璃厚、颜色深，中间透；顶上一道长高光、底下一道反光；
+  // 瓶底画成椭圆端面，瓶口单独一截细颈
   const body = new Path2D()
-  body.moveTo(-L / 2, -R); body.lineTo(L * 0.22, -R)
-  body.quadraticCurveTo(L * 0.34, -R, L * 0.38, -R * 0.45); body.lineTo(L / 2, -R * 0.40)
-  body.lineTo(L / 2, R * 0.40); body.lineTo(L * 0.38, R * 0.45)
-  body.quadraticCurveTo(L * 0.34, R, L * 0.22, R); body.lineTo(-L / 2, R)
-  body.quadraticCurveTo(-L / 2 - R * 0.5, 0, -L / 2, -R); body.closePath()
-  // 玻璃：暗处几乎看不见，光里透出青绿
+  body.moveTo(-L / 2, -R); body.lineTo(L * 0.20, -R)
+  body.bezierCurveTo(L * 0.30, -R, L * 0.33, -R * 0.42, L * 0.40, -R * 0.40); body.lineTo(L / 2, -R * 0.40)
+  body.lineTo(L / 2, R * 0.40); body.lineTo(L * 0.40, R * 0.40)
+  body.bezierCurveTo(L * 0.33, R * 0.42, L * 0.30, R, L * 0.20, R); body.lineTo(-L / 2, R)
+  body.ellipse(-L / 2, 0, R * 0.32, R, 0, Math.PI / 2, Math.PI * 1.5); body.closePath()
+  const k = lit
+  const glass = (al) => `rgba(${(40 + k * 110) | 0},${(90 + k * 120) | 0},${(110 + k * 110) | 0},${al.toFixed(3)})`
   const bg = ctx.createLinearGradient(0, -R, 0, R)
-  bg.addColorStop(0, `rgba(${(60 + lit * 120) | 0},${(110 + lit * 130) | 0},${(140 + lit * 100) | 0},${(0.10 + lit * 0.22).toFixed(2)})`)
-  bg.addColorStop(1, `rgba(10,30,50,${(0.25 + lit * 0.1).toFixed(2)})`)
+  bg.addColorStop(0.00, glass(0.55 + k * 0.2)); bg.addColorStop(0.16, glass(0.22 + k * 0.1))
+  bg.addColorStop(0.50, glass(0.07 + k * 0.05)); bg.addColorStop(0.84, glass(0.20 + k * 0.08)); bg.addColorStop(1.00, glass(0.60 + k * 0.15))
   ctx.fillStyle = bg; ctx.fill(body)
-  ctx.strokeStyle = `rgba(170,215,255,${(0.10 + lit * 0.45).toFixed(2)})`; ctx.lineWidth = 1.2; ctx.stroke(body)
-  // 纸条＋红绳
-  ctx.fillStyle = `rgba(${(90 + lit * 150) | 0},${(85 + lit * 140) | 0},${(80 + lit * 110) | 0},.85)`
-  ctx.beginPath(); ctx.ellipse(-L * 0.06, R * 0.18, L * 0.22, R * 0.36, 0, 0, Math.PI * 2); ctx.fill()
-  ctx.strokeStyle = `rgba(${(90 + lit * 90) | 0},30,30,.8)`; ctx.lineWidth = 1.6
-  ctx.beginPath(); ctx.moveTo(-L * 0.06, R * 0.18 - R * 0.36); ctx.lineTo(-L * 0.06, R * 0.18 + R * 0.36); ctx.stroke()
-  ctx.fillStyle = `rgba(${(50 + lit * 90) | 0},${(35 + lit * 60) | 0},${(25 + lit * 40) | 0},.95)`; ctx.fillRect(L / 2 - 1, -R * 0.36, R * 0.42, R * 0.72)
-  // 受光那一侧的高光
-  if (lit > 0.05) {
-    const hx = (sun - BX) * L * 1.2
-    const hg = ctx.createLinearGradient(hx - 18, 0, hx + 18, 0)
-    hg.addColorStop(0, 'rgba(255,255,255,0)'); hg.addColorStop(.5, `rgba(235,245,255,${(lit * 0.7).toFixed(2)})`); hg.addColorStop(1, 'rgba(255,255,255,0)')
-    ctx.fillStyle = hg; ctx.fillRect(hx - 18, -R * 0.82, 36, R * 0.3)
-  }
+  // 纸条：隔着玻璃看，颜色被染青一点
+  ctx.save(); ctx.clip(body)
+  const pg = ctx.createLinearGradient(0, -R * 0.2, 0, R * 0.55)
+  pg.addColorStop(0, `rgba(${(120 + k * 120) | 0},${(120 + k * 110) | 0},${(105 + k * 80) | 0},.9)`)
+  pg.addColorStop(1, `rgba(${(60 + k * 80) | 0},${(65 + k * 75) | 0},${(65 + k * 55) | 0},.9)`)
+  ctx.fillStyle = pg
+  ctx.beginPath(); ctx.ellipse(-L * 0.08, R * 0.2, L * 0.24, R * 0.34, 0, 0, Math.PI * 2); ctx.fill()
+  ctx.strokeStyle = `rgba(0,0,0,.18)`; ctx.lineWidth = 0.8   // 卷起来的那几圈
+  for (const dx of [-0.2, -0.05, 0.08]) { ctx.beginPath(); ctx.ellipse(-L * 0.08 + dx * L, R * 0.2, L * 0.012, R * 0.3, 0, -1.2, 1.2); ctx.stroke() }
+  ctx.strokeStyle = `rgba(${(110 + k * 100) | 0},28,32,.85)`; ctx.lineWidth = 2
+  ctx.beginPath(); ctx.moveTo(-L * 0.08, R * 0.2 - R * 0.34); ctx.lineTo(-L * 0.08, R * 0.2 + R * 0.34); ctx.stroke()
+  // 底下一道反光（沙子反上来的）
+  const rg = ctx.createLinearGradient(-L / 2, 0, L * 0.3, 0)
+  rg.addColorStop(0, 'rgba(160,200,255,0)'); rg.addColorStop(.5, `rgba(160,200,255,${(0.10 + k * 0.25).toFixed(3)})`); rg.addColorStop(1, 'rgba(160,200,255,0)')
+  ctx.fillStyle = rg; ctx.fillRect(-L / 2, R * 0.62, L * 0.8, R * 0.16)
+  ctx.restore()
+  // 轮廓：上缘亮、下缘暗
+  const og = ctx.createLinearGradient(0, -R, 0, R)
+  og.addColorStop(0, `rgba(190,225,255,${(0.25 + k * 0.5).toFixed(3)})`); og.addColorStop(1, `rgba(120,160,200,${(0.10 + k * 0.2).toFixed(3)})`)
+  ctx.strokeStyle = og; ctx.lineWidth = 1.3; ctx.stroke(body)
+  // 瓶底端面（看得出是圆筒）和底部那圈厚玻璃
+  ctx.strokeStyle = `rgba(170,210,250,${(0.18 + k * 0.35).toFixed(3)})`; ctx.lineWidth = 1
+  ctx.beginPath(); ctx.ellipse(-L / 2, 0, R * 0.32, R * 0.98, 0, 0, Math.PI * 2); ctx.stroke()
+  ctx.beginPath(); ctx.ellipse(-L / 2 + R * 0.12, 0, R * 0.16, R * 0.55, 0, 0, Math.PI * 2); ctx.stroke()
+  // 瓶口一圈唇＋软木塞（塞子也是圆柱：上亮下暗）
+  ctx.beginPath(); ctx.ellipse(L / 2, 0, R * 0.12, R * 0.42, 0, 0, Math.PI * 2); ctx.stroke()
+  const cg = ctx.createLinearGradient(0, -R * 0.34, 0, R * 0.34)
+  cg.addColorStop(0, `rgb(${(90 + k * 110) | 0},${(65 + k * 80) | 0},${(40 + k * 50) | 0})`); cg.addColorStop(1, `rgb(${(35 + k * 50) | 0},${(25 + k * 35) | 0},${(18 + k * 22) | 0})`)
+  ctx.fillStyle = cg; ctx.fillRect(L / 2, -R * 0.33, R * 0.45, R * 0.66)
+  ctx.beginPath(); ctx.ellipse(L / 2 + R * 0.45, 0, R * 0.08, R * 0.33, 0, 0, Math.PI * 2); ctx.fill()
+  // 顶上一道长高光（受光越多越亮，位置跟着太阳挪一点）
+  const hx = (sun - BX) * L * 0.6
+  const hg = ctx.createLinearGradient(-L * 0.45 + hx, 0, L * 0.25 + hx, 0)
+  hg.addColorStop(0, 'rgba(255,255,255,0)'); hg.addColorStop(.35, `rgba(235,245,255,${(0.18 + k * 0.6).toFixed(3)})`)
+  hg.addColorStop(.7, `rgba(235,245,255,${(0.10 + k * 0.35).toFixed(3)})`); hg.addColorStop(1, 'rgba(255,255,255,0)')
+  ctx.fillStyle = hg
+  ctx.beginPath(); ctx.ellipse(-L * 0.1 + hx, -R * 0.62, L * 0.34, R * 0.09, 0, 0, Math.PI * 2); ctx.fill()
+  ctx.fillStyle = `rgba(240,250,255,${(0.15 + k * 0.5).toFixed(3)})`
+  ctx.beginPath(); ctx.ellipse(L * 0.36, -R * 0.36, L * 0.03, R * 0.05, -0.4, 0, Math.PI * 2); ctx.fill()  // 瓶肩一点
   ctx.restore()
 }
 
@@ -317,24 +408,50 @@ function drawFeather(B) {
   const f = feather, L = Math.min(W, H) * 0.15
   const lit = Math.min(1, lightAt(f.x, f.y, B, AS) * 1.5)
   ctx.save(); ctx.translate(X(f.x), Y(f.y)); ctx.rotate(f.rot)
-  ctx.lineCap = 'round'
-  const N = 26
-  for (let i = 0; i < N; i++) {
-    const u = i / (N - 1)                               // 0 根 → 1 尖
-    const py = L * 0.5 - u * L                          // 羽轴从下往上
-    const bend = Math.sin(u * Math.PI) * L * 0.04
-    const prof = Math.sin(Math.min(1, u * 1.25) * Math.PI) * (u < 0.12 ? u / 0.12 : 1)
-    const gapL = (u > 0.42 && u < 0.47) ? 0.35 : 1, gapR = (u > 0.66 && u < 0.71) ? 0.3 : 1   // 分叉
-    const lw = L * 0.20 * prof * gapL, rw = L * 0.11 * prof * gapR
-    ctx.strokeStyle = `rgba(${(12 + lit * 40) | 0},${(14 + lit * 40) | 0},${(24 + lit * 70) | 0},.92)`
-    ctx.lineWidth = L * 0.035
-    ctx.beginPath(); ctx.moveTo(bend, py); ctx.quadraticCurveTo(bend - lw * 0.6, py - L * 0.02, bend - lw, py - L * 0.07); ctx.stroke()
-    ctx.beginPath(); ctx.moveTo(bend, py); ctx.quadraticCurveTo(bend + rw * 0.6, py - L * 0.02, bend + rw, py - L * 0.06); ctx.stroke()
+  // 第三版（她：「羽毛有点怪」，第二版一根根羽枝分太开像蕨菜）：先填整片羽片（左宽右窄、尖上圆），
+  // 再在上面刷细羽枝纹；切两道小口子当分叉；根上一撮绒毛；下面露一截羽管
+  const ax = u => Math.sin(u * Math.PI) * L * 0.035          // 羽轴的弯
+  const ay = u => L * 0.45 - u * L * 0.95                     // u: 0 根 → 1 尖
+  const prof = u => Math.pow(Math.sin(Math.min(1, u * 1.08) * Math.PI * 0.5 + 0.0001), 0.6) * (1 - Math.pow(u, 3)) * Math.min(1, u * 5)
+  const vane = new Path2D(), M = 40
+  for (let i = 0; i <= M; i++) { const u = i / M; const p = [ax(u) - L * 0.17 * prof(u), ay(u) - L * 0.05 * prof(u)]; i ? vane.lineTo(...p) : vane.moveTo(...p) }
+  for (let i = M; i >= 0; i--) { const u = i / M; vane.lineTo(ax(u) + L * 0.095 * prof(u), ay(u) - L * 0.035 * prof(u)) }
+  vane.closePath()
+  const vg = ctx.createLinearGradient(-L * 0.17, 0, L * 0.1, 0)
+  vg.addColorStop(0, `rgba(${(14 + lit * 30) | 0},${(14 + lit * 26) | 0},${(28 + lit * 60) | 0},.95)`)
+  vg.addColorStop(.55, `rgba(${(8 + lit * 20) | 0},${(9 + lit * 20) | 0},${(16 + lit * 40) | 0},.97)`)
+  vg.addColorStop(1, `rgba(${(30 + lit * 70) | 0},${(26 + lit * 50) | 0},${(60 + lit * 110) | 0},.95)`)  // 乌鸦羽毛那点蓝紫
+  ctx.fillStyle = vg; ctx.fill(vane)
+  ctx.save(); ctx.clip(vane)
+  ctx.strokeStyle = `rgba(${(90 + lit * 120) | 0},${(100 + lit * 120) | 0},${(150 + lit * 100) | 0},${(0.10 + lit * 0.18).toFixed(3)})`
+  ctx.lineWidth = 0.6
+  for (let i = 0; i < 46; i++) {
+    const u = 0.05 + i / 46 * 0.93, x0 = ax(u), y0 = ay(u)
+    ctx.beginPath(); ctx.moveTo(x0, y0); ctx.quadraticCurveTo(x0 - L * 0.08, y0 - L * 0.015, x0 - L * 0.2, y0 - L * 0.07); ctx.stroke()
+    ctx.beginPath(); ctx.moveTo(x0, y0); ctx.quadraticCurveTo(x0 + L * 0.05, y0 - L * 0.01, x0 + L * 0.12, y0 - L * 0.05); ctx.stroke()
   }
-  // 羽轴＋受光的边
-  ctx.strokeStyle = `rgba(${(60 + lit * 140) | 0},${(70 + lit * 130) | 0},${(110 + lit * 140) | 0},${(0.35 + lit * 0.5).toFixed(2)})`
-  ctx.lineWidth = 1.3
-  ctx.beginPath(); ctx.moveTo(0, L * 0.62); ctx.quadraticCurveTo(L * 0.04, 0, 0, -L * 0.5); ctx.stroke()
+  // 两道分叉：用背景色细细划开
+  ctx.globalCompositeOperation = 'destination-out'; ctx.lineWidth = 1.4; ctx.strokeStyle = 'rgba(0,0,0,1)'
+  for (const [u, side] of [[0.46, -1], [0.68, 1]]) {
+    const x0 = ax(u) + side * L * 0.02, y0 = ay(u)
+    ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x0 + side * L * 0.2, y0 - L * 0.075); ctx.stroke()
+  }
+  ctx.restore()
+  // 根上的绒毛
+  ctx.strokeStyle = `rgba(${(40 + lit * 60) | 0},${(42 + lit * 60) | 0},${(60 + lit * 80) | 0},.55)`; ctx.lineWidth = 0.7
+  for (let i = 0; i < 14; i++) {
+    const u = 0.02 + i * 0.008, x0 = ax(u), y0 = ay(u), s = i % 2 ? 1 : -1
+    ctx.beginPath(); ctx.moveTo(x0, y0)
+    ctx.bezierCurveTo(x0 + s * L * 0.05, y0 - L * 0.01, x0 + s * L * 0.07, y0 + L * 0.03, x0 + s * L * (0.06 + (i % 3) * 0.02), y0 + L * 0.02)
+    ctx.stroke()
+  }
+  // 羽轴＋羽管（受光时亮）
+  ctx.strokeStyle = `rgba(${(70 + lit * 150) | 0},${(75 + lit * 140) | 0},${(100 + lit * 140) | 0},${(0.45 + lit * 0.45).toFixed(2)})`
+  ctx.lineCap = 'round'
+  ctx.lineWidth = 1.6; ctx.beginPath(); ctx.moveTo(0, L * 0.58); ctx.lineTo(ax(0), ay(0)); ctx.stroke()
+  ctx.lineWidth = 1.1; ctx.beginPath(); ctx.moveTo(ax(0), ay(0))
+  for (let i = 1; i <= 20; i++) { const u = i / 20 * 0.97; ctx.lineTo(ax(u), ay(u)) }
+  ctx.stroke()
   ctx.restore()
 }
 
@@ -369,10 +486,19 @@ function drawSparks(t, dt, B) {
     const x = X(p.x), y = Y(p.y)
     ctx.fillStyle = p.gold ? `rgba(255,214,150,${a.toFixed(3)})` : `rgba(205,228,255,${a.toFixed(3)})`
     ctx.beginPath(); ctx.arc(x, y, p.r, 0, Math.PI * 2); ctx.fill()
-    if (p.r > 1.6 && L > 0.3) {  // 大颗的带一点光晕和十字闪
-      ctx.fillStyle = p.gold ? `rgba(255,200,120,${(a * 0.18).toFixed(3)})` : `rgba(160,200,255,${(a * 0.18).toFixed(3)})`
-      ctx.beginPath(); ctx.arc(x, y, p.r * 4, 0, Math.PI * 2); ctx.fill()
-      ctx.fillRect(x - p.r * 5, y - 0.4, p.r * 10, 0.8); ctx.fillRect(x - 0.4, y - p.r * 5, 0.8, p.r * 10)
+    if (p.r > 1.6 && L > 0.3) {  // 大颗的带一点光晕和十字闪；光晕要中间亮往外散（1020 第二版画成实心圆，她看成「套了一圈小圆圈」）
+      const hr = p.r * 3.2
+      const hg = ctx.createRadialGradient(x, y, 0, x, y, hr)
+      const c = p.gold ? '255,205,140' : '170,205,255'
+      hg.addColorStop(0, `rgba(${c},${(a * 0.35).toFixed(3)})`); hg.addColorStop(1, `rgba(${c},0)`)
+      ctx.fillStyle = hg; ctx.beginPath(); ctx.arc(x, y, hr, 0, Math.PI * 2); ctx.fill()
+      const sl = p.r * 3.5 * tw
+      const lg = ctx.createLinearGradient(x - sl, y, x + sl, y)
+      lg.addColorStop(0, `rgba(${c},0)`); lg.addColorStop(.5, `rgba(${c},${(a * 0.5).toFixed(3)})`); lg.addColorStop(1, `rgba(${c},0)`)
+      ctx.fillStyle = lg; ctx.fillRect(x - sl, y - 0.35, sl * 2, 0.7)
+      const vg = ctx.createLinearGradient(x, y - sl, x, y + sl)
+      vg.addColorStop(0, `rgba(${c},0)`); vg.addColorStop(.5, `rgba(${c},${(a * 0.5).toFixed(3)})`); vg.addColorStop(1, `rgba(${c},0)`)
+      ctx.fillStyle = vg; ctx.fillRect(x - 0.35, y - sl, 0.7, sl * 2)
     }
   }
   ctx.globalCompositeOperation = 'source-over'
@@ -416,7 +542,7 @@ function frame(now) {
   const t = (now - t0) / 1000
   sun += (target - sun) * Math.min(1, dt * 3)
   const par = (sun - 0.5) * 2          // -1..1，视差用
-  const B = beams(sun, AS); B0 = B
+  const B = beams(sun, AS); B0 = B; B_now = B; sunNow = sun
   const BL = Math.min(1, lightAt(BX, FLOOR(BX) + 0.03, B, AS) * 1.6)
   if (glOK) {
     gl.uniform2f(U.R, glc.width, glc.height); gl.uniform1f(U.T, t)
@@ -431,7 +557,7 @@ function frame(now) {
   stepFeather(dt, t); drawFeather(B)
   stepBubbles(dt); drawBubbles(B)
   for (const w of weeds) if (w.depth < 1) drawWeed(w, t, par)         // 近处
-  drawRock(par)
+  drawRock(par, B)
   // 数字：被光柱扫到时亮
   const L = Math.min(1, lightAt(0.5, 0.72, B, AS) * 1.4)
   const g = 0.25 + L * 0.75
