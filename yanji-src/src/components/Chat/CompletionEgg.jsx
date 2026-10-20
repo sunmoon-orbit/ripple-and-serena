@@ -149,7 +149,9 @@ const CLAWD_GIFS = [
   'nightcap-sleeping.gif', 'nightcap-yawning.gif', 'winter-fur-waving.gif', 'winter-fur-heart-gift.gif', 'beret-painting.gif', 'aviator-leaping.gif',
 ])
 const CLAWD_POOL = [{ svg: CLAWD_COFFEE }, { svg: CLAWD_MUSIC }, ...CLAWD_GIFS.map((f) => ({ img: `${import.meta.env.BASE_URL}clawd/${f}` }))]
-const CROW_POOL = [{ svg: CROW_HEART }, { svg: CROW_SLEEP }]
+// 乌鸦衣柜（1020）：~/opt/pixel-crow/wardrobe.py 生成，底子是 1015 一起画的几帧，叠睡帽／围巾／派对帽
+const CROW_GIFS = ['crow-doze-nightcap.gif','crow-doze-scarf.gif','crow-listen-party.gif','crow-listen-scarf.gif','crow-proud-party.gif','crow-proud-scarf.gif','crow-startle-nightcap.gif','crow-startle-party.gif','crow-write-scarf.gif']
+const CROW_POOL = [{ svg: CROW_HEART }, { svg: CROW_SLEEP }, ...CROW_GIFS.map((f) => ({ img: `${import.meta.env.BASE_URL}clawd/${f}` }))]
 
 // 每次回复完成后调用：约 4% 概率返回一只小家伙，其余时候 null
 // （原 1%+4.9s 停留，阿颖聊了一周从没见过——期望太低，0709 调成 4%+8s）
