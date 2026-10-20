@@ -4226,13 +4226,23 @@ textarea.form-input { display: block; margin: 8px 16px 12px; }
   background: transparent; color: var(--text-muted); cursor: pointer;
 }
 .bookread-view-toggle button.on { background: var(--accent); color: #fff; }
-/* 每一行高 198px、下面压一条 8px 的隔板；书多了自动换行，每行底下都有板 */
+/* 每一行高 198px、下面压一块有厚度的隔板；书多了自动换行，每行底下都有板。
+   1020 她说太平：书后面加一面稍深的背板（顶上被上一层压出一点影子），
+   隔板分成亮的板面＋深的板沿＋底下一道软影，书才像「放在柜子里」 */
 .bookread-plank {
   --plank: color-mix(in srgb, var(--accent) 16%, color-mix(in srgb, var(--text) 14%, var(--card)));
+  --plank-top: color-mix(in srgb, #fff 35%, var(--plank));
+  --plank-edge: color-mix(in srgb, #000 12%, var(--plank));
+  --wall: color-mix(in srgb, var(--text) 5%, var(--card));
+  --wall-dark: color-mix(in srgb, var(--text) 11%, var(--card));
   display: flex; flex-wrap: wrap; align-items: flex-end; align-content: flex-start;
-  column-gap: 3px; row-gap: 8px; padding: 0 10px;
-  background: repeating-linear-gradient(to bottom, transparent 0 198px, var(--plank) 198px 206px);
-  border-radius: 0 0 3px 3px;
+  column-gap: 2px; row-gap: 16px; padding: 0 12px;
+  background: repeating-linear-gradient(to bottom,
+    var(--wall-dark) 0, var(--wall) 26px, var(--wall) 198px,
+    var(--plank-top) 198px 200px,
+    var(--plank-edge) 200px 208px,
+    rgba(0,0,0,.13) 208px, transparent 214px);
+  border-radius: 4px 4px 3px 3px;
 }
 .bookread-plank::after { content: ''; flex-basis: 100%; height: 0; }
 .bookread-spine-book {
@@ -4243,15 +4253,66 @@ textarea.form-input { display: block; margin: 8px 16px 12px; }
   font: inherit;
   /* 左亮右暗，像一根圆过的书脊；上下各一道压线 */
   background-image:
-    linear-gradient(to right, rgba(255,255,255,.10), transparent 35%, transparent 72%, rgba(0,0,0,.10)),
+    linear-gradient(to right, rgba(0,0,0,.10), rgba(255,255,255,.18) 28%, rgba(255,255,255,.04) 52%, transparent 70%, rgba(0,0,0,.16)),
     linear-gradient(to bottom, transparent 9px, rgba(255,255,255,.22) 9px 10px, transparent 10px calc(100% - 9px), rgba(0,0,0,.12) calc(100% - 9px) calc(100% - 8px), transparent calc(100% - 8px)) !important;
-  box-shadow: 1px 0 0 rgba(0,0,0,.06);
+  /* 书和书之间一道暗缝，右边投一点影子，体积靠这个出来 */
+  box-shadow: inset -1px 0 0 rgba(0,0,0,.14), 2px 0 3px rgba(0,0,0,.10);
   transition: transform .15s ease;
 }
 /* 让每本书的底都落在这一行的隔板上：行高靠这个撑出来 */
 .bookread-plank > .bookread-spine-book { margin-top: calc(198px - var(--h, 198px)); }
 .bookread-spine-book:active { transform: translateY(-6px); }
 @media (hover: hover) { .bookread-spine-book:hover { transform: translateY(-6px); } }
+/* 每层最后一本歪着靠（1020）：绕右下角转，左下角翘起来一点，像真书架上没靠稳的那本 */
+.bookread-plank > .bookread-spine-book:last-of-type:not(:first-of-type) {
+  transform-origin: 100% 100%; transform: rotate(6deg); margin-left: 8px;
+}
+.bookread-plank > .bookread-spine-book:last-of-type:not(:first-of-type):active { transform: rotate(6deg) translateY(-6px); }
+@media (hover: hover) { .bookread-plank > .bookread-spine-book:last-of-type:not(:first-of-type):hover { transform: rotate(6deg) translateY(-6px); } }
+
+/* 点书先转过来看封面（1020）：没传图就用书脊的颜色画一本素色布面精装 */
+.bookread-cover-stage {
+  position: fixed; inset: 0; z-index: 60; display: flex; align-items: center; justify-content: center;
+  background: rgba(20,16,12,.45); perspective: 1200px; animation: bookread-fade .2s ease;
+}
+@keyframes bookread-fade { from { opacity: 0; } }
+.bookread-cover-wrap { display: flex; flex-direction: column; align-items: center; gap: 16px; }
+.bookread-cover {
+  width: min(62vw, 240px); aspect-ratio: 5 / 7; position: relative; overflow: hidden;
+  border-radius: 3px 8px 8px 3px; color: var(--cover-ink);
+  background-color: var(--cover);
+  background-image:
+    linear-gradient(to right, rgba(0,0,0,.22), rgba(0,0,0,.06) 4%, rgba(255,255,255,.12) 6%, transparent 12%),
+    repeating-linear-gradient(0deg, rgba(255,255,255,.035) 0 1px, transparent 1px 3px),
+    repeating-linear-gradient(90deg, rgba(0,0,0,.03) 0 1px, transparent 1px 3px);
+  box-shadow: 0 18px 40px rgba(0,0,0,.35), 0 2px 6px rgba(0,0,0,.2);
+  transform-origin: 0 50%; animation: bookread-cover-in .45s cubic-bezier(.2,.8,.25,1);
+}
+@keyframes bookread-cover-in { from { transform: rotateY(-80deg) scale(.9); opacity: .4; } }
+.bookread-cover.has-image img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.bookread-cover.has-image::after {
+  content: ''; position: absolute; inset: 0; pointer-events: none;
+  background: linear-gradient(to right, rgba(0,0,0,.25), transparent 6%, rgba(255,255,255,.10) 7%, transparent 12%);
+}
+.bookread-cover-drawn {
+  position: absolute; inset: 0; padding: 18% 14% 12% 18%;
+  display: flex; flex-direction: column; align-items: center; text-align: center; gap: 10px;
+}
+.bookread-cover-rule { display: block; width: 46%; height: 0; border-top: 1px solid currentColor; opacity: .55; }
+.bookread-cover-rule.bottom { margin-top: auto; }
+.bookread-cover-title {
+  font-family: 'Noto Serif SC', 'Songti SC', serif; font-size: 22px; font-weight: 600;
+  letter-spacing: 3px; line-height: 1.35; margin-top: 8px; word-break: break-all;
+}
+.bookread-cover-author { font-size: 12px; letter-spacing: 2px; opacity: .8; }
+.bookread-cover-intro {
+  font-size: 11.5px; line-height: 1.6; opacity: .75; margin-top: 10px;
+  display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden;
+}
+.bookread-cover-loading { font-size: 11px; opacity: .6; }
+.bookread-cover-actions { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; }
+.bookread-cover-actions .roost-btn { min-width: 76px; }
+.bookread-cover-actions .roost-btn.ghost { background: color-mix(in srgb, var(--card) 85%, transparent); color: var(--text); }
 .bookread-spine-title {
   writing-mode: vertical-rl; text-orientation: mixed;
   font-size: 12.5px; line-height: 1.15; letter-spacing: 1px; font-weight: 500;

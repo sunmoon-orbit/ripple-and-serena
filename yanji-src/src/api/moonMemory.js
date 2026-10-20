@@ -266,6 +266,19 @@ export async function fetchBookAnnotationsAll(config, bookId) {
   return request(baseUrl, `/books/${bookId}/annotations`, { headers: headers(apiToken) })
 }
 
+// 封面（1020）：没传过 image 是 null，书架自己按书脊颜色画；传 null 换回画的
+export async function fetchBookCover(config, bookId) {
+  const { baseUrl, apiToken } = config
+  return request(baseUrl, `/books/${bookId}/cover`, { headers: headers(apiToken) })
+}
+
+export async function saveBookCover(config, bookId, image) {
+  const { baseUrl, apiToken } = config
+  return request(baseUrl, `/books/${bookId}/cover`, {
+    method: 'PUT', headers: headers(apiToken), body: JSON.stringify({ image }),
+  })
+}
+
 // 读讫章：读完一本盖一枚，阿颖和涟言各一枚分开盖
 export async function stampBook(config, bookId, reader) {
   const { baseUrl, apiToken } = config

@@ -5,7 +5,7 @@ import {
   fetchBooks, fetchBook, fetchBookChapter, createBook, appendBookChapters,
   deleteBook, createBookAnnotation, deleteBookAnnotation, saveBookBookmark,
   sendReadingHeartbeat, fetchBookChat, createBookChatMessage, stampBook, unstampBook,
-  fetchReadingActivity,
+  fetchReadingActivity, fetchBookCover, saveBookCover,
 } from '../../api/moonMemory'
 import { sendMessage } from '../../api/llm'
 import { useThemedConfirm } from '../ThemedConfirmDialog'
@@ -40,6 +40,24 @@ function spineLook(book) {
   const [r, g, b] = [1, 3, 5].map((k, n) => Math.round(parseInt(hex.slice(k, k + 2), 16) * 0.55 + GREY[n] * 0.45))
   const light = (r * 299 + g * 587 + b * 114) / 1000 > 158
   return { title, width, height, color: `rgb(${r}, ${g}, ${b})`, ink: light ? 'rgba(58,48,38,.86)' : 'rgba(255,252,246,.95)' }
+}
+
+// 她传的封面图：长边压到 720、转 jpeg，存进记忆库不至于太大
+function compressCover(file) {
+  return new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(file)
+    const img = new Image()
+    img.onload = () => {
+      const k = Math.min(1, 720 / Math.max(img.width, img.height))
+      const c = document.createElement('canvas')
+      c.width = Math.round(img.width * k); c.height = Math.round(img.height * k)
+      c.getContext('2d').drawImage(img, 0, 0, c.width, c.height)
+      URL.revokeObjectURL(url)
+      resolve(c.toDataURL('image/jpeg', 0.85))
+    }
+    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('这张图读不出来')) }
+    img.src = url
+  })
 }
 
 function beijingDateKey(date = new Date()) {
@@ -183,6 +201,8 @@ export default function BookRead({ onClose }) {
     try { localStorage.setItem(SHELF_VIEW_KEY, next) } catch { /* 存不上就每次回到默认 */ }
   }
   const [active, setActive] = useState(null)    // 选中的书（列表项）
+  const [coverBook, setCoverBook] = useState(null) // 书架上点了一本：先转过来看封面（1020）{book, image, loading}
+  const coverFileRef = useRef(null)
   const [chapter, setChapter] = useState(null)  // {idx,title,content,annotations}
   const [chapterViewKey, setChapterViewKey] = useState(0) // 只在真正打开章节时触发阅读位置恢复
   const [chapterCount, setChapterCount] = useState(1)
@@ -351,6 +371,39 @@ export default function BookRead({ onClose }) {
       if (!toc) setToc([]) // 保持面板打开，把错误亮出来
       setTocErr(`目录加载失败：${e?.message || e}`)
     }
+  }
+
+  function showCover(book) {
+    setCoverBook({ book, image: null, loading: !!book.has_cover })
+    if (book.has_cover) {
+      fetchBookCover(cfg, book.id)
+        .then((r) => setCoverBook((cur) => cur && cur.book.id === book.id ? { ...cur, image: r?.image || null, loading: false } : cur))
+        .catch(() => setCoverBook((cur) => cur && cur.book.id === book.id ? { ...cur, loading: false } : cur))
+    }
+  }
+
+  async function pickCover(e) {
+    const file = e.target.files?.[0]
+    e.target.value = ''
+    if (!file || !coverBook) return
+    const id = coverBook.book.id
+    try {
+      const image = await compressCover(file)
+      await saveBookCover(cfg, id, image)
+      setCoverBook((cur) => cur && cur.book.id === id ? { ...cur, image } : cur)
+      setBooks((list) => (list || []).map((b) => b.id === id ? { ...b, has_cover: 1 } : b))
+      showToast('封面换好了')
+    } catch (err) { showToast('封面没换上：' + (err.message || err)) }
+  }
+
+  async function dropCover() {
+    if (!coverBook) return
+    const id = coverBook.book.id
+    try {
+      await saveBookCover(cfg, id, null)
+      setCoverBook((cur) => cur && cur.book.id === id ? { ...cur, image: null } : cur)
+      setBooks((list) => (list || []).map((b) => b.id === id ? { ...b, has_cover: 0 } : b))
+    } catch (err) { showToast('没换回去：' + (err.message || err)) }
   }
 
   async function openBook(book) {
@@ -844,7 +897,7 @@ export default function BookRead({ onClose }) {
       const reading = b.bookmark_chapter != null
       return (
         <button
-          key={b.id} type="button" onClick={() => openBook(b)}
+          key={b.id} type="button" onClick={() => showCover(b)}
           className={'bookread-spine-book' + (reading ? ' has-ribbon' : '') + (b.stamps?.length > 0 ? ' has-seal' : '')}
           title={`${b.title}${b.author ? ' · ' + b.author : ''}`}
           aria-label={`${b.title}${reading ? `，书签在第 ${b.bookmark_chapter + 1} 章` : ''}`}
@@ -886,9 +939,40 @@ export default function BookRead({ onClose }) {
               ))}
             </div>
             {shelfView === 'spines' && books?.length > 0 && (
-              <div className="bookread-foot-hint" style={{ marginTop: 10, textAlign: 'center' }}>丝带是书签，红点是读讫。追更和删除在「列表」里。</div>
+              <div className="bookread-foot-hint" style={{ marginTop: 10, textAlign: 'center' }}>点书先看封面。丝带是书签，红点是读讫。追更和删除在「列表」里。</div>
             )}
           </div>
+          {coverBook && (() => {
+            const b = coverBook.book
+            const look = spineLook(b)
+            return (
+              <div className="bookread-cover-stage" onClick={() => setCoverBook(null)}>
+                <div className="bookread-cover-wrap" onClick={(e) => e.stopPropagation()}>
+                  <div className={'bookread-cover' + (coverBook.image ? ' has-image' : '')}
+                    style={{ '--cover': look.color, '--cover-ink': look.ink }}>
+                    {coverBook.image
+                      ? <img src={coverBook.image} alt={b.title} />
+                      : (
+                        <div className="bookread-cover-drawn">
+                          <i className="bookread-cover-rule" />
+                          <div className="bookread-cover-title">{look.title}</div>
+                          {b.author && <div className="bookread-cover-author">{b.author}</div>}
+                          {b.intro && <div className="bookread-cover-intro">{b.intro}</div>}
+                          <i className="bookread-cover-rule bottom" />
+                          {coverBook.loading && <div className="bookread-cover-loading">封面取来中……</div>}
+                        </div>
+                      )}
+                  </div>
+                  <div className="bookread-cover-actions">
+                    <button className="roost-btn" onClick={() => { const bk = b; setCoverBook(null); openBook(bk) }}>翻开</button>
+                    <button className="roost-btn ghost" onClick={() => coverFileRef.current?.click()}>{coverBook.image ? '换一张' : '换封面'}</button>
+                    {coverBook.image && <button className="roost-btn ghost" onClick={dropCover}>换回画的</button>}
+                  </div>
+                  <input ref={coverFileRef} type="file" accept="image/*" hidden onChange={pickCover} />
+                </div>
+              </div>
+            )
+          })()}
         </div>
       </div>
     )
