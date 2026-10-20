@@ -2242,6 +2242,13 @@ function fillAlarmCards(root, msgKey) {
       if (!r.startsWith('ok')) { card.querySelector('.rv-alarm-msg').textContent = '没设上：' + r; return }
       try { const all = JSON.parse(localStorage.getItem(ALARM_DONE_KEY) || '{}'); all[key] = Date.now(); localStorage.setItem(ALARM_DONE_KEY, JSON.stringify(all)) } catch {}
       btn.disabled = true; btn.textContent = '已设好 ✓'
+      // 1020 她问「闹钟是循环的吗」：头一天点晚了，壳把过了点的顺延到第二天，她不知道。点的时候说一声
+      const now = new Date()
+      if (now.getHours() * 60 + now.getMinutes() >= h * 60 + m) {
+        const t = document.createElement('div'); t.className = 'rv-alarm-tip'
+        t.textContent = `今天这个点已经过了，设在明天 ${hh}，只响一次`
+        card.querySelector('.rv-alarm-main').appendChild(t)
+      }
       addAlarmCancel(card, h, m, key)
       if (r === 'ok-nofs' && typeof N.openAlarmFullScreenSettings === 'function') {
         const tip = document.createElement('button')
