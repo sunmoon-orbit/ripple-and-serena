@@ -2231,7 +2231,9 @@ function addAlarmCancel(card, h, m, key) {
   }
   card.querySelector('.rv-alarm-main').appendChild(c)
 }
-function fillAlarmCards(root, msgKey) {
+// 1020 她：「你不能直接帮我设吗，还要我点一下设好？……不想要的话直接点取消就好了」——
+// 改成我新发来的闹钟卡自动设上（十分钟内、刚收到的才算，翻旧消息不会把过期的又设一遍），卡上留「取消这个闹钟」
+function fillAlarmCards(root, msgKey, autoSet = false) {
   root.querySelectorAll('.rv-alarm').forEach((card, idx) => {
     const h = +card.dataset.h, m = +card.dataset.m, msg = decodeURIComponent(card.dataset.msg || '') || '阿言叫你起床'
     const hh = String(h).padStart(2, '0') + ':' + String(m).padStart(2, '0')
@@ -2244,7 +2246,7 @@ function fillAlarmCards(root, msgKey) {
     const btn = card.querySelector('.rv-alarm-btn')
     if (done && can) addAlarmCancel(card, h, m, key)
     btn.onclick = e => {
-      e.stopPropagation()
+      e?.stopPropagation()
       try { if (typeof N.setAlarmAvatar === 'function') N.setAlarmAvatar(localStorage.getItem('raven-avatar') || '') } catch {}
       let r = ''; try { r = String(N.setAlarm(h, m, msg)) } catch (err) { r = err.message || '设不上' }
       if (!r.startsWith('ok')) { card.querySelector('.rv-alarm-msg').textContent = '没设上：' + r; return }
@@ -2265,6 +2267,9 @@ function fillAlarmCards(root, msgKey) {
         card.querySelector('.rv-alarm-main').appendChild(tip)
       }
     }
+    // 已经过了点的不自动设（会顺延到明天，偷偷多一个闹钟）——那种还是让她自己点
+    const ahead = (() => { const n = new Date(); return h * 60 + m > n.getHours() * 60 + n.getMinutes() })()
+    if (autoSet && can && !done && ahead) btn.onclick()
   })
 }
 const ASK_DONE_KEY = 'raven-ask-done'
@@ -2888,7 +2893,7 @@ function appendMsg(text, role, save = true, ts = Date.now(), msgId = null, suppl
       body.innerHTML = DOMPurify.sanitize(rendered, PURIFY_OPTS)
       fillMusicIcons(body)
       fillAskCards(body)
-      fillAlarmCards(body, String(msgId || ts))
+      fillAlarmCards(body, String(msgId || ts), role === 'assistant' && save && Date.now() - ts < 10 * 60 * 1000)
       attachStickerFallback(body)
       enhanceCodeBlocks(body)
       if (aq) { const q = document.createElement('div'); q.className = 'quote-ref'; q.textContent = aq[1]; body.prepend(q) }
