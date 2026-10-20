@@ -378,7 +378,7 @@
 }
 .completion-egg svg { width: 100%; height: 100%; display: block; image-rendering: pixelated; }
 /* Clawd 动图是 300×300、螃蟹只占下面一截：放大一点、往下压，看着和 SVG 那几只差不多大 */
-.completion-egg.is-gif { width: 150px; height: 150px; }
+.completion-egg.is-gif { width: 110px; height: 110px; } /* 1020 归巢那边她嫌大，这边也收一点 */
 .completion-egg.is-gif img { width: 100%; height: 100%; display: block; image-rendering: pixelated; }
 .completion-egg.fade-out { animation: egg-out 600ms ease-in forwards; }
 @keyframes egg-in { from { opacity: 0; transform: translateY(20px) scale(0.7); } to { opacity: 1; transform: translateY(0) scale(1); } }

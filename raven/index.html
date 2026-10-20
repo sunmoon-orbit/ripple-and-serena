@@ -1136,9 +1136,10 @@
   .rv-alarm-msg { font-size: 12.5px; color: var(--text-dim); margin-top: 4px; line-height: 1.4; }
   .rv-alarm-btn { flex-shrink: 0; border: 0; border-radius: 999px; padding: 7px 13px; background: var(--accent); color: var(--bg); font-size: 13px; font-family: inherit; cursor: pointer; }
   .rv-alarm-btn:disabled { background: none; color: var(--accent); padding: 7px 4px; cursor: default; }
-  .rv-egg { position: fixed; right: 16px; bottom: 96px; z-index: 900; width: 120px; height: 120px; cursor: pointer;
+  /* 1020 她截图「螃蟹好像有点大」：压在字上了。缩小、往角落贴 */
+  .rv-egg { position: fixed; right: 10px; bottom: 92px; z-index: 900; width: 84px; height: 84px; cursor: pointer;
     animation: rv-egg-in 320ms cubic-bezier(.2,.8,.2,1); filter: drop-shadow(0 8px 18px rgba(0,0,0,.18)); }
-  .rv-egg.is-gif { width: 140px; height: 140px; }
+  .rv-egg.is-gif { width: 92px; height: 92px; }
   .rv-egg img { width: 100%; height: 100%; display: block; image-rendering: pixelated; }
   .rv-egg.out { animation: rv-egg-out 600ms ease-in forwards; }
   @keyframes rv-egg-in { from { opacity: 0; transform: translateY(20px) scale(.7); } }
