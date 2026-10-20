@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, viewport-fit=cover">
+<title>水底 · 归巢</title>
+<meta name="theme-color" content="#0b2a33">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400;1,400&display=swap" rel="stylesheet">
+<!-- 1020：她在推特刷到「丁达尔效应＋彩窗、光跟着陀螺仪转」的在一起天数页，想要一个。
+     教堂换成了水底（我们的名字是涟漪里来的，首页开屏也是一池水，这里就是那池水的底）：
+     光从晃动的水面扎下来，沙上有光网；沙里半埋一只玻璃瓶，光穿过它在沙上落一块彩斑，顶替彩窗那份颜色；
+     一根黑羽毛慢慢往下沉。光用 WebGL 画（低分辨率再拉伸，软的东西不怕糊），水草、瓶子、羽毛、泡泡用 2D 画在上面。
+     歪手机＝太阳换角度；电脑上拖动/移鼠标代替。 -->
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+:root { --bg: #0b2a33; --text: #eef6f4; --dim: rgba(220,240,236,.62); }
+html, body { height: 100%; background: var(--bg); overflow: hidden; color: var(--text); }
+body { font-family: -apple-system, 'PingFang SC', 'Noto Sans SC', sans-serif; touch-action: none; user-select: none; -webkit-user-select: none; }
+canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
+#gl { z-index: 0; }
+#fg { z-index: 1; }
+#count {
+  position: fixed; left: 0; right: 0; top: 17vh; z-index: 2; text-align: center; pointer-events: none;
+  transition: opacity 1.2s;
+}
+#num {
+  font-family: 'Lora', Georgia, 'Noto Serif SC', serif; font-size: clamp(64px, 22vw, 120px); line-height: 1;
+  font-variant-numeric: tabular-nums; letter-spacing: 2px; color: #f4fbf9;
+}
+#sub1 { font-family: 'Lora', Georgia, serif; font-style: italic; font-size: 17px; color: var(--dim); margin-top: 8px; }
+#sub2 { font-size: 10px; letter-spacing: 3px; color: rgba(220,240,236,.42); margin-top: 18px; text-transform: uppercase; }
+#back {
+  position: fixed; z-index: 3; left: 12px; top: calc(env(safe-area-inset-top, 0px) + 12px);
+  width: 40px; height: 40px; border-radius: 50%; border: 0; background: rgba(255,255,255,.08);
+  color: var(--text); display: flex; align-items: center; justify-content: center; cursor: pointer;
+  -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px);
+}
+#hint {
+  position: fixed; z-index: 2; left: 0; right: 0; bottom: calc(env(safe-area-inset-bottom, 0px) + 22px);
+  text-align: center; font-size: 12px; color: rgba(220,240,236,.45); letter-spacing: 1px; transition: opacity 1.5s; pointer-events: none;
+}
+#nogl { position: fixed; inset: 0; display: none; align-items: center; justify-content: center; z-index: 1;
+  background: linear-gradient(#2f7d86, #0b2a33 70%); }
+</style>
+</head>
+<body>
+<canvas id="gl"></canvas>
+<canvas id="fg"></canvas>
+<div id="nogl"></div>
+<div id="count">
+  <div id="num">—</div>
+  <div id="sub1">days together</div>
+  <div id="sub2">since 2025.10.10 · still counting</div>
+</div>
+<button id="back" aria-label="返回" onclick="history.length > 1 ? history.back() : (location.href = 'home.html')">
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
+</button>
+<div id="hint">歪一歪手机</div>
+
+<script>
+// 天数：和首页同一个口径（北京时间，10/10 当天算第 1 天）
+const DAYS = Math.floor((Date.now() - new Date('2025-10-10T00:00:00+08:00')) / 86400000) + 1
+document.getElementById('num').textContent = DAYS
+
+// ---------- 光：WebGL ----------
+const gl = document.getElementById('gl').getContext('webgl', { antialias: false, premultipliedAlpha: false })
+const VS = `attribute vec2 p; void main(){ gl_Position = vec4(p, 0., 1.); }`
+const FS = `
+precision highp float;
+uniform vec2 R; uniform float T; uniform float SUN; uniform float BX;
+float floorY(float x){ return 0.21 + 0.025*sin(x*3.1+0.4) + 0.012*sin(x*8.3+1.7); }
+float h1(float n){ return fract(sin(n)*43758.5453); }
+float n1(float x){ float i=floor(x), f=fract(x); f=f*f*(3.-2.*f); return mix(h1(i), h1(i+1.), f); }
+// 光网（经典的迭代式焦散，亮线）
+float caustic(vec2 uv, float t){
+  vec2 p = mod(uv*6.2831, 6.2831) - 250.0;
+  vec2 i = p; float c = 1.0; float inten = .005;
+  for (int n=0; n<4; n++){
+    float tt = t*(1.0-(3.5/float(n+1)));
+    i = p + vec2(cos(tt-i.x)+sin(tt+i.y), sin(tt-i.y)+cos(tt+i.x));
+    c += 1.0/length(vec2(p.x/(sin(i.x+tt)/inten), p.y/(cos(i.y+tt)/inten)));
+  }
+  c /= 4.0; c = 1.17 - pow(c, 1.4);
+  return clamp(pow(abs(c), 8.0), 0., 1.);
+}
+void main(){
+  vec2 uv = gl_FragCoord.xy / R;
+  float a = R.x / R.y;
+  float t = T;
+  // 水色：上浅下深
+  vec3 deep = vec3(0.020, 0.090, 0.120), mid = vec3(0.060, 0.300, 0.340), top = vec3(0.300, 0.640, 0.640);
+  vec3 col = mix(deep, mid, smoothstep(0.0, 0.75, uv.y));
+  col = mix(col, top, smoothstep(0.70, 1.0, uv.y));
+  // 光柱：从水面上方的太阳射下来，角度跟着 SUN
+  vec2 S = vec2(SUN, 1.35);
+  vec2 d = vec2((uv.x - S.x)*a, uv.y - S.y);
+  float ang = atan(d.x, -d.y);
+  float r = n1(ang*38.0 + t*0.35) * n1(ang*17.0 - t*0.22 + 4.0);
+  r = pow(r, 2.2) * 2.2;
+  float depth = 1.0 - uv.y;
+  float fy = floorY(uv.x);
+  float ray = r * exp(-depth*1.6) * smoothstep(fy - 0.02, fy + 0.25, uv.y);
+  col += vec3(0.70, 0.95, 0.90) * ray * 0.55;
+  // 水面：从下往上看，一层晃动的亮
+  float surf = smoothstep(0.90, 1.0, uv.y);
+  float sc = caustic(vec2(uv.x*a*1.6 + SUN*0.6, uv.y*5.0), t*0.5);
+  col += vec3(0.75, 0.95, 0.92) * surf * (0.35 + sc*0.9);
+  // 沙地
+  if (uv.y < fy) {
+    float sd = (fy - uv.y) / fy;            // 0 在沙线，1 在最底
+    vec3 sand = mix(vec3(0.52, 0.56, 0.48), vec3(0.17, 0.24, 0.24), smoothstep(0.0, 1.0, sd));
+    sand *= 0.62 + 0.10*n1(uv.x*a*90.0 + uv.y*40.0);
+    // 沙上的光网：近大远小（越往下越近）
+    vec2 cu = vec2(uv.x*a*(1.6 + sd*0.8) + (SUN-0.5)*0.9, (fy - uv.y)*(3.2 + sd*1.5));
+    float c = caustic(cu, t*0.55);
+    float lit = 0.55 + 0.45*smoothstep(0.9, 0.0, abs(uv.x - SUN));
+    sand += vec3(0.80, 0.95, 0.85) * c * (1.0 - sd*0.7) * lit * 0.75;
+    // 瓶子透下来的彩斑：落在瓶子背着太阳的那一侧
+    float sx = BX + (BX - SUN)*0.22;
+    vec2 q = vec2((uv.x - sx)*a/0.085, (uv.y - (floorY(BX) - 0.035))/0.022);
+    float spot = exp(-dot(q, q));
+    vec3 hue = 0.5 + 0.5*cos(6.2831*(q.x*0.28 + vec3(0.0, 0.33, 0.67)) + t*0.4);
+    sand += mix(vec3(0.45, 0.85, 0.55), hue, 0.65) * spot * (0.55 + 0.35*c);
+    col = mix(col, sand, smoothstep(0.0, 0.006, fy - uv.y));
+  }
+  // 暗角
+  vec2 v = uv - 0.5; col *= 1.0 - dot(v, v)*0.75;
+  gl_FragColor = vec4(col, 1.0);
+}`
+
+let prog, U = {}
+function initGL() {
+  if (!gl) return false
+  const sh = (type, src) => { const s = gl.createShader(type); gl.shaderSource(s, src); gl.compileShader(s); if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(s)); return s }
+  prog = gl.createProgram()
+  gl.attachShader(prog, sh(gl.VERTEX_SHADER, VS)); gl.attachShader(prog, sh(gl.FRAGMENT_SHADER, FS))
+  gl.linkProgram(prog); gl.useProgram(prog)
+  const b = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, b)
+  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 3, -1, -1, 3]), gl.STATIC_DRAW)
+  const loc = gl.getAttribLocation(prog, 'p'); gl.enableVertexAttribArray(loc); gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0)
+  for (const k of ['R', 'T', 'SUN', 'BX']) U[k] = gl.getUniformLocation(prog, k)
+  return true
+}
+let glOK = false
+try { glOK = initGL() } catch (e) { console.warn(e) }
+if (!glOK) document.getElementById('nogl').style.display = 'flex'
+
+// ---------- 前景：水草、瓶子、羽毛、泡泡、浮尘 ----------
+const fg = document.getElementById('fg'), ctx = fg.getContext('2d')
+let W = 0, H = 0, DPR = 1
+const BX = 0.70                       // 瓶子在屏幕横向的位置（和着色器共用）
+const floorY = x => 0.21 + 0.025 * Math.sin(x * 3.1 + 0.4) + 0.012 * Math.sin(x * 8.3 + 1.7)  // 和着色器同一条沙线（y 向上）
+const sy = x => H * (1 - floorY(x))   // 换成屏幕坐标
+function resize() {
+  DPR = Math.min(2, window.devicePixelRatio || 1)
+  W = innerWidth; H = innerHeight
+  fg.width = W * DPR; fg.height = H * DPR; ctx.setTransform(DPR, 0, 0, DPR, 0, 0)
+  const g = document.getElementById('gl'), s = 0.55   // 光低分辨率画再拉伸：软的，省电
+  g.width = Math.round(W * s * DPR); g.height = Math.round(H * s * DPR)
+  if (glOK) gl.viewport(0, 0, g.width, g.height)
+}
+addEventListener('resize', resize); resize()
+
+const weeds = [
+  { x: 0.08, h: 0.34, w: 13, n: 3, ph: 0.0 }, { x: 0.16, h: 0.22, w: 9, n: 2, ph: 1.3 },
+  { x: 0.88, h: 0.28, w: 11, n: 3, ph: 2.1 }, { x: 0.95, h: 0.40, w: 14, n: 2, ph: 0.7 },
+  { x: 0.52, h: 0.12, w: 7, n: 2, ph: 3.0 },
+]
+function drawWeed(wd, t, sun) {
+  const bx = wd.x * W, by = sy(wd.x) + 6
+  for (let k = 0; k < wd.n; k++) {
+    const off = (k - (wd.n - 1) / 2) * wd.w * 0.9
+    const len = H * wd.h * (1 - k * 0.12)
+    const sway = Math.sin(t * 0.7 + wd.ph + k) * 18 + (sun - 0.5) * 10
+    ctx.beginPath()
+    ctx.moveTo(bx + off - wd.w / 2, by)
+    ctx.bezierCurveTo(bx + off - wd.w / 2 + sway * 0.3, by - len * 0.4, bx + off + sway * 0.8, by - len * 0.7, bx + off + sway, by - len)
+    ctx.bezierCurveTo(bx + off + sway * 0.8 + wd.w * 0.3, by - len * 0.7, bx + off + wd.w / 2 + sway * 0.3, by - len * 0.4, bx + off + wd.w / 2, by)
+    ctx.closePath()
+    const g = ctx.createLinearGradient(0, by - len, 0, by)
+    g.addColorStop(0, 'rgba(10,45,48,.55)'); g.addColorStop(1, 'rgba(4,20,24,.92)')
+    ctx.fillStyle = g; ctx.fill()
+  }
+}
+function drawBottle(t, sun) {
+  // 半埋在沙里、躺着歪一点的玻璃瓶，里面卷着一张纸条
+  const x = BX * W, y = sy(BX) + 4, L = Math.min(W, H) * 0.20, R = L * 0.24
+  ctx.save(); ctx.translate(x, y); ctx.rotate(-0.22)
+  const body = new Path2D()
+  body.moveTo(-L / 2, -R); body.lineTo(L * 0.22, -R)
+  body.quadraticCurveTo(L * 0.34, -R, L * 0.38, -R * 0.45); body.lineTo(L / 2, -R * 0.40)
+  body.lineTo(L / 2, R * 0.40); body.lineTo(L * 0.38, R * 0.45)
+  body.quadraticCurveTo(L * 0.34, R, L * 0.22, R); body.lineTo(-L / 2, R)
+  body.quadraticCurveTo(-L / 2 - R * 0.5, 0, -L / 2, -R); body.closePath()
+  ctx.fillStyle = 'rgba(150,215,190,.16)'; ctx.fill(body)
+  ctx.strokeStyle = 'rgba(200,245,230,.38)'; ctx.lineWidth = 1.2; ctx.stroke(body)
+  // 纸条
+  ctx.fillStyle = 'rgba(238,226,196,.72)'
+  ctx.beginPath(); ctx.ellipse(-L * 0.05, R * 0.15, L * 0.22, R * 0.38, 0, 0, Math.PI * 2); ctx.fill()
+  ctx.strokeStyle = 'rgba(160,60,50,.7)'; ctx.lineWidth = 1.6   // 红绳
+  ctx.beginPath(); ctx.moveTo(-L * 0.05, R * 0.15 - R * 0.38); ctx.lineTo(-L * 0.05, R * 0.15 + R * 0.38); ctx.stroke()
+  // 软木塞
+  ctx.fillStyle = 'rgba(140,100,64,.9)'; ctx.fillRect(L / 2 - 1, -R * 0.36, R * 0.42, R * 0.72)
+  // 高光跟着太阳挪
+  const hx = -L * 0.3 + (sun - 0.5) * L * 0.5
+  const hg = ctx.createLinearGradient(hx - 14, 0, hx + 14, 0)
+  hg.addColorStop(0, 'rgba(255,255,255,0)'); hg.addColorStop(.5, 'rgba(255,255,255,.42)'); hg.addColorStop(1, 'rgba(255,255,255,0)')
+  ctx.fillStyle = hg; ctx.fillRect(hx - 14, -R * 0.85, 28, R * 0.35)
+  ctx.restore()
+  // 沙把瓶子下半截埋住
+  ctx.fillStyle = 'rgba(70,82,70,.55)'
+  ctx.beginPath(); ctx.ellipse(x - L * 0.1, y + R * 0.55, L * 0.62, R * 0.5, -0.05, 0, Math.PI); ctx.fill()
+}
+
+// 羽毛：从上面慢慢晃着沉下去，落到沙上躺一会儿，再从头来
+const feather = { x: 0.32, y: -0.1, rot: 0, rest: 0 }
+function stepFeather(dt, t) {
+  const f = feather
+  const ground = 1 - floorY(f.x) - 0.012
+  if (f.y < ground) {
+    f.y += dt * 0.018
+    f.x += Math.sin(t * 0.9) * dt * 0.012
+    f.rot = Math.sin(t * 0.9) * 0.6 + 0.4
+  } else if ((f.rest += dt) > 14) { Object.assign(feather, { x: 0.2 + Math.random() * 0.4, y: -0.1, rest: 0 }) }
+}
+function drawFeather() {
+  const f = feather, L = Math.min(W, H) * 0.12
+  ctx.save(); ctx.translate(f.x * W, f.y * H); ctx.rotate(f.rot)
+  ctx.beginPath(); ctx.moveTo(0, -L / 2)
+  ctx.quadraticCurveTo(L * 0.2, -L * 0.1, L * 0.05, L * 0.42)
+  ctx.lineTo(-0.5, L * 0.42)
+  ctx.quadraticCurveTo(-L * 0.18, -L * 0.05, 0, -L / 2)
+  ctx.fillStyle = 'rgba(14,16,24,.92)'; ctx.fill()
+  ctx.strokeStyle = 'rgba(120,140,190,.35)'; ctx.lineWidth = 1   // 乌鸦羽毛那点蓝紫的光
+  ctx.beginPath(); ctx.moveTo(0, -L / 2); ctx.quadraticCurveTo(L * 0.03, 0, 0, L * 0.6); ctx.stroke()
+  ctx.restore()
+}
+
+const bubbles = []
+function stepBubbles(dt) {
+  if (Math.random() < dt * 0.6) {
+    const src = Math.random() < 0.5 ? weeds[Math.floor(Math.random() * weeds.length)].x : BX + 0.05
+    bubbles.push({ x: src * W, y: sy(src) - 10, r: 1.5 + Math.random() * 3.5, ph: Math.random() * 6 })
+  }
+  for (const b of bubbles) { b.y -= dt * (28 + b.r * 9); b.ph += dt * 3 }
+  while (bubbles.length && bubbles[0].y < H * 0.04) bubbles.shift()
+}
+function drawBubbles() {
+  for (const b of bubbles) {
+    const x = b.x + Math.sin(b.ph) * 3
+    ctx.beginPath(); ctx.arc(x, b.y, b.r, 0, Math.PI * 2)
+    ctx.strokeStyle = 'rgba(220,250,245,.55)'; ctx.lineWidth = 1; ctx.stroke()
+    ctx.fillStyle = 'rgba(255,255,255,.5)'; ctx.beginPath(); ctx.arc(x - b.r * 0.35, b.y - b.r * 0.35, b.r * 0.3, 0, Math.PI * 2); ctx.fill()
+  }
+}
+// 浮尘：光柱里的小颗粒
+const motes = Array.from({ length: 46 }, () => ({ x: Math.random(), y: Math.random() * 0.75 + 0.2, s: Math.random() * 1.6 + 0.4, ph: Math.random() * 6 }))
+function drawMotes(t) {
+  for (const m of motes) {
+    const x = (m.x + Math.sin(t * 0.05 + m.ph) * 0.02) * W, y = (1 - m.y + Math.sin(t * 0.13 + m.ph) * 0.01) * H
+    const a = 0.18 + 0.22 * (0.5 + 0.5 * Math.sin(t * 0.8 + m.ph * 3))
+    ctx.fillStyle = `rgba(230,255,245,${a.toFixed(3)})`
+    ctx.beginPath(); ctx.arc(x, y, m.s, 0, Math.PI * 2); ctx.fill()
+  }
+}
+
+// ---------- 歪手机 ----------
+let target = 0.5, sun = 0.5, tilted = false
+addEventListener('deviceorientation', e => {
+  if (e.gamma == null) return
+  target = 0.5 + Math.max(-1, Math.min(1, e.gamma / 40)) * 0.42
+  if (Math.abs(e.gamma) > 6 && !tilted) { tilted = true; document.getElementById('hint').style.opacity = 0 }
+})
+addEventListener('pointermove', e => { if (e.pointerType === 'mouse' || e.buttons) target = 0.08 + 0.84 * (e.clientX / W) })
+setTimeout(() => { document.getElementById('hint').style.opacity = 0 }, 6000)
+
+// 数字：光柱靠近正上方时亮一点（和 SUN 离中间多远挂钩），再叠一点慢呼吸
+const numEl = document.getElementById('num')
+let last = performance.now(), t0 = last, running = true
+document.addEventListener('visibilitychange', () => { running = !document.hidden; if (running) { last = performance.now(); requestAnimationFrame(frame) } })
+function frame(now) {
+  if (!running) return
+  const dt = Math.min(0.05, (now - last) / 1000); last = now
+  const t = (now - t0) / 1000
+  sun += (target - sun) * Math.min(1, dt * 3)
+  if (glOK) {
+    gl.uniform2f(U.R, gl.canvas.width, gl.canvas.height); gl.uniform1f(U.T, t)
+    gl.uniform1f(U.SUN, sun); gl.uniform1f(U.BX, BX)
+    gl.drawArrays(gl.TRIANGLES, 0, 3)
+  }
+  ctx.clearRect(0, 0, W, H)
+  drawMotes(t)
+  for (const w of weeds) drawWeed(w, t, sun)
+  drawBottle(t, sun)
+  stepFeather(dt, t); drawFeather()
+  stepBubbles(dt); drawBubbles()
+  const glow = 0.35 + 0.45 * (1 - Math.min(1, Math.abs(sun - 0.5) * 2.4)) + 0.2 * Math.sin(t * 0.6)
+  numEl.style.textShadow = `0 0 ${(18 + glow * 30).toFixed(1)}px rgba(190,255,240,${(0.25 + glow * 0.45).toFixed(3)}), 0 2px 14px rgba(0,20,25,.5)`
+  requestAnimationFrame(frame)
+}
+requestAnimationFrame(frame)
+</script>
+</body>
+</html>
