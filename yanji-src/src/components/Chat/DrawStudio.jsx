@@ -36,9 +36,53 @@ function bumpCount() {
   return n
 }
 // 地址填到哪一层都认：https://x.com、https://x.com/v1、https://x.com/v1/ 都拼成 …/v1/images/generations
-function endpoint(base) {
+// 带参考图时走 …/v1/images/edits（1020 她：「如果语言表达不出来的话，可以用火柴人……去给模型喂动作」）
+function endpoint(base, path = 'generations') {
   const b = (base || 'https://api.openai.com').trim().replace(/\/+$/, '')
-  return /\/v1$/.test(b) ? `${b}/images/generations` : `${b}/v1/images/generations`
+  return /\/v1$/.test(b) ? `${b}/images/${path}` : `${b}/v1/images/${path}`
+}
+const MAX_REFS = 4
+// 火柴人参考图会被模型当成「画风」照抄，提示词前面垫一句说清楚它只管动作
+const SKETCH_HINT = '（参考图里的火柴人／线条草图只表示人物的姿势、动作和构图，不要照抄它的线条和画风，按下面的描述正常画。）\n'
+
+// 现场画火柴人：手指在白底上画黑线，能撤销、清空
+function SketchPad({ onDone, onCancel }) {
+  const cv = useRef(null)
+  const strokes = useRef([])
+  const cur = useRef(null)
+  const [, bump] = useState(0)
+  const [width, setWidth] = useState(10)
+  const redraw = () => {
+    const c = cv.current; if (!c) return
+    const g = c.getContext('2d')
+    g.fillStyle = '#fff'; g.fillRect(0, 0, c.width, c.height)
+    g.strokeStyle = '#111'; g.lineCap = 'round'; g.lineJoin = 'round'
+    for (const st of strokes.current) {
+      g.lineWidth = st.w; g.beginPath()
+      st.pts.forEach(([x, y], i) => (i ? g.lineTo(x, y) : g.moveTo(x, y)))
+      if (st.pts.length === 1) g.lineTo(st.pts[0][0] + .1, st.pts[0][1])
+      g.stroke()
+    }
+  }
+  useEffect(redraw, [])
+  const at = (e) => { const r = cv.current.getBoundingClientRect(); return [(e.clientX - r.left) * cv.current.width / r.width, (e.clientY - r.top) * cv.current.height / r.height] }
+  return (
+    <div className="draw-sketch">
+      <canvas ref={cv} width={768} height={768}
+        onPointerDown={e => { e.currentTarget.setPointerCapture(e.pointerId); cur.current = { w: width, pts: [at(e)] }; strokes.current.push(cur.current); redraw() }}
+        onPointerMove={e => { if (!cur.current) return; cur.current.pts.push(at(e)); redraw() }}
+        onPointerUp={() => { cur.current = null; bump(n => n + 1) }}
+        onPointerCancel={() => { cur.current = null }} />
+      <div className="draw-sketch-bar">
+        <label>粗细<input type="range" min="4" max="28" value={width} onChange={e => setWidth(+e.target.value)} /></label>
+        <button onClick={() => { strokes.current.pop(); redraw(); bump(n => n + 1) }}>撤销</button>
+        <button onClick={() => { strokes.current = []; redraw(); bump(n => n + 1) }}>清空</button>
+        <button onClick={onCancel}>不画了</button>
+        <button className="on" disabled={!strokes.current.length} onClick={() => onDone(cv.current.toDataURL('image/png'))}>用这张</button>
+      </div>
+      <small>画个火柴人摆好动作就行：圆圈是头，线是身子和四肢。画得丑没关系，模型只看姿势。</small>
+    </div>
+  )
 }
 async function toDataUrl(blob) {
   return await new Promise((ok, bad) => { const fr = new FileReader(); fr.onload = () => ok(fr.result); fr.onerror = bad; fr.readAsDataURL(blob) })
@@ -64,6 +108,9 @@ export default function DrawStudio({ onClose, onSendToChat }) {
   const [view, setView] = useState(null)   // 点开大图的那一张
   const [err, setErr] = useState('')        // 报错留在窗口里，不再红框一闪就没（1015 她：「突然闪了一个红框，然后啥也没输出」）
   const [partial, setPartial] = useState('') // 边画边传时的半成品
+  const [refs, setRefs] = useState([])       // 参考图 [{id, dataUrl, sketch}]，有就走 /images/edits
+  const [sketching, setSketching] = useState(false)
+  const refInput = useRef(null)
   const timer = useRef(null)
   const ctrl = useRef(null)   // 停掉卡住的请求（1016 第一张等了四百秒还没出来，只能干等）
 
@@ -75,13 +122,18 @@ export default function DrawStudio({ onClose, onSendToChat }) {
   // 发一次请求。stream=true 时让它边画边传半成品（partial_images），连接一直有动静，
   // 就不会被中转站前面的 Cloudflare 一百秒没回话就掐断（1015 第一次画了九十多秒被掐，没扣费）。
   // 中转站不支持流式、直接回一整个 JSON 的，也照常接住。
-  async function request(body) {
-    const r = await fetch(endpoint(base), {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${String(key).trim()}` },
-      body: JSON.stringify(body),
-      signal: ctrl.current?.signal,
-    })
+  async function request(body, images = null) {
+    let init
+    if (images?.length) {
+      // 参考图：multipart 发到 /images/edits；一张时字段叫 image，几张时叫 image[]（跟官方 SDK 一样）
+      const fd = new FormData()
+      for (const [k, v] of Object.entries(body)) fd.append(k, typeof v === 'string' ? v : String(v))
+      for (let i = 0; i < images.length; i++) fd.append(images.length > 1 ? 'image[]' : 'image', await dataUrlToBlob(images[i]), `ref-${i}.png`)
+      init = { method: 'POST', headers: { Authorization: `Bearer ${String(key).trim()}` }, body: fd, signal: ctrl.current?.signal }
+    } else {
+      init = { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${String(key).trim()}` }, body: JSON.stringify(body), signal: ctrl.current?.signal }
+    }
+    const r = await fetch(endpoint(base, images?.length ? 'edits' : 'generations'), init)
     const ct = r.headers.get('content-type') || ''
     if (!r.ok) {
       const raw = await r.text(); let d = null; try { d = JSON.parse(raw) } catch {}
@@ -125,13 +177,15 @@ export default function DrawStudio({ onClose, onSendToChat }) {
     setBusy(true); setElapsed(0); setErr(''); setPartial('')
     ctrl.current = new AbortController()
     const t0 = Date.now(); timer.current = setInterval(() => setElapsed(Math.round((Date.now() - t0) / 1000)), 1000)
-    const body = { model: conf.model.trim(), prompt: text, n: 1 }
+    const refImgs = refs.map(r => r.dataUrl)
+    const body = { model: conf.model.trim(), prompt: (refs.some(r => r.sketch) ? SKETCH_HINT : '') + text, n: 1 }
     if (conf.size !== 'auto') body.size = conf.size
     if (conf.quality !== 'auto') body.quality = conf.quality
     if (conf.transparent) body.background = 'transparent'
     try {
       let res
-      if (conf.stream) {
+      if (refImgs.length) res = await request(body, refImgs)   // 带参考图不流式：edits 接口各家支持得更参差
+      else if (conf.stream) {
         try { res = await request({ ...body, stream: true, partial_images: 2 }) }
         catch (e) {
           // 中转站不认 stream／partial_images 这类参数时会立刻回 4xx：退回不流式再来一次
@@ -139,7 +193,7 @@ export default function DrawStudio({ onClose, onSendToChat }) {
           else throw e
         }
       } else res = await request(body)
-      const entry = { id: Date.now(), prompt: text, model: body.model, size: conf.size, dataUrl: res.dataUrl, at: new Date().toISOString(), usage: res.usage }
+      const entry = { id: Date.now(), prompt: text, model: body.model, size: conf.size, dataUrl: res.dataUrl, at: new Date().toISOString(), usage: res.usage, refs: refImgs.length }
       saveHist([entry, ...hist].slice(0, MAX_HIST))
       setCount(bumpCount())
       setView(entry); setPartial('')
@@ -149,7 +203,7 @@ export default function DrawStudio({ onClose, onSendToChat }) {
       if (e?.name === 'AbortError') { setErr(`第 ${sec} 秒你停掉了。中转站那头可能还在画，扣没扣钱去它后台看一眼再重画。`); return }
       setErr(/Failed to fetch|NetworkError|Load failed|network/i.test(msg)
         ? `第 ${sec} 秒连接断了，没拿到图（中转站那头断开的，不是你的网）。${conf.stream ? '可以先把「边画边传」去掉再试；' : ''}也可以换「中」档或者小一点的尺寸。`
-        : `第 ${sec} 秒失败：${msg}`)
+        : `第 ${sec} 秒失败：${msg}${refImgs.length && e?.status >= 400 && e?.status < 500 ? '（带参考图走的是 /images/edits，这家中转站可能不支持；把参考图拿掉就是普通画图）' : ''}`)
     } finally {
       clearInterval(timer.current); setBusy(false)
     }
@@ -168,6 +222,23 @@ export default function DrawStudio({ onClose, onSendToChat }) {
       setModels([...img, ...rest])
       showToast(img.length ? `找到 ${img.length} 个像是画图的模型` : '没认出画图模型，列表里自己挑', img.length ? 'success' : 'error')
     } catch (e) { showToast('拉不到模型：' + e.message, 'error') } finally { setFetching(false) }
+  }
+
+  async function addRefFiles(files) {
+    const list = [...(files || [])].slice(0, MAX_REFS - refs.length)
+    const add = []
+    for (const f of list) {
+      try {
+        // 压到长边 1024，参考图不用太大，传得快也省流量
+        const url = URL.createObjectURL(f)
+        const img = await new Promise((ok, bad) => { const i = new Image(); i.onload = () => ok(i); i.onerror = bad; i.src = url })
+        const k = Math.min(1, 1024 / Math.max(img.width, img.height))
+        const c = document.createElement('canvas'); c.width = Math.round(img.width * k); c.height = Math.round(img.height * k)
+        c.getContext('2d').drawImage(img, 0, 0, c.width, c.height); URL.revokeObjectURL(url)
+        add.push({ id: Date.now() + Math.random(), dataUrl: c.toDataURL('image/png'), sketch: false })
+      } catch { showToast('有一张图读不出来', 'error') }
+    }
+    if (add.length) setRefs(r => [...r, ...add].slice(0, MAX_REFS))
   }
 
   async function toAlbum(e) {
@@ -224,13 +295,31 @@ export default function DrawStudio({ onClose, onSendToChat }) {
 
           <textarea className="draw-prompt" value={prompt} onChange={e => setPrompt(e.target.value)} rows={3}
             placeholder="想画什么？比如：一只黑色小乌鸦捂着脸害羞，Q 版表情包，白底，粗线条" />
+          <div className="draw-refs">
+            <span className="draw-refs-label">参考图<small>（可选，最多 {MAX_REFS} 张；说不清的动作画个火柴人）</small></span>
+            <div className="draw-refs-row">
+              {refs.map(r => (
+                <div key={r.id} className="draw-ref-thumb">
+                  <img src={r.dataUrl} alt="参考图" />
+                  {r.sketch && <i>火柴人</i>}
+                  <button aria-label="拿掉" onClick={() => setRefs(x => x.filter(y => y.id !== r.id))}>×</button>
+                </div>
+              ))}
+              {refs.length < MAX_REFS && <>
+                <button className="draw-ref-add" onClick={() => setSketching(true)}>画火柴人</button>
+                <button className="draw-ref-add" onClick={() => refInput.current?.click()}>传图</button>
+              </>}
+            </div>
+            <input ref={refInput} type="file" accept="image/*" multiple hidden onChange={e => { addRefFiles(e.target.files); e.target.value = '' }} />
+          </div>
+          {sketching && <SketchPad onCancel={() => setSketching(false)} onDone={(u) => { setRefs(r => [...r, { id: Date.now(), dataUrl: u, sketch: true }].slice(0, MAX_REFS)); setSketching(false) }} />}
           <div className="draw-opts">
             <div className="draw-seg">{SIZES.map(([v, l]) => <button key={v} className={conf.size === v ? 'on' : ''} onClick={() => patch({ size: v })}>{l}</button>)}</div>
             <div className="draw-seg">{QUALITIES.map(([v, l]) => <button key={v} className={conf.quality === v ? 'on' : ''} onClick={() => patch({ quality: v })}>{l}</button>)}</div>
             <label className="draw-check"><input type="checkbox" checked={conf.transparent} onChange={e => patch({ transparent: e.target.checked })} />透明底（做贴纸）</label>
           </div>
           <label className="draw-check"><input type="checkbox" checked={conf.stream} onChange={e => patch({ stream: e.target.checked })} />边画边传（试验：有的中转站会因此断开，出问题就别勾）</label>
-          <button className="draw-go" disabled={busy} onClick={draw}>{busy ? `在画… ${elapsed} 秒` : '画'}</button>
+          <button className="draw-go" disabled={busy} onClick={draw}>{busy ? `在画… ${elapsed} 秒` : refs.length ? `照参考图画（${refs.length} 张）` : '画'}</button>
           {busy && <button className="draw-stop" onClick={() => ctrl.current?.abort()}>停</button>}
           {busy && elapsed >= 180 && <div className="draw-slow">超过三分钟了，平常一两分钟就出来，多半是中转站卡住了，可以停掉重来。</div>}
           {err && <div className="draw-err" onClick={() => setErr('')}>{err}<small>点一下收起</small></div>}
@@ -245,6 +334,7 @@ export default function DrawStudio({ onClose, onSendToChat }) {
                 <button onClick={() => toAlbum(view)}>存相册</button>
                 <button onClick={() => toPhone(view)}>存手机</button>
                 <button onClick={() => setPrompt(view.prompt)}>照这句再改</button>
+                {refs.length < MAX_REFS && <button onClick={() => setRefs(r => [...r, { id: Date.now(), dataUrl: view.dataUrl, sketch: false }])}>当参考图</button>}
                 <button className="danger" onClick={() => remove(view)}>删掉</button>
               </div>
             </div>

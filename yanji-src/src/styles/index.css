@@ -6256,3 +6256,23 @@ body.mp-active .scroll-bottom-btn { bottom: 139px; }
 .draw-err { border: 1px solid #c0605a; color: #c0605a; background: color-mix(in srgb, #c0605a 8%, var(--bg)); border-radius: 12px; padding: 9px 12px; font-size: 13px; line-height: 1.55; overflow-wrap: anywhere; cursor: pointer; }
 .draw-err small { display: block; opacity: .6; font-size: 11px; margin-top: 4px; }
 .privacy-hint { font-size: 12.5px; opacity: .75; line-height: 1.6; margin-bottom: 8px; }
+
+/* 画图窗口·参考图（1020）：传图或者现场画火柴人，带上就走 /images/edits */
+.draw-refs { display: flex; flex-direction: column; gap: 6px; margin: 8px 0 4px; }
+.draw-refs-label { font-size: 13px; color: var(--text); }
+.draw-refs-label small { color: var(--text-muted); margin-left: 4px; font-size: 11.5px; }
+.draw-refs-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.draw-ref-thumb { position: relative; width: 64px; height: 64px; border-radius: 10px; overflow: hidden; border: 1px solid var(--border); background: #fff; }
+.draw-ref-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.draw-ref-thumb i { position: absolute; left: 0; right: 0; bottom: 0; font-style: normal; font-size: 10px; text-align: center; background: rgba(0,0,0,.45); color: #fff; }
+.draw-ref-thumb button { position: absolute; top: 2px; right: 2px; width: 20px; height: 20px; border-radius: 50%; border: none; background: rgba(0,0,0,.55); color: #fff; font-size: 14px; line-height: 20px; padding: 0; cursor: pointer; }
+.draw-ref-add { height: 64px; padding: 0 12px; border-radius: 10px; border: 1px dashed var(--border); background: transparent; color: var(--text-muted); font: inherit; font-size: 12.5px; cursor: pointer; }
+.draw-sketch { display: flex; flex-direction: column; gap: 8px; margin: 6px 0 10px; }
+.draw-sketch canvas { width: 100%; aspect-ratio: 1; border-radius: 12px; border: 1px solid var(--border); background: #fff; touch-action: none; }
+.draw-sketch-bar { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.draw-sketch-bar label { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text-muted); margin-right: auto; }
+.draw-sketch-bar input[type=range] { width: 90px; accent-color: var(--accent); }
+.draw-sketch-bar button { font: inherit; font-size: 12.5px; padding: 6px 12px; border-radius: 999px; border: 1px solid var(--border); background: var(--card); color: var(--text); cursor: pointer; }
+.draw-sketch-bar button.on { background: var(--accent); color: #fff; border-color: var(--accent); }
+.draw-sketch-bar button:disabled { opacity: .45; }
+.draw-sketch small { font-size: 11.5px; color: var(--text-muted); }
