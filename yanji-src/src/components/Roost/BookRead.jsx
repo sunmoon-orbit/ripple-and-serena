@@ -203,6 +203,7 @@ export default function BookRead({ onClose }) {
   const [active, setActive] = useState(null)    // 选中的书（列表项）
   const [coverBook, setCoverBook] = useState(null) // 书架上点了一本：先转过来看封面（1020）{book, image, loading}
   const coverFileRef = useRef(null)
+  const [straight, setStraight] = useState(() => new Set()) // 被她扶正的书（只在这次打开书架里算，下次再来又歪了）
   const [chapter, setChapter] = useState(null)  // {idx,title,content,annotations}
   const [chapterViewKey, setChapterViewKey] = useState(0) // 只在真正打开章节时触发阅读位置恢复
   const [chapterCount, setChapterCount] = useState(1)
@@ -892,16 +893,33 @@ export default function BookRead({ onClose }) {
         )}
       </div>
     )
-    const renderSpine = (b) => {
+    // 每层最后一本歪着靠在前一本肩上（1020）：绕自己右下角往左倒 LEAN 度，
+    // 左边缘刚好碰到邻居——邻居矮就搭在它的顶角上，邻居高就整本侧面贴上去。底下留出的空隙就是 margin-left
+    const LEAN = 9 * Math.PI / 180
+    const leanGap = (W, H, prevH) => {
+      const t = Math.min(H, (prevH - W * Math.sin(LEAN)) / Math.cos(LEAN))
+      return Math.max(0, Math.round(t * Math.sin(LEAN) - W + W * Math.cos(LEAN)))
+    }
+    const renderSpine = (b, i, list) => {
       const look = spineLook(b)
       const reading = b.bookmark_chapter != null
+      const canLean = list.length > 1 && i === list.length - 1
+      const leaning = canLean && !straight.has(b.id)
+      const extra = leaning
+        ? { transform: `rotate(-${LEAN * 180 / Math.PI}deg)`, marginLeft: leanGap(look.width, look.height, spineLook(list[i - 1]).height) }
+        : {}
       return (
         <button
-          key={b.id} type="button" onClick={() => showCover(b)}
-          className={'bookread-spine-book' + (reading ? ' has-ribbon' : '') + (b.stamps?.length > 0 ? ' has-seal' : '')}
-          title={`${b.title}${b.author ? ' · ' + b.author : ''}`}
-          aria-label={`${b.title}${reading ? `，书签在第 ${b.bookmark_chapter + 1} 章` : ''}`}
-          style={{ width: look.width, height: look.height, '--h': look.height + 'px', backgroundColor: look.color, color: look.ink }}
+          key={b.id} type="button"
+          onClick={() => {
+            if (leaning) { setStraight((prev) => new Set(prev).add(b.id)); return } // 歪着的先扶正，再点才看封面
+            showCover(b)
+          }}
+          className={'bookread-spine-book' + (reading ? ' has-ribbon' : '') + (b.stamps?.length > 0 ? ' has-seal' : '')
+            + (leaning ? ' leaning' : canLean ? ' just-straightened' : '')}
+          title={leaning ? '歪了，点一下扶正' : `${b.title}${b.author ? ' · ' + b.author : ''}`}
+          aria-label={`${b.title}${reading ? `，书签在第 ${b.bookmark_chapter + 1} 章` : ''}${leaning ? '（歪着，点一下扶正）' : ''}`}
+          style={{ width: look.width, height: look.height, '--h': look.height + 'px', backgroundColor: look.color, color: look.ink, ...extra }}
         >
           {reading && <i className="bookread-spine-ribbon" />}
           <span className="bookread-spine-title">{look.title}</span>
@@ -939,7 +957,7 @@ export default function BookRead({ onClose }) {
               ))}
             </div>
             {shelfView === 'spines' && books?.length > 0 && (
-              <div className="bookread-foot-hint" style={{ marginTop: 10, textAlign: 'center' }}>点书先看封面。丝带是书签，红点是读讫。追更和删除在「列表」里。</div>
+              <div className="bookread-foot-hint" style={{ marginTop: 10, textAlign: 'center' }}>点书先看封面，歪着的那本先扶正。丝带是书签，红点是读讫。追更和删除在「列表」里。</div>
             )}
           </div>
           {coverBook && (() => {

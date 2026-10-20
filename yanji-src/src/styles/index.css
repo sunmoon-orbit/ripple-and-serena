@@ -4263,13 +4263,12 @@ textarea.form-input { display: block; margin: 8px 16px 12px; }
 .bookread-plank > .bookread-spine-book { margin-top: calc(198px - var(--h, 198px)); }
 .bookread-spine-book:active { transform: translateY(-6px); }
 @media (hover: hover) { .bookread-spine-book:hover { transform: translateY(-6px); } }
-/* 每层最后一本歪着靠（1020）：绕右下角转，左下角翘起来一点，像真书架上没靠稳的那本 */
-.bookread-plank > .bookread-spine-book:last-of-type:not(:first-of-type) {
-  transform-origin: 100% 100%; transform: rotate(6deg); margin-left: 8px;
+/* 每层最后一本歪着靠（1020）：角度和离旁边那本多远在 JS 里算（要真靠在邻居肩上，不能悬空）。
+   点它一下扶正，过渡慢一点像真的被扶起来 */
+.bookread-spine-book.leaning, .bookread-spine-book.just-straightened {
+  transform-origin: 100% 100%;
+  transition: transform .5s cubic-bezier(.3,1.4,.5,1), margin-left .5s ease;
 }
-.bookread-plank > .bookread-spine-book:last-of-type:not(:first-of-type):active { transform: rotate(6deg) translateY(-6px); }
-@media (hover: hover) { .bookread-plank > .bookread-spine-book:last-of-type:not(:first-of-type):hover { transform: rotate(6deg) translateY(-6px); } }
-
 /* 点书先转过来看封面（1020）：没传图就用书脊的颜色画一本素色布面精装 */
 .bookread-cover-stage {
   position: fixed; inset: 0; z-index: 60; display: flex; align-items: center; justify-content: center;
