@@ -2813,7 +2813,7 @@ function buildVoiceNote(sec, text, heard, path) {
   row.appendChild(bar)
   const extra = document.createElement('div'); extra.className = 'vnote-extra'; extra.hidden = true
   if (text) extra.appendChild(Object.assign(document.createElement('div'), { className: 'vnote-text', textContent: text }))
-  if (heard) extra.appendChild(Object.assign(document.createElement('div'), { className: 'vnote-heard', textContent: '听到：' + heard }))
+  if (heard) extra.appendChild(Object.assign(document.createElement('div'), { className: 'vnote-heard', textContent: '听到了：' + heard }))
   if (extra.childNodes.length) {
     const tg = Object.assign(document.createElement('button'), { type: 'button', className: 'vnote-toggle', textContent: '转文字' })
     tg.addEventListener('click', e => { e.stopPropagation(); extra.hidden = !extra.hidden; tg.textContent = extra.hidden ? '转文字' : '收起' })
@@ -4509,7 +4509,8 @@ async function noteSend(blob, ext, sec, stt) {
   try {
     const [u, t] = await Promise.all([fetch(UPLOAD_URL, { method: 'POST', headers: noteAuth(), body: up }).then(r => r.json()), stt])
     if (!u || !u.path) throw new Error('录音没传上去')
-    const heard = [...new Set([t.tone && `语气${t.tone}`, ...(t.events || [])].filter(Boolean))]
+    // 1020：有 Omni 写的一句描述就用它（「听到了」），没有再退回 SenseVoice 的语气标签
+    const heard = t.heard ? [t.heard] : [...new Set([t.tone && `语气${t.tone}`, ...(t.events || [])].filter(Boolean))]
     const words = String(t.text || '').trim() || '（没转出字）'
     sendMsg(`【语音条·${sec}秒】${words}` + (heard.length ? `\n〔机器听到：${heard.join('、')}〕` : '') + `\n[附件: ${u.path}]`)
   } catch (e) {
