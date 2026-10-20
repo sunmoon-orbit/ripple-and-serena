@@ -2841,7 +2841,8 @@ function maybeEgg(force = false) {
   const f = pool[Math.floor(Math.random() * pool.length)]
   const el = document.createElement('div')
   el.className = 'rv-egg' + (f.endsWith('.gif') ? ' is-gif' : '')
-  const img = document.createElement('img'); img.src = 'clawd/' + f; img.alt = ''
+  // ?v= 换图时加一：Cloudflare 对图片缓存七天还标了 immutable，不改地址手机上永远是旧的（1020 修断开的乌鸦时撞上）
+  const img = document.createElement('img'); img.src = 'clawd/' + f + '?v=2'; img.alt = ''
   el.appendChild(img)
   const bye = () => { el.classList.add('out'); setTimeout(() => el.remove(), 600) }
   el.onclick = bye; img.onerror = () => el.remove()
