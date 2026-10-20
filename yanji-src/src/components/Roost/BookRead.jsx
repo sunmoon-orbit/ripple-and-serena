@@ -204,6 +204,7 @@ export default function BookRead({ onClose }) {
   const [coverBook, setCoverBook] = useState(null) // 书架上点了一本：先转过来看封面（1020）{book, image, loading}
   const coverFileRef = useRef(null)
   const [straight, setStraight] = useState(() => new Set()) // 被她扶正的书（只在这次打开书架里算，下次再来又歪了）
+  const pressRef = useRef(null) // 长按扶正过的那本 → 再把它推歪（1020 她问「没做点一下把它放斜吗」）
   const [chapter, setChapter] = useState(null)  // {idx,title,content,annotations}
   const [chapterViewKey, setChapterViewKey] = useState(0) // 只在真正打开章节时触发阅读位置恢复
   const [chapterCount, setChapterCount] = useState(1)
@@ -912,9 +913,22 @@ export default function BookRead({ onClose }) {
         <button
           key={b.id} type="button"
           onClick={() => {
+            if (pressRef.current?.fired) { pressRef.current = null; return } // 刚长按推歪了，这一下不算点
             if (leaning) { setStraight((prev) => new Set(prev).add(b.id)); return } // 歪着的先扶正，再点才看封面
             showCover(b)
           }}
+          onPointerDown={() => {
+            if (!canLean || leaning) return
+            const timer = setTimeout(() => {
+              pressRef.current = { fired: true }
+              setStraight((prev) => { const n = new Set(prev); n.delete(b.id); return n })
+              try { navigator.vibrate?.(15) } catch { /* 不支持就算了 */ }
+            }, 450)
+            pressRef.current = { timer }
+          }}
+          onPointerUp={() => { if (pressRef.current?.timer) clearTimeout(pressRef.current.timer) }}
+          onPointerLeave={() => { if (pressRef.current?.timer) clearTimeout(pressRef.current.timer) }}
+          onContextMenu={(e) => { if (canLean) e.preventDefault() }}
           className={'bookread-spine-book' + (reading ? ' has-ribbon' : '') + (b.stamps?.length > 0 ? ' has-seal' : '')
             + (leaning ? ' leaning' : canLean ? ' just-straightened' : '')}
           title={leaning ? '歪了，点一下扶正' : `${b.title}${b.author ? ' · ' + b.author : ''}`}
@@ -957,7 +971,7 @@ export default function BookRead({ onClose }) {
               ))}
             </div>
             {shelfView === 'spines' && books?.length > 0 && (
-              <div className="bookread-foot-hint" style={{ marginTop: 10, textAlign: 'center' }}>点书先看封面，歪着的那本先扶正。丝带是书签，红点是读讫。追更和删除在「列表」里。</div>
+              <div className="bookread-foot-hint" style={{ marginTop: 10, textAlign: 'center' }}>点书先看封面；歪着的那本点一下扶正，长按再推歪。丝带是书签，红点是读讫。追更和删除在「列表」里。</div>
             )}
           </div>
           {coverBook && (() => {

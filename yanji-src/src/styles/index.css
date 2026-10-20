@@ -4265,6 +4265,7 @@ textarea.form-input { display: block; margin: 8px 16px 12px; }
 @media (hover: hover) { .bookread-spine-book:hover { transform: translateY(-6px); } }
 /* 每层最后一本歪着靠（1020）：角度和离旁边那本多远在 JS 里算（要真靠在邻居肩上，不能悬空）。
    点它一下扶正，过渡慢一点像真的被扶起来 */
+.bookread-spine-book { -webkit-touch-callout: none; user-select: none; } /* 长按推歪时别弹出系统菜单、别选中书名 */
 .bookread-spine-book.leaning, .bookread-spine-book.just-straightened {
   transform-origin: 100% 100%;
   transition: transform .5s cubic-bezier(.3,1.4,.5,1), margin-left .5s ease;
