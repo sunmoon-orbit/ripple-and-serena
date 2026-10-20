@@ -2009,7 +2009,7 @@ export default function Chat() {
           }}
         />
       )}
-      {egg && <CompletionEgg svg={egg} onDone={() => setEgg(null)} />}
+      {egg && <CompletionEgg egg={egg} onDone={() => setEgg(null)} />}
       {musicOpen && <MusicRoom onClose={() => setMusicOpen(false)} />}
       {drawOpen && <DrawStudio onClose={() => setDrawOpen(false)} onSendToChat={(src) => setPendingImages((p) => [...p, src])} />}
       {wheelOpen && <FortuneWheel onClose={() => setWheelOpen(false)} />}

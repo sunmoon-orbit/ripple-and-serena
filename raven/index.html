@@ -1136,6 +1136,13 @@
   .rv-alarm-msg { font-size: 12.5px; color: var(--text-dim); margin-top: 4px; line-height: 1.4; }
   .rv-alarm-btn { flex-shrink: 0; border: 0; border-radius: 999px; padding: 7px 13px; background: var(--accent); color: var(--bg); font-size: 13px; font-family: inherit; cursor: pointer; }
   .rv-alarm-btn:disabled { background: none; color: var(--accent); padding: 7px 4px; cursor: default; }
+  .rv-egg { position: fixed; right: 16px; bottom: 96px; z-index: 900; width: 120px; height: 120px; cursor: pointer;
+    animation: rv-egg-in 320ms cubic-bezier(.2,.8,.2,1); filter: drop-shadow(0 8px 18px rgba(0,0,0,.18)); }
+  .rv-egg.is-gif { width: 140px; height: 140px; }
+  .rv-egg img { width: 100%; height: 100%; display: block; image-rendering: pixelated; }
+  .rv-egg.out { animation: rv-egg-out 600ms ease-in forwards; }
+  @keyframes rv-egg-in { from { opacity: 0; transform: translateY(20px) scale(.7); } }
+  @keyframes rv-egg-out { to { opacity: 0; transform: translateY(8px) scale(.92); } }
   .rv-alarm-tip { font-size: 11.5px; color: var(--text-dim); margin-top: 4px; }
   .rv-alarm-fs { display: block; background: none; border: 0; padding: 0; color: var(--accent); text-decoration: underline; cursor: pointer; font-family: inherit; text-align: left; }
   .rv-ask { margin: 8px 0 2px; padding: 10px 12px 8px; border: 1px solid var(--border); border-radius: 14px; background: color-mix(in srgb, var(--surface) 88%, transparent); max-width: 360px; }
@@ -2600,6 +2607,7 @@ function connect() {
         if (!alreadyShown) {
           if (msg.id) shownMsgIds.add(msg.id)
           const msgEl = appendMsg(msg.text, 'assistant', true, msg.ts || Date.now(), msg.id || null)
+          if (!msg.replayed && !callActive) maybeEgg()
           if (!msg.replayed && callActive) handleCallReply(msg.text, msgEl)
           else if (!msg.replayed && Date.now() < voiceReplyUntil) autoReadReply(msgEl)
           if (msg.thinking) {
@@ -2815,6 +2823,30 @@ function splitUserSegments(text) {
   return segs.length > 1 ? segs : [text]
 }
 
+// 完成彩蛋（1020 从言叽搬来）：我回话后偶尔右下角冒出一只像素小家伙，一半乌鸦一半 Clawd，点一下或八秒后消失。
+// 归巢这边我一句一条地发，按条算会太频繁：每条 2%，而且十分钟里最多冒一次。
+// Clawd 动图来自 clawds-new-clothes（CC BY-NC-SA 4.0，出处见 clawd/ATTRIBUTION.md）
+const EGG_CROWS = ['crow-heart.svg', 'crow-sleep.svg']
+const EGG_CLAWDS = ['clawd-coffee.svg', 'clawd-music.svg', 'clawd-waving.gif', 'clawd-heart-gift.gif', 'clawd-happy.gif', 'clawd-jumping.gif',
+  'clawd-laughing.gif', 'clawd-typing.gif', 'clawd-delighted.gif', 'clawd-greeting.gif', 'clawd-blushing.gif', 'clawd-reading.gif',
+  'clawd-stargazing.gif', 'nightcap-sleeping.gif', 'nightcap-yawning.gif', 'winter-fur-waving.gif', 'winter-fur-heart-gift.gif',
+  'beret-painting.gif', 'aviator-leaping.gif']
+let eggLastAt = 0
+function maybeEgg(force = false) {
+  if (!force && (Math.random() >= 0.02 || Date.now() - eggLastAt < 10 * 60 * 1000)) return
+  if (document.querySelector('.rv-egg')) return
+  eggLastAt = Date.now()
+  const pool = Math.random() < 0.5 ? EGG_CROWS : EGG_CLAWDS
+  const f = pool[Math.floor(Math.random() * pool.length)]
+  const el = document.createElement('div')
+  el.className = 'rv-egg' + (f.endsWith('.gif') ? ' is-gif' : '')
+  const img = document.createElement('img'); img.src = 'clawd/' + f; img.alt = ''
+  el.appendChild(img)
+  const bye = () => { el.classList.add('out'); setTimeout(() => el.remove(), 600) }
+  el.onclick = bye; img.onerror = () => el.remove()
+  document.body.appendChild(el)
+  setTimeout(bye, 7400)
+}
 function appendMsg(text, role, save = true, ts = Date.now(), msgId = null, supplemental = false) {
   const el = document.createElement('div')
   el.className = `msg ${role}`

@@ -140,27 +140,44 @@ const CROW_SLEEP = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="-15 -25 45 
   </g>
 </svg>`
 
-const EGG_POOL = [CLAWD_COFFEE, CLAWD_MUSIC, CROW_HEART, CROW_SLEEP]
+// 1020 加：Clawd 的 48 个动作里挑了 17 个，有几个穿着衣柜里的衣服（睡帽、冬天毛毛装、贝雷帽、飞行帽）。
+// 动图来自 clawds-new-clothes（Charlie Luinaris，美术 CC BY-NC-SA 4.0，原样使用；出处见 public/clawd/ATTRIBUTION.md）。
+// 一半时候是乌鸦、一半是螃蟹：螃蟹那一半里旧的两只 SVG 和新动图一起抽
+const CLAWD_GIFS = [
+  'waving', 'heart-gift', 'happy', 'jumping', 'laughing', 'typing', 'delighted', 'greeting', 'blushing', 'reading', 'stargazing',
+].map((n) => `clawd-${n}.gif`).concat([
+  'nightcap-sleeping.gif', 'nightcap-yawning.gif', 'winter-fur-waving.gif', 'winter-fur-heart-gift.gif', 'beret-painting.gif', 'aviator-leaping.gif',
+])
+const CLAWD_POOL = [{ svg: CLAWD_COFFEE }, { svg: CLAWD_MUSIC }, ...CLAWD_GIFS.map((f) => ({ img: `${import.meta.env.BASE_URL}clawd/${f}` }))]
+const CROW_POOL = [{ svg: CROW_HEART }, { svg: CROW_SLEEP }]
 
 // 每次回复完成后调用：约 4% 概率返回一只小家伙，其余时候 null
 // （原 1%+4.9s 停留，阿颖聊了一周从没见过——期望太低，0709 调成 4%+8s）
 export function pickEgg(prob = 0.04) {
   if (Math.random() >= prob) return null
-  return EGG_POOL[Math.floor(Math.random() * EGG_POOL.length)]
+  const pool = Math.random() < 0.5 ? CROW_POOL : CLAWD_POOL
+  return pool[Math.floor(Math.random() * pool.length)]
 }
 
-export default function CompletionEgg({ svg, onDone }) {
+export default function CompletionEgg({ egg, onDone }) {
   const [fading, setFading] = useState(false)
   useEffect(() => {
     const t1 = setTimeout(() => setFading(true), 7300)
     const t2 = setTimeout(() => onDone?.(), 8000)
     return () => { clearTimeout(t1); clearTimeout(t2) }
   }, [onDone])
+  if (egg?.img) {
+    return (
+      <div className={'completion-egg is-gif' + (fading ? ' fade-out' : '')} onClick={() => onDone?.()}>
+        <img src={egg.img} alt="" onError={() => onDone?.()} />
+      </div>
+    )
+  }
   return (
     <div
       className={'completion-egg' + (fading ? ' fade-out' : '')}
       onClick={() => onDone?.()}
-      dangerouslySetInnerHTML={{ __html: svg }}
+      dangerouslySetInnerHTML={{ __html: egg?.svg || '' }}
     />
   )
 }
