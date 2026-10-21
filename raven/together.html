@@ -444,9 +444,10 @@ function drawCrab(t, B) {
   dot(3, 1, E); dot(5, 1, E)                                   // 眼睛
   const cl = c.dir > 0 ? 8 : 0, cr = c.dir > 0 ? 0 : 8           // 朝走的方向那只钳子戳瓶子
   dot(cl, 2 - pk, O); dot(cl, 1 - pk, O); dot(cr, 2, O)
-  for (const gx of [2, 4, 5, 7]) dot(gx, 4 + ((gx + leg) % 2), O)
+  // 腿贴着身子长（1021 她：「腿好像是断的」——原来抬起的那条只画在第 5 行，跟身子隔了一格）：都从第 4 行起，踩地的那几条再往下多一格
+  for (const gx of [2, 4, 5, 7]) { dot(gx, 4, O); if ((gx + leg) % 2) dot(gx, 5, O) }
   // 沙上一小块影子
-  ctx.fillStyle = 'rgba(0,0,8,.35)'; ctx.fillRect(px + s, py + 5 * s, 7 * s, Math.max(1, s * 0.5))
+  ctx.fillStyle = 'rgba(0,0,8,.35)'; ctx.fillRect(px + s, py + 6 * s, 7 * s, Math.max(1, s * 0.5))
 }
 
 // 沙上的小东西：贝壳、石子、海星。y 越低越近、越大；光网扫过时贝壳闪一下
