@@ -419,35 +419,49 @@ function drawNearFish(t, B) {
   ctx.restore()
 }
 
-// 鱼群（1021 她发来一个「鱼群顺着光往上游、越往上越淡」的开屏）：几十条小银鱼排成一股，
-// 沿着主光柱从下往上绕着游，越往上越透明，游没了从底下补上；歪手机光柱转，鱼群跟着光拐。
-// 银白、在光里反亮，跟黑剪影的小鱼、礁石分开——它们是往光里去的那一群。
-const SCHOOL = Array.from({ length: 56 }, () => ({ u: Math.random(), off: (Math.random() + Math.random() - 1), v: 0.018 + Math.random() * 0.01, sz: 0.7 + Math.random() * 0.6, ph: Math.random() * 6.28 }))
-function schoolPos(f, t, b) {
-  const s = 0.95 - f.u * 0.8                                   // 沿光柱的深度：0.95 靠底 → 0.15 靠水面
-  const w = b.w0 + s * b.k
-  const swirl = Math.sin(f.u * Math.PI * 1.6 + t * 0.25) * w * 0.55 + f.off * w * 0.35
+// 鱼群（1021 她发来一个「鱼群顺着光往上游、越往上越淡」的开屏）。
+// 第二版（她：「好像少了点啥」——第一版一条条均匀撒满全程、个个直挺挺朝上，像往上飘的雨点）：
+// 一百五十条挤成一条有头有尾的鱼带，整条一起沿主光柱绕着往上游（中间密、两头稀、中段宽）；
+// 大小分远近；隔一阵整群拐个弯，从鱼头到鱼尾依次侧身，银光一闪。游到水面附近淡掉，歇一会儿从底下再来一群。
+const SCHOOL = Array.from({ length: 150 }, () => {
+  const rel = (Math.random() + Math.random()) / 2                // 在鱼带里的位置：0 尾 → 1 头，中间多
+  return { rel, off: (Math.random() + Math.random() + Math.random() - 1.5) / 1.5, z: Math.random(), ph: Math.random() * 6.28, jit: Math.random() * 0.02 }
+})
+const school = { c: 0, turnAt: 6 }
+const BAND = 0.38                                                 // 鱼带有多长（沿路径）
+function schoolPos(u, off, t, b) {
+  const s = 0.98 - u * 0.85                                       // 沿光柱的深度：靠底 → 靠水面
+  const w = b.w0 + Math.max(0, s) * b.k
+  const swirl = Math.sin(u * Math.PI * 1.7 + t * 0.22) * w * 0.75 + off * w * 0.32
   const px = b.A[0] + b.D[0] * s - b.D[1] * swirl, py = b.A[1] + b.D[1] * s + b.D[0] * swirl
   return [px / AS, py]
 }
 function drawSchool(t, dt, B) {
   const b = B[0]
+  school.c += dt * 0.03
+  if (school.c > 1 + BAND + 0.25) school.c = -0.05                 // 整群游没了，歇一下再从底下来
+  if (t > school.turnAt + 3) school.turnAt = t + 5 + Math.random() * 5
   for (const f of SCHOOL) {
-    const [x0, y0] = schoolPos(f, t, b)
-    f.u += f.v * dt
-    if (f.u > 1) { f.u -= 1; f.off = (Math.random() + Math.random() - 1) }
-    const [x1, y1] = schoolPos(f, t, b)
-    const fade = Math.min(1, f.u / 0.12) * (1 - sstep(0.6, 1.0, f.u))
+    const u = school.c - (1 - f.rel) * BAND + f.jit
+    if (u < 0 || u > 1) continue
+    const off = f.off * Math.sin(Math.PI * Math.min(1, Math.max(0, f.rel))) * 1.3
+    const [x0, y0] = schoolPos(u - 0.004, off, t, b)
+    const [x1, y1] = schoolPos(u, off, t, b)
+    const fade = Math.min(1, u / 0.08) * (1 - sstep(0.62, 1.0, u))
     if (fade < 0.02) continue
     const L = Math.min(1, lightAt(x1, y1, B, AS) * 1.5)
-    const ang = Math.atan2(-(y1 - y0) * H, (x1 - x0) * W)    // 屏幕坐标里的朝向
-    const len = Math.min(W, H) * 0.022 * f.sz * (1 - f.u * 0.35)
-    const a = fade * (0.35 + L * 0.6)
+    // 拐弯：从头到尾依次侧身、闪一下
+    const dtTurn = t - school.turnAt - (1 - f.rel) * 0.9
+    const flash = Math.exp(-dtTurn * dtTurn * 10)
+    const ang = Math.atan2(-(y1 - y0) * H, (x1 - x0) * W) + flash * 0.6 * Math.sin(f.ph)
+    const len = Math.min(W, H) * 0.02 * (0.55 + f.z * 0.9)
+    const a = fade * (0.25 + 0.75 * f.z) * (0.35 + L * 0.55 + flash * 0.5)
+    const lum = Math.min(1, L * 0.8 + flash * 0.7)
     ctx.save(); ctx.translate(X(x1), Y(y1)); ctx.rotate(ang)
-    const wag = Math.sin(t * 9 + f.ph) * len * 0.12
-    ctx.fillStyle = `rgba(${(150 + L * 90) | 0},${(175 + L * 75) | 0},${(205 + L * 50) | 0},${a.toFixed(3)})`
-    ctx.beginPath(); ctx.ellipse(0, 0, len * 0.5, len * 0.16, 0, 0, Math.PI * 2); ctx.fill()
-    ctx.beginPath(); ctx.moveTo(-len * 0.42, 0); ctx.lineTo(-len * 0.72, -len * 0.16 + wag); ctx.lineTo(-len * 0.72, len * 0.16 + wag); ctx.closePath(); ctx.fill()
+    const wag = Math.sin(t * 10 + f.ph) * len * 0.12
+    ctx.fillStyle = `rgba(${(140 + lum * 110) | 0},${(165 + lum * 88) | 0},${(195 + lum * 60) | 0},${Math.min(1, a).toFixed(3)})`
+    ctx.beginPath(); ctx.ellipse(0, 0, len * 0.5, len * (0.15 + flash * 0.13), 0, 0, Math.PI * 2); ctx.fill()
+    ctx.beginPath(); ctx.moveTo(-len * 0.42, 0); ctx.lineTo(-len * 0.72, -len * 0.15 + wag); ctx.lineTo(-len * 0.72, len * 0.15 + wag); ctx.closePath(); ctx.fill()
     ctx.restore()
   }
 }
