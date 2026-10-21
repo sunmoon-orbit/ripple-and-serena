@@ -68,8 +68,11 @@ export default function PasswordGate({ onUnlock }) {
       <div className="gate-inputs">
         {err && <p className="gate-err-text gate-err-shake" key={err}>{err}</p>}
         <div className="ink-field">
+          {/* 1021 她：「打第一个数字的时候还是会被弹一下」。type=password 在 vivo 上会把输入法换成「安全键盘」，
+              第一个字落下时键盘重载一次——改成普通文本框、用 CSS 把字遮成圆点，输入法就不换了 */}
           <input
-            className="ink-input" type="password"
+            className="ink-input ink-masked" type="text"
+            autoComplete="off" autoCorrect="off" autoCapitalize="off" spellCheck={false}
             value={pw} autoFocus
             placeholder={IS_ZHAOHUA ? '昭华访问密码' : isSetup ? '设置访问密码' : '···'}
             onChange={(e) => { typedAt.current = Date.now(); setPw(e.target.value); setErr('') }}
@@ -81,7 +84,8 @@ export default function PasswordGate({ onUnlock }) {
           <>
             <div className="ink-field">
               <input
-                className="ink-input" type="password"
+                className="ink-input ink-masked" type="text"
+                autoComplete="off" autoCorrect="off" autoCapitalize="off" spellCheck={false}
                 value={pw2} placeholder="再次输入"
                 onChange={(e) => { setPw2(e.target.value); setErr('') }}
                 onKeyDown={(e) => e.key === 'Enter' && submit()}

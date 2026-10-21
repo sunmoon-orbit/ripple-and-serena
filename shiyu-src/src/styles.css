@@ -1159,3 +1159,6 @@ input, textarea, select { font-family: inherit; font-size: 15px; color: var(--in
 .vein-peek-meta { font-size: 11px; color: var(--ink-faint); }
 .vein-peek-title { margin: 8px 0 10px; font-size: 14px; color: var(--ink); line-height: 1.5; }
 .vein-peek-open { font-size: 12px; padding: 5px 14px; border-radius: 999px; border: 1px solid var(--line); background: transparent; color: var(--accent); }
+
+/* 1021：密码框改成普通文本框（避开 vivo 安全键盘重载），字用圆点遮住 */
+.ink-masked { -webkit-text-security: disc; text-security: disc; }
