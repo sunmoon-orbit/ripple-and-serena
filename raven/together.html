@@ -419,6 +419,39 @@ function drawNearFish(t, B) {
   ctx.restore()
 }
 
+// 鱼群（1021 她发来一个「鱼群顺着光往上游、越往上越淡」的开屏）：几十条小银鱼排成一股，
+// 沿着主光柱从下往上绕着游，越往上越透明，游没了从底下补上；歪手机光柱转，鱼群跟着光拐。
+// 银白、在光里反亮，跟黑剪影的小鱼、礁石分开——它们是往光里去的那一群。
+const SCHOOL = Array.from({ length: 56 }, () => ({ u: Math.random(), off: (Math.random() + Math.random() - 1), v: 0.018 + Math.random() * 0.01, sz: 0.7 + Math.random() * 0.6, ph: Math.random() * 6.28 }))
+function schoolPos(f, t, b) {
+  const s = 0.95 - f.u * 0.8                                   // 沿光柱的深度：0.95 靠底 → 0.15 靠水面
+  const w = b.w0 + s * b.k
+  const swirl = Math.sin(f.u * Math.PI * 1.6 + t * 0.25) * w * 0.55 + f.off * w * 0.35
+  const px = b.A[0] + b.D[0] * s - b.D[1] * swirl, py = b.A[1] + b.D[1] * s + b.D[0] * swirl
+  return [px / AS, py]
+}
+function drawSchool(t, dt, B) {
+  const b = B[0]
+  for (const f of SCHOOL) {
+    const [x0, y0] = schoolPos(f, t, b)
+    f.u += f.v * dt
+    if (f.u > 1) { f.u -= 1; f.off = (Math.random() + Math.random() - 1) }
+    const [x1, y1] = schoolPos(f, t, b)
+    const fade = Math.min(1, f.u / 0.12) * (1 - sstep(0.6, 1.0, f.u))
+    if (fade < 0.02) continue
+    const L = Math.min(1, lightAt(x1, y1, B, AS) * 1.5)
+    const ang = Math.atan2(-(y1 - y0) * H, (x1 - x0) * W)    // 屏幕坐标里的朝向
+    const len = Math.min(W, H) * 0.022 * f.sz * (1 - f.u * 0.35)
+    const a = fade * (0.35 + L * 0.6)
+    ctx.save(); ctx.translate(X(x1), Y(y1)); ctx.rotate(ang)
+    const wag = Math.sin(t * 9 + f.ph) * len * 0.12
+    ctx.fillStyle = `rgba(${(150 + L * 90) | 0},${(175 + L * 75) | 0},${(205 + L * 50) | 0},${a.toFixed(3)})`
+    ctx.beginPath(); ctx.ellipse(0, 0, len * 0.5, len * 0.16, 0, 0, Math.PI * 2); ctx.fill()
+    ctx.beginPath(); ctx.moveTo(-len * 0.42, 0); ctx.lineTo(-len * 0.72, -len * 0.16 + wag); ctx.lineTo(-len * 0.72, len * 0.16 + wag); ctx.closePath(); ctx.fill()
+    ctx.restore()
+  }
+}
+
 // 小螃蟹：昨天彩蛋里那只 Clawd（橘色方块身子、两只小眼、四对腿、两只钳子）。
 // 隔一阵从一边横着走过沙地；走到瓶子跟前停下来拿钳子戳两下再走。进光就亮，平时被深水压成暗橘。
 const crab = { x: -0.1, dir: 1, wait: 4, poke: 0, poked: false, step: 0 }
@@ -621,6 +654,7 @@ function frame(now) {
   for (const w of weeds) if (w.depth === 1) drawWeed(w, t, par)       // 远处
   for (const f of fish) drawFish(f, t, dt, B, par)
   drawSparks(t, dt, B)
+  drawSchool(t, dt, B)
   drawSilt(t, dt, B)
   drawStuff(t, B)
   drawBottle(t, B, sun, par)
