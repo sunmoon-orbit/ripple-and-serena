@@ -2593,6 +2593,8 @@ function connect() {
       else if (msg.type === 'sent') {
         ackReceived(msg.cid)
         if (msg.cid && shownCids.has(msg.cid)) return
+        // 重连补发的她那句（1021）：页面刷新过 shownCids 是空的，拿最近的历史对一遍，已经画过就不再画
+        if (msg.replayed && chatHistory.slice(-30).some(h => h.role === 'user' && h.text === (splitUserSegments(msg.text)[0] || msg.text))) { if (msg.cid) shownCids.add(msg.cid); return }
         if (msg.cid) {
           shownCids.add(msg.cid)
           if (shownCids.size > 200) shownCids.delete(shownCids.values().next().value)

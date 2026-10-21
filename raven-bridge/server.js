@@ -523,6 +523,9 @@ function ingestUserMessage(text, cid, note = '') {
     .catch(e => console.error('[emotion] touch 失败（言叽那边会误判她离开多久）:', e.message))
   lastBroadcastReply = extractLastResponse(lastCapture) || ''
   lastReplyMsgs = []  // 发新消息时清空回放队列，重连不会刷旧消息
+  // 1021：她这一句也放进回放队列打头。通知栏快捷回复的时候页面没开，广播的 sent 没人收，
+  // 等她点开归巢只补发了我的回复、她自己那句没画出来（她：「我没看到我发的那条消息，但是有看到你的回复」）
+  lastReplyMsgs.push({ type: 'sent', text, ts: Date.now(), cid: cid || `srv-${Date.now()}` })
   archiveMsg('human', text)
   // 前端消息一律带【阿颖】前缀：CC 靠它区分「浏览器来的要用 curl 回」还是终端直聊。
   // 旧逻辑绑在 mcpSseClients.size 上，MCP 掉线就裸发，CC 回终端她在浏览器看不见（0712 实锤）
