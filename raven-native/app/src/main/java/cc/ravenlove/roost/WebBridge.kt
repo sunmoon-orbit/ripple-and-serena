@@ -75,6 +75,13 @@ class WebBridge(private val activity: MainActivity) {
         }
     }
 
+    // 1021：冷不冷、她的生日（MM-dd），给桌面乌鸦自己换衣服用
+    @JavascriptInterface
+    fun crowCold(cold: Boolean) { activity.runOnUiThread { CrowOverlay.get(activity).setCold(cold) } }
+
+    @JavascriptInterface
+    fun crowBirthday(md: String) { activity.runOnUiThread { CrowOverlay.get(activity).setBirthday(md) } }
+
     @JavascriptInterface
     fun openCrowSettings() { activity.runOnUiThread { activity.openCrowSettings() } }
 

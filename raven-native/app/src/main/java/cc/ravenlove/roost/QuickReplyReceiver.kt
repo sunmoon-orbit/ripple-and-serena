@@ -57,7 +57,7 @@ class QuickReplyReceiver : BroadcastReceiver() {
                 val code = conn.responseCode
                 conn.disconnect()
                 when (code) {
-                    200 -> toast(context, "已送到阿言那儿 ✓")
+                    200 -> { toast(context, "已送到阿言那儿 ✓"); CrowOverlay.get(context).hop(true) }
                     401 -> toast(context, "归巢：凭证过期了（401），打开归巢重新输一次密码")
                     else -> toast(context, "归巢：服务器返回 $code，没发成功")
                 }

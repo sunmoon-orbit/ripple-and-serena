@@ -32,6 +32,7 @@ class RoostFCMService : FirebaseMessagingService() {
 
         createChannel()
         showNotification(title, body)
+        CrowOverlay.get(this).hop()   // 1021：我回她了，屏幕上那只蹦一下
     }
 
     private fun createChannel() {

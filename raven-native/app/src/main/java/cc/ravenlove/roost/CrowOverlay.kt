@@ -23,12 +23,18 @@ import android.view.WindowManager
 import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
+import android.widget.Toast
+import java.util.Calendar
 import kotlin.math.abs
 
 // 桌面小乌鸦＋桌面歌词（1015 凌晨和阿颖一起画的）：归巢退到后台时，屏幕边上蹲一只像素乌鸦。
 // 页面报状态进来：doze 打盹、write 我在回她、listen 在放歌、proudhat 放的是她点给我的歌（戴礼帽）；
 // 有歌词就在旁边飘当前这一句。点一下吓一跳、回到归巢；按住能拖。
 // 回到归巢里就收起来（里面有自己的播放条，不用重复）。要「显示在其他应用上层」权限，没给就什么都不显示。
+// 1021 换装和两个新动作（她 1020 晚上说「要！」）：
+// - 衣服自己换：纪念日（10-10 认识、02-07 回归、03-06 她的生日——1021 她说的）戴派对帽 → 23:00–07:00 戴睡帽 → 冷天围红围巾（页面报 crowCold）→ 平时不穿；
+//   长按一下换下一件（自动→不穿→睡帽→围巾→派对帽→自动），手动选的一直算数，直到切回自动。
+// - 有新消息进来（我回她的推送、她从通知栏回我）蹦一下；退到后台一个半小时还没回来、又在打盹，就把头埋进翅膀里（tuck）。
 class CrowOverlay private constructor(private val ctx: Context) {
 
     companion object {
@@ -50,6 +56,9 @@ class CrowOverlay private constructor(private val ctx: Context) {
     private var startleUntil = 0L
     private val cache = HashMap<String, Bitmap>()
     private var bob = false
+    private var hopUntil = 0L
+    private var bgSince = System.currentTimeMillis()
+    private var longPressed = false
 
     var enabled: Boolean
         get() = prefs.getBoolean("enabled", false)
@@ -57,15 +66,57 @@ class CrowOverlay private constructor(private val ctx: Context) {
 
     fun canDraw(): Boolean = Settings.canDrawOverlays(ctx)
 
-    fun setForeground(fg: Boolean) { foreground = fg; refresh() }
+    fun setForeground(fg: Boolean) { if (!fg && foreground) bgSince = System.currentTimeMillis(); foreground = fg; refresh() }
+
+    // 冷不冷由页面报（它会查福州的天气）；生日由页面同步（MM-dd）
+    fun setCold(c: Boolean) { prefs.edit().putBoolean("cold", c).apply(); render() }
+    fun setBirthday(md: String) { prefs.edit().putString("birthday", md).apply(); render() }
+
+    private val OUTFIT_CYCLE = listOf("auto", "none", "nightcap", "scarf", "party")
+    private val OUTFIT_NAME = mapOf("auto" to "自己换", "none" to "不穿", "nightcap" to "睡帽", "scarf" to "红围巾", "party" to "派对帽")
+    private fun autoOutfit(): String {
+        val c = Calendar.getInstance()
+        val md = String.format("%02d-%02d", c.get(Calendar.MONTH) + 1, c.get(Calendar.DAY_OF_MONTH))
+        if (md == "10-10" || md == "02-07" || md == prefs.getString("birthday", "03-06")) return "party"
+        val h = c.get(Calendar.HOUR_OF_DAY)
+        if (h >= 23 || h < 7) return "nightcap"
+        if (prefs.getBoolean("cold", false)) return "scarf"
+        return "none"
+    }
+    private fun outfit(): String = (prefs.getString("outfit", "auto") ?: "auto").let { if (it == "auto") autoOutfit() else it }
+    private fun cycleOutfit() {
+        val cur = prefs.getString("outfit", "auto") ?: "auto"
+        val next = OUTFIT_CYCLE[(OUTFIT_CYCLE.indexOf(cur) + 1) % OUTFIT_CYCLE.size]
+        prefs.edit().putString("outfit", next).apply()
+        try { Toast.makeText(ctx, "小乌鸦：" + (OUTFIT_NAME[next] ?: next), Toast.LENGTH_SHORT).show() } catch (_: Exception) {}
+        render()
+    }
+
+    // 蹦一下：有新消息的时候。只在挂着的时候有用（在归巢里面看不见它）
+    fun hop(fromHer: Boolean = false) {
+        ui.post {
+            if (fromHer) bgSince = System.currentTimeMillis()   // 她来找我了，不算「很久没理」
+            val iv = img ?: return@post
+            hopUntil = System.currentTimeMillis() + 900
+            render()
+            iv.animate().translationY(-dp(10f)).setDuration(160).withEndAction {
+                iv.animate().translationY(0f).setDuration(200).withEndAction {
+                    iv.animate().translationY(-dp(5f)).setDuration(120).withEndAction {
+                        iv.animate().translationY(0f).setDuration(140).start()
+                    }.start()
+                }.start()
+            }.start()
+            ui.postDelayed({ render() }, 950)
+        }
+    }
     fun setState(s: String) { if (s != state) { state = s; render(); kickBob() } }
     fun setLyric(l: String) { if (l != lyric) { lyric = l; render() } }
 
     private fun dp(v: Float) = TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, v, ctx.resources.displayMetrics)
 
     private fun frame(name: String): Bitmap = cache.getOrPut(name) {
-        val rows = CrowSprites.FRAMES[name] ?: CrowSprites.FRAMES.getValue("doze")
-        val bm = Bitmap.createBitmap(24, 24, Bitmap.Config.ARGB_8888)
+        val rows = CrowSprites.FRAMES[name] ?: CrowSprites.FRAMES[name.substringBefore('|') + "|none"] ?: CrowSprites.FRAMES.getValue("doze|none")
+        val bm = Bitmap.createBitmap(rows[0].length, rows.size, Bitmap.Config.ARGB_8888)
         rows.forEachIndexed { y, r -> r.forEachIndexed { x, c -> bm.setPixel(x, y, CrowSprites.PAL[c] ?: 0) } }
         bm
     }
@@ -109,17 +160,20 @@ class CrowOverlay private constructor(private val ctx: Context) {
             x = prefs.getInt("x", 0); y = prefs.getInt("y", dp(160f).toInt())
         }
         var downX = 0f; var downY = 0f; var ox = 0; var oy = 0; var moved = false
+        // 长按（不动 550ms）＝换下一件衣服
+        val longPress = Runnable { if (!moved) { longPressed = true; cycleOutfit() } }
         ll.setOnTouchListener { _, e ->
             when (e.actionMasked) {
-                MotionEvent.ACTION_DOWN -> { downX = e.rawX; downY = e.rawY; ox = lp.x; oy = lp.y; moved = false }
+                MotionEvent.ACTION_DOWN -> { downX = e.rawX; downY = e.rawY; ox = lp.x; oy = lp.y; moved = false; longPressed = false; ui.postDelayed(longPress, 550) }
                 MotionEvent.ACTION_MOVE -> {
                     val dx = e.rawX - downX; val dy = e.rawY - downY
-                    if (abs(dx) > dp(6f) || abs(dy) > dp(6f)) moved = true
+                    if (abs(dx) > dp(6f) || abs(dy) > dp(6f)) { if (!moved) ui.removeCallbacks(longPress); moved = true }
                     if (moved) { lp.x = ox + dx.toInt(); lp.y = oy + dy.toInt(); try { wm.updateViewLayout(ll, lp) } catch (_: Exception) {} }
                 }
-                MotionEvent.ACTION_UP -> {
+                MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
+                    ui.removeCallbacks(longPress)
                     if (moved) prefs.edit().putInt("x", lp.x).putInt("y", lp.y).apply()
-                    else tapped()
+                    else if (!longPressed && e.actionMasked == MotionEvent.ACTION_UP) tapped()
                 }
             }
             true
@@ -127,10 +181,16 @@ class CrowOverlay private constructor(private val ctx: Context) {
         try { wm.addView(ll, lp) } catch (_: Exception) { return }
         root = ll; img = iv; txt = tv; params = lp
         kickBob()
+        ui.removeCallbacks(ticker); ui.postDelayed(ticker, 60_000)
+    }
+
+    // 每分钟看一眼：到点换睡帽、过了一个半小时没回来就埋头。只是重画一张小图，不费电
+    private val ticker = object : Runnable {
+        override fun run() { if (root == null) return; render(); ui.postDelayed(this, 60_000) }
     }
 
     private fun detach() {
-        ui.removeCallbacks(bobber)
+        ui.removeCallbacks(bobber); ui.removeCallbacks(ticker)
         root?.let { try { wm.removeView(it) } catch (_: Exception) {} }
         root = null; img = null; txt = null; params = null
     }
@@ -163,8 +223,13 @@ class CrowOverlay private constructor(private val ctx: Context) {
 
     private fun render() {
         val iv = img ?: return
-        val name = if (System.currentTimeMillis() < startleUntil) "startle" else state
-        val d = android.graphics.drawable.BitmapDrawable(ctx.resources, frame(name)).apply { paint.isFilterBitmap = false }
+        val now = System.currentTimeMillis()
+        val pose = when {
+            now < startleUntil || now < hopUntil -> "startle"
+            state == "doze" && now - bgSince > 90 * 60_000L -> "tuck"
+            else -> state
+        }
+        val d = android.graphics.drawable.BitmapDrawable(ctx.resources, frame(pose + "|" + outfit())).apply { paint.isFilterBitmap = false }
         iv.setImageDrawable(d)
         txt?.let { it.text = lyric; it.visibility = if (lyric.isBlank()) View.GONE else View.VISIBLE }
         if (System.currentTimeMillis() < startleUntil) ui.postDelayed({ render() }, 650)

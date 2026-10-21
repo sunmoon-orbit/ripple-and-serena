@@ -1083,7 +1083,7 @@ const server = http.createServer((req, res) => {
     })
     return
   }
-  const TOKEN_REQUIRED = ['/raven/status', '/raven/last-thinking', '/raven/memory-random', '/raven/journal', '/raven/journal/unlock', '/raven/journal/write', '/raven/journal/attempts', '/raven/journal/reveal', '/raven/cards/unseen', '/raven/cards/seen', '/raven/archive/days', '/raven/archive/day', '/raven/receipt', '/raven/translate-thinking', '/raven/on-this-day', '/raven/echo', '/raven/memory-count', '/raven/activity', '/raven/upload', '/raven/push/subscribe', '/raven/push/unsubscribe', '/raven/usage']
+  const TOKEN_REQUIRED = ['/raven/status', '/raven/last-thinking', '/raven/memory-random', '/raven/journal', '/raven/journal/unlock', '/raven/journal/write', '/raven/journal/attempts', '/raven/journal/reveal', '/raven/cards/unseen', '/raven/cards/seen', '/raven/archive/days', '/raven/archive/day', '/raven/receipt', '/raven/translate-thinking', '/raven/on-this-day', '/raven/echo', '/raven/memory-count', '/raven/crow-weather', '/raven/activity', '/raven/upload', '/raven/push/subscribe', '/raven/push/unsubscribe', '/raven/usage']
   if (TOKEN_REQUIRED.includes(url.pathname) && !externalAuthed(req, url)) {
     res.writeHead(401, { 'Content-Type': 'application/json' })
     res.end(JSON.stringify({ error: 'unauthorized' }))
@@ -1595,6 +1595,18 @@ const server = http.createServer((req, res) => {
   }
 
   // memory count proxy
+  // 1021：桌面乌鸦冷天围围巾，要知道她那儿冷不冷。只回一个冷暖结论和最低温，不带别的
+  if (req.method === 'GET' && url.pathname === '/raven/crow-weather') {
+    moonGet('/weather')
+      .then(d => {
+        const low = Number(d.low), now = Number(d.temp)
+        const cold = (Number.isFinite(low) && low <= 15) || (Number.isFinite(now) && now <= 15)
+        res.writeHead(200, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ cold, low: Number.isFinite(low) ? low : null }))
+      })
+      .catch(() => { res.writeHead(200, { 'Content-Type': 'application/json' }); res.end('{"cold":null}') })
+    return
+  }
+
   if (req.method === 'GET' && url.pathname === '/raven/memory-count') {
     // 1004：原来拉 limit=500 再数，首页永远显示 500；改成 moon 直接数
     moonGet('/memories/count')

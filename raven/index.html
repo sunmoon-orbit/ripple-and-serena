@@ -4068,6 +4068,14 @@ function maskClear() {
   maskBox.classList.remove('mask-host')
 }
 // 小乌鸦的开关在壳里（原生弹窗），只有新壳才露这一格
+// 桌面乌鸦冷天围红围巾（1021）：开着的时候每三小时问一次她那儿冷不冷，告诉壳；旧壳没有 crowCold 就不问
+function rvCrowWeather() {
+  const N = window.RoostNative
+  if (!N || typeof N.crowCold !== 'function') return
+  fetch('/raven/crow-weather', { headers: noteAuth() }).then(r => r.ok ? r.json() : null)
+    .then(d => { if (d && typeof d.cold === 'boolean') try { N.crowCold(d.cold) } catch {} }).catch(() => {})
+}
+rvCrowWeather(); setInterval(rvCrowWeather, 3 * 3600e3)
 if (window.RoostNative && typeof window.RoostNative.openCrowSettings === 'function') {
   document.getElementById('crow-tool').hidden = false
   document.getElementById('crow-btn').addEventListener('click', () => { document.getElementById('attach-menu').hidden = true; try { window.RoostNative.openCrowSettings() } catch {} })
