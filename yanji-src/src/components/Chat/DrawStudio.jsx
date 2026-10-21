@@ -283,10 +283,10 @@ export default function DrawStudio({ onClose, onSendToChat }) {
               </>}
               <label>模型名
                 <div className="draw-model-row">
-                  <input list="draw-models" value={conf.model} onChange={e => patch({ model: e.target.value })} placeholder="比如 gpt-image-1，照你那边的写" autoComplete="off" />
+                  <input value={conf.model} onChange={e => patch({ model: e.target.value })} placeholder="比如 gpt-image-1，照你那边的写" autoComplete="off" />
                   <button type="button" onClick={fetchModels} disabled={fetching}>{fetching ? '拉取中' : '拉列表'}</button>
                 </div>
-                <datalist id="draw-models">{models.map(m => <option key={m} value={m} />)}</datalist>
+                {/* 1021：去掉 datalist——安卓上它会在输入框底下浮出一条灰色候选，盖住下面的提示词；挑模型用下面那排小按钮 */}
               </label>
               {models.length > 0 && <div className="draw-model-chips">{models.filter(m => IMAGE_MODEL.test(m)).slice(0, 12).map(m => <button key={m} type="button" className={conf.model === m ? 'on' : ''} onClick={() => patch({ model: m })}>{m}</button>)}</div>}
               <small>连接就是 Hollow 里存的那些，钥匙不另存。每画一张都按次扣钱，「省钱」那档最便宜。</small>
