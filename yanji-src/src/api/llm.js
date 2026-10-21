@@ -628,6 +628,10 @@ async function callWithTools({
     : systemPrompt
   let convo = [...messages]
   let finalText = ''
+  // 1021 阿颖：解牌解到一半，正文突然换成另一段安慰的话。原因在这儿：模型先写了一段正文、再调工具，
+  // 那段正文已经流到屏幕上了，可收尾只认最后一轮的正文，前面那段落盘时整段被丢掉。
+  // 带工具的那几轮里说过的话攒起来，收尾时接在最后一轮前面。
+  const carriedText = []
   let usage = { promptTokens: 0, completionTokens: 0, totalTokens: 0 }
   // 已经边生成边吐给 UI 了就别在末尾再整段推一次，否则气泡里会出现两份
   let streamedOut = false
@@ -735,6 +739,7 @@ async function callWithTools({
           finalText = stripFakeToolResult(msg.content || '')
           break
         }
+        { const t = stripFakeToolResult(msg.content || '').trim(); if (t) carriedText.push(t) }
         onToolCall?.(msg.tool_calls.map((t) => t.function.name))
         const aMsg = { role: 'assistant', content: msg.content || '', tool_calls: msg.tool_calls }
         if (msg.reasoning_content) aMsg.reasoning_content = msg.reasoning_content
@@ -844,6 +849,7 @@ async function callWithTools({
           finalText = anthropicText
           break
         }
+        if (anthropicText.trim()) carriedText.push(anthropicText.trim())
         // 一次回复可能含多个 tool_use，每个都必须有对应 tool_result，否则 API 400
         onToolCall?.(toolBlocks.map((b) => b.name))
         convo.push({ role: 'assistant', content: data.content })
@@ -896,6 +902,7 @@ async function callWithTools({
           finalText = geminiText
           break
         }
+        if (geminiText.trim()) carriedText.push(geminiText.trim())
         const fc = fcPart.functionCall
         onToolCall?.([fc.name])
         convo.push({ role: 'assistant', content: '', functionCall: fc })
@@ -911,6 +918,7 @@ async function callWithTools({
   }
 
   // 空回一律抛错，别当成一次正常回复落盘（详见 assertNotEmpty 上方注释）
+  if (carriedText.length) finalText = [...carriedText, finalText].filter((t) => t && t.trim()).join('\n\n')
   finalText = commitGuard.reconcile(finalText)
   assertNotEmpty({ text: finalText, usage, responseDiagnostic }, { provider, finishReason: lastFinish, blockReason: lastBlock })
   if (!streamedOut) onChunk?.(finalText)
