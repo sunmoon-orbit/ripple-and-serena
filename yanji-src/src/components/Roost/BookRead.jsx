@@ -42,6 +42,20 @@ function spineLook(book) {
   return { title, width, height, color: `rgb(${r}, ${g}, ${b})`, ink: light ? 'rgba(58,48,38,.86)' : 'rgba(255,252,246,.95)' }
 }
 
+// 封面缓存（1021 她：「换了封面以后，点书籍会闪一下才更换封面」——每次点开都现取，取回来之前先露出画的那张）。
+// 内存里一份、本机 localStorage 一份；书架一打开就把有封面的预取好，点开直接是她那张图。
+const coverMem = new Map()
+const COVER_LS = (id) => 'yanji-book-cover-' + id
+function cachedCover(id) {
+  if (coverMem.has(id)) return coverMem.get(id)
+  try { const v = localStorage.getItem(COVER_LS(id)); if (v) { coverMem.set(id, v); return v } } catch { /* 隐私模式等 */ }
+  return null
+}
+function rememberCover(id, image) {
+  if (image) coverMem.set(id, image); else coverMem.delete(id)
+  try { image ? localStorage.setItem(COVER_LS(id), image) : localStorage.removeItem(COVER_LS(id)) } catch { /* 满了就只留内存那份 */ }
+}
+
 // 她传的封面图：长边压到 720、转 jpeg，存进记忆库不至于太大
 function compressCover(file) {
   return new Promise((resolve, reject) => {
@@ -249,7 +263,15 @@ export default function BookRead({ onClose }) {
 
   useEffect(() => {
     if (!cfg.apiToken) { setBooks([]); return }
-    fetchBooks(cfg).then((list) => setBooks(Array.isArray(list) ? list : [])).catch(() => setBooks([]))
+    fetchBooks(cfg).then((list) => {
+      const arr = Array.isArray(list) ? list : []
+      setBooks(arr)
+      // 预取：有封面、本机还没有的，悄悄先拿回来
+      for (const b of arr) {
+        if (b.has_cover && !cachedCover(b.id)) fetchBookCover(cfg, b.id).then((r) => r?.image && rememberCover(b.id, r.image)).catch(() => {})
+        if (!b.has_cover && cachedCover(b.id)) rememberCover(b.id, null)
+      }
+    }).catch(() => setBooks([]))
   }, [])
 
   // 阅读心跳 + 页内时长摘要：书打开且页面可见时每60s上报，并刷新今日/近7天统计。
@@ -376,10 +398,11 @@ export default function BookRead({ onClose }) {
   }
 
   function showCover(book) {
-    setCoverBook({ book, image: null, loading: !!book.has_cover })
+    const cached = book.has_cover ? cachedCover(book.id) : null
+    setCoverBook({ book, image: cached, loading: !!book.has_cover && !cached })
     if (book.has_cover) {
       fetchBookCover(cfg, book.id)
-        .then((r) => setCoverBook((cur) => cur && cur.book.id === book.id ? { ...cur, image: r?.image || null, loading: false } : cur))
+        .then((r) => { rememberCover(book.id, r?.image || null); setCoverBook((cur) => cur && cur.book.id === book.id ? { ...cur, image: r?.image || null, loading: false } : cur) })
         .catch(() => setCoverBook((cur) => cur && cur.book.id === book.id ? { ...cur, loading: false } : cur))
     }
   }
@@ -392,6 +415,7 @@ export default function BookRead({ onClose }) {
     try {
       const image = await compressCover(file)
       await saveBookCover(cfg, id, image)
+      rememberCover(id, image)
       setCoverBook((cur) => cur && cur.book.id === id ? { ...cur, image } : cur)
       setBooks((list) => (list || []).map((b) => b.id === id ? { ...b, has_cover: 1 } : b))
       showToast('封面换好了')
@@ -403,6 +427,7 @@ export default function BookRead({ onClose }) {
     const id = coverBook.book.id
     try {
       await saveBookCover(cfg, id, null)
+      rememberCover(id, null)
       setCoverBook((cur) => cur && cur.book.id === id ? { ...cur, image: null } : cur)
       setBooks((list) => (list || []).map((b) => b.id === id ? { ...b, has_cover: 0 } : b))
     } catch (err) { showToast('没换回去：' + (err.message || err)) }
@@ -984,6 +1009,8 @@ export default function BookRead({ onClose }) {
                     style={{ '--cover': look.color, '--cover-ink': look.ink }}>
                     {coverBook.image
                       ? <img src={coverBook.image} alt={b.title} />
+                      : coverBook.loading
+                      ? <div className="bookread-cover-drawn bookread-cover-wait"><div className="bookread-cover-loading">封面取来中……</div></div>
                       : (
                         <div className="bookread-cover-drawn">
                           <i className="bookread-cover-rule" />

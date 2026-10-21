@@ -4313,6 +4313,8 @@ textarea.form-input { display: block; margin: 8px 16px 12px; }
   display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden;
 }
 .bookread-cover-loading { font-size: 11px; opacity: .6; }
+.bookread-cover-wait { justify-content: center; animation: cover-wait 1.4s ease-in-out infinite alternate; }
+@keyframes cover-wait { from { opacity: .55 } to { opacity: .9 } }
 .bookread-cover-actions { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; }
 .bookread-cover-actions .roost-btn { min-width: 76px; }
 .bookread-cover-actions .roost-btn.ghost { background: color-mix(in srgb, var(--card) 85%, transparent); color: var(--text); }
