@@ -663,6 +663,7 @@ function applyTheme(t) {
   META.content = t === 'light' ? '#faf7f2' : '#1a1a1f'
   localStorage.setItem('home-theme', t)
   theme = t
+  if (typeof applyWall === 'function') applyWall()   // 1021：亮暗分开设壁纸时，换主题跟着换图
 }
 applyTheme(theme)
 function toggleTheme() { applyTheme(theme === 'dark' ? 'light' : 'dark') }
@@ -1341,6 +1342,7 @@ document.addEventListener('visibilitychange', () => {
 })
 </script>
 <div id="wall-sheet" class="glass" hidden>
+  <button type="button" id="wall-split">亮暗分开：关</button>
   <button type="button" id="wall-pick">换一张</button>
   <button type="button" id="wall-splash">用开屏那张</button>
   <button type="button" id="wall-off">关掉壁纸</button>
@@ -1349,22 +1351,46 @@ document.addEventListener('visibilitychange', () => {
 </div>
 <script>
 // ── 首页壁纸（1004）：存在本机 localStorage，不上传；'off' 表示她关掉了 ──
+// 1021 她：「能不能亮色和暗色分开设置两个不同的壁纸，就是目前这种模式也保留」——
+// 默认还是一张图两种主题共用；打开「亮暗分开」后，换图/关掉/用开屏那张都只作用于当前主题，
+// 某个主题还没单独设过就沿用共用那张。
 const WALL_KEY = 'raven-home-wall'
+const WALL_SPLIT = 'raven-home-wall-split'
+const isLight = () => document.documentElement.getAttribute('data-theme') === 'light'
+const splitOn = () => { try { return localStorage.getItem(WALL_SPLIT) === '1' } catch { return false } }
+const wallKey = () => splitOn() ? WALL_KEY + (isLight() ? '-light' : '-dark') : WALL_KEY
+function readWall(k) {
+  const v = localStorage.getItem(k)
+  if (v === 'off') return null
+  if (v) return v
+  if (k !== WALL_KEY) return readWall(WALL_KEY)                     // 这个主题还没单独设过：沿用共用那张
+  return localStorage.getItem('raven-splash-bg')
+}
 function applyWall() {
   const app = document.getElementById('app'); if (!app) return
   let url = null
-  try {
-    const v = localStorage.getItem(WALL_KEY)
-    url = v === 'off' ? null : (v || localStorage.getItem('raven-splash-bg'))
-  } catch {}
+  try { url = readWall(wallKey()) } catch {}
   if (url) { app.style.setProperty('--wall', `url("${url}")`); app.classList.add('has-wall') }
   else { app.style.removeProperty('--wall'); app.classList.remove('has-wall') }
 }
-function openWallSheet() { document.getElementById('wall-sheet').hidden = false }
+function syncWallSheet() {
+  const on = splitOn(), mode = isLight() ? '亮色' : '暗色'
+  document.getElementById('wall-split').textContent = '亮暗分开：' + (on ? '开' : '关')
+  document.getElementById('wall-pick').textContent = on ? `换一张（${mode}）` : '换一张'
+  document.getElementById('wall-off').textContent = on ? `关掉${mode}壁纸` : '关掉壁纸'
+}
+function openWallSheet() { syncWallSheet(); document.getElementById('wall-sheet').hidden = false }
 function closeWallSheet() { document.getElementById('wall-sheet').hidden = true }
 document.getElementById('wall-close').onclick = closeWallSheet
-document.getElementById('wall-off').onclick = () => { try { localStorage.setItem(WALL_KEY, 'off') } catch {} applyWall(); closeWallSheet() }
-document.getElementById('wall-splash').onclick = () => { try { localStorage.removeItem(WALL_KEY) } catch {} applyWall(); closeWallSheet() }
+document.getElementById('wall-split').onclick = () => {
+  try { localStorage.setItem(WALL_SPLIT, splitOn() ? '0' : '1') } catch {}
+  applyWall(); syncWallSheet()
+}
+document.getElementById('wall-off').onclick = () => { try { localStorage.setItem(wallKey(), 'off') } catch {} applyWall(); closeWallSheet() }
+document.getElementById('wall-splash').onclick = () => {
+  try { splitOn() ? localStorage.setItem(wallKey(), localStorage.getItem('raven-splash-bg') || 'off') : localStorage.removeItem(WALL_KEY) } catch {}
+  applyWall(); closeWallSheet()
+}
 document.getElementById('wall-pick').onclick = () => document.getElementById('wall-file').click()
 document.getElementById('wall-file').onchange = (ev) => {
   const file = ev.target.files && ev.target.files[0]; if (!file) return
@@ -1374,7 +1400,7 @@ document.getElementById('wall-file').onchange = (ev) => {
     const c = document.createElement('canvas'); c.width = Math.round(img.width * k); c.height = Math.round(img.height * k)
     c.getContext('2d').drawImage(img, 0, 0, c.width, c.height)
     URL.revokeObjectURL(img.src)
-    try { localStorage.setItem(WALL_KEY, c.toDataURL('image/jpeg', .85)) } catch {}
+    try { localStorage.setItem(wallKey(), c.toDataURL('image/jpeg', .85)) } catch (e) { alert('存不下了：手机给网页的空间满了，先关掉另一张壁纸再试') }
     applyWall(); closeWallSheet()
   }
   img.src = URL.createObjectURL(file)
