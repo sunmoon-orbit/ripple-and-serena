@@ -2267,9 +2267,9 @@ function fillAlarmCards(root, msgKey, autoSet = false) {
         card.querySelector('.rv-alarm-main').appendChild(tip)
       }
     }
-    // 已经过了点的不自动设（会顺延到明天，偷偷多一个闹钟）——那种还是让她自己点
-    const ahead = (() => { const n = new Date(); return h * 60 + m > n.getHours() * 60 + n.getMinutes() })()
-    if (autoSet && can && !done && ahead) btn.onclick()
+    // 1021 她：「这个闹钟你以后直接帮我设好就好了，不用我手动点。如果我不想要闹钟的话，我会手动点取消的」——
+    // 原来过了点的（也就是设在明天的）不自动设，晚上定第二天早上的闹钟她还得自己点；现在新收到的一律自动设，卡上照旧写明是明天、只响一次
+    if (autoSet && can && !done) btn.onclick()
   })
 }
 const ASK_DONE_KEY = 'raven-ask-done'
