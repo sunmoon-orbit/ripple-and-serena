@@ -368,13 +368,20 @@ function drawBottle(t, B, sun, par) {
     ig.addColorStop(0, `rgba(120,180,255,${(k * 0.45).toFixed(3)})`); ig.addColorStop(1, 'rgba(120,180,255,0)')
     ctx.fillStyle = ig; ctx.fillRect(-L, -R * 2, L * 2, R * 4)
     ctx.restore()
-    const gx = L * 0.12 + hx * 0.5, gy = -R * 0.72, tw = 0.65 + 0.35 * Math.sin(t * 3.1)
-    const gr = R * (0.5 + k * 0.9) * tw
+    // 高光（1021 第六版：十字星像贴上去的特效，她说闪光「有点问题」）：改成顺着瓶身弧面的一道细长亮痕＋瓶肩一小点，
+    // 跟着水面的晃动明暗起伏，没有十字线
+    const tw = 0.7 + 0.3 * Math.sin(t * 2.6) * Math.sin(t * 1.7 + 1)
+    ctx.save(); ctx.clip(body)
+    const sx0 = -L * 0.38 + hx * 0.5, sx1 = L * 0.2 + hx * 0.5
+    const sg2 = ctx.createLinearGradient(sx0, 0, sx1, 0)
+    sg2.addColorStop(0, 'rgba(255,255,255,0)'); sg2.addColorStop(0.45, `rgba(245,250,255,${(k * 0.85 * tw).toFixed(3)})`); sg2.addColorStop(1, 'rgba(255,255,255,0)')
+    ctx.fillStyle = sg2
+    ctx.beginPath(); ctx.ellipse((sx0 + sx1) / 2, -R * 0.66, (sx1 - sx0) / 2, R * 0.07, 0, 0, Math.PI * 2); ctx.fill()
+    ctx.restore()
+    const gx = L * 0.33, gy = -R * 0.5, gr = R * 0.35
     const gg = ctx.createRadialGradient(gx, gy, 0, gx, gy, gr)
-    gg.addColorStop(0, `rgba(255,255,255,${(k * 0.95).toFixed(3)})`); gg.addColorStop(1, 'rgba(200,230,255,0)')
+    gg.addColorStop(0, `rgba(255,255,255,${(k * 0.7 * tw).toFixed(3)})`); gg.addColorStop(1, 'rgba(220,235,255,0)')
     ctx.fillStyle = gg; ctx.beginPath(); ctx.arc(gx, gy, gr, 0, Math.PI * 2); ctx.fill()
-    ctx.strokeStyle = `rgba(255,255,255,${(k * 0.8 * tw).toFixed(3)})`; ctx.lineWidth = 1
-    ctx.beginPath(); ctx.moveTo(gx - gr * 2.2, gy); ctx.lineTo(gx + gr * 2.2, gy); ctx.moveTo(gx, gy - gr * 1.6); ctx.lineTo(gx, gy + gr * 1.6); ctx.stroke()
     ctx.globalCompositeOperation = 'source-over'
   }
   ctx.restore()
@@ -431,7 +438,7 @@ function drawCrab(t, B) {
   const O = `rgb(${mix(60, 217)},${mix(30, 119)},${mix(28, 87)})`, E = 'rgb(20,12,10)'
   const leg = Math.floor(c.step * 6) % 2, pk = c.poke > 0 ? Math.floor(c.poke * 5) % 2 : 0
   // 9×6 的小像素：身子 7 宽 3 高，两边钳子，下面腿
-  const px = Math.round(X(c.x) - 4.5 * s), py = Math.round(Y(FLOOR(c.x)) - 6 * s)
+  const px = Math.round(X(c.x) - 4.5 * s), py = Math.round(Y(FLOOR(c.x) - 0.035) - 6 * s)   // 走在瓶子前面一点（离你更近），不压在瓶子上
   const dot = (gx, gy, col) => { ctx.fillStyle = col; ctx.fillRect(px + gx * s, py + gy * s, s, s) }
   for (let gx = 1; gx <= 7; gx++) for (let gy = 1; gy <= 3; gy++) dot(gx, gy, O)
   dot(3, 1, E); dot(5, 1, E)                                   // 眼睛
