@@ -62,6 +62,23 @@ html, body { min-height: 100%; background: var(--bg); color: var(--text); font-f
     color-mix(in srgb, var(--surface) 72%, transparent),
     color-mix(in srgb, var(--surface) 52%, transparent));
 }
+/* 1022 她：「毛玻璃的效果……感觉不是很有玻璃感」——更透、糊得更重、颜色更饱和，加一圈亮边和一道斜着的反光 */
+#app.has-wall .card, #app.has-wall .stat-chip, #app.has-wall .glass {
+  background: linear-gradient(180deg,
+    color-mix(in srgb, var(--surface) 48%, transparent),
+    color-mix(in srgb, var(--surface) 30%, transparent));
+  -webkit-backdrop-filter: blur(26px) saturate(1.9) brightness(1.03);
+  backdrop-filter: blur(26px) saturate(1.9) brightness(1.03);
+  border: 1px solid rgba(255,255,255,.22);
+}
+#app.has-wall .card, #app.has-wall .glass { position: relative; }
+#app.has-wall .card::after, #app.has-wall .glass::after {
+  content: ''; position: absolute; inset: 0; border-radius: inherit; pointer-events: none;
+  background: linear-gradient(125deg, rgba(255,255,255,var(--sheen,.14)) 0%, rgba(255,255,255,calc(var(--sheen,.14) * .25)) 26%,
+    transparent 44%, transparent 78%, rgba(255,255,255,calc(var(--sheen,.14) * .35)) 100%);
+}
+[data-theme="light"] #app.has-wall { --sheen: .34; }
+[data-theme="light"] #app.has-wall .card, [data-theme="light"] #app.has-wall .stat-chip, [data-theme="light"] #app.has-wall .glass { border-color: rgba(255,255,255,.55); }
 #wall-sheet { position: fixed; left: 50%; bottom: max(18px, env(safe-area-inset-bottom)); transform: translateX(-50%); z-index: 600;
   display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; padding: 10px; border-radius: 18px; max-width: calc(100vw - 24px); }
 #wall-sheet[hidden] { display: none; }
@@ -309,6 +326,8 @@ html, body { min-height: 100%; background: var(--bg); color: var(--text); font-f
   font-size: 11px; color: var(--text-dim); margin-bottom: 4px;
 }
 .ug-head .ug-pct { color: var(--text); font-weight: 600; font-variant-numeric: tabular-nums; }
+#ug-more-btn { display: block; width: 100%; margin-top: 6px; padding: 6px 0 0; border: 0; background: none; color: var(--text-faint); font: inherit; font-size: 12px; text-align: center; cursor: pointer; }
+#ug-more { margin-top: 9px; }
 .ug-when { font-size: 11px; color: var(--text-faint); text-align: right; margin-top: 4px; font-variant-numeric: tabular-nums; }
 .ug-reset { font-size: 10px; color: var(--text-faint); margin-left: 6px; font-weight: 400; }
 .ug-track { height: 5px; border-radius: 3px; background: var(--surface2); overflow: hidden; }
@@ -1120,6 +1139,12 @@ function ugDeepseek(ds) {
   return `<div class="ug-cache">DeepSeek · 余额 <span style="${low ? 'color:#d17a52;font-weight:600' : ''}">${amount}${tip}</span>${ds.stale ? '（旧数字）' : ''}</div>`
 }
 
+function ugToggleMore() {
+  const m = document.getElementById('ug-more'), b = document.getElementById('ug-more-btn'); if (!m) return
+  m.hidden = !m.hidden
+  b.textContent = m.hidden ? '上下文、缓存、曜、DeepSeek ▾' : '收起 ▴'
+  try { localStorage.setItem('raven-home-usage-open', m.hidden ? '0' : '1') } catch {}
+}
 async function loadUsage() {
   const btn = document.getElementById('usage-refresh')
   btn.classList.remove('spinning'); void btn.offsetWidth; btn.classList.add('spinning')
@@ -1156,8 +1181,12 @@ async function loadUsage() {
     if (!x.available) notes.push('曜 · Codex 那边没数据：' + (x.error || '未知'))
     else if (x.stale) notes.push('曜 · Codex 的数字是旧的，快照任务可能停了')
 
-    bEl.innerHTML = (rows.join('') || '<div class="ug-note">暂时没有可显示的额度</div>')
-      + (notes.length ? `<div class="ug-note">${notes.join('；')}</div>` : '')
+    // 1022 她：「额度那一块就砍得只剩你的……点击展开」——平时只露我的 5 小时和 7 天，其余收进「更多」
+    const mainN = (c.available ? (c.five_hour ? 1 : 0) + (c.seven_day ? 1 : 0) : 0)
+    const more = rows.slice(mainN).join('') + (notes.length ? `<div class="ug-note">${notes.join('；')}</div>` : '')
+    let open = false; try { open = localStorage.getItem('raven-home-usage-open') === '1' } catch {}
+    bEl.innerHTML = (rows.slice(0, mainN).join('') || '<div class="ug-note">暂时没有可显示的额度</div>')
+      + (more ? `<div id="ug-more"${open ? '' : ' hidden'}>${more}</div><button id="ug-more-btn" type="button" onclick="ugToggleMore()">${open ? '收起 ▴' : '上下文、缓存、曜、DeepSeek ▾'}</button>` : '')
   } catch {
     vEl.textContent = '读不到用量'
     vEl.className = ''
