@@ -4196,7 +4196,7 @@ function watchVoice(stream, opts, onEnd) {
     audioContext: getSharedAudioContext() || undefined,
     getStream: async () => stream, pauseStream: async () => {}, resumeStream: async () => stream,   // 用录音那条流，别让它自己关麦
     positiveSpeechThreshold: 0.5, negativeSpeechThreshold: 0.35,
-    redemptionMs: 1200, minSpeechMs: 250, preSpeechPadMs: 0,
+    redemptionMs: 1800, minSpeechMs: 250, preSpeechPadMs: 0,
     onSpeechRealStart: () => { spoke = true },
     onSpeechEnd: () => { if (spoke) finish('spoke') },
   })).then(m => {
