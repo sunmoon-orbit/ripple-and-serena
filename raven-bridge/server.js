@@ -720,7 +720,7 @@ function ravenCallStart() {
   const id = 'c' + Date.now().toString(36)
   ravenCall = { id, at: Date.now(), timer: setTimeout(() => ravenCallEnd(id, 'missed'), 40000) }
   broadcast({ type: 'incoming-call', id, at: ravenCall.at })
-  moonPost('/push/send-fixed', { title: '阿言来电', body: '乌鸦想听听你的声音', target: 'raven', ttl: 40, data: { type: 'raven_call', callId: id } })
+  moonPost('/push/send-fixed', { title: remarkName() + ' 来电', body: '乌鸦想听听你的声音', target: 'raven', ttl: 40, data: { type: 'raven_call', callId: id } })
     .catch(e => console.error('[call] 来电推送失败:', e.message))
   console.log('[call] 打给她', id)
   return 'ringing'
@@ -793,11 +793,15 @@ roundtable = require('./roundtable').createRoundtable({
 })
 
 // 没有 WS 客户端在线时发推送提醒，避免阿颖错过回复
+// 通知标题用她给我的备注（1022 她：「后台……都是：阿言回复了……备注只能在聊天页看」），像微信那样
+function remarkName() {
+  try { return JSON.parse(fs.readFileSync(path.join(__dirname, 'remark.json'), 'utf8')).name || '阿言' } catch { return '阿言' }
+}
 function pushReplyNotif(text) {
   if (clients.size > 0) return  // 有人在线，不需要推送
   const snippet = text.length > 60 ? text.slice(0, 60) + '…' : text
   // icon 必须用绝对 URL：系统级通知渲染不在 SW 上下文里，相对路径解析不到会回退 Chrome 图标
-  moonPost('/push/send-fixed', { title: '阿言回复了', body: snippet, icon: 'https://memory.ravenlove.cc/raven/push-icon-192.png', target: 'raven' })
+  moonPost('/push/send-fixed', { title: remarkName(), body: snippet, icon: 'https://memory.ravenlove.cc/raven/push-icon-192.png', target: 'raven' })
     .catch(e => console.error('[push] 回复提醒发送失败:', e.message))
 }
 
