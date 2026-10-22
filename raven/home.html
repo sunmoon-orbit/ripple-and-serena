@@ -280,6 +280,7 @@ html, body { min-height: 100%; background: var(--bg); color: var(--text); font-f
   font-size: 11px; color: var(--text-dim); margin-bottom: 4px;
 }
 .ug-head .ug-pct { color: var(--text); font-weight: 600; font-variant-numeric: tabular-nums; }
+.ug-when { font-size: 11px; color: var(--text-faint); text-align: right; margin-top: 4px; font-variant-numeric: tabular-nums; }
 .ug-reset { font-size: 10px; color: var(--text-faint); margin-left: 6px; font-weight: 400; }
 .ug-track { height: 5px; border-radius: 3px; background: var(--surface2); overflow: hidden; }
 .ug-fill { height: 100%; border-radius: 3px; background: var(--accent-dim); transition: width .4s ease; }
@@ -987,21 +988,26 @@ async function loadMemory({ cycle = true } = {}) {
 
 // 额度卡片：涟言（Claude 订阅额度 + 上下文余量）和曜 · Codex
 // 数据来自 /raven/usage —— 服务端只读两份快照文件，不碰任何凭证，详见 raven-bridge/usage.js
-function ugDuration(sec) {
+// 1022 她：「只有到当天剩余 24 小时内才会显示剩下的小时……能不能再精确一点」→ 相对时间多一级，再带上几点
+function ugDuration(sec, word = '重置') {
   if (sec == null || sec <= 0) return ''
-  const h = Math.floor(sec / 3600)
-  if (h >= 24) return `${Math.floor(h / 24)} 天后重置`
-  if (h >= 1) return `${h} 小时后重置`
-  return `${Math.max(1, Math.round(sec / 60))} 分钟后重置`
+  const d = Math.floor(sec / 86400), h = Math.floor(sec % 86400 / 3600), m = Math.max(1, Math.round(sec % 3600 / 60))
+  const rel = d ? `${d} 天${h ? ` ${h} 小时` : ''}` : h ? `${h} 小时${m < 60 ? ` ${m} 分` : ''}` : `${m} 分钟`
+  const at = new Date(Date.now() + sec * 1000), now = new Date()
+  const dayDiff = Math.round((new Date(at.getFullYear(), at.getMonth(), at.getDate()) - new Date(now.getFullYear(), now.getMonth(), now.getDate())) / 86400000)
+  const day = dayDiff === 0 ? '' : dayDiff === 1 ? '明天 ' : dayDiff === 2 ? '后天 ' : `${at.getMonth() + 1}/${at.getDate()} 周${'日一二三四五六'[at.getDay()]} `
+  const hm = `${String(at.getHours()).padStart(2, '0')}:${String(at.getMinutes()).padStart(2, '0')}`
+  return `${rel}后 · ${day}${hm} ${word}`
 }
 
 function ugBar(label, pct, resetSec, extra) {
   const p = Math.max(0, Math.min(100, Math.round(pct || 0)))
   const cls = p >= 85 ? 'hot' : p >= 60 ? 'mid' : ''
-  const reset = resetSec != null ? `<span class="ug-reset">${ugDuration(resetSec)}</span>` : ''
+  // 重置时间变长了（带几点），挪到进度条下面单独一行，免得和百分比挤在一起折行
+  const reset = resetSec != null && resetSec > 0 ? `<div class="ug-when">${ugDuration(resetSec)}</div>` : ''
   return `<div class="ug-row">
-    <div class="ug-head"><span>${label}${extra || ''}</span><span><span class="ug-pct">${p}%</span>${reset}</span></div>
-    <div class="ug-track"><div class="ug-fill ${cls}" style="width:${p}%"></div></div>
+    <div class="ug-head"><span>${label}${extra || ''}</span><span class="ug-pct">${p}%</span></div>
+    <div class="ug-track"><div class="ug-fill ${cls}" style="width:${p}%"></div></div>${reset}
   </div>`
 }
 
@@ -1014,7 +1020,7 @@ function ugCache(cache) {
   if (cache.hit_percent != null) parts.push(`命中 ${cache.hit_percent}%`)
   if (cache.requests != null) parts.push(`${cache.requests} 次请求`)
   if (cache.misses != null) parts.push(`${cache.misses} 次未命中`)
-  if (cache.warm && cache.expires_after_seconds != null) parts.push(ugDuration(cache.expires_after_seconds).replace('重置', '变冷'))
+  if (cache.warm && cache.expires_after_seconds != null) parts.push(ugDuration(cache.expires_after_seconds, '变冷'))
   const causeNames = {
     tools_changed: '工具发生变化',
     system_prompt_changed: '系统提示发生变化',
