@@ -81,6 +81,20 @@
             android:turnScreenOn="true"
             android:taskAffinity="cc.ravenlove.roost.alarm" />
 
+        <!-- 阿言来电（1022） -->
+        <service
+            android:name=".CallRingService"
+            android:exported="false"
+            android:foregroundServiceType="mediaPlayback" />
+        <activity
+            android:name=".IncomingCallActivity"
+            android:exported="false"
+            android:excludeFromRecents="true"
+            android:launchMode="singleInstance"
+            android:showWhenLocked="true"
+            android:turnScreenOn="true"
+            android:taskAffinity="cc.ravenlove.roost.call" />
+
         <!-- 通知栏直接回复 -->
         <receiver
             android:name=".QuickReplyReceiver"

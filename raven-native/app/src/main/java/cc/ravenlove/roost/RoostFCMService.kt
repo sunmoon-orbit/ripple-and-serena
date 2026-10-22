@@ -27,6 +27,14 @@ class RoostFCMService : FirebaseMessagingService() {
 
     override fun onMessageReceived(message: RemoteMessage) {
         super.onMessageReceived(message)
+        // 1022：我打给她。归巢正开在聊天页（网页自己会弹来电）就不响；否则前台服务响铃＋全屏来电
+        if (message.data["type"] == "raven_call") {
+            val id = message.data["callId"] ?: return
+            if (MainActivity.onChatPage) return
+            val i = Intent(this, CallRingService::class.java).putExtra("callId", id)
+            try { startForegroundService(i) } catch (_: Exception) {}
+            return
+        }
         val title = message.data["title"] ?: message.notification?.title ?: "归巢"
         val body = message.data["body"] ?: message.notification?.body ?: return
 

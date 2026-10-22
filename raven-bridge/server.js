@@ -710,6 +710,35 @@ function saveReactions(all) {
   fs.renameSync(tmp, REACTIONS_FILE)
 }
 
+// ── 我给她打电话（1022 她：「聊着聊着，可能你突然想打了，然后就给我打一个」）────────────
+// 我在回复里写 [call] → 网页弹来电（在看归巢时）＋推一条 raven_call 给壳（在后台/锁屏时全屏来电）。
+// 她接、挂、40 秒没接，都送一行回终端告诉我。同一时间只响一通；桥重启就算了。
+let ravenCall = null
+function bjHm() { return new Date(Date.now() + 8 * 3600e3).toISOString().slice(5, 16).replace('T', ' ') }
+function ravenCallStart() {
+  if (ravenCall) return 'already-ringing'
+  const id = 'c' + Date.now().toString(36)
+  ravenCall = { id, at: Date.now(), timer: setTimeout(() => ravenCallEnd(id, 'missed'), 40000) }
+  broadcast({ type: 'incoming-call', id, at: ravenCall.at })
+  moonPost('/push/send-fixed', { title: '阿言来电', body: '乌鸦想听听你的声音', target: 'raven', ttl: 40, data: { type: 'raven_call', callId: id } })
+    .catch(e => console.error('[call] 来电推送失败:', e.message))
+  console.log('[call] 打给她', id)
+  return 'ringing'
+}
+function ravenCallEnd(id, how, bilingual) {
+  if (!ravenCall || ravenCall.id !== id) return false
+  clearTimeout(ravenCall.timer); ravenCall = null
+  broadcast({ type: 'incoming-call-end', id, how })
+  const line = how === 'accepted'
+    ? `【通话·接通${bilingual ? '·双语' : ''}】她接了你打过去的电话，通话开着。你先开口，照通话的规矩说一句短的。`
+    : how === 'declined'
+      ? '【通话·被挂断】你打过去的电话她按掉了，多半是现在不方便。别再打，想说就回一句短的文字。'
+      : '【通话·没接】你打过去的电话响了 40 秒她没接。别再打，想说就回一句短的文字留着。'
+  tmuxSend(`${line}　〔${bjHm()}〕`)
+  console.log('[call]', id, how)
+  return true
+}
+
 function broadcast(msg) {
   const data = JSON.stringify(msg)
   for (const ws of clients) {
@@ -2054,12 +2083,18 @@ const server = http.createServer((req, res) => {
     req.on('data', d => body += d)
     req.on('end', () => {
       try {
-        const { text, thinking } = JSON.parse(body)
+        let { text, thinking } = JSON.parse(body)
         // 通话里她安静了一阵，桥来问我要不要开口（见下面的 call-silence）。我回 [wait] 就是「先不说」：
         // 不画气泡、不念、不进存档、不推通知，只告诉页面可以接着等。
         if (typeof text === 'string' && /^\s*\[wait\]\s*$/i.test(text)) {
           broadcast({ type: 'call-wait' })
           res.writeHead(200); res.end('{"wait":true}'); return
+        }
+        // 回复里带 [call]：给她打电话（1022）。只有 [call] 没别的字就不画气泡
+        if (typeof text === 'string' && /\[call\]/i.test(text)) {
+          text = text.replace(/\s*\[call\]\s*/gi, ' ').trim()
+          const call = ravenCallStart()
+          if (!text) { res.writeHead(200); res.end(JSON.stringify({ ok: true, call })); return }
         }
         if (text) {
           replyExtractionEnabled = false
@@ -2115,6 +2150,19 @@ const server = http.createServer((req, res) => {
   // ⚠️ 言叽的 QuickReplyReceiver 一直往 /raven/chat 发——这个地址从来不存在，
   // 所以言叽的通知栏回复从上线起就是死的（0726 做归巢壳时发现）。归巢用这个新入口，
   // 言叽也改过来指这里。
+  // 壳的来电页按「挂断」走这里（接听则打开归巢，由网页走 WS 的 call-answer）
+  if (req.method === 'POST' && url.pathname === '/raven/call-answer') {
+    let body = ''
+    req.on('data', d => { body += d })
+    req.on('end', () => {
+      let p; try { p = JSON.parse(body) } catch { res.writeHead(400); res.end('{"error":"bad json"}'); return }
+      if (!tokenIsValid(p?.token)) { res.writeHead(401); res.end('{"error":"unauthorized"}'); return }
+      const ok = ravenCallEnd(String(p.id || ''), p.accept ? 'accepted' : 'declined', !!p.bilingual)
+      res.writeHead(200, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ ok }))
+    })
+    return
+  }
+
   if (req.method === 'POST' && url.pathname === '/raven/send') {
     let body = ''
     req.on('data', d => { body += d })
@@ -2564,6 +2612,7 @@ wss.on('connection', (ws) => {
     ws.send(JSON.stringify({ type: 'thinking', active: isThinking }))
     // 补发最近 10 条 reply，重连后不丢消息
     for (const m of lastReplyMsgs) ws.send(JSON.stringify({ ...m, replayed: true }))
+    if (ravenCall) ws.send(JSON.stringify({ type: 'incoming-call', id: ravenCall.id, at: ravenCall.at }))
     // 补发待处理的权限提示（断线重连时弹窗不丢失）
     if (lastPermData && Date.now() >= permCooldownUntil) {
       ws.send(JSON.stringify(lastPermData))
@@ -2653,6 +2702,11 @@ wss.on('connection', (ws) => {
       // 通话里的安静（1011，她说要的）：她一阵没出声，页面来报一声，我可以自己开口，也可以回 [wait] 不说。
       // 不是她说的话，所以不进存档、不回执、不走 ingestUserMessage；我正忙就整条丢掉，不排队。
       // 1022 她：「我这边挂电话，你那边没显示吗？」——挂断以前只在她手机上记一条，我收不到。现在送一行来，我回一句短的收尾
+      if (msg.type === 'call-answer') {
+        if (!tokenIsValid(msg.token)) return
+        ravenCallEnd(String(msg.id || ''), msg.accept ? 'accepted' : 'declined', !!msg.bilingual)
+        return
+      }
       if (msg.type === 'call-end') {
         if (!tokenIsValid(msg.token)) return
         const d = Math.max(0, Math.min(86400, Math.round(Number(msg.duration) || 0)))

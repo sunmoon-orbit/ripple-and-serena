@@ -33,6 +33,8 @@ class MainActivity : AppCompatActivity() {
     private var pendingAudioPermission: PermissionRequest? = null
 
     companion object {
+        // 正在前台、而且开着聊天页（/raven/ 或 index.html）：我打来的电话由网页弹，壳不响（1022）
+        @Volatile var onChatPage = false
         private const val FILE_CHOOSER_CODE = 1001
         private const val NOTIFICATION_PERM_CODE = 1002
         private const val AUDIO_PERM_CODE = 1003
@@ -90,6 +92,8 @@ class MainActivity : AppCompatActivity() {
         webView.webViewClient = object : WebViewClient() {
             override fun onPageFinished(view: WebView?, url: String?) {
                 super.onPageFinished(view, url)
+                pageUrl = url ?: ""
+                updateChatFlag()
                 splash.animate().alpha(0f).setDuration(400).withEndAction {
                     splash.visibility = View.GONE
                 }.start()
@@ -203,11 +207,35 @@ class MainActivity : AppCompatActivity() {
         fetchFcmToken()
         checkUpdate()
         handleShareIntent(intent)
+        handleAnswerIntent(intent)
     }
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         handleShareIntent(intent)
+        handleAnswerIntent(intent)
+    }
+
+    private var pageUrl = ""
+    private var resumed = false
+    private fun updateChatFlag() {
+        val path = android.net.Uri.parse(pageUrl).path ?: ""
+        onChatPage = resumed && (path == "/raven/" || path == "/raven" || path.endsWith("/raven/index.html"))
+    }
+    override fun onResume() { super.onResume(); resumed = true; updateChatFlag(); CallRingService.stop(this) }
+    override fun onPause() { super.onPause(); resumed = false; updateChatFlag() }
+
+    // 来电页点了接听：开着聊天页就直接接，不然带着 ?answer= 打开聊天页
+    private fun handleAnswerIntent(intent: Intent?) {
+        val id = intent?.getStringExtra("answerCall") ?: return
+        intent?.removeExtra("answerCall")
+        if (!id.matches(Regex("[a-z0-9]{1,24}"))) return
+        webView.post {
+            val path = android.net.Uri.parse(webView.url ?: "").path ?: ""
+            if (path == "/raven/" || path == "/raven" || path.endsWith("/raven/index.html"))
+                webView.evaluateJavascript("window.rvAnswerCall && rvAnswerCall('$id')", null)
+            else webView.loadUrl("https://memory.ravenlove.cc/raven/?answer=$id")
+        }
     }
 
     private fun handleShareIntent(intent: Intent?) {

@@ -86,7 +86,7 @@ class AlarmActivity : AppCompatActivity() {
             }
         } else {
             fun pix(name: String): android.graphics.drawable.BitmapDrawable {
-                val rows = CrowSprites.FRAMES[name] ?: CrowSprites.FRAMES.getValue("doze")
+                val rows = CrowSprites.FRAMES["$name|none"] ?: CrowSprites.FRAMES.getValue("doze|none")   // 1021 换装后键名带了衣服
                 val b = android.graphics.Bitmap.createBitmap(24, 24, android.graphics.Bitmap.Config.ARGB_8888)
                 rows.forEachIndexed { y, r -> r.forEachIndexed { x, c -> b.setPixel(x, y, CrowSprites.PAL[c] ?: 0) } }
                 return android.graphics.drawable.BitmapDrawable(resources, b).apply { paint.isFilterBitmap = false }

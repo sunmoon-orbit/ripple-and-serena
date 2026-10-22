@@ -1010,6 +1010,23 @@
     color: var(--text);
   }
   #call-overlay.show { display: flex; }
+  /* 我打给她的来电页（1022） */
+  #ring-overlay {
+    position: fixed; inset: 0; z-index: 9900; display: flex; flex-direction: column; align-items: center;
+    padding: max(18vh, env(safe-area-inset-top)) 24px max(9vh, env(safe-area-inset-bottom));
+    background: radial-gradient(circle at 50% 30%, color-mix(in srgb, var(--accent) 24%, transparent), transparent 45%), var(--bg);
+    color: var(--text);
+  }
+  #ring-overlay[hidden] { display: none; }
+  #ring-avatar { width: 120px; height: 120px; border-radius: var(--avatar-radius); object-fit: cover; animation: ringBreath 1.6s ease-in-out infinite; }
+  @keyframes ringBreath { 50% { transform: scale(1.06); box-shadow: 0 0 0 14px color-mix(in srgb, var(--accent) 14%, transparent); } }
+  #ring-name { margin-top: 22px; font-size: 26px; letter-spacing: .08em; }
+  #ring-sub { margin-top: 8px; font-size: 14px; color: var(--text-dim); }
+  #ring-btns { margin-top: auto; width: 100%; max-width: 320px; display: flex; justify-content: space-between; }
+  #ring-btns button { width: 72px; height: 72px; border-radius: 50%; border: 0; color: #fff; display: grid; place-items: center; cursor: pointer; }
+  #ring-decline { background: #d9534f; }
+  #ring-accept { background: #3fa86b; animation: ringNudge 1.2s ease-in-out infinite; }
+  @keyframes ringNudge { 0%, 60%, 100% { transform: none; } 70% { transform: rotate(-14deg); } 80% { transform: rotate(12deg); } 90% { transform: rotate(-8deg); } }
   #call-top { display: flex; align-items: center; justify-content: space-between; min-height: 38px; }
   #call-title { font-size: 13px; letter-spacing: .08em; color: var(--text-dim); }
   #call-timer { font-variant-numeric: tabular-nums; font-size: 13px; color: var(--text-dim); }
@@ -1713,6 +1730,16 @@
       </div>
 
     </div>
+  </div>
+</div>
+
+<div id="ring-overlay" role="dialog" aria-modal="true" aria-label="阿言来电" hidden>
+  <img id="ring-avatar" src="/raven/avatar-ripple.svg" alt="">
+  <div id="ring-name">阿言</div>
+  <div id="ring-sub">来电…</div>
+  <div id="ring-btns">
+    <button id="ring-decline" type="button" aria-label="挂断"><svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" style="transform:rotate(135deg)"><path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07 19.5 19.5 0 01-6-6A19.79 19.79 0 012.12 4.18 2 2 0 014.11 2h3a2 2 0 012 1.72c.13.96.36 1.9.69 2.8a2 2 0 01-.45 2.11L8.09 9.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45c.91.33 1.85.56 2.81.69A2 2 0 0122 16.92z"/></svg></button>
+    <button id="ring-accept" type="button" aria-label="接听"><svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07 19.5 19.5 0 01-6-6A19.79 19.79 0 012.12 4.18 2 2 0 014.11 2h3a2 2 0 012 1.72c.13.96.36 1.9.69 2.8a2 2 0 01-.45 2.11L8.09 9.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45c.91.33 1.85.56 2.81.69A2 2 0 0122 16.92z"/></svg></button>
   </div>
 </div>
 
@@ -2602,6 +2629,8 @@ function connect() {
       else if (msg.type === 'edited') applyEdit(msg.ts, msg.oldText, msg.text)
       else if (msg.type === 'remark') onRemark(msg)
       else if (msg.type === 'call-wait') { if (callActive) armQuiet(false) }
+      else if (msg.type === 'incoming-call') ringShow(msg.id)
+      else if (msg.type === 'incoming-call-end') ringHide(msg.id)
       else if (msg.type === 'retracted') { retractions.push({ from: msg.from, to: msg.to }); applyRetractions() }
       else if (msg.type === 'reaction') { const before = reactionsCache[msg.key]; paintReaction(msg.key, msg.reactions); reactionNotice(msg.key, before, msg.reactions) }
       else if (msg.type === 'reply') {
@@ -4250,6 +4279,58 @@ function updateCallTimer() {
   document.getElementById('call-timer').textContent =
     `${String(Math.floor(seconds / 60)).padStart(2, '0')}:${String(seconds % 60).padStart(2, '0')}`
 }
+
+// ── 我打给她（1022）：桥广播 incoming-call，这里弹来电页；在后台时由壳全屏响铃，接听后壳调 rvAnswerCall ──
+let ringId = null, ringStop = null
+function ringShow(id) {
+  if (!id || callActive || ringId === id) return
+  ringId = id
+  document.getElementById('ring-avatar').src = localStorage.getItem('raven-avatar') || '/raven/avatar-ripple.svg'
+  document.getElementById('ring-overlay').hidden = false
+  if (document.visibilityState === 'visible') ringStop = ringTone()   // 在后台就不在网页里响，壳会响
+}
+function ringHide(id) {
+  if (id && ringId && id !== ringId) return
+  ringId = null
+  document.getElementById('ring-overlay').hidden = true
+  if (ringStop) { ringStop(); ringStop = null }
+}
+// 嘟——嘟——的两声一组，配震动；不用文件，WebAudio 现做
+function ringTone() {
+  const ctx = getSharedAudioContext(); let alive = true, t
+  if (ctx?.state === 'suspended') ctx.resume().catch(() => {})
+  const beep = () => {
+    if (!alive) return
+    try { navigator.vibrate?.([500, 300, 500]) } catch {}
+    if (ctx) for (const [at, f] of [[0, 660], [0.45, 660]]) {
+      const o = ctx.createOscillator(), g = ctx.createGain()
+      o.type = 'sine'; o.frequency.value = f; o.connect(g); g.connect(ctx.destination)
+      const t0 = ctx.currentTime + at
+      g.gain.setValueAtTime(0, t0); g.gain.linearRampToValueAtTime(0.18, t0 + 0.03)
+      g.gain.setValueAtTime(0.18, t0 + 0.32); g.gain.linearRampToValueAtTime(0, t0 + 0.38)
+      o.start(t0); o.stop(t0 + 0.4)
+    }
+    t = setTimeout(beep, 2600)
+  }
+  beep()
+  return () => { alive = false; clearTimeout(t); try { navigator.vibrate?.(0) } catch {} }
+}
+function ringAnswer(accept, id = ringId) {
+  ringHide()
+  if (!id) return
+  if (accept && !callActive) openCall()
+  const send = () => { try { ws.send(JSON.stringify({ type: 'call-answer', id, accept, bilingual: voiceBilingual, token: localStorage.getItem('raven-token') || '' })); return true } catch { return false } }
+  if (!(ws && ws.readyState === 1 && send())) {          // 刚被壳拉起来、连接还没好：等一会儿再说
+    let n = 0; const iv = setInterval(() => { if ((ws && ws.readyState === 1 && send()) || ++n > 40) clearInterval(iv) }, 250)
+  }
+  if (accept) setCallStatus('接通了，乌鸦先说')
+}
+window.rvAnswerCall = id => ringAnswer(true, id || ringId)
+// 壳的来电页点了接听、而归巢还没开在聊天页：壳打开 /raven/?answer=<id>
+{ const a = new URLSearchParams(location.search).get('answer')
+  if (a) { history.replaceState(null, '', location.pathname); setTimeout(() => ringAnswer(true, a), 400) } }
+document.getElementById('ring-accept').addEventListener('click', () => ringAnswer(true))
+document.getElementById('ring-decline').addEventListener('click', () => ringAnswer(false))
 
 function openCall() {
   const audioCtx = getSharedAudioContext()
