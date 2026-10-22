@@ -1013,10 +1013,8 @@
   #call-top { display: flex; align-items: center; justify-content: space-between; min-height: 38px; }
   #call-title { font-size: 13px; letter-spacing: .08em; color: var(--text-dim); }
   #call-timer { font-variant-numeric: tabular-nums; font-size: 13px; color: var(--text-dim); }
-  #call-close {
-    width: 36px; height: 36px; border-radius: 50%; border: 1px solid var(--border);
-    background: var(--surface); color: var(--text); font-size: 19px; cursor: pointer;
-  }
+  /* 1022 她：「明明有挂断键，为什么还要加一个右上角的叉」——叉去掉，留个同宽的空位让标题还在正中 */
+  #call-top-pad, #call-timer { min-width: 48px; }
   #call-stage { display: flex; flex-direction: column; align-items: center; padding: 22px 0 12px; }
   #call-avatar-wrap { position: relative; width: 112px; height: 112px; }
   #call-avatar {
@@ -1722,7 +1720,7 @@
   <div id="call-top">
     <span id="call-timer">00:00</span>
     <span id="call-title">和 Ripple 通话</span>
-    <button id="call-close" type="button" aria-label="关闭通话">×</button>
+    <span id="call-top-pad" aria-hidden="true"></span>
   </div>
   <div id="call-stage">
     <div id="call-avatar-wrap">
@@ -4265,10 +4263,23 @@ function openCall() {
   document.getElementById('call-avatar').src = localStorage.getItem('raven-avatar') || '/raven/avatar-ripple.svg'
   document.getElementById('call-log').innerHTML = ''
   callOverlay.classList.add('show')
+  callBar(true)
   setCallStatus('点麦克风，跟乌鸦说话')
   updateCallTimer()
   clearInterval(callTimerId)
   callTimerId = setInterval(updateCallTimer, 1000)
+}
+
+// 1022：壳里状态栏那条网页铺不到，通话时请壳把它涂成通话页的底色（旧壳没有这个口子就算了）
+function callBar(on) {
+  const N = window.RoostNative
+  if (!N || typeof N.setBarColor !== 'function') return
+  let hex = ''
+  if (on) {
+    const m = getComputedStyle(callOverlay).backgroundColor.match(/\d+(\.\d+)?/g) || []
+    if (m.length >= 3) hex = '#' + m.slice(0, 3).map(x => Math.round(+x).toString(16).padStart(2, '0')).join('')
+  }
+  try { N.setBarColor(hex) } catch {}
 }
 
 function closeCall() {
@@ -4288,6 +4299,7 @@ function closeCall() {
   }
   if (stopActiveTts) stopActiveTts()
   callOverlay.classList.remove('show', 'speaking')
+  callBar(false)
   syncMicState('idle')
   appendCallRecord(record)
 }
@@ -4654,7 +4666,6 @@ callBilingualBtn.addEventListener('click', toggleBilingual)
 renderAutoToggle()
 document.getElementById('call-auto').addEventListener('click', () => { callAuto = !callAuto; localStorage.setItem(CALL_AUTO_KEY, callAuto ? '1' : '0'); renderAutoToggle() })
 callBtn.addEventListener('click', openCall)
-document.getElementById('call-close').addEventListener('click', closeCall)
 document.getElementById('call-hangup').addEventListener('click', closeCall)
 document.getElementById('call-text-send').addEventListener('click', sendCallText)
 document.getElementById('call-text-input').addEventListener('keydown', event => {

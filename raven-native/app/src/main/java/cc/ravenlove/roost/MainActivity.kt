@@ -19,7 +19,9 @@ import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
+import androidx.core.graphics.ColorUtils
 import androidx.core.view.ViewCompat
+import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 
 class MainActivity : AppCompatActivity() {
@@ -36,6 +38,26 @@ class MainActivity : AppCompatActivity() {
         private const val AUDIO_PERM_CODE = 1003
         // 阿颖装的 PWA 入口就是 home.html（0702 确认），原生壳保持一致
         const val ROOST_URL = "https://memory.ravenlove.cc/raven/home.html"
+    }
+
+    // 网页铺不到状态栏那条（内容区让出了系统栏的边距），那一条露的是窗口底色。
+    // 通话这种整页的界面让网页把自己的底色告诉壳，壳把内容区底色设成它，图标深浅跟着变；"" 还原成原来的样子。
+    private var barLightDefault: Boolean? = null
+    fun setBarColor(color: String) {
+        val root = findViewById<View>(android.R.id.content)
+        val ctl = WindowCompat.getInsetsController(window, window.decorView)
+        if (barLightDefault == null) barLightDefault = ctl.isAppearanceLightStatusBars
+        val c = try { if (color.isBlank()) null else android.graphics.Color.parseColor(color) } catch (e: Exception) { null }
+        if (c == null) {
+            root.background = null
+            ctl.isAppearanceLightStatusBars = barLightDefault ?: false
+            ctl.isAppearanceLightNavigationBars = barLightDefault ?: false
+            return
+        }
+        root.setBackgroundColor(c)
+        val light = ColorUtils.calculateLuminance(c) > 0.5
+        ctl.isAppearanceLightStatusBars = light
+        ctl.isAppearanceLightNavigationBars = light
     }
 
     @SuppressLint("SetJavaScriptEnabled")

@@ -82,6 +82,10 @@ class WebBridge(private val activity: MainActivity) {
     @JavascriptInterface
     fun crowBirthday(md: String) { activity.runOnUiThread { CrowOverlay.get(activity).setBirthday(md) } }
 
+    // 1022：通话页底色铺到状态栏后面（她：「它好像不是全屏的页面」）。传 "" 还原
+    @JavascriptInterface
+    fun setBarColor(color: String) { activity.runOnUiThread { activity.setBarColor(color) } }
+
     @JavascriptInterface
     fun openCrowSettings() { activity.runOnUiThread { activity.openCrowSettings() } }
 
