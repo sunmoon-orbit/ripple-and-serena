@@ -71,6 +71,24 @@ html, body { min-height: 100%; background: var(--bg); color: var(--text); font-f
   backdrop-filter: blur(26px) saturate(1.9) brightness(1.03);
   border: 1px solid rgba(255,255,255,.22);
 }
+/* 12:06 她：「工具和服务状态……是那个实色的对吧，就是不受背景影响？」——小格子和服务行原来是实底，有壁纸时也换成同一种玻璃 */
+#app.has-wall .tool-card, #app.has-wall .svc-row {
+  background: linear-gradient(180deg,
+    color-mix(in srgb, var(--surface) 50%, transparent),
+    color-mix(in srgb, var(--surface) 34%, transparent));
+  -webkit-backdrop-filter: blur(22px) saturate(1.8); backdrop-filter: blur(22px) saturate(1.8);
+  border: 1px solid rgba(255,255,255,.16);
+  box-shadow: 0 6px 18px rgba(0,0,0,.12), inset 0 1px 0 rgba(255,255,255,.14);
+  position: relative;
+}
+[data-theme="light"] #app.has-wall .tool-card, [data-theme="light"] #app.has-wall .svc-row {
+  border-color: rgba(255,255,255,.26); box-shadow: 0 6px 18px rgba(120,90,60,.08), inset 0 1px 0 rgba(255,255,255,.5);
+}
+#app.has-wall .tool-card::after, #app.has-wall .svc-row::after {
+  content: ''; position: absolute; inset: 0; border-radius: inherit; pointer-events: none;
+  background: linear-gradient(125deg, rgba(255,255,255,var(--sheen,.14)) 0%, transparent 40%);
+}
+#app.has-wall .tool-card:active { background: color-mix(in srgb, var(--surface) 60%, transparent); }
 #app.has-wall .card, #app.has-wall .glass { position: relative; }
 #app.has-wall .card::after, #app.has-wall .glass::after {
   content: ''; position: absolute; inset: 0; border-radius: inherit; pointer-events: none;
