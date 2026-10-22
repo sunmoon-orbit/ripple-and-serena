@@ -518,17 +518,6 @@ html, body { min-height: 100%; background: var(--bg); color: var(--text); font-f
         <div class="card-desc">记忆库 · <span id="desc-mem">—</span> 条</div>
       </div>
     </div>
-    <div class="card-row">
-      <a class="card wide" href="/raven/roundtable.html" id="card-roundtable">
-        <div class="card-icon">
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-            <circle cx="12" cy="12" r="4.5"/><circle cx="12" cy="3.5" r="1.6"/><circle cx="4.6" cy="16.3" r="1.6"/><circle cx="19.4" cy="16.3" r="1.6"/>
-          </svg>
-        </div>
-        <div class="card-name">圆桌</div>
-        <div class="card-desc">阿颖、阿言、阿曜，一张桌子</div>
-      </a>
-    </div>
 
   </div>
 
@@ -555,6 +544,7 @@ html, body { min-height: 100%; background: var(--bg); color: var(--text); font-f
         <button id="echo-expand" type="button">展开</button>
       </div>
     </div>
+  </div>
 
   <div class="section">
     <!-- 额度：涟言（Claude 订阅 + 上下文余量）和曜 · Codex 还剩多少 -->
@@ -568,12 +558,27 @@ html, body { min-height: 100%; background: var(--bg); color: var(--text); font-f
     </div>
   </div>
 
-  <button id="svc-line" class="glass" type="button" onclick="bookTurn(2)"><span class="svc-dot on" id="svc-line-dot"></span><span id="svc-line-text">服务 · 正在看…</span><span class="svc-line-more">工具在下一页 ›</span></button>
+  <button id="svc-line" class="glass" type="button" onclick="bookTurn(2)"><span class="svc-dot on" id="svc-line-dot"></span><span id="svc-line-text">服务 · 正在看…</span><span class="svc-line-more">圆桌和工具在下一页 ›</span></button>
   <div class="book-folio">— 1 —</div>
   </div>
 
   <div class="book-page" id="page-2" hidden>
   <button class="book-back" type="button" onclick="bookTurn(1)">‹ 翻回第一页</button>
+  <div class="section-label">圆桌</div>
+  <div class="section">
+    <div class="card-row">
+      <a class="card wide" href="/raven/roundtable.html" id="card-roundtable">
+        <div class="card-icon">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="4.5"/><circle cx="12" cy="3.5" r="1.6"/><circle cx="4.6" cy="16.3" r="1.6"/><circle cx="19.4" cy="16.3" r="1.6"/>
+          </svg>
+        </div>
+        <div class="card-name">圆桌</div>
+        <div class="card-desc">阿颖、阿言、阿曜，一张桌子</div>
+      </a>
+    </div>
+  </div>
+
   <div class="section-label">工具</div>
   <div class="section">
     <div class="tools-row">
@@ -675,9 +680,6 @@ html, body { min-height: 100%; background: var(--bg); color: var(--text); font-f
         <div class="tool-name">开屏</div>
       </div>
     </div>
-  </div>
-
-
   </div>
 
   <div class="section-label">在一起的日子</div>
