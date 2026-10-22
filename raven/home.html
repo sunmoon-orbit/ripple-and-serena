@@ -180,11 +180,12 @@ html, body { min-height: 100%; background: var(--bg); color: var(--text); font-f
 .book-page[hidden] { display: none; }
 .book-page.turning {
   position: absolute; top: 0; left: 0; right: 0; z-index: 3; will-change: transform;
-  backface-visibility: hidden; border-radius: 0 18px 18px 0;
+  border-radius: 0 18px 18px 0;
   background: color-mix(in srgb, var(--bg) 93%, transparent);
   -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px);
   box-shadow: 6px 0 24px rgba(0,0,0,.18);
 }
+.book-page.turning.back > * { visibility: hidden; }   /* 转过一半露出来的是纸背：空白的纸，不是镜像的字 */
 .book-page.turning::after {   /* 转过去时越来越暗，像纸背着光 */
   content: ''; position: absolute; inset: 0; pointer-events: none; border-radius: inherit;
   background: linear-gradient(to left, rgba(0,0,0,.38), rgba(0,0,0,.06) 55%, transparent);
@@ -531,6 +532,30 @@ html, body { min-height: 100%; background: var(--bg); color: var(--text); font-f
 
   </div>
 
+  <div class="section">
+    <!-- memory fragment -->
+    <!-- 记忆碎片和涟漪共用一张卡，顶上点名字切换（1019 她嫌首页太长） -->
+    <div class="card wide" id="mem-card">
+      <div class="mem-header">
+        <div class="mem-tabs">
+          <button class="mem-tab mem-label on" id="tab-mem" type="button" onclick="memTab('mem')">记忆碎片</button>
+          <button class="mem-tab mem-label" id="tab-echo" type="button" onclick="memTab('echo')" hidden>涟漪</button>
+        </div>
+        <button id="mem-refresh" onclick="loadMemory()" title="换一条">↻</button>
+      </div>
+      <div id="mem-pane">
+        <div id="mem-date">—</div>
+        <div id="mem-content">加载中…</div>
+        <button id="mem-expand" type="button" onclick="toggleMemory()">展开</button>
+        <div id="mem-tags"></div>
+      </div>
+      <div id="echo-pane" hidden>
+        <div id="echo-date"></div>
+        <div id="echo-lines"></div>
+        <button id="echo-expand" type="button">展开</button>
+      </div>
+    </div>
+
   <div class="section-label">工具</div>
   <div class="section">
     <div class="tools-row">
@@ -634,29 +659,6 @@ html, body { min-height: 100%; background: var(--bg); color: var(--text); font-f
     </div>
   </div>
 
-  <div class="section">
-    <!-- memory fragment -->
-    <!-- 记忆碎片和涟漪共用一张卡，顶上点名字切换（1019 她嫌首页太长） -->
-    <div class="card wide" id="mem-card">
-      <div class="mem-header">
-        <div class="mem-tabs">
-          <button class="mem-tab mem-label on" id="tab-mem" type="button" onclick="memTab('mem')">记忆碎片</button>
-          <button class="mem-tab mem-label" id="tab-echo" type="button" onclick="memTab('echo')" hidden>涟漪</button>
-        </div>
-        <button id="mem-refresh" onclick="loadMemory()" title="换一条">↻</button>
-      </div>
-      <div id="mem-pane">
-        <div id="mem-date">—</div>
-        <div id="mem-content">加载中…</div>
-        <button id="mem-expand" type="button" onclick="toggleMemory()">展开</button>
-        <div id="mem-tags"></div>
-      </div>
-      <div id="echo-pane" hidden>
-        <div id="echo-date"></div>
-        <div id="echo-lines"></div>
-        <button id="echo-expand" type="button">展开</button>
-      </div>
-    </div>
 
   </div>
 
@@ -1413,7 +1415,8 @@ function bookSetup() {
 function bookAngle(a) {
   const p1 = bookPg(1)
   p1.style.transform = `rotateY(${a}deg)`
-  p1.style.setProperty('--shade', Math.min(1, -a / 90).toFixed(2))
+  p1.style.setProperty('--shade', (a < -90 ? 0.35 : Math.min(1, -a / 90)).toFixed(2))
+  p1.classList.toggle('back', a < -90)
 }
 function bookFinish(target) {
   const p1 = bookPg(1), end = target === 2 ? -165 : 0
@@ -1421,7 +1424,7 @@ function bookFinish(target) {
   bookAngle(end)
   clearTimeout(bookFinish.t)
   bookFinish.t = setTimeout(() => {
-    p1.classList.remove('turning'); p1.style.transition = ''; p1.style.transform = ''; p1.style.removeProperty('--shade')
+    p1.classList.remove('turning', 'back'); p1.style.transition = ''; p1.style.transform = ''; p1.style.removeProperty('--shade')
     p1.hidden = target !== 1; bookPg(2).hidden = target !== 2
     bookPage = target
     const top = document.getElementById('book').getBoundingClientRect().top + scrollY - 70
@@ -1436,10 +1439,12 @@ function bookTurn(target) {
 ;(() => {
   const book = document.getElementById('book')
   let x0 = null, y0 = 0, t0 = 0, mode = null, W = 360
-  // 手指落在能横着滚的东西上（热力图、小胶囊那排）就不翻页
-  const inScroller = el => { for (; el && el !== book; el = el.parentElement) if (el.scrollWidth > el.clientWidth + 2 && /auto|scroll/.test(getComputedStyle(el).overflowX)) return true; return false }
+  // 手指落在能横着滚的东西上（热力图、小胶囊那排）：它还能往那个方向滚就让它滚，滚到头了才翻页
+  let scroller = null
+  const findScroller = el => { for (; el && el !== book; el = el.parentElement) if (el.scrollWidth > el.clientWidth + 2 && /auto|scroll/.test(getComputedStyle(el).overflowX)) return el; return null }
   book.addEventListener('touchstart', e => {
-    if (e.touches.length !== 1 || inScroller(e.target)) { x0 = null; return }
+    if (e.touches.length !== 1) { x0 = null; return }
+    scroller = findScroller(e.target)
     x0 = e.touches[0].clientX; y0 = e.touches[0].clientY; t0 = Date.now(); mode = null; W = book.clientWidth || 360
   }, { passive: true })
   book.addEventListener('touchmove', e => {
@@ -1448,6 +1453,7 @@ function bookTurn(target) {
     if (!mode) {
       if (Math.abs(dy) > 10 && Math.abs(dy) >= Math.abs(dx)) { mode = 'v'; return }
       if (Math.abs(dx) < 16 || Math.abs(dx) < 2 * Math.abs(dy)) return   // 非得明显横着才算翻页
+      if (scroller && (dx > 0 ? scroller.scrollLeft > 1 : scroller.scrollLeft + scroller.clientWidth < scroller.scrollWidth - 1)) { mode = 'v'; return }
       if ((bookPage === 1 && dx < 0) || (bookPage === 2 && dx > 0)) { mode = 'h'; bookSetup() } else { mode = 'v'; return }
     }
     e.preventDefault()
