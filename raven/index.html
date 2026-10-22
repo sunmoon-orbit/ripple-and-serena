@@ -5139,28 +5139,52 @@ document.getElementById('sticker-btn').addEventListener('click', (e) => {
 stickerPicker.addEventListener('click', e => e.stopPropagation())
 document.addEventListener('click', () => stickerPicker.classList.remove('open'))
 
+// 1022：她拍电脑屏幕的照片一张五六兆、一张十一兆半——十一兆的撞上服务器 10MB 上限被掐断（三次全 502），
+// 五兆的要传十几秒，期间附件栏什么都不显示，她以为没加上。现在：大图先在手机上缩到长边 2560、JPEG 0.86（一般一兆以内），
+// 传的时候附件栏先挂一个「正在传…」，传不上说清楚是太大还是网络。
+async function shrinkImage(file) {
+  if (!/^image\/(jpeg|png|webp|heic|heif)$/i.test(file.type) || file.size < 1.5 * 1024 * 1024) return file
+  try {
+    const bmp = await createImageBitmap(file)
+    const k = Math.min(1, 2560 / Math.max(bmp.width, bmp.height))
+    const c = document.createElement('canvas'); c.width = Math.round(bmp.width * k); c.height = Math.round(bmp.height * k)
+    c.getContext('2d').drawImage(bmp, 0, 0, c.width, c.height); bmp.close?.()
+    const blob = await new Promise(r => c.toBlob(r, 'image/jpeg', 0.86))
+    if (!blob || blob.size >= file.size) return file
+    return new File([blob], file.name.replace(/\.[^.]+$/, '') + '.jpg', { type: 'image/jpeg' })
+  } catch { return file }
+}
+
 async function onAttachPicked(e) {
-  const file = e.target.files[0]
-  if (!file) return
+  const picked = e.target.files[0]
+  if (!picked) return
   e.target.value = ''
 
-  const form = new FormData()
-  form.append('file', file, file.name)
-
+  const box = document.getElementById('attach-preview')
+  const busy = document.createElement('div')
+  busy.className = 'attach-chip'; busy.textContent = `正在传 ${picked.name}…`
+  box.classList.add('show'); box.appendChild(busy)
+  let file = picked
   try {
+    file = await shrinkImage(picked)
+    const form = new FormData()
+    form.append('file', file, file.name)
     const res = await fetch(UPLOAD_URL, { method: 'POST', headers: { Authorization: 'Bearer ' + (localStorage.getItem('raven-token') || '') }, body: form })
+    if (res.status === 413) throw new Error('太大了（超过 25MB）')
     const data = await res.json()
     if (!data.path) throw new Error()
+    busy.remove()
     pendingFiles.push({ name: data.name, path: data.path })
     renderAttachPreview()
-  } catch {
+  } catch (err) {
+    busy.remove()
     // App 壳里 alert 可能根本弹不出来（0930 阿颖私聊传 4 张图，全静默失败），改成在附件栏里显示
     const box = document.getElementById('attach-preview')
     box.classList.add('show')
     const chip = document.createElement('div')
     chip.className = 'attach-chip'
     chip.style.color = 'var(--red)'
-    chip.textContent = `${file.name} 没传上去，再选一次试试`
+    chip.textContent = `${picked.name} 没传上去${err?.message ? '：' + err.message : ''}，再选一次试试`
     box.appendChild(chip)
     setTimeout(() => { chip.remove(); if (!pendingFiles.length) box.classList.remove('show') }, 6000)
   }

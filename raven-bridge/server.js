@@ -1283,15 +1283,18 @@ const server = http.createServer((req, res) => {
     const ct = req.headers['content-type'] || ''
     const boundary = ct.split('boundary=')[1]
     if (!boundary) { res.writeHead(400); res.end(); return }
-    const MAX_UPLOAD = 10 * 1024 * 1024  // 10 MB
-    let received = 0
+    // 1022：10MB 掐断她一张 11.5MB 的屏幕照片三次。上限放到 25MB；超了好好回 413（原来是 destroy，Caddy 那边只看到 502）
+    const MAX_UPLOAD = 25 * 1024 * 1024
+    let received = 0, tooBig = false
     const chunks = []
     req.on('data', d => {
+      if (tooBig) return
       received += d.length
-      if (received > MAX_UPLOAD) { req.destroy(); res.writeHead(413); res.end(); return }
+      if (received > MAX_UPLOAD) { tooBig = true; chunks.length = 0; return }
       chunks.push(d)
     })
     req.on('end', () => {
+      if (tooBig) { res.writeHead(413, { 'Content-Type': 'application/json' }); res.end('{"error":"too large"}'); return }
       try {
         const buf = Buffer.concat(chunks)
         const bnd = Buffer.from('--' + boundary)
