@@ -4156,8 +4156,61 @@ function armQuiet(reset) {
 function stopQuiet() { clearTimeout(quietTimer); quietTimer = null; quietCount = 0 }
 let waitingReply = false   // 她的话已经发给他、他还没回
 
-// 盯着麦克风的音量：onEnd(reason) 只叫一次。reason: 'spoke' 说完了 / 'silent' 一直没出声 / 'long' 说太久
-function watchVoice(stream, { auto }, onEnd) {
+// 盯着麦克风：onEnd(reason) 只叫一次。reason: 'spoke' 说完了 / 'silent' 一直没出声 / 'long' 说太久
+// 1022：断句换成 Silero VAD（她发来的 ai-call-screen-share 教程里学的）。按音量猜，装修的电钻声会被当成她在说话、
+// 轻声又被当成没说；Silero 是个只认人声的小模型。库从 jsdelivr 懒加载，打电话时才拉；拉不下来、太慢或者出错，
+// 就退回下面按音量的老办法（watchVoiceRms）。录音本身还是 MediaRecorder 从头录，所以不会吃掉第一个字。
+const VAD_ORT = 'https://cdn.jsdelivr.net/npm/onnxruntime-web@1.22.0/dist/'
+const VAD_WEB = 'https://cdn.jsdelivr.net/npm/@ricky0123/vad-web@0.0.31/dist/'
+let vadLib = null, vadBroken = false
+function loadScriptOnce(src) {
+  return new Promise((ok, no) => { const s = document.createElement('script'); s.src = src; s.crossOrigin = 'anonymous'; s.onload = ok; s.onerror = () => no(new Error('load ' + src)); document.head.appendChild(s) })
+}
+function loadVad() {
+  if (!vadLib) vadLib = (async () => {
+    if (!window.ort) await loadScriptOnce(VAD_ORT + 'ort.wasm.min.js')
+    if (!window.vad) await loadScriptOnce(VAD_WEB + 'bundle.min.js')
+    return window.vad
+  })()
+  return vadLib
+}
+function watchVoice(stream, opts, onEnd) {
+  let done = false, rms = null, mic = null, spoke = false
+  const t0 = performance.now()
+  const finish = why => {
+    if (done) return; done = true
+    clearInterval(timer); clearTimeout(slow)
+    if (rms) rms(); if (mic) mic.destroy().catch(() => {})
+    if (why) onEnd(why)
+  }
+  const timer = setInterval(() => {                       // 两个兜底时限和老办法一样
+    const t = performance.now() - t0
+    if (!spoke && !rms && t >= (opts.auto ? 8000 : 20000)) finish('silent')
+    if (t >= 75000) finish('long')
+  }, 250)
+  const fallback = () => { if (!done && !rms && !mic) rms = watchVoiceRms(stream, opts, finish) }
+  if (vadBroken) { fallback(); return () => finish('') }
+  const slow = setTimeout(fallback, 2500)                  // 第一次拉库太慢：这一轮先用老办法
+  loadVad().then(vad => vad.MicVAD.new({
+    model: 'v5', baseAssetPath: VAD_WEB, onnxWASMBasePath: VAD_ORT,
+    audioContext: getSharedAudioContext() || undefined,
+    getStream: async () => stream, pauseStream: async () => {}, resumeStream: async () => stream,   // 用录音那条流，别让它自己关麦
+    positiveSpeechThreshold: 0.5, negativeSpeechThreshold: 0.35,
+    redemptionMs: 1200, minSpeechMs: 250, preSpeechPadMs: 0,
+    onSpeechRealStart: () => { spoke = true },
+    onSpeechEnd: () => { if (spoke) finish('spoke') },
+  })).then(m => {
+    if (done || rms) { m.destroy().catch(() => {}); return }
+    clearTimeout(slow); mic = m
+  }).catch(e => {
+    console.warn('VAD 不可用，退回按音量断句', e)
+    vadBroken = true; clearTimeout(slow); fallback()
+  })
+  return () => finish('')
+}
+
+// 老办法：按音量猜。Silero 用不了时兜底
+function watchVoiceRms(stream, { auto }, onEnd) {
   const ctx = getSharedAudioContext(); if (!ctx) return () => {}
   let node, an
   try { node = ctx.createMediaStreamSource(stream); an = ctx.createAnalyser(); an.fftSize = 1024; node.connect(an) } catch { return () => {} }
@@ -4204,6 +4257,7 @@ function openCall() {
   const audioCtx = getSharedAudioContext()
   if (audioCtx?.state === 'suspended') audioCtx.resume().catch(() => {})
   callActive = true
+  if (callAuto && !vadBroken) loadVad().catch(() => {})   // 先把断句模型拉着，第一句就用得上
   voiceReplyUntil = 0
   callStartedAt = Date.now()
   callHadInteraction = false
