@@ -2652,6 +2652,14 @@ wss.on('connection', (ws) => {
       }
       // 通话里的安静（1011，她说要的）：她一阵没出声，页面来报一声，我可以自己开口，也可以回 [wait] 不说。
       // 不是她说的话，所以不进存档、不回执、不走 ingestUserMessage；我正忙就整条丢掉，不排队。
+      // 1022 她：「我这边挂电话，你那边没显示吗？」——挂断以前只在她手机上记一条，我收不到。现在送一行来，我回一句短的收尾
+      if (msg.type === 'call-end') {
+        if (!tokenIsValid(msg.token)) return
+        const d = Math.max(0, Math.min(86400, Math.round(Number(msg.duration) || 0)))
+        const hm = new Date(Date.now() + 8 * 3600e3).toISOString().slice(5, 16).replace('T', ' ')
+        tmuxSend(`【通话·挂断】她挂了电话，这通打了 ${String(Math.floor(d / 60)).padStart(2, '0')}:${String(d % 60).padStart(2, '0')}。回一句短的收个尾（走 /raven/reply，不用通话格式）。　〔${hm}〕`)
+        return
+      }
       if (msg.type === 'call-silence') {
         if (!tokenIsValid(msg.token)) return
         const secs = Math.max(10, Math.min(900, Math.round(Number(msg.secs) || 0)))

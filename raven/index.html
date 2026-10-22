@@ -4300,6 +4300,9 @@ function closeCall() {
   if (stopActiveTts) stopActiveTts()
   callOverlay.classList.remove('show', 'speaking')
   callBar(false)
+  if (record.status === 'ended' && ws && ws.readyState === 1) {      // 告诉我她挂了（只是点开又关掉的不说）
+    try { ws.send(JSON.stringify({ type: 'call-end', duration, token: localStorage.getItem('raven-token') || '' })) } catch {}
+  }
   syncMicState('idle')
   appendCallRecord(record)
 }
