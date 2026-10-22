@@ -2645,7 +2645,8 @@ wss.on('connection', (ws) => {
   ws.authed = false
   const sendWelcome = () => {
     clients.add(ws)
-    console.log('[ws] client authed, total:', clients.size)
+    ws.authedAt = Date.now()
+    console.log(`[ws] client authed ${new Date(Date.now() + 8 * 3600e3).toISOString().slice(11, 19)}, total:`, clients.size)
     ws.send(JSON.stringify({ type: 'status', data: getStatus() }))
     ws.send(JSON.stringify({ type: 'terminal', lines: lastCapture.split('\n').slice(-80) }))
     ws.send(JSON.stringify({ type: 'busy', active: ccBusy() }))
@@ -2808,14 +2809,16 @@ wss.on('connection', (ws) => {
     } catch {}
   })
 
-  ws.on('close', () => {
+  ws.on('close', (code) => {
     clients.delete(ws)
     if (ws.crossingClientId) {
       agentSessions.revoke(ws.crossingClientId)
       crossing.disconnect(ws.crossingClientId)
       crossingClients.delete(ws.crossingClientId)
     }
-    console.log('[ws] client disconnected, total:', clients.size)
+    // 1022 她：「一直消息已暂存，重连后自动发送」——带上时间、连了多久、关闭码，下回能分清是她切后台、网断，还是我这边踢的
+    const bj = new Date(Date.now() + 8 * 3600e3).toISOString().slice(11, 19)
+    console.log(`[ws] client disconnected ${bj} code=${code} lived=${ws.authedAt ? Math.round((Date.now() - ws.authedAt) / 1000) + 's' : '-'}, total:`, clients.size)
   })
   ws.on('error', () => {
     clients.delete(ws)
