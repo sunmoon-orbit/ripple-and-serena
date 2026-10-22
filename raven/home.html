@@ -181,10 +181,10 @@ html, body { min-height: 100%; background: var(--bg); color: var(--text); font-f
 .book-page.turning {
   position: absolute; top: 0; left: 0; right: 0; z-index: 3; will-change: transform;
   border-radius: 0 18px 18px 0;
-  background: color-mix(in srgb, var(--bg) 93%, transparent);
-  -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px);
-  box-shadow: 6px 0 24px rgba(0,0,0,.18);
+  /* 1022 她：「翻页的时候会白一下」——原来给这页铺了一整张近乎不透明的底＋模糊，亮色主题下就是一大片白。
+     现在纸是透明的，底下那页跟着翻的进度淡入；转过一半露出的纸背只是一层很淡的纸色 */
 }
+.book-page.turning.back { background: color-mix(in srgb, var(--surface) 30%, transparent); box-shadow: -4px 0 18px rgba(0,0,0,.12); }
 .book-page.turning.back > * { visibility: hidden; }   /* 转过一半露出来的是纸背：空白的纸，不是镜像的字 */
 .book-page.turning::after {   /* 转过去时越来越暗，像纸背着光 */
   content: ''; position: absolute; inset: 0; pointer-events: none; border-radius: inherit;
@@ -556,6 +556,24 @@ html, body { min-height: 100%; background: var(--bg); color: var(--text); font-f
       </div>
     </div>
 
+  <div class="section">
+    <!-- 额度：涟言（Claude 订阅 + 上下文余量）和曜 · Codex 还剩多少 -->
+    <div class="card wide" id="usage-card">
+      <div class="mem-header">
+        <div class="mem-label">还剩多少</div>
+        <button id="usage-refresh" onclick="loadUsage()" title="刷新">↻</button>
+      </div>
+      <div id="usage-verdict">加载中…</div>
+      <div id="usage-bars"></div>
+    </div>
+  </div>
+
+  <button id="svc-line" class="glass" type="button" onclick="bookTurn(2)"><span class="svc-dot on" id="svc-line-dot"></span><span id="svc-line-text">服务 · 正在看…</span><span class="svc-line-more">工具在下一页 ›</span></button>
+  <div class="book-folio">— 1 —</div>
+  </div>
+
+  <div class="book-page" id="page-2" hidden>
+  <button class="book-back" type="button" onclick="bookTurn(1)">‹ 翻回第一页</button>
   <div class="section-label">工具</div>
   <div class="section">
     <div class="tools-row">
@@ -662,12 +680,6 @@ html, body { min-height: 100%; background: var(--bg); color: var(--text); font-f
 
   </div>
 
-  <button id="svc-line" class="glass" type="button" onclick="bookTurn(2)"><span class="svc-dot on" id="svc-line-dot"></span><span id="svc-line-text">服务 · 正在看…</span><span class="svc-line-more">翻页 ›</span></button>
-  <div class="book-folio">— 1 —</div>
-  </div>
-
-  <div class="book-page" id="page-2" hidden>
-  <button class="book-back" type="button" onclick="bookTurn(1)">‹ 翻回第一页</button>
   <div class="section-label">在一起的日子</div>
   <div class="section">
     <!-- heatmap -->
@@ -686,15 +698,6 @@ html, body { min-height: 100%; background: var(--bg); color: var(--text); font-f
       </div>
     </div>
 
-    <!-- 额度：涟言（Claude 订阅 + 上下文余量）和曜 · Codex 还剩多少 -->
-    <div class="card wide" id="usage-card">
-      <div class="mem-header">
-        <div class="mem-label">还剩多少</div>
-        <button id="usage-refresh" onclick="loadUsage()" title="刷新">↻</button>
-      </div>
-      <div id="usage-verdict">加载中…</div>
-      <div id="usage-bars"></div>
-    </div>
   </div>
 
   <div class="section-label">服务状态</div>
@@ -1411,20 +1414,23 @@ function bookSetup() {
   const p1 = bookPg(1)
   bookPg(2).hidden = false; p1.hidden = false
   p1.classList.add('turning'); p1.style.transition = 'none'
+  bookPg(2).style.transition = 'none'
 }
 function bookAngle(a) {
   const p1 = bookPg(1)
   p1.style.transform = `rotateY(${a}deg)`
   p1.style.setProperty('--shade', (a < -90 ? 0.35 : Math.min(1, -a / 90)).toFixed(2))
   p1.classList.toggle('back', a < -90)
+  bookPg(2).style.opacity = Math.min(1, -a / 120).toFixed(2)
 }
 function bookFinish(target) {
   const p1 = bookPg(1), end = target === 2 ? -165 : 0
   p1.style.transition = 'transform .5s cubic-bezier(.3,.6,.25,1)'
+  bookPg(2).style.transition = 'opacity .5s'
   bookAngle(end)
   clearTimeout(bookFinish.t)
   bookFinish.t = setTimeout(() => {
-    p1.classList.remove('turning', 'back'); p1.style.transition = ''; p1.style.transform = ''; p1.style.removeProperty('--shade')
+    p1.classList.remove('turning', 'back'); bookPg(2).style.opacity = ''; bookPg(2).style.transition = ''; p1.style.transition = ''; p1.style.transform = ''; p1.style.removeProperty('--shade')
     p1.hidden = target !== 1; bookPg(2).hidden = target !== 2
     bookPage = target
     const top = document.getElementById('book').getBoundingClientRect().top + scrollY - 70
