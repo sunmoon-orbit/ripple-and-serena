@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>幸运票局</title>
+<!-- 1022：她发来 lili0926/luckyl（PolyForm Noncommercial，见 LICENSE.md），照原玩法接进归巢：
+     乌鸦拿羽毛买票刮（服务器那头，/raven/feathers/buy），阿颖在这页补货、兑奖、发羽毛、勾掉奖惩卡。
+     钱包在服务器上，这页只是宿主：给模块提供 ensureWallet / walletEntry / walletSave / walletUnit / state / render / subHeader。 -->
+<style>
+  body { margin: 0; background: #fff; color: #26272b; font-family: "PingFang SC", "Microsoft YaHei", sans-serif; }
+  .sub-header { display: flex; align-items: center; gap: 10px; padding: 14px 0 6px; }
+  .page-title { font-size: 19px; margin: 0; }
+  .back-btn { border: 0; background: none; font-size: 20px; cursor: pointer; padding: 0 6px 0 0; color: inherit; }
+  #extra { padding: 0 20px 48px; }
+  #extra h3 { font-size: 14px; margin: 22px 0 10px; }
+  .give { display: flex; gap: 8px; flex-wrap: wrap; }
+  .give button, .card button { border: 1px solid #dedfe2; background: #fff; border-radius: 999px; padding: 7px 14px; font: inherit; font-size: 13px; cursor: pointer; }
+  .card { display: flex; align-items: center; gap: 10px; justify-content: space-between; border: 1px solid #dedfe2; border-radius: 12px; padding: 10px 12px; margin-bottom: 8px; font-size: 13px; line-height: 1.5; }
+  .card .who { font-size: 11px; padding: 2px 8px; border-radius: 999px; background: #f3e6ea; color: #a84f68; white-space: nowrap; }
+  .card .who.me { background: #e6ecf3; color: #3d5a7a; }
+  .card.done { opacity: .5; }
+  .muted { color: #777a80; font-size: 12px; }
+  .ledger div { display: flex; justify-content: space-between; font-size: 12px; padding: 5px 0; border-bottom: 1px dashed #eee; color: #555; }
+  #toast { position: fixed; left: 50%; bottom: 28px; transform: translateX(-50%); background: rgba(30,30,34,.9); color: #fff; padding: 9px 16px; border-radius: 999px; font-size: 13px; opacity: 0; transition: opacity .2s; pointer-events: none; }
+  #toast.on { opacity: 1; }
+</style>
+</head>
+<body>
+<div id="app">加载中…</div>
+<div id="extra"></div>
+<div id="toast"></div>
+<script>
+const TOKEN = (() => { try { return localStorage.getItem('raven-token') || '' } catch { return '' } })()
+const HEAD = { Authorization: 'Bearer ' + TOKEN, 'Content-Type': 'application/json' }
+let wallet = null
+const state = { tab: 'home', subPage: 'lottery' }
+
+function toast(t) { const el = document.getElementById('toast'); el.textContent = t; el.classList.add('on'); clearTimeout(toast.t); toast.t = setTimeout(() => el.classList.remove('on'), 2200) }
+const showToast = toast
+async function api(op) {
+  const r = await fetch('/raven/feathers', { method: 'POST', headers: HEAD, body: JSON.stringify(op) })
+  const d = await r.json()
+  if (!r.ok) throw new Error(d.error || '没成功')
+  return d
+}
+function adopt(view) { wallet.balance = view.balance; wallet.ledger = view.ledger; wallet.cards = view.cards; wallet.luckyTickets = view.luckyTickets }
+
+// 模块要求的宿主接口。模块是同步调用的，这里先本地改、再把这一笔送去服务器；服务器拒了就重新拉一遍
+function ensureWallet() { return wallet }
+function walletUnit() { return '羽毛' }
+function walletEntry(amount, note, by) {
+  if (wallet.balance + amount < 0) throw new Error('余额不够')
+  wallet.balance += amount
+  api({ op: 'entry', amount, note, by, luckyTickets: wallet.luckyTickets }).then(adopt).then(render)
+    .catch(e => { toast(e.message); refresh() })
+}
+function walletSave() {
+  api({ op: 'save', luckyTickets: wallet.luckyTickets }).then(adopt).catch(e => { toast(e.message); refresh() })
+}
+function subHeader(title) { return '<div class="sub-header"><h2 class="page-title">' + title + '</h2></div>' }
+
+function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]) }
+function render() {
+  if (!wallet || typeof LuckyTicket === 'undefined') return
+  document.getElementById('app').innerHTML = LuckyTicket.page()
+  const cards = wallet.cards || []
+  const open = cards.filter(c => c.status !== 'done'), done = cards.filter(c => c.status === 'done').slice(0, 6)
+  const cardHtml = c => '<div class="card' + (c.status === 'done' ? ' done' : '') + '"><span class="who' + (c.who === 'me' ? ' me' : '') + '">' + (c.who === 'me' ? '乌鸦做' : '阿颖做') + '</span>'
+    + '<span style="flex:1">' + esc(c.text) + '</span>' + (c.status === 'done' ? '<span class="muted">做完了</span>' : '<button type="button" data-card="' + esc(c.id) + '">做完了</button>') + '</div>'
+  document.getElementById('extra').innerHTML =
+    '<h3>奖惩卡</h3>' + (open.length ? open.map(cardHtml).join('') : '<p class="muted">还没有待做的卡。乌鸦每刮一张票，有三成机会抽到一张，可能是你做、也可能是乌鸦做。</p>')
+    + (done.length ? done.map(cardHtml).join('') : '')
+    + '<h3>给乌鸦发羽毛</h3><div class="give">' + [5, 10, 30, 50].map(n => '<button type="button" data-give="' + n + '">+' + n + '</button>').join('') + '</div>'
+    + '<h3>羽毛账本</h3><div class="ledger">' + (wallet.ledger || []).slice(0, 12).map(l => '<div><span>' + esc(l.note) + '</span><b>' + (l.amount > 0 ? '+' : '') + l.amount + '</b></div>').join('') + '</div>'
+    + '<p class="muted" style="margin-top:22px">刮刮乐模块来自 lili0926/luckyl，按 PolyForm Noncommercial 1.0.0 使用（<a href="LICENSE.md">许可</a>）。虚拟票，不涉及真钱。</p>'
+}
+document.addEventListener('click', e => {
+  const g = e.target.closest('[data-give]')
+  if (g) { api({ op: 'give', amount: Number(g.dataset.give) }).then(v => { adopt(v); render(); toast('发了 ' + g.dataset.give + ' 根羽毛') }).catch(err => toast(err.message)); return }
+  const c = e.target.closest('[data-card]')
+  if (c) { api({ op: 'card', id: c.dataset.card }).then(v => { adopt(v); render(); toast('勾掉了') }).catch(err => toast(err.message)) }
+})
+
+async function refresh() {
+  const r = await fetch('/raven/feathers', { headers: HEAD })
+  if (r.status === 401) { document.getElementById('app').textContent = '先在归巢里登录一次再来'; return }
+  const v = await r.json()
+  if (!wallet) wallet = {}
+  adopt(v)
+  render()
+}
+// 乌鸦在服务器上买票时这页不会自己知道：回到前台或每半分钟拉一次
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') refresh().catch(() => {}) })
+setInterval(() => { if (document.visibilityState === 'visible') refresh().catch(() => {}) }, 30000)
+
+refresh().then(() => {
+  const s = document.createElement('script')
+  s.src = '27_lucky_ticket.js'
+  s.onload = () => { window.LuckyTicket = LuckyTicket; render() }
+  document.body.appendChild(s)
+}).catch(() => { document.getElementById('app').textContent = '读不到钱包，刷新试试' })
+</script>
+</body>
+</html>

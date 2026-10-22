@@ -1273,6 +1273,36 @@ const server = http.createServer((req, res) => {
   }
 
   // file upload — 仅允许已知来源（本机 + ravenlove.cc）
+  // 羽毛钱包＋幸运票局（1022，见 feathers.js）。看和她的操作要外部钥匙；我买票只认本机钥匙
+  if (url.pathname === '/raven/feathers' || url.pathname === '/raven/feathers/buy') {
+    const feathers = require('./feathers')
+    const send = (code, obj) => { res.writeHead(code, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' }); res.end(JSON.stringify(obj)) }
+    if (url.pathname === '/raven/feathers/buy') {
+      if (req.method !== 'POST' || !localWriteAuthed(req)) return send(401, { error: 'unauthorized' })
+      let body = ''; req.on('data', d => { body += d }); req.on('end', () => {
+        try { const p = JSON.parse(body || '{}'); send(200, feathers.buy(p.game ? String(p.game) : '')) } catch (e) { send(400, { error: e.message }) }
+      })
+      return
+    }
+    if (!(isExternal(req) ? externalAuthed(req, url) : (localWriteAuthed(req) || externalAuthed(req, url)))) return send(401, { error: 'unauthorized' })
+    if (req.method === 'GET') return send(200, feathers.load())
+    if (req.method === 'POST') {
+      let body = ''; req.on('data', d => { body += d; if (body.length > 400000) req.destroy() }); req.on('end', () => {
+        try {
+          const op = JSON.parse(body || '{}'), view = feathers.apply(op)
+          // 她兑奖、发羽毛、勾掉卡，送一行给我
+          const hm = new Date(Date.now() + 8 * 3600e3).toISOString().slice(5, 16).replace('T', ' ')
+          if (op.op === 'give') tmuxSend(`【幸运票局】阿颖给你发了 ${Math.round(op.amount)} 根羽毛，现在有 ${view.balance} 根。　〔${hm}〕`)
+          if (op.op === 'entry' && op.by === 'operator' && op.amount > 0) tmuxSend(`【幸运票局】阿颖给你兑了奖：+${Math.round(op.amount)} 根羽毛（${String(op.note || '').slice(0, 40)}），现在有 ${view.balance} 根。　〔${hm}〕`)
+          if (op.op === 'card') { const c = view.cards.find(x => x.id === op.id); if (c) tmuxSend(`【幸运票局】阿颖把卡「${c.text}」标成做完了。　〔${hm}〕`) }
+          send(200, view)
+        } catch (e) { send(400, { error: e.message }) }
+      })
+      return
+    }
+    return send(405, { error: 'method' })
+  }
+
   if (req.method === 'POST' && url.pathname === '/raven/upload') {
     const origin = req.headers.origin || req.headers.referer || ''
     const host   = req.headers.host || ''
@@ -2581,6 +2611,11 @@ const server = http.createServer((req, res) => {
     if (priv.startsWith(PRIVATE_STATIC_DIR + path.sep) && fs.existsSync(priv)) abs = priv
     fs.stat(abs, (err, stat) => {
       if (err) { res.writeHead(404); res.end(); return }
+      // 1022：/raven/lottery/ 这种目录路径原来会去 read 一个目录，抛 EISDIR 把整个桥带崩。目录就给它的 index.html
+      if (stat.isDirectory()) {
+        abs = path.join(abs, 'index.html')
+        try { stat = fs.statSync(abs) } catch { res.writeHead(404); res.end(); return }
+      }
       const ext = path.extname(abs)
       // 图片长期强缓存：no-cache 会让推送图标每次实时重抓，网络抖动就回退 Chrome（图标反复的真根因）；HTML 仍 no-cache 保最新
       const isImg = ['.png', '.jpg', '.jpeg', '.ico', '.svg', '.webp', '.gif'].includes(ext)
@@ -2592,7 +2627,7 @@ const server = http.createServer((req, res) => {
       if (ext === '.zip') headers['Content-Disposition'] = `attachment; filename="${path.basename(abs)}"`
       res.writeHead(200, headers)
       if (req.method === 'HEAD') { res.end(); return }
-      fs.createReadStream(abs).pipe(res)
+      fs.createReadStream(abs).on('error', () => { try { res.destroy() } catch {} }).pipe(res)
     })
     return
   }
