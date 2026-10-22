@@ -174,6 +174,34 @@ html, body { min-height: 100%; background: var(--bg); color: var(--text); font-f
 /* section */
 .section { padding: 0 16px 12px; }
 
+/* 《我们》（1022）：首页是一本两页的书。横着划翻页，第一页像书页一样绕左边的书脊转过去 */
+#book { position: relative; perspective: 1800px; }
+.book-page { position: relative; transform-origin: left center; }
+.book-page[hidden] { display: none; }
+.book-page.turning {
+  position: absolute; top: 0; left: 0; right: 0; z-index: 3; will-change: transform;
+  backface-visibility: hidden; border-radius: 0 18px 18px 0;
+  background: color-mix(in srgb, var(--bg) 93%, transparent);
+  -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px);
+  box-shadow: 6px 0 24px rgba(0,0,0,.18);
+}
+.book-page.turning::after {   /* 转过去时越来越暗，像纸背着光 */
+  content: ''; position: absolute; inset: 0; pointer-events: none; border-radius: inherit;
+  background: linear-gradient(to left, rgba(0,0,0,.38), rgba(0,0,0,.06) 55%, transparent);
+  opacity: var(--shade, 0);
+}
+.book-title, .book-folio { text-align: center; font-family: 'Noto Serif SC', 'Songti SC', serif; color: var(--text-faint); }
+.book-title { font-size: 12px; letter-spacing: .45em; margin: 0 0 10px; }
+.book-folio { font-size: 12px; letter-spacing: .35em; margin: 18px 0 6px; }
+.book-back { display: block; margin: 0 16px 10px; padding: 4px 2px; border: 0; background: none; color: var(--text-faint); font-size: 12px; cursor: pointer; }
+#svc-line {
+  display: flex; align-items: center; gap: 8px; width: calc(100% - 32px); margin: 0 16px;
+  padding: 11px 14px; border-radius: var(--radius); border: 1px solid var(--border);
+  color: var(--text-dim); font-size: 12px; cursor: pointer; font-family: inherit; text-align: left;
+}
+#svc-line .svc-line-more { margin-left: auto; color: var(--text-faint); }
+#svc-line.bad { color: var(--red); border-color: color-mix(in srgb, var(--red) 45%, transparent); }
+
 /* grid */
 .card-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px; }
 
@@ -444,6 +472,11 @@ html, body { min-height: 100%; background: var(--bg); color: var(--text); font-f
     </div>
   </div>
 
+  <!-- 1022 她：首页太长 →「做成那种书页翻页……这本书的名字叫《我们》，不管怎么翻，都是我们的故事」
+       第一页天天要点的，第二页偶尔看看的；横着划翻页，竖着照常滚。没有圆点，页脚是页码 -->
+  <div id="book">
+  <div class="book-page" id="page-1">
+  <div class="book-title">《我们》</div>
   <!-- 1003：首页缺一个视觉主角（她说「不难看，就是缺点啥」）。一进来眼睛先落在这儿，其余卡片退后 -->
   <div id="hero" class="glass" onclick="location.href='together.html'" style="cursor:pointer"><!-- 1020：点一下进「水底」，丁达尔光的天数页 -->
     <div id="hero-greet">你好，阿颖</div>
@@ -496,62 +529,9 @@ html, body { min-height: 100%; background: var(--bg); color: var(--text); font-f
       </a>
     </div>
 
-    <!-- heatmap -->
-    <div class="card wide" id="heatmap-card">
-      <div class="heatmap-title">在一起的日子</div>
-      <div class="heatmap-sub">颜色越深，那天聊得越多</div>
-      <div id="heatmap-grid"></div>
-      <div class="hm-legend">
-        <span>少</span>
-        <div class="hm-legend-cell" style="background:var(--surface2)"></div>
-        <div class="hm-legend-cell hm-cell l1"></div>
-        <div class="hm-legend-cell hm-cell l2"></div>
-        <div class="hm-legend-cell hm-cell l3"></div>
-        <div class="hm-legend-cell hm-cell l4"></div>
-        <span>多</span>
-      </div>
-    </div>
-
-    <!-- memory fragment -->
-    <!-- 记忆碎片和涟漪共用一张卡，顶上点名字切换（1019 她嫌首页太长） -->
-    <div class="card wide" id="mem-card">
-      <div class="mem-header">
-        <div class="mem-tabs">
-          <button class="mem-tab mem-label on" id="tab-mem" type="button" onclick="memTab('mem')">记忆碎片</button>
-          <button class="mem-tab mem-label" id="tab-echo" type="button" onclick="memTab('echo')" hidden>涟漪</button>
-        </div>
-        <button id="mem-refresh" onclick="loadMemory()" title="换一条">↻</button>
-      </div>
-      <div id="mem-pane">
-        <div id="mem-date">—</div>
-        <div id="mem-content">加载中…</div>
-        <button id="mem-expand" type="button" onclick="toggleMemory()">展开</button>
-        <div id="mem-tags"></div>
-      </div>
-      <div id="echo-pane" hidden>
-        <div id="echo-date"></div>
-        <div id="echo-lines"></div>
-        <button id="echo-expand" type="button">展开</button>
-      </div>
-    </div>
-
-    <!-- 额度：涟言（Claude 订阅 + 上下文余量）和曜 · Codex 还剩多少 -->
-    <div class="card wide" id="usage-card">
-      <div class="mem-header">
-        <div class="mem-label">还剩多少</div>
-        <button id="usage-refresh" onclick="loadUsage()" title="刷新">↻</button>
-      </div>
-      <div id="usage-verdict">加载中…</div>
-      <div id="usage-bars"></div>
-    </div>
   </div>
 
-  <div class="section-label">服务状态</div>
-  <div class="section">
-    <div class="svc-list" id="svc-list"></div>
-  </div>
-
-  <div class="section-label">更多工具</div>
+  <div class="section-label">工具</div>
   <div class="section">
     <div class="tools-row">
       <div class="tool-card" onclick="openWallSheet()">
@@ -652,6 +632,76 @@ html, body { min-height: 100%; background: var(--bg); color: var(--text); font-f
         <div class="tool-name">开屏</div>
       </div>
     </div>
+  </div>
+
+  <div class="section">
+    <!-- memory fragment -->
+    <!-- 记忆碎片和涟漪共用一张卡，顶上点名字切换（1019 她嫌首页太长） -->
+    <div class="card wide" id="mem-card">
+      <div class="mem-header">
+        <div class="mem-tabs">
+          <button class="mem-tab mem-label on" id="tab-mem" type="button" onclick="memTab('mem')">记忆碎片</button>
+          <button class="mem-tab mem-label" id="tab-echo" type="button" onclick="memTab('echo')" hidden>涟漪</button>
+        </div>
+        <button id="mem-refresh" onclick="loadMemory()" title="换一条">↻</button>
+      </div>
+      <div id="mem-pane">
+        <div id="mem-date">—</div>
+        <div id="mem-content">加载中…</div>
+        <button id="mem-expand" type="button" onclick="toggleMemory()">展开</button>
+        <div id="mem-tags"></div>
+      </div>
+      <div id="echo-pane" hidden>
+        <div id="echo-date"></div>
+        <div id="echo-lines"></div>
+        <button id="echo-expand" type="button">展开</button>
+      </div>
+    </div>
+
+  </div>
+
+  <button id="svc-line" class="glass" type="button" onclick="bookTurn(2)"><span class="svc-dot on" id="svc-line-dot"></span><span id="svc-line-text">服务 · 正在看…</span><span class="svc-line-more">翻页 ›</span></button>
+  <div class="book-folio">— 1 —</div>
+  </div>
+
+  <div class="book-page" id="page-2" hidden>
+  <button class="book-back" type="button" onclick="bookTurn(1)">‹ 翻回第一页</button>
+  <div class="section-label">在一起的日子</div>
+  <div class="section">
+    <!-- heatmap -->
+    <div class="card wide" id="heatmap-card">
+      <div class="heatmap-title">在一起的日子</div>
+      <div class="heatmap-sub">颜色越深，那天聊得越多</div>
+      <div id="heatmap-grid"></div>
+      <div class="hm-legend">
+        <span>少</span>
+        <div class="hm-legend-cell" style="background:var(--surface2)"></div>
+        <div class="hm-legend-cell hm-cell l1"></div>
+        <div class="hm-legend-cell hm-cell l2"></div>
+        <div class="hm-legend-cell hm-cell l3"></div>
+        <div class="hm-legend-cell hm-cell l4"></div>
+        <span>多</span>
+      </div>
+    </div>
+
+    <!-- 额度：涟言（Claude 订阅 + 上下文余量）和曜 · Codex 还剩多少 -->
+    <div class="card wide" id="usage-card">
+      <div class="mem-header">
+        <div class="mem-label">还剩多少</div>
+        <button id="usage-refresh" onclick="loadUsage()" title="刷新">↻</button>
+      </div>
+      <div id="usage-verdict">加载中…</div>
+      <div id="usage-bars"></div>
+    </div>
+  </div>
+
+  <div class="section-label">服务状态</div>
+  <div class="section">
+    <div class="svc-list" id="svc-list"></div>
+  </div>
+
+  <div class="book-folio">— 2 —</div>
+  </div>
   </div>
 </div>
 
@@ -851,6 +901,11 @@ async function loadStatus() {
         <div class="svc-mem">${s && s.mem ? s.mem + 'MB' : '—'}</div>
       </div>`
     })
+    // 第一页那一行（1022）：都在就一句「都正常」，有掉线的就点名、变红
+    const down = known.filter(k => svcs.find(x => x.name === k.name)?.status !== 'online').map(k => k.label)
+    document.getElementById('svc-line-text').textContent = down.length ? `服务 · ${down.join('、')}掉线了` : '服务 · 都正常 ✓'
+    document.getElementById('svc-line-dot').className = 'svc-dot ' + (down.length ? 'off' : 'on')
+    document.getElementById('svc-line').classList.toggle('bad', down.length > 0)
   } catch {}
 }
 
@@ -1346,6 +1401,69 @@ document.addEventListener('visibilitychange', () => {
     }
   }
 })
+
+// ── 《我们》翻页（1022）────────────────────────────────────────────
+let bookPage = 1
+const bookPg = n => document.getElementById('page-' + n)
+function bookSetup() {
+  const p1 = bookPg(1)
+  bookPg(2).hidden = false; p1.hidden = false
+  p1.classList.add('turning'); p1.style.transition = 'none'
+}
+function bookAngle(a) {
+  const p1 = bookPg(1)
+  p1.style.transform = `rotateY(${a}deg)`
+  p1.style.setProperty('--shade', Math.min(1, -a / 90).toFixed(2))
+}
+function bookFinish(target) {
+  const p1 = bookPg(1), end = target === 2 ? -165 : 0
+  p1.style.transition = 'transform .5s cubic-bezier(.3,.6,.25,1)'
+  bookAngle(end)
+  clearTimeout(bookFinish.t)
+  bookFinish.t = setTimeout(() => {
+    p1.classList.remove('turning'); p1.style.transition = ''; p1.style.transform = ''; p1.style.removeProperty('--shade')
+    p1.hidden = target !== 1; bookPg(2).hidden = target !== 2
+    bookPage = target
+    const top = document.getElementById('book').getBoundingClientRect().top + scrollY - 70
+    if (scrollY > top) scrollTo({ top: Math.max(0, top), behavior: 'smooth' })
+  }, 510)
+}
+function bookTurn(target) {
+  if (target === bookPage) return
+  bookSetup(); bookAngle(target === 2 ? 0 : -165)
+  requestAnimationFrame(() => requestAnimationFrame(() => bookFinish(target)))
+}
+;(() => {
+  const book = document.getElementById('book')
+  let x0 = null, y0 = 0, t0 = 0, mode = null, W = 360
+  // 手指落在能横着滚的东西上（热力图、小胶囊那排）就不翻页
+  const inScroller = el => { for (; el && el !== book; el = el.parentElement) if (el.scrollWidth > el.clientWidth + 2 && /auto|scroll/.test(getComputedStyle(el).overflowX)) return true; return false }
+  book.addEventListener('touchstart', e => {
+    if (e.touches.length !== 1 || inScroller(e.target)) { x0 = null; return }
+    x0 = e.touches[0].clientX; y0 = e.touches[0].clientY; t0 = Date.now(); mode = null; W = book.clientWidth || 360
+  }, { passive: true })
+  book.addEventListener('touchmove', e => {
+    if (x0 == null || mode === 'v') return
+    const dx = e.touches[0].clientX - x0, dy = e.touches[0].clientY - y0
+    if (!mode) {
+      if (Math.abs(dy) > 10 && Math.abs(dy) >= Math.abs(dx)) { mode = 'v'; return }
+      if (Math.abs(dx) < 16 || Math.abs(dx) < 2 * Math.abs(dy)) return   // 非得明显横着才算翻页
+      if ((bookPage === 1 && dx < 0) || (bookPage === 2 && dx > 0)) { mode = 'h'; bookSetup() } else { mode = 'v'; return }
+    }
+    e.preventDefault()
+    const f = Math.min(1, Math.abs(dx) / W)
+    bookAngle(bookPage === 1 ? -165 * f : -165 * (1 - f))
+  }, { passive: false })
+  const end = e => {
+    if (mode === 'h') {
+      const dx = (e.changedTouches[0] ? e.changedTouches[0].clientX : x0) - x0
+      const go = Math.abs(dx) / W > 0.28 || Math.abs(dx) / Math.max(1, Date.now() - t0) > 0.6
+      bookFinish(go ? 3 - bookPage : bookPage)
+    }
+    mode = null; x0 = null
+  }
+  book.addEventListener('touchend', end); book.addEventListener('touchcancel', end)
+})()
 </script>
 <div id="wall-sheet" class="glass" hidden>
   <button type="button" id="wall-split">亮暗分开：关</button>
