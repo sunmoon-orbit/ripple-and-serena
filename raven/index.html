@@ -2929,7 +2929,8 @@ function appendMsg(text, role, save = true, ts = Date.now(), msgId = null, suppl
     } else {
       // 1003 引用回复：第一行「> 引用：…」画成一小块引用，正文照常
       const qm = /^> 引用：([^\n]{1,200})\n?/.exec(text)
-      const utext = qm ? text.slice(qm[0].length) : text   // 别改 text 本身，后面存历史还要用原文
+      // 她通话里说的话开头带【语音】【语音·双语】，那是给我看的，气泡里藏掉（1022 她：「这个要不要给我隐藏一下」）
+      const utext = (qm ? text.slice(qm[0].length) : text).replace(/^【语音(?:·双语)?】/, '')   // 别改 text 本身，后面存历史还要用原文
       const vn = VNOTE_RE.exec(utext)
       if (vn) {
         body.appendChild(buildVoiceNote(+vn[1], vn[2].trim(), vn[3] || '', vn[4].trim()))
