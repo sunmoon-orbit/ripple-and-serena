@@ -1162,3 +1162,4 @@ input, textarea, select { font-family: inherit; font-size: 15px; color: var(--in
 
 /* 1021：密码框改成普通文本框（避开 vivo 安全键盘重载），字用圆点遮住 */
 .ink-masked { -webkit-text-security: disc; text-security: disc; }
+.badge-btn { border: 0; cursor: pointer; font: inherit; }

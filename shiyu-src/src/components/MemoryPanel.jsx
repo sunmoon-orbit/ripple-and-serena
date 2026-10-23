@@ -20,6 +20,8 @@ const TABS = [
   { l: '日记',    scope: '',            type: 'diary' },
   { l: '阿颖私密', scope: 'private_阿颖', type: '' },
   { l: IS_ZHAOHUA ? '昭华私密' : '阿言私密', scope: 'private_阿言', type: '' },
+  // 1023 她：整理记忆时有的被标成已了结，她觉得还不该完结——单独一页翻出来，点卡片上的「已了结」就能拉回来
+  { l: '已了结',  scope: '',            type: '', resolved: '1' },
 ]
 
 const IMP_OPTS = [{ v: 10, l: '珍藏' }, { v: 7, l: '重要' }, { v: 5, l: '普通' }, { v: 3, l: '琐碎' }]
@@ -137,6 +139,7 @@ function Editor({ initial, onClose, onSaved }) {
   const [memType, setMemType] = useState(initial?.type || 'memory')
   const [importance, setImportance] = useState(initial?.importance || 5)
   const [memorable, setMemorable] = useState((initial?.arousal || 0) > 0.6)
+  const [resolved, setResolved] = useState(!!initial?.resolved)
   const [agent, setAgent] = useState(IS_ZHAOHUA ? APP.agent : (initial?.agent || (initial?.type === 'diary' ? '阿颖' : APP.agent)))
   const [saving, setSaving] = useState(false)
 
@@ -145,7 +148,7 @@ function Editor({ initial, onClose, onSaved }) {
     setSaving(true)
     const fields = { content: content.trim(), tags, scope, layer: layer || null, type: memType, importance, arousal: memorable ? 0.85 : 0.3 }
     try {
-      if (isEdit) await api.update(initial.id, { ...fields, agent })
+      if (isEdit) await api.update(initial.id, { ...fields, agent, resolved })
       else await api.create({ ...fields, owner: '阿颖', agent })
       showToast(isEdit ? '已更新' : '已记下', 'success')
       onSaved()
@@ -197,6 +200,12 @@ function Editor({ initial, onClose, onSaved }) {
             <span className={'toggle' + (memorable ? ' on' : '')} />
             <span>难忘</span>
           </label>
+          {isEdit && (
+            <label className="memorable-toggle" title="已了结的记忆会沉底，很少再被想起" onClick={() => setResolved(!resolved)}>
+              <span className={'toggle' + (resolved ? ' on' : '')} />
+              <span>已了结</span>
+            </label>
+          )}
         </div>
         <div className="modal-actions">
           <button className="btn btn-ghost" onClick={onClose}>取消</button>
@@ -216,7 +225,7 @@ function emotionColor(valence) {
   return null
 }
 
-function Card({ m, onEdit, onTrash }) {
+function Card({ m, onEdit, onTrash, onChanged }) {
   const [exp, setExp] = useState(false)
   const [relOpen, setRelOpen] = useState(false)
   const [related, setRelated] = useState(null)
@@ -251,7 +260,13 @@ function Card({ m, onEdit, onTrash }) {
             <span className="badge badge-scope">{SCOPES[m.scope] || m.scope}</span>
           )}
           {impLabel && <span className="imp-text">{impLabel}</span>}
-          {m.resolved ? <span className="badge badge-resolved">已了结</span> : null}
+          {m.resolved ? (
+            <button type="button" className="badge badge-resolved badge-btn" title="点一下拉回来（不再沉底）"
+              onClick={async () => {
+                try { await api.update(m.id, { resolved: false }); showToast('拉回来了，不再沉底', 'success'); onChanged?.() }
+                catch (e) { showToast(e.message, 'error') }
+              }}>已了结 ↩</button>
+          ) : null}
           {emotionColor(m.valence) && (
             <span style={{ width: 7, height: 7, borderRadius: '50%', background: emotionColor(m.valence), display: 'inline-block', flexShrink: 0 }} title={`情绪 ${m.valence > 0 ? '+' : ''}${m.valence?.toFixed(2)}`} />
           )}
@@ -335,6 +350,7 @@ export default function MemoryPanel() {
   const [editor, setEditor] = useState(null)
   const [days, setDays] = useState(null)
   const [tabIdx, setTabIdx] = useState(0)
+  const [resolvedOnly, setResolvedOnly] = useState(false)
   const [selectedDate, setSelectedDate] = useState(null)
   const [sortBy, setSortBy] = useState('date') // date | importance | arousal
   const [sortDir, setSortDir] = useState('desc') // desc | asc
@@ -362,11 +378,12 @@ export default function MemoryPanel() {
       if (memType) params.type = memType
       if (layer) params.layer = layer
       if (selectedDate) params.date = selectedDate
+      if (resolvedOnly) params.resolved = '1'
       const heatOffset = heatPage * 84
       const [m, h, eh] = await Promise.all([api.list(params), api.heatmap({ offset: heatOffset }), api.emotionHeatmap({ offset: heatOffset })])
       setMems(m); setHeat(h); setEmotionHeat(eh)
     } catch (e) { setError(e.message) } finally { setLoading(false) }
-  }, [q, scope, memType, layer, selectedDate, heatPage])
+  }, [q, scope, memType, layer, selectedDate, heatPage, resolvedOnly])
 
   useEffect(() => { load() }, [load])
 
@@ -475,7 +492,7 @@ export default function MemoryPanel() {
         {TABS.map((t, i) => (
           <button key={i}
             className={'scope-tab' + (tabIdx === i ? ' active' : '')}
-            onClick={() => { setTabIdx(i); setScope(t.scope); setMemType(t.type) }}>
+            onClick={() => { setTabIdx(i); setScope(t.scope); setMemType(t.type); setResolvedOnly(!!t.resolved) }}>
             {t.l}
           </button>
         ))}
@@ -496,7 +513,7 @@ export default function MemoryPanel() {
       {!error && mems.length === 0 && !loading && <div className="empty">暂无记忆</div>}
 
       <div className="mem-list">
-        {sortedMems.map((m) => <Card key={m.id} m={m} onEdit={setEditor} onTrash={trash} />)}
+        {sortedMems.map((m) => <Card key={m.id} m={m} onEdit={setEditor} onTrash={trash} onChanged={load} />)}
       </div>
 
       {/* 悬浮新建按钮 */}
