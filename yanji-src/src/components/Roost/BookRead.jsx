@@ -5,8 +5,9 @@ import {
   fetchBooks, fetchBook, fetchBookChapter, createBook, appendBookChapters,
   deleteBook, createBookAnnotation, deleteBookAnnotation, saveBookBookmark,
   sendReadingHeartbeat, fetchBookChat, createBookChatMessage, stampBook, unstampBook,
-  fetchReadingActivity, fetchBookCover, saveBookCover,
+  fetchReadingActivity, fetchBookCover, saveBookCover, saveBookChapterAlt,
 } from '../../api/moonMemory'
+import { readBookFile, splitChapters, pairBooks, guessOffset, paragraphEnds } from '../../utils/bookImport'
 import { sendMessage } from '../../api/llm'
 import { useThemedConfirm } from '../ThemedConfirmDialog'
 import { downloadBlob } from '../../utils/download'
@@ -99,65 +100,10 @@ function formatReadingTime(seconds) {
   return rest ? `${hours} 小时 ${rest} 分钟` : `${hours} 小时`
 }
 
-// 读 txt 文件：先按 UTF-8 严格解码，失败退 GBK（国内 txt 大多是 GBK，直接 readAsText 会乱码）
-async function readTxtFile(file) {
-  if (!/\.(txt|text)$/i.test(file.name)) {
-    const ext = file.name.split('.').pop()?.toUpperCase() || '未知格式'
-    throw new Error(`这是 ${ext} 文件，书架目前只支持 TXT`)
-  }
-  const buf = await file.arrayBuffer()
-  const bytes = new Uint8Array(buf)
-  const head = new TextDecoder('latin1').decode(bytes.slice(0, 96))
-  if (head.startsWith('PK\u0003\u0004') || head.includes('BOOKMOBI') || head.startsWith('%PDF-')) {
-    throw new Error('这个文件不是纯文本，请先转换成 TXT')
-  }
-  if (bytes[0] === 0xff && bytes[1] === 0xfe) return new TextDecoder('utf-16le').decode(buf)
-  if (bytes[0] === 0xfe && bytes[1] === 0xff) return new TextDecoder('utf-16be').decode(buf)
-  try {
-    return new TextDecoder('utf-8', { fatal: true }).decode(buf)
-  } catch {
-    const controls = bytes.slice(0, 4096).reduce((n, b) => n + (b < 32 && b !== 9 && b !== 10 && b !== 13 ? 1 : 0), 0)
-    if (controls > Math.max(8, Math.min(bytes.length, 4096) * 0.02)) {
-      throw new Error('检测到二进制内容，请先转换成 TXT')
-    }
-    return new TextDecoder('gbk').decode(buf)
-  }
-}
-
-// 自动分章：识别行首「第X章/回/卷…」「序章/楔子/后记…」；没有章节标记就整本一章，超长按段落切块
-function splitChapters(raw) {
-  const text = raw.replace(/\r\n?/g, '\n').replace(/　/g, ' ').trim()
-  const re = /^[ \t]*((?:第[0-9０-９一二两三四五六七八九十百千零〇]+[章回卷节集部篇])[^\n]{0,30}|(?:序章|序言|楔子|引子|前言|后记|尾声|终章|番外)[^\n]{0,20})[ \t]*$/gm
-  const marks = [...text.matchAll(re)]
-  if (marks.length < 2) return fallbackSplit(text)
-  const chapters = []
-  const head = text.slice(0, marks[0].index).trim()
-  if (head) chapters.push({ title: '开篇', content: head })
-  marks.forEach((m, i) => {
-    const end = i + 1 < marks.length ? marks[i + 1].index : text.length
-    const body = text.slice(m.index + m[0].length, end).trim()
-    if (body) chapters.push({ title: m[1].trim(), content: body })
-  })
-  return chapters.length ? chapters : fallbackSplit(text)
-}
-
-function fallbackSplit(text) {
-  const MAX = 12000
-  if (text.length <= MAX) return [{ title: '全文', content: text }]
-  const paras = text.split(/\n{2,}/)
-  const parts = []
-  let buf = [], len = 0
-  for (const p of paras) {
-    buf.push(p); len += p.length
-    if (len >= 10000) { parts.push(buf.join('\n\n')); buf = []; len = 0 }
-  }
-  if (buf.length) parts.push(buf.join('\n\n'))
-  return parts.map((c, i) => ({ title: `第 ${i + 1} 部分`, content: c }))
-}
-
 // 把章节正文按标注偏移切成段：每段带覆盖它的标注列表（正文渲染必须与原文逐字一致，偏移才准）
-function buildSegments(content, annos) {
-  const points = new Set([0, content.length])
+// 中英对照时还要在每段中文末尾切一刀，好把英文挂在那儿（paraEnds 为空就和原来一样）
+function buildSegments(content, annos, paraEnds = []) {
+  const points = new Set([0, content.length, ...paraEnds])
   for (const a of annos) {
     points.add(Math.max(0, Math.min(a.start_off, content.length)))
     points.add(Math.max(0, Math.min(a.end_off, content.length)))
@@ -229,7 +175,11 @@ export default function BookRead({ onClose }) {
   const [annoNote, setAnnoNote] = useState('')
   const [annoAuthor, setAnnoAuthor] = useState('阿颖')
   const [focusAnno, setFocusAnno] = useState(null) // 点了正文划线 → 高亮下方对应批注卡
-  const [upload, setUpload] = useState(null)       // 上架表单 {title,author,intro,color,shelf,chapters,fileName}
+  const [upload, setUpload] = useState(null)       // 上架表单 {title,author,intro,color,shelf,chapters,fileName, bilingual,altChapters,altName,altOffset}
+  const altFileRef = useRef(null)
+  // 中英对照怎么看（1023）：both 中文下面跟英文 / zh 只中文 / en 只英文。记在本机
+  const [langMode, setLangMode] = useState(() => { try { return localStorage.getItem('bookread-lang') || 'both' } catch { return 'both' } })
+  const [altEdit, setAltEdit] = useState(null)      // 点了某段英文：{k} 弹「往上挪／往下挪」
   const [saving, setSaving] = useState(false)
   const [stamps, setStamps] = useState([])         // 当前书的读讫章 [{reader,stamped_at}]
   const [toc, setToc] = useState(null)             // 目录 [{idx,title,chars}]，打开时拉取
@@ -499,7 +449,7 @@ export default function BookRead({ onClose }) {
       observer?.disconnect()
       window.removeEventListener('resize', measure)
     }
-  }, [chapterViewKey, readingMode, chapter])
+  }, [chapterViewKey, readingMode, chapter, langMode])
 
   // 滚动时静默记进度（防抖 300ms；savePos 只写 localStorage，组件卸载后落笔也安全）
   function onBodyScroll(e) {
@@ -609,6 +559,7 @@ export default function BookRead({ onClose }) {
     if (!chapter) return
     function onSelChange() {
       if (composing || excerptCard) return // 编辑器打开时锁定当前选区
+      if (textRef.current?.dataset.lang === 'en') { setPending(null); return } // 只英文时没有中文偏移，不划线
       const sel = window.getSelection()
       const el = textRef.current
       if (!el || !sel || sel.rangeCount === 0 || sel.isCollapsed) { setPending(null); return }
@@ -626,6 +577,32 @@ export default function BookRead({ onClose }) {
     document.addEventListener('selectionchange', onSelChange)
     return () => document.removeEventListener('selectionchange', onSelChange)
   }, [chapter, composing, excerptCard])
+
+  // 中英对照挪段（1023）：配错了一两段时，把这格英文的第一段挪给上一段，或最后一段挪给下一段，整章存回去
+  async function moveAlt(dir) {
+    if (!altEdit || !Array.isArray(chapter?.alt)) return
+    const k = altEdit.k
+    const arr = [...chapter.alt]
+    const parts = String(arr[k] || '').split('\n').filter(Boolean)
+    if (!parts.length) return
+    if (dir < 0) {
+      if (k === 0) { showToast('已经是第一段了'); return }
+      const first = parts.shift()
+      arr[k - 1] = arr[k - 1] ? arr[k - 1] + '\n' + first : first
+    } else {
+      if (k >= arr.length - 1) { showToast('已经是最后一段了'); return }
+      const last = parts.pop()
+      arr[k + 1] = arr[k + 1] ? last + '\n' + arr[k + 1] : last
+    }
+    arr[k] = parts.join('\n')
+    const before = chapter.alt
+    setChapter((prev) => ({ ...prev, alt: arr }))
+    setAltEdit(arr[k] ? { k } : null)
+    try { await saveBookChapterAlt(cfg, active.id, chapter.idx, arr) } catch {
+      setChapter((prev) => ({ ...prev, alt: before }))
+      showToast('没存上，再试一次', 'error')
+    }
+  }
 
   async function submitAnno() {
     if (!pending) return
@@ -725,21 +702,39 @@ export default function BookRead({ onClose }) {
     annoRefs.current[id]?.scrollIntoView({ behavior: 'smooth', block: 'center' })
   }
 
+  // 1023：TXT / EPUB / 文字型 PDF 都收，解析在本机做。中英对照时这是中文那本
   async function pickFile(e) {
     const file = e.target.files?.[0]
-    if (!file) return
-    try {
-      const text = await readTxtFile(file)
-      if (!text.trim()) { showToast('文件是空的', 'error'); return }
-      const chapters = splitChapters(text)
-      setUpload((prev) => ({
-        ...prev,
-        fileName: file.name,
-        chapters,
-        title: prev.title || file.name.replace(/\.(txt|text)$/i, '').trim(),
-      }))
-    } catch (error) { showToast(error?.message || '读取文件失败', 'error') }
     e.target.value = ''
+    if (!file) return
+    setUpload((prev) => ({ ...prev, reading: 'zh' }))
+    try {
+      const r = await readBookFile(file)
+      setUpload((prev) => {
+        const next = { ...prev, reading: null, fileName: file.name, chapters: r.chapters,
+          title: prev.title || r.title, author: prev.author || r.author }
+        if (next.altChapters) next.altOffset = guessOffset(next.chapters, next.altChapters)
+        return next
+      })
+    } catch (error) {
+      setUpload((prev) => ({ ...prev, reading: null }))
+      showToast(error?.message || '读取文件失败', 'error')
+    }
+  }
+
+  async function pickAltFile(e) {
+    const file = e.target.files?.[0]
+    e.target.value = ''
+    if (!file) return
+    setUpload((prev) => ({ ...prev, reading: 'en' }))
+    try {
+      const r = await readBookFile(file)
+      setUpload((prev) => ({ ...prev, reading: null, altName: file.name, altChapters: r.chapters,
+        altOffset: prev.chapters ? guessOffset(prev.chapters, r.chapters) : 0 }))
+    } catch (error) {
+      setUpload((prev) => ({ ...prev, reading: null }))
+      showToast(error?.message || '读取文件失败', 'error')
+    }
   }
 
   function applyPaste(text) {
@@ -749,6 +744,7 @@ export default function BookRead({ onClose }) {
 
   async function submitBook() {
     if (!upload.chapters?.length) { showToast('还没有正文（选文件或粘贴）', 'error'); return }
+    if (upload.bilingual && !upload.appendTo && !upload.altChapters?.length) { showToast('英文版还没选', 'error'); return }
     // 追更模式：只往已有的书末尾续章，元信息全部不动
     if (upload.appendTo) {
       setSaving(true)
@@ -771,7 +767,9 @@ export default function BookRead({ onClose }) {
         cover_color: upload.color || SPINE_COLORS[0],
         added_by: '阿颖',
         shelf: upload.shelf || '闲书层',
-        chapters: upload.chapters,
+        ...(upload.bilingual && upload.altChapters
+          ? { alt_lang: 'en', chapters: pairBooks(upload.chapters, upload.altChapters, upload.altOffset || 0) }
+          : { chapters: upload.chapters }),
       })
       showToast('上架好了')
       setUpload(null)
@@ -824,11 +822,53 @@ export default function BookRead({ onClose }) {
             <button className="roost-modal-close" onClick={() => !saving && setUpload(null)}>✕</button>
           </div>
           <div className="roost-modal-body">
-            <input ref={fileRef} type="file" accept=".txt,text/plain" style={{ display: 'none' }} onChange={pickFile} />
-            <button className="roost-btn" style={{ width: '100%', marginBottom: 10 }} onClick={() => fileRef.current?.click()}>
-              {upload.fileName ? `已读取：${upload.fileName}` : '选一个 txt 文件'}
+            <input ref={fileRef} type="file" accept=".txt,.text,.epub,.pdf,text/plain,application/epub+zip,application/pdf" style={{ display: 'none' }} onChange={pickFile} />
+            <input ref={altFileRef} type="file" accept=".txt,.text,.epub,.pdf,text/plain,application/epub+zip,application/pdf" style={{ display: 'none' }} onChange={pickAltFile} />
+            {!upload.appendTo && (
+              <div className="bookread-spine-row">
+                <span className="bookread-foot-hint">版本</span>
+                <div className="bookread-author-toggle">
+                  <button className={!upload.bilingual ? 'active' : ''} onClick={() => setUpload({ ...upload, bilingual: false })}>单本</button>
+                  <button className={upload.bilingual ? 'active' : ''} onClick={() => setUpload({ ...upload, bilingual: true })}>中英对照</button>
+                </div>
+              </div>
+            )}
+            <button className="roost-btn" style={{ width: '100%', marginBottom: 10 }} disabled={!!upload.reading} onClick={() => fileRef.current?.click()}>
+              {upload.reading === 'zh' ? '读取中……' : upload.fileName ? `${upload.bilingual ? '中文版：' : '已读取：'}${upload.fileName}` : (upload.bilingual ? '选中文版（txt / epub / pdf）' : '选一个文件（txt / epub / pdf）')}
             </button>
-            {!upload.fileName && (
+            {upload.bilingual && !upload.appendTo && (
+              <button className="roost-btn" style={{ width: '100%', marginBottom: 10 }} disabled={!!upload.reading} onClick={() => altFileRef.current?.click()}>
+                {upload.reading === 'en' ? '读取中……' : upload.altName ? `英文版：${upload.altName}` : '选英文版（txt / epub / pdf）'}
+              </button>
+            )}
+            {upload.bilingual && upload.chapters?.length > 0 && upload.altChapters?.length > 0 && (() => {
+              const off = upload.altOffset || 0
+              // 预览从两边第一对配上的章开始看（偏移是负的时候中文前几章没有英文）
+              const start = Math.max(0, -off)
+              const preview = pairBooks(upload.chapters, upload.altChapters, off).slice(start, start + 2)
+              return (
+                <div className="bookread-pair-preview">
+                  <div className="bookread-pair-offset">
+                    <span>{off >= 0 ? `中文第 1 章配英文第 ${off + 1} 章` : `英文第 1 章配中文第 ${1 - off} 章`}</span>
+                    <button disabled={off <= -(upload.chapters.length - 1)} onClick={() => setUpload({ ...upload, altOffset: off - 1 })}>−</button>
+                    <button disabled={off >= upload.altChapters.length - 1} onClick={() => setUpload({ ...upload, altOffset: off + 1 })}>＋</button>
+                  </div>
+                  <div className="bookread-foot-hint">中文 {upload.chapters.length} 章 · 英文 {upload.altChapters.length} 章。看下面前两章配得对不对，不对就挪上面的数字；段落错一两段，读的时候点英文可以挪。</div>
+                  {preview.map((c, ci) => (
+                    <div key={ci} className="bookread-pair-chapter">
+                      <div className="bookread-pair-title">{c.title}{c.alt_title ? ` ⇄ ${c.alt_title}` : ' ⇄ （没有对应的英文章）'}</div>
+                      {(c.content.match(/[^\n]*\S[^\n]*/g) || []).slice(0, 3).map((zh, pi) => (
+                        <div key={pi} className="bookread-pair-para">
+                          <div>{zh.trim().slice(0, 80)}{zh.trim().length > 80 ? '…' : ''}</div>
+                          <div className="bookread-pair-en">{(c.alt?.[pi] || '（这段下面没配上英文）').slice(0, 120)}</div>
+                        </div>
+                      ))}
+                    </div>
+                  ))}
+                </div>
+              )
+            })()}
+            {!upload.fileName && !upload.bilingual && (
               <textarea
                 className="roost-note-input"
                 rows={5}
@@ -977,7 +1017,7 @@ export default function BookRead({ onClose }) {
             {books === null && <div className="roost-empty">加载中……</div>}
             {books?.length === 0 && <div className="roost-empty">书架还空着（跟阿言说一声想读什么，我来上架）</div>}
             <button className="roost-btn" style={{ width: '100%', marginBottom: 12 }} onClick={() => setUpload({ color: SPINE_COLORS[0], shelf: '闲书层' })}>
-              ＋ 上架新书（txt / 粘贴文本）
+              ＋ 上架新书（txt / epub / pdf，可中英对照）
             </button>
             {books?.length > 0 && (
               <div className="bookread-view-toggle" role="tablist" aria-label="书架的看法">
@@ -1039,7 +1079,36 @@ export default function BookRead({ onClose }) {
 
   // ── 阅读视图 ──
   const annos = chapter?.annotations || []
-  const segs = chapter ? buildSegments(chapter.content, annos) : []
+  // 中英对照：alt[k] 挂在中文第 k 段末尾。只中文就不切；只英文另画一份，不带划线
+  const altArr = Array.isArray(chapter?.alt) ? chapter.alt : null
+  const bilingual = !!altArr && altArr.some(Boolean)
+  const viewLang = bilingual ? langMode : 'zh'
+  const paraEndList = chapter && viewLang === 'both' ? paragraphEnds(chapter.content) : []
+  const paraEndIdx = new Map(paraEndList.map((e, k) => [e, k]))
+  const segs = chapter ? buildSegments(chapter.content, annos, paraEndList) : []
+  const renderSegs = (paged) => segs.map((s) => {
+    const k = paraEndIdx.get(s.start + s.text.length)
+    const alt = k != null && altArr[k] ? (
+      <span
+        key={'alt' + k}
+        className={'bookread-alt' + (altEdit?.k === k ? ' editing' : '')}
+        data-alt={altArr[k]}
+        onClick={(event) => { event.stopPropagation(); setAltEdit(altEdit?.k === k ? null : { k }) }}
+      />
+    ) : null
+    const body = s.annos.length ? (
+      <mark
+        key={s.start}
+        className="bookread-mark"
+        style={{ backgroundColor: (COLOR_HEX[s.annos[0].color] || '#f5d76e') + '66', borderBottom: `2px solid ${COLOR_HEX[s.annos[0].color] || '#f5d76e'}` }}
+        onClick={(event) => { if (paged) event.stopPropagation(); jumpToAnno(s.annos[0].id) }}
+      >{s.text}</mark>
+    ) : <span key={s.start}>{s.text}</span>
+    return alt ? [body, alt] : body
+  })
+  const englishOnly = viewLang === 'en'
+    ? altArr.map((t, k) => t ? <span key={k} className="bookread-alt-only">{t + '\n\n'}</span> : null)
+    : null
   const excerptLayout = excerptCard ? excerptCardTextLayout(excerptCard.quote, excerptCard.note) : null
 
   return (
@@ -1049,6 +1118,15 @@ export default function BookRead({ onClose }) {
           <button className="coread-back" onClick={() => { setActive(null); setChapter(null); setPending(null); setComposing(false) }}>‹ 书架</button>
           <span className="coread-reader-title">{active.title}</span>
           <div className="bookread-header-actions">
+            {bilingual && (
+              <button className="bookread-mode-toggle" onClick={() => {
+                const next = { both: 'zh', zh: 'en', en: 'both' }[langMode] || 'both'
+                setLangMode(next); setAltEdit(null); setPending(null)
+                try { localStorage.setItem('bookread-lang', next) } catch { /* 记不住就每次双语 */ }
+              }} title="中英对照 / 只中文 / 只英文">
+                {{ both: '中英', zh: '中', en: 'EN' }[langMode] || '中英'}
+              </button>
+            )}
             <button className="bookread-mode-toggle" onClick={switchReadingMode} title="切换阅读模式">
               {readingMode === 'page' ? '翻页' : '滚动'}
             </button>
@@ -1084,6 +1162,14 @@ export default function BookRead({ onClose }) {
                 </button>
                 <button disabled={chapter.idx >= chapterCount - 1} onClick={() => openChapter(active, chapter.idx + 1)}>下一章 ›</button>
               </div>
+              {altEdit && (
+                <div className="bookread-alt-bar" onClick={(e) => e.stopPropagation()}>
+                  <span>这段英文配错了？</span>
+                  <button onClick={() => moveAlt(-1)}>↑ 头一段挪给上面</button>
+                  <button onClick={() => moveAlt(1)}>↓ 末一段挪给下面</button>
+                  <button onClick={() => setAltEdit(null)}>好了</button>
+                </div>
+              )}
               {tocOpen && (
                 <div className="bookread-toc">
                   {!toc && <div className="roost-empty">翻目录……</div>}
@@ -1115,18 +1201,10 @@ export default function BookRead({ onClose }) {
                     <div
                       className="bookread-text bookread-text-paged"
                       ref={textRef}
+                      data-lang={viewLang}
                       style={{ transform: `translate3d(${-pageIndex * pageWidth}px, 0, 0)` }}
                     >
-                      {segs.map((s) =>
-                        s.annos.length ? (
-                          <mark
-                            key={s.start}
-                            className="bookread-mark"
-                            style={{ backgroundColor: (COLOR_HEX[s.annos[0].color] || '#f5d76e') + '66', borderBottom: `2px solid ${COLOR_HEX[s.annos[0].color] || '#f5d76e'}` }}
-                            onClick={(event) => { event.stopPropagation(); jumpToAnno(s.annos[0].id) }}
-                          >{s.text}</mark>
-                        ) : <span key={s.start}>{s.text}</span>
-                      )}
+                      {englishOnly || renderSegs(true)}
                     </div>
                   </div>
                   <div className="bookread-page-footer">
@@ -1140,17 +1218,8 @@ export default function BookRead({ onClose }) {
                 </>
               ) : (
                 <>
-                  <div className="bookread-text" ref={textRef}>
-                    {segs.map((s) =>
-                      s.annos.length ? (
-                        <mark
-                          key={s.start}
-                          className="bookread-mark"
-                          style={{ backgroundColor: (COLOR_HEX[s.annos[0].color] || '#f5d76e') + '66', borderBottom: `2px solid ${COLOR_HEX[s.annos[0].color] || '#f5d76e'}` }}
-                          onClick={() => jumpToAnno(s.annos[0].id)}
-                        >{s.text}</mark>
-                      ) : <span key={s.start}>{s.text}</span>
-                    )}
+                  <div className="bookread-text" ref={textRef} data-lang={viewLang}>
+                    {englishOnly || renderSegs(false)}
                   </div>
                   <div className="bookread-foot">
                     <button className="roost-btn roost-btn-ghost roost-btn-sm" onClick={markBookmark}>夹书签</button>

@@ -6282,3 +6282,29 @@ body.mp-active .scroll-bottom-btn { bottom: 139px; }
 
 .draw-conf .picker-trigger { display: flex; align-items: center; justify-content: space-between; gap: 6px; text-align: left; }
 .draw-conf .picker-trigger:focus-visible, .draw-conf input:focus-visible, .draw-conf textarea:focus-visible { outline: 2px solid color-mix(in srgb, var(--accent) 55%, transparent); outline-offset: 1px; }
+
+/* 共读书架·中英对照（1023）：英文用 ::after 从 data-alt 画出来，不进 DOM 文字，划线偏移照旧只数中文 */
+.bookread-alt { cursor: pointer; }
+.bookread-alt::after {
+  content: "\A" attr(data-alt);
+  font-size: .86em; line-height: 1.7; color: var(--text-faint);
+  font-family: Georgia, "Times New Roman", serif;
+}
+.bookread-alt.editing::after { color: var(--accent); }
+.bookread-alt-only { font-family: Georgia, "Times New Roman", serif; }
+.bookread-alt-bar {
+  position: sticky; top: 0; z-index: 6; display: flex; flex-wrap: wrap; align-items: center; gap: 6px;
+  margin: 0 0 8px; padding: 8px 10px; border-radius: 12px; font-size: 12px;
+  background: color-mix(in srgb, var(--card, var(--bg)) 92%, transparent); border: 1px solid var(--border);
+  backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+}
+.bookread-alt-bar span { color: var(--text-faint); margin-right: auto; }
+.bookread-alt-bar button { border: 1px solid var(--border); background: transparent; color: var(--text); border-radius: 999px; padding: 4px 10px; font-size: 12px; }
+.bookread-pair-preview { border: 1px solid var(--border); border-radius: 12px; padding: 10px 12px; margin-bottom: 10px; }
+.bookread-pair-offset { display: flex; align-items: center; gap: 8px; font-size: 13px; margin-bottom: 4px; }
+.bookread-pair-offset span { margin-right: auto; }
+.bookread-pair-offset button { width: 28px; height: 28px; border-radius: 50%; border: 1px solid var(--border); background: transparent; color: var(--text); }
+.bookread-pair-chapter { margin-top: 10px; }
+.bookread-pair-title { font-size: 12px; font-weight: 600; margin-bottom: 4px; }
+.bookread-pair-para { font-size: 12px; line-height: 1.6; padding: 4px 0; border-top: 1px dashed var(--border); }
+.bookread-pair-en { color: var(--text-faint); font-family: Georgia, serif; }

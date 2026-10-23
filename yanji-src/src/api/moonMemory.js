@@ -244,6 +244,14 @@ export async function appendBookChapters(config, bookId, chapters) {
   })
 }
 
+// 中英对照：她在阅读页挪过英文段落后，整章对照数组存回去
+export async function saveBookChapterAlt(config, bookId, idx, alt) {
+  const { baseUrl, apiToken } = config
+  return request(baseUrl, `/books/${bookId}/chapters/${idx}/alt`, {
+    method: 'PUT', headers: headers(apiToken), body: JSON.stringify({ alt }),
+  })
+}
+
 export async function fetchBookChapter(config, bookId, idx) {
   const { baseUrl, apiToken } = config
   return request(baseUrl, `/books/${bookId}/chapters/${idx}`, { headers: headers(apiToken) })
