@@ -386,6 +386,8 @@
   /* 纯贴图消息不套气泡，两边都是（0926 阿颖：以前只管了我这边，她发的还裹着） */
   .msg.sticker-msg { background: none; border: none; padding: 2px 0; box-shadow: none; backdrop-filter: none; -webkit-backdrop-filter: none; }
   .msg.sticker-msg .msg-body img { margin: 0 !important; }
+  /* 1023：她画的竖长条表情包撑得太高（她：「画的稍微有点大」）。所有贴图都限高，竖的就窄一点，跟方的看着一样大 */
+  .msg-body img[src*="/raven/stickers/"] { max-height: 170px; width: auto; object-fit: contain; }
   .msg-body audio.voice-attach { display: block; width: 240px; max-width: 100%; height: 40px; margin: 4px 0; }
   .msg.system { align-self: center; font-size: 12px; color: var(--text-dim); background: none; padding: 2px 0; }
 
