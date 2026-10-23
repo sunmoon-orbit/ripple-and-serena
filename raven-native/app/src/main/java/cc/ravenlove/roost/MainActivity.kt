@@ -99,8 +99,19 @@ class MainActivity : AppCompatActivity() {
                 }.start()
             }
 
+            // 1023 她嫌安卓自带的「Webpage not available」丑：主页面加载失败就换成壳里自己的离线页，
+            // 网回来离线页自己跳回原地址（地址放在 # 后面带过去）。图片、接口这些子请求失败不管。
+            override fun onReceivedError(view: WebView?, request: WebResourceRequest?, error: WebResourceError?) {
+                super.onReceivedError(view, request, error)
+                if (request?.isForMainFrame != true) return
+                val failed = request.url?.toString() ?: return
+                if (failed.startsWith("file:///android_asset/")) return
+                view?.loadUrl("file:///android_asset/offline.html#" + Uri.encode(failed))
+            }
+
             override fun shouldOverrideUrlLoading(view: WebView?, request: WebResourceRequest?): Boolean {
                 val url = request?.url?.toString() ?: return false
+                if (url.startsWith("file:///android_asset/")) return false
                 if (url.startsWith("https://memory.ravenlove.cc/") ||
                     url.startsWith("https://sunmoon-orbit.github.io/")) {
                     return false

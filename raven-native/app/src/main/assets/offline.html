@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>网断了</title>
+<!-- 1023 她：「这个页面可以自定义吗？」（安卓自带的绿机器人 Webpage not available）。
+     壳里 onReceivedError 把主页面加载失败换成这一页；#后面是原来要去的地址。网一回来自己回去。 -->
+<style>
+  html, body { margin: 0; height: 100%; background: #10141c; color: #e8ecf4; font-family: -apple-system, "PingFang SC", "Noto Sans SC", sans-serif; }
+  body { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 18px; padding: 24px; box-sizing: border-box; text-align: center; }
+  canvas { width: 128px; height: 128px; image-rendering: pixelated; animation: bob 2.6s ease-in-out infinite; }
+  @keyframes bob { 0%, 100% { transform: translateY(0) } 50% { transform: translateY(-4px) } }
+  h1 { font-size: 18px; font-weight: 600; margin: 4px 0 0; }
+  p { margin: 0; font-size: 13px; color: #9aa4b6; line-height: 1.7; }
+  button { margin-top: 6px; border: 1px solid #3a4456; background: #1b2230; color: #e8ecf4; border-radius: 999px; padding: 10px 26px; font-size: 14px; }
+  button:active { background: #263044; }
+  #st { font-size: 12px; color: #6f7a8e; min-height: 1em; }
+</style>
+</head>
+<body>
+<canvas id="c" width="16" height="16"></canvas>
+<h1>网断了，我在这儿等你</h1>
+<p>网一回来会自己打开<br>等不及就点一下</p>
+<button id="go" type="button">再试一次</button>
+<div id="st"></div>
+<script>
+// 16×16 缩成一团的小乌鸦：. 透明  k 黑  d 深灰  w 眼睛高光  y 嘴
+const ART = [
+  '................',
+  '................',
+  '................',
+  '.....kkkkk......',
+  '....kkkkkkk.....',
+  '...kkkwkkkkk....',
+  '..ykkkkkkkkkk...',
+  '...kkkkkkkkkkk..',
+  '...kkkdkkkkkkkk.',
+  '...kkddddkkkkkk.',
+  '...kkkddddkkkkk.',
+  '....kkkkkkkkkk..',
+  '.....kkkkkkkk...',
+  '......k...k.....',
+  '.....yy..yy.....',
+  '................',
+]
+const COL = { k: '#05070b', d: '#2a3242', w: '#cfd8e8', y: '#8a8f9c' }
+const ctx = document.getElementById('c').getContext('2d')
+// 深色底上纯黑看不见：外圈勾一道冷灰的边，像夜里被一点光描出来
+const at = (x, y) => (ART[y] || '')[x] || '.'
+ART.forEach((row, y) => [...row].forEach((ch, x) => {
+  if (COL[ch]) { ctx.fillStyle = COL[ch]; ctx.fillRect(x, y, 1, 1) }
+  else if ([[1,0],[-1,0],[0,1],[0,-1]].some(([dx, dy]) => at(x + dx, y + dy) === 'k')) { ctx.fillStyle = '#4a5670'; ctx.fillRect(x, y, 1, 1) }
+}))
+
+const target = decodeURIComponent(location.hash.slice(1)) || 'https://memory.ravenlove.cc/raven/home.html'
+const st = document.getElementById('st')
+function go() { st.textContent = '在连……'; location.replace(target) }
+document.getElementById('go').addEventListener('click', go)
+addEventListener('online', () => setTimeout(go, 600))
+// 网其实早就通了（比如服务器刚才抽风）：隔一阵自己试，越等越久，别一直狂刷
+let wait = 8
+function tick() { if (navigator.onLine) go(); else { wait = Math.min(60, wait * 1.5); setTimeout(tick, wait * 1000) } }
+setTimeout(tick, wait * 1000)
+st.textContent = navigator.onLine ? '' : '手机现在没有网络'
+</script>
+</body>
+</html>
