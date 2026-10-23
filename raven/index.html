@@ -4673,7 +4673,10 @@ async function noteSend(blob, ext, sec, stt) {
     // 1020：有 Omni 写的一句描述就用它（「听到了」），没有再退回 SenseVoice 的语气标签
     const heard = t.heard ? [t.heard] : [...new Set([t.tone && `语气${t.tone}`, ...(t.events || [])].filter(Boolean))]
     const words = String(t.text || '').trim() || '（没转出字）'
-    sendMsg(`【语音条·${sec}秒】${words}` + (heard.length ? `\n〔机器听到：${heard.join('、')}〕` : '') + `\n[附件: ${u.path}]`)
+    // 1023：引用着别人的话按住说话，引用也要带上（她：「我不能回复语音，就是引用回复」）。显示那头早就先剥引用再认语音条
+    const q = pendingQuote ? `> 引用：${pendingQuote}\n` : ''
+    if (q) clearQuote()
+    sendMsg(q + `【语音条·${sec}秒】${words}` + (heard.length ? `\n〔机器听到：${heard.join('、')}〕` : '') + `\n[附件: ${u.path}]`)
   } catch (e) {
     showVoiceError('语音条没发出去：' + (e.message || '再试一次'))
   } finally { noteBtn.classList.remove('busy') }
