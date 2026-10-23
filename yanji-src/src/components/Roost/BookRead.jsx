@@ -8,6 +8,8 @@ import {
   fetchReadingActivity, fetchBookCover, saveBookCover, saveBookChapterAlt,
 } from '../../api/moonMemory'
 import { readBookFile, splitChapters, pairBooks, guessOffset, paragraphEnds } from '../../utils/bookImport'
+import { savePdfBlob, deletePdfBlob, openPdf } from '../../utils/pdfBooks'
+import PdfBookReader from './PdfBookReader'
 import { sendMessage } from '../../api/llm'
 import { useThemedConfirm } from '../ThemedConfirmDialog'
 import { downloadBlob } from '../../utils/download'
@@ -177,6 +179,7 @@ export default function BookRead({ onClose }) {
   const [focusAnno, setFocusAnno] = useState(null) // 点了正文划线 → 高亮下方对应批注卡
   const [upload, setUpload] = useState(null)       // 上架表单 {title,author,intro,color,shelf,chapters,fileName, bilingual,altChapters,altName,altOffset}
   const altFileRef = useRef(null)
+  const [pdfBook, setPdfBook] = useState(null)      // 打开的是原样 PDF（1023）
   // 中英对照怎么看（1023）：both 中文下面跟英文 / zh 只中文 / en 只英文。记在本机
   const [langMode, setLangMode] = useState(() => { try { return localStorage.getItem('bookread-lang') || 'both' } catch { return 'both' } })
   const [altEdit, setAltEdit] = useState(null)      // 点了某段英文：{k} 弹「往上挪／往下挪」
@@ -384,6 +387,7 @@ export default function BookRead({ onClose }) {
   }
 
   async function openBook(book) {
+    if (book.format === 'pdf') { setPdfBook(book); return }
     setActive(book)
     setReaderChromeVisible(true)
     setChapterCount(book.chapter_count || 1)
@@ -708,15 +712,24 @@ export default function BookRead({ onClose }) {
     e.target.value = ''
     if (!file) return
     setUpload((prev) => ({ ...prev, reading: 'zh' }))
+    const isPdf = /\.pdf$/i.test(file.name) || file.type === 'application/pdf'
     try {
       const r = await readBookFile(file)
       setUpload((prev) => {
         const next = { ...prev, reading: null, fileName: file.name, chapters: r.chapters,
-          title: prev.title || r.title, author: prev.author || r.author }
+          title: prev.title || r.title, author: prev.author || r.author,
+          pdfFile: isPdf ? file : null, pdfMode: isPdf ? 'text' : null, pdfImageOnly: false }
         if (next.altChapters) next.altOffset = guessOffset(next.chapters, next.altChapters)
         return next
       })
     } catch (error) {
+      // 图片版 PDF 单本上架时不算失败：改成原样翻页（中英对照里还是不收）
+      if (error?.imagePdf && !upload?.bilingual) {
+        setUpload((prev) => ({ ...prev, reading: null, fileName: file.name, chapters: null,
+          title: prev.title || file.name.replace(/\.pdf$/i, '').trim(),
+          pdfFile: file, pdfMode: 'page', pdfImageOnly: true }))
+        return
+      }
       setUpload((prev) => ({ ...prev, reading: null }))
       showToast(error?.message || '读取文件失败', 'error')
     }
@@ -743,6 +756,7 @@ export default function BookRead({ onClose }) {
   }
 
   async function submitBook() {
+    if (upload.pdfFile && upload.pdfMode === 'page' && !upload.bilingual && !upload.appendTo) { submitPdfBook(); return }
     if (!upload.chapters?.length) { showToast('还没有正文（选文件或粘贴）', 'error'); return }
     if (upload.bilingual && !upload.appendTo && !upload.altChapters?.length) { showToast('英文版还没选', 'error'); return }
     // 追更模式：只往已有的书末尾续章，元信息全部不动
@@ -778,6 +792,32 @@ export default function BookRead({ onClose }) {
     } catch { showToast('上架失败（文件太大或网络问题）', 'error') } finally { setSaving(false) }
   }
 
+  // 原样 PDF：服务器只记书名和页数，文件存进这台设备
+  async function submitPdfBook() {
+    if (!upload.title?.trim()) { showToast('给书起个名字', 'error'); return }
+    setSaving(true)
+    try {
+      const doc = await openPdf(upload.pdfFile)
+      const pages = doc.numPages
+      doc.destroy?.()
+      const created = await createBook(cfg, {
+        title: upload.title.trim(),
+        author: upload.author?.trim() || '',
+        intro: upload.intro?.trim() || '',
+        cover_color: upload.color || SPINE_COLORS[0],
+        added_by: '阿颖',
+        shelf: upload.shelf || '工具层',
+        format: 'pdf',
+        chapters: [{ title: '原样 PDF', content: `原样 PDF，共 ${pages} 页。文件存在阿颖的设备上，看不懂的页她会截图来问。` }],
+      })
+      await savePdfBlob(created.id, upload.pdfFile)
+      showToast('上架好了')
+      setUpload(null)
+      const list = await fetchBooks(cfg).catch(() => null)
+      if (Array.isArray(list)) setBooks(list)
+    } catch (e) { showToast('上架失败：' + (e?.message || '网络问题'), 'error') } finally { setSaving(false) }
+  }
+
   async function removeBook(event, book) {
     event.stopPropagation()
     const bookId = Number(book.id)
@@ -800,6 +840,7 @@ export default function BookRead({ onClose }) {
       const result = await deleteBook(cfg, bookId)
       if (!result?.ok) throw new Error('服务端没有确认删除')
       setBooks((current) => current?.filter((item) => Number(item.id) !== bookId) ?? current)
+      if (book.format === 'pdf') deletePdfBlob(bookId).catch(() => {})
       try {
         const positions = JSON.parse(localStorage.getItem(POS_KEY) || '{}')
         delete positions[bookId]
@@ -810,6 +851,8 @@ export default function BookRead({ onClose }) {
       showToast(error?.message || '删除失败，请稍后再试', 'error')
     }
   }
+
+  if (pdfBook) return <PdfBookReader book={pdfBook} cfg={cfg} onBack={() => setPdfBook(null)} onClose={onClose} />
 
   // ── 上架新书视图 ──
   if (!active && upload) {
@@ -868,6 +911,22 @@ export default function BookRead({ onClose }) {
                 </div>
               )
             })()}
+            {upload.pdfFile && !upload.bilingual && !upload.appendTo && (
+              <div className="bookread-spine-row">
+                <span className="bookread-foot-hint">PDF 怎么放</span>
+                <div className="bookread-author-toggle">
+                  <button className={upload.pdfMode === 'text' ? 'active' : ''} disabled={upload.pdfImageOnly}
+                    onClick={() => setUpload({ ...upload, pdfMode: 'text' })}>抽成文字</button>
+                  <button className={upload.pdfMode === 'page' ? 'active' : ''} onClick={() => setUpload({ ...upload, pdfMode: 'page' })}>原样翻页</button>
+                </div>
+              </div>
+            )}
+            {upload.pdfFile && upload.pdfMode === 'page' && !upload.bilingual && (
+              <div className="bookread-foot-hint" style={{ marginBottom: 10 }}>
+                {upload.pdfImageOnly ? '这是图片版 PDF，抽不出字，只能原样翻页。' : '图文教程选这个：照原样一页页翻。'}
+                文件只存在这台设备上；哪页看不懂点「问阿言」，只把那一页发过去。不能划线。
+              </div>
+            )}
             {!upload.fileName && !upload.bilingual && (
               <textarea
                 className="roost-note-input"
@@ -877,7 +936,7 @@ export default function BookRead({ onClose }) {
                 style={{ marginBottom: 10 }}
               />
             )}
-            {upload.chapters?.length > 0 && (
+            {upload.chapters?.length > 0 && upload.pdfMode !== 'page' && (
               <div className="bookread-split-info">
                 识别出 {upload.chapters.length} 章，共 {upload.chapters.reduce((s, c) => s + c.content.length, 0).toLocaleString()} 字
                 {upload.chapters.length > 1 && <span className="bookread-split-titles">{upload.chapters.slice(0, 3).map((c) => c.title).join(' / ')}{upload.chapters.length > 3 ? ' …' : ''}</span>}
@@ -934,13 +993,13 @@ export default function BookRead({ onClose }) {
           <div className="bookread-book-title">{b.title}<span className="bookread-book-author">{b.author}</span></div>
           {b.intro && <div className="bookread-book-intro">{b.intro}</div>}
           <div className="bookread-book-meta">
-            <span>{b.chapter_count} 章</span>
+            <span>{b.format === 'pdf' ? '原样 PDF' : `${b.chapter_count} 章`}{b.alt_lang ? ' · 中英' : ''}</span>
             <span>{b.anno_count > 0 ? `${b.anno_count} 处划线` : '还没有划线'}</span>
             {b.bookmark_chapter != null && <span>书签在第 {b.bookmark_chapter + 1} 章</span>}
-            <span
+            {b.format !== 'pdf' && <span
               className="bookread-append-link"
               onClick={(e) => { e.stopPropagation(); setUpload({ appendTo: b.id, appendTitle: b.title }) }}
-            >＋追更</span>
+            >＋追更</span>}
             <span
               className="bookread-append-link"
               style={{ color: 'var(--danger, #b3453f)' }}

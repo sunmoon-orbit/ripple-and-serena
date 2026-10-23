@@ -6308,3 +6308,6 @@ body.mp-active .scroll-bottom-btn { bottom: 139px; }
 .bookread-pair-title { font-size: 12px; font-weight: 600; margin-bottom: 4px; }
 .bookread-pair-para { font-size: 12px; line-height: 1.6; padding: 4px 0; border-top: 1px dashed var(--border); }
 .bookread-pair-en { color: var(--text-faint); font-family: Georgia, serif; }
+/* 原样 PDF（1023）：一页一张 canvas，放大时左右也能滑 */
+.bookread-pdf-body { overflow: auto; padding: 8px; -webkit-overflow-scrolling: touch; }
+.bookread-pdf-canvas { margin: 0 auto; background: #fff; box-shadow: 0 2px 12px rgba(0,0,0,.12); border-radius: 4px; }
