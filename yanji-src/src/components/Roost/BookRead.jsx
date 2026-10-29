@@ -183,6 +183,10 @@ export default function BookRead({ onClose }) {
   const [replyDraft, setReplyDraft] = useState({})  // {批注id: 正在写的回复}
   // 好句子书签（1029 她：留了很棒的句子就夹个书签，下次直接翻到那儿看）
   const [starOpen, setStarOpen] = useState(false)
+  // 从「新回音」「书签」翻过去看一眼，是串门，不是读到那儿了（1029 她问：回完评论再进书，是我的进度还是那一页？）
+  // 串门期间不记进度；底下浮一个「回到读到的地方」
+  const peekRef = useRef(false)
+  const [peekFrom, setPeekFrom] = useState(null)   // 串门前真正读到的位置 {ch, ...}
   const [starred, setStarred] = useState(null)
   const [upload, setUpload] = useState(null)       // 上架表单 {title,author,intro,color,shelf,chapters,fileName, bilingual,altChapters,altName,altOffset}
   const altFileRef = useRef(null)
@@ -272,7 +276,9 @@ export default function BookRead({ onClose }) {
     return () => { cancelled = true; clearInterval(t) }
   }, [active?.id, chapter?.idx, cfg.apiToken, cfg.baseUrl])
 
-  const openChapter = useCallback(async (book, idx, restorePosition = null) => {
+  const openChapter = useCallback(async (book, idx, restorePosition = null, peek = false) => {
+    peekRef.current = peek
+    if (!peek) setPeekFrom(null)
     setLoading(true)
     setChatOpen(false); setChatMessages([]); setChatLoading(true)
     setPending(null); setComposing(false); setFocusAnno(null)
@@ -285,8 +291,10 @@ export default function BookRead({ onClose }) {
       setChapter(ch)
       setChapterViewKey((key) => key + 1)
       setChatMessages(Array.isArray(messages) ? messages : [])
-      savePos(book.id, idx, restorePosition || { scroll: 0, page: 0, mode: readingMode, ratio: 0 })
-      sendReadingHeartbeat(cfg, book.id, '阿颖', idx, 0).catch(() => {})
+      if (!peek) {
+        savePos(book.id, idx, restorePosition || { scroll: 0, page: 0, mode: readingMode, ratio: 0 })
+        sendReadingHeartbeat(cfg, book.id, '阿颖', idx, 0).catch(() => {})
+      }
     } catch { showToast('章节加载失败', 'error') } finally { setLoading(false); setChatLoading(false) }
   }, [readingMode])
 
@@ -469,13 +477,14 @@ export default function BookRead({ onClose }) {
     const top = e.target.scrollTop
     const max = Math.max(1, e.target.scrollHeight - e.target.clientHeight)
     clearTimeout(scrollTimerRef.current)
+    if (peekRef.current) return
     scrollTimerRef.current = setTimeout(() => savePos(active.id, chapter.idx, {
       scroll: top, page: 0, mode: 'scroll', ratio: top / max,
     }), 300)
   }
 
   function rememberPage(nextPage) {
-    if (!active || !chapter) return
+    if (!active || !chapter || peekRef.current) return
     savePos(active.id, chapter.idx, {
       page: nextPage,
       scroll: 0,
@@ -731,7 +740,11 @@ export default function BookRead({ onClose }) {
   }
   async function goToStar(a) {
     setStarOpen(false)
-    if (chapter?.idx !== a.chapter_idx) await openChapter(active, a.chapter_idx)
+    if (chapter?.idx !== a.chapter_idx) {
+      const from = peekFrom || loadPos(active.id) || { ch: chapter?.idx ?? 0 }
+      await openChapter(active, a.chapter_idx, null, true)
+      setPeekFrom(from)
+    }
     setFocusAnno(a.id)
     if (readingMode !== 'page') setTimeout(() => annoRefs.current[a.id]?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 300)
   }
@@ -746,7 +759,9 @@ export default function BookRead({ onClose }) {
     if (!book) { showToast('这本书不在书架上了', 'error'); return }
     setEchoOpen(false); setEchoes([])
     await openBook(book)
-    await openChapter(book, e.chapter_idx)
+    const from = loadPos(book.id)
+    await openChapter(book, e.chapter_idx, null, true)
+    setPeekFrom(from || { ch: book.bookmark_chapter ?? 0 })
     setFocusAnno(e.parent_id ?? e.id)
   }
 
@@ -1288,7 +1303,7 @@ export default function BookRead({ onClose }) {
     <div className="roost-overlay bookread-reader-overlay" onClick={onClose}>
       <div className={`roost-modal coread-modal coread-reader coread-reader-fullscreen${readerChromeVisible ? '' : ' coread-reader-chrome-hidden'}`} onClick={(e) => { e.stopPropagation(); if (readingMode === 'page') setFocusAnno(null) }}>
         <div className="roost-modal-header">
-          <button className="coread-back" onClick={() => { setActive(null); setChapter(null); setPending(null); setComposing(false) }}>‹ 书架</button>
+          <button className="coread-back" onClick={() => { peekRef.current = false; setPeekFrom(null); setActive(null); setChapter(null); setPending(null); setComposing(false) }}>‹ 书架</button>
           <span className="coread-reader-title">{active.title}</span>
           <div className="bookread-header-actions">
             {bilingual && (
@@ -1480,6 +1495,11 @@ export default function BookRead({ onClose }) {
               {renderThread(a)}
             </div>)}
           </section>
+        )}
+        {peekFrom && (
+          <button className="bookread-peek-back" onClick={(e) => { e.stopPropagation(); const p = peekFrom; openChapter(active, p.ch ?? 0, p.ch != null ? p : null) }}>
+            ↩ 回到读到的地方（第 {(peekFrom.ch ?? 0) + 1} 章）
+          </button>
         )}
         {starOpen && (
           <div className="bookread-echo-sheet" onClick={() => setStarOpen(false)}>
