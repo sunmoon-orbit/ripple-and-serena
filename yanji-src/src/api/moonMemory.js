@@ -42,6 +42,13 @@ export async function semanticSearchMemories(config, q, k) {
   return request(baseUrl, `/memories/semantic?${qs.toString()}`, { headers: headers(apiToken) })
 }
 
+// 自动浮上来用（1029）：touch=0 只看不记激活，和归巢的桥一样
+export async function recallSearchMemories(config, q) {
+  const { baseUrl, apiToken } = config
+  const qs = new URLSearchParams({ q, k: '8', threshold: '0.3', touch: '0' })
+  return request(baseUrl, `/memories/semantic?${qs.toString()}`, { headers: headers(apiToken) })
+}
+
 export async function createMemory(config, body) {
   const { baseUrl, apiToken } = config
   return request(baseUrl, '/memories', {

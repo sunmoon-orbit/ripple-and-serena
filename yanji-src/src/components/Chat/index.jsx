@@ -59,6 +59,7 @@ import AnniversaryCard from './AnniversaryCard'
 import HeartCard from './HeartCard'
 import HeartCardAlbum from './HeartCardAlbum'
 import PhotoAlbum, { AlbumIcon } from './PhotoAlbum'
+import { surfaceMemory } from '../../utils/autoRecall'
 import { fetchAnniversaryToday, fetchUnseenHeartCards, markHeartCardSeen, formatWeatherLine, fetchContactLastSeen } from '../../api/moonMemory'
 import CompletionEgg, { pickEgg } from './CompletionEgg'
 import QuestionCard from './QuestionCard'
@@ -741,6 +742,13 @@ export default function Chat() {
       {
         const s = useStore.getState()
         maybeSyncEmotion(s.moonMemory, { timeAwareness: s.timeAwareness, longingPush: s.longingPush, proactiveCall: s.proactiveCall })
+      }
+
+      // 自动浮上来（1029）：拿她最新这句去翻一下记忆库，最多一条；主动开口那轮不翻
+      if (!proactive && moonMemory?.apiToken) {
+        const lastUser = [...merged].reverse().find((m) => m.role === 'user')
+        const line = await surfaceMemory({ baseUrl: moonMemory.baseUrl, apiToken: moonMemory.apiToken }, typeof lastUser?.content === 'string' ? lastUser.content : '')
+        if (line) dynParts.push(line)
       }
 
       // inject compaction summary if available
