@@ -28,3 +28,4 @@ raven-bridge/.thinking-zh-cache.json
 raven-bridge/remark.json*
 raven-bridge/recall-state.json
 raven-bridge/recall-log.jsonl
+raven-bridge/cc-token-fallback-state.json

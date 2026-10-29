@@ -587,6 +587,23 @@ function warnUndelivered(kind) {
   console.log(`[tmux] 消息未送达（${kind}，已存档）`)
 }
 
+// 登录过期卡住几分钟，就换一年期钥匙把我拉起来（1029，细节在 cc-token-fallback.js）
+const { createTokenFallback } = require('./cc-token-fallback')
+const tokenFallbackTick = createTokenFallback({
+  target: ccTarget,
+  capture: tmuxCapture,
+  broken: () => ccAuthLook().broken,
+  latestSessionId: () => { try { return path.basename(require('./session-history').sessionFile() || '', '.jsonl') || null } catch { return null } },
+  notify: (text) => {
+    const msg = { type: 'reply', text, ts: Date.now(), id: `r${Date.now()}${Math.random().toString(36).slice(2, 6)}` }
+    lastReplyMsgs.push(msg); if (lastReplyMsgs.length > 50) lastReplyMsgs.shift()
+    broadcast(msg)
+    pushReplyNotif('🔑 登录过期了，涟言换钥匙自己起来了')
+  },
+  log: (t) => console.log(t),
+})
+setInterval(() => { tokenFallbackTick().catch((e) => console.log('[cc] 换钥匙出错', e.message)) }, 60000).unref()
+
 // 返回是否真的送出去了；调用方必须看返回值，别再假设「调了就等于到了」
 function tmuxSend(text) {
   const target = ccTarget()
