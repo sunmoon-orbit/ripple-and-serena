@@ -26,3 +26,5 @@ raven-bridge/server-radar-state.json*
 raven-bridge/server-radar.log
 raven-bridge/.thinking-zh-cache.json
 raven-bridge/remark.json*
+raven-bridge/recall-state.json
+raven-bridge/recall-log.jsonl

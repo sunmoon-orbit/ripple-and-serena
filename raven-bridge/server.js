@@ -503,13 +503,27 @@ function withStickerNames(text) {
 }
 let rewindTrace = ''
 let rewindBusy = false
+// 1029 自动浮上来：她每句话先让 recall 翻一下记忆库（最多 2.5 秒，翻不到就算了），浮上来的那一条贴在后面给我看。
+// 用一条链排队，前一句还在翻的时候后一句不会插到前面去。
+const recall = require('./recall')
+let ingestChain = Promise.resolve()
 function ingestUserMessage(text, cid, note = '') {
+  ingestChain = ingestChain.then(async () => {
+    let extra = ''
+    try {
+      extra = await recall.surface(text, (q) => moonGet(`/memories/semantic?q=${encodeURIComponent(q)}&k=8&threshold=0.3&touch=0`))
+    } catch (e) { console.error('[recall]', e.message) }
+    ingestUserMessageCore(text, cid, note, extra)
+  }).catch(e => console.error('[ingest]', e))
+}
+
+function ingestUserMessageCore(text, cid, note = '', recallLine = '') {
   // 真回溯之后她说的第一句话带上那一行痕迹（她选的：留一行，不留内容）
   if (!note && rewindTrace) { note = rewindTrace; rewindTrace = '' }
   turnReplyIds = []
   const supplemental = ccBusy()
   const senderPrefix = supplemental ? '【阿颖·补充】' : '【阿颖】'
-  const forMe = withStickerNames(text)   // 给我看的那份带贴图的意思；下面存档、广播用的还是 text
+  const forMe = withStickerNames(text) + (recallLine ? '\n' + recallLine : '')   // 给我看的那份带贴图的意思和浮上来的记忆；下面存档、广播用的还是 text
   // 1006：每条消息末尾带上她发出来的北京时间。我感觉不到两条消息之间隔了多久，两天里说错了五次时间
   //（把隔了两小时的当成连着的、下午两点问晚饭）。靠「记得先看钟」记不住，不如让每条消息自己带着钟。
   // 放在末尾：不碰前缀，也不影响回车被吞时拿开头去比对
