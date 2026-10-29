@@ -6316,3 +6316,24 @@ body.mp-active .scroll-bottom-btn { bottom: 139px; }
 /* 1029 她截图：书里点「EN」冒出安卓系统的蓝色点按框。全局关掉点按高亮，按钮自己有按下的样子 */
 button, a, [role="button"], label { -webkit-tap-highlight-color: transparent; }
 button:focus:not(:focus-visible) { outline: none; }
+
+/* 页边回复成串＋「新回音」（1029） */
+.bookread-anno-thread { margin-top: 6px; padding-left: 10px; border-left: 2px dashed var(--border); }
+.bookread-anno-reply { display: flex; gap: 6px; align-items: baseline; font-size: 13px; line-height: 1.6; padding: 3px 0; }
+.bookread-anno-reply .coread-anno-note { flex: 1; min-width: 0; }
+.bookread-anno-reply-box { display: flex; gap: 6px; margin-top: 4px; }
+.bookread-anno-reply-box input { flex: 1; min-width: 0; font-size: 13px; padding: 6px 10px; border-radius: 14px; border: 1px solid var(--border); background: transparent; color: var(--text); }
+.bookread-anno-reply-box button { font-size: 13px; padding: 4px 12px; border-radius: 14px; border: 1px solid var(--border); background: transparent; color: var(--text); }
+.bookread-anno-reply-box button:disabled { opacity: .4; }
+.bookread-echo-banner { display: flex; align-items: center; gap: 8px; width: 100%; margin-bottom: 10px; padding: 10px 14px; border-radius: 12px; border: 1px solid var(--border); background: color-mix(in srgb, var(--accent, #b88aa6) 12%, transparent); color: var(--text); font-size: 14px; text-align: left; }
+.bookread-echo-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent, #b88aa6); flex: none; animation: bookread-echo-pulse 1.8s ease-in-out infinite; }
+@keyframes bookread-echo-pulse { 50% { opacity: .35; } }
+.bookread-echo-sheet { position: fixed; inset: 0; z-index: 60; background: rgba(0,0,0,.35); display: flex; align-items: flex-end; justify-content: center; }
+.bookread-echo-sheet section { width: 100%; max-width: 560px; max-height: 78vh; overflow: auto; background: var(--card, var(--bg)); color: var(--text); border-radius: 18px 18px 0 0; padding: 14px 16px 24px; }
+.bookread-echo-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+.bookread-echo-head button { background: none; border: none; color: var(--text-dim); font-size: 18px; }
+.bookread-echo-item { padding: 10px 0; border-top: 1px dashed var(--border); }
+.bookread-echo-where { font-size: 12px; color: var(--text-faint); margin-bottom: 4px; }
+.bookread-echo-line { font-size: 14px; line-height: 1.6; margin-top: 4px; }
+.bookread-echo-line .coread-anno-author { margin-right: 6px; }
+.bookread-echo-line.mine { padding-left: 10px; border-left: 2px solid var(--accent, #b88aa6); }

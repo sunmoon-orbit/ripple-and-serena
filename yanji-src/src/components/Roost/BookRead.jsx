@@ -3,7 +3,7 @@ import { useStore } from '../../store'
 import { showToast } from '../Toast'
 import {
   fetchBooks, fetchBook, fetchBookChapter, createBook, appendBookChapters,
-  deleteBook, createBookAnnotation, deleteBookAnnotation, saveBookBookmark,
+  deleteBook, createBookAnnotation, deleteBookAnnotation, saveBookBookmark, fetchBookEchoes, markBookEchoesSeen,
   sendReadingHeartbeat, fetchBookChat, createBookChatMessage, stampBook, unstampBook,
   fetchReadingActivity, fetchBookCover, saveBookCover, saveBookChapterAlt,
 } from '../../api/moonMemory'
@@ -177,6 +177,10 @@ export default function BookRead({ onClose }) {
   const [annoNote, setAnnoNote] = useState('')
   const [annoAuthor, setAnnoAuthor] = useState('阿颖')
   const [focusAnno, setFocusAnno] = useState(null) // 点了正文划线 → 高亮下方对应批注卡
+  // 页边回复成串＋书架上的「新回音」（1029 她：我回了第 15 页的批注，她读到第 20 页还得翻回去找）
+  const [echoes, setEchoes] = useState([])
+  const [echoOpen, setEchoOpen] = useState(false)
+  const [replyDraft, setReplyDraft] = useState({})  // {批注id: 正在写的回复}
   const [upload, setUpload] = useState(null)       // 上架表单 {title,author,intro,color,shelf,chapters,fileName, bilingual,altChapters,altName,altOffset}
   const altFileRef = useRef(null)
   const [pdfBook, setPdfBook] = useState(null)      // 打开的是原样 PDF（1023）
@@ -216,6 +220,7 @@ export default function BookRead({ onClose }) {
 
   useEffect(() => {
     if (!cfg.apiToken) { setBooks([]); return }
+    fetchBookEchoes(cfg).then((list) => setEchoes(Array.isArray(list) ? list : [])).catch(() => {})
     fetchBooks(cfg).then((list) => {
       const arr = Array.isArray(list) ? list : []
       setBooks(arr)
@@ -696,6 +701,33 @@ export default function BookRead({ onClose }) {
     } catch { showToast('书签保存失败', 'error') }
   }
 
+  async function sendReply(parent) {
+    const text = (replyDraft[parent.id] || '').trim()
+    if (!text) return
+    try {
+      const created = await createBookAnnotation(cfg, active.id, {
+        chapter_idx: chapter.idx, start_off: parent.start_off, end_off: parent.end_off, quote: parent.quote,
+        author: annoAuthor, color: parent.color, note: text, parent_id: parent.id,
+      })
+      setChapter((prev) => ({ ...prev, annotations: [...prev.annotations, created] }))
+      setReplyDraft((d) => ({ ...d, [parent.id]: '' }))
+    } catch { showToast('没回上，再试一次', 'error') }
+  }
+
+  function openEchoes() {
+    setEchoOpen(true)
+    const ids = echoes.map((e) => e.id)
+    if (ids.length) markBookEchoesSeen(cfg, ids).catch(() => {})   // 清单里就能读完，打开即算看过
+  }
+  async function goToEcho(e) {
+    const book = books?.find((b) => b.id === e.book_id)
+    if (!book) { showToast('这本书不在书架上了', 'error'); return }
+    setEchoOpen(false); setEchoes([])
+    await openBook(book)
+    await openChapter(book, e.chapter_idx)
+    setFocusAnno(e.parent_id ?? e.id)
+  }
+
   function jumpToAnno(id) {
     if (Date.now() - lastPageSwipeAtRef.current < 450 || !window.getSelection()?.isCollapsed) return
     if (readingMode === 'page') {
@@ -1084,6 +1116,30 @@ export default function BookRead({ onClose }) {
           <div className="roost-modal-body">
             {books === null && <div className="roost-empty">加载中……</div>}
             {books?.length === 0 && <div className="roost-empty">书架还空着（跟阿言说一声想读什么，我来上架）</div>}
+            {echoes.length > 0 && (
+              <button className="bookread-echo-banner" onClick={openEchoes}>
+                <span className="bookread-echo-dot" />页边有 {echoes.length} 条新回音
+              </button>
+            )}
+            {echoOpen && (
+              <div className="bookread-echo-sheet" onClick={() => { setEchoOpen(false); setEchoes([]) }}>
+                <section onClick={(e) => e.stopPropagation()} aria-label="页边新回音">
+                  <div className="bookread-echo-head">
+                    <strong>页边新回音</strong>
+                    <button onClick={() => { setEchoOpen(false); setEchoes([]) }} aria-label="关上">✕</button>
+                  </div>
+                  {echoes.map((e) => (
+                    <div key={e.id} className="bookread-echo-item">
+                      <div className="bookread-echo-where">《{e.book_title}》{e.chapter_title ? ` · ${e.chapter_title}` : ''}</div>
+                      <div className="bookread-anno-quote">「{e.quote}」</div>
+                      {e.parent_note && <div className="bookread-echo-line"><span className="coread-anno-author">{e.parent_author}</span>{e.parent_note}</div>}
+                      <div className="bookread-echo-line mine"><span className="coread-anno-author">{e.author}</span>{e.note || '（划了一道）'}</div>
+                      <button className="bookread-card-link" onClick={() => goToEcho(e)}>翻到那儿</button>
+                    </div>
+                  ))}
+                </section>
+              </div>
+            )}
             <button className="roost-btn" style={{ width: '100%', marginBottom: 12 }} onClick={() => setUpload({ color: SPINE_COLORS[0], shelf: '闲书层' })}>
               ＋ 上架新书（txt / epub / pdf，可中英对照）
             </button>
@@ -1146,7 +1202,28 @@ export default function BookRead({ onClose }) {
   }
 
   // ── 阅读视图 ──
-  const annos = chapter?.annotations || []
+  const allAnnos = chapter?.annotations || []
+  // 回复挂在被回复的那条下面，不另画一道划线；被回复的那条删了的，回复自己当一条
+  const annoIds = new Set(allAnnos.map((a) => a.id))
+  const annos = allAnnos.filter((a) => a.parent_id == null || !annoIds.has(a.parent_id))
+  const repliesOf = (id) => allAnnos.filter((a) => a.parent_id === id)
+  const renderThread = (a) => (
+    <div className="bookread-anno-thread" onClick={(e) => e.stopPropagation()}>
+      {repliesOf(a.id).map((r) => (
+        <div key={r.id} className="bookread-anno-reply">
+          <span className="coread-anno-author">{r.author}</span>
+          <span className="coread-anno-note">{r.note}</span>
+          <button className="coread-anno-del" onClick={() => removeAnno(r.id)} aria-label="删掉这条回复">✕</button>
+        </div>
+      ))}
+      <div className="bookread-anno-reply-box">
+        <input value={replyDraft[a.id] || ''} placeholder="回一句……"
+          onChange={(e) => setReplyDraft((d) => ({ ...d, [a.id]: e.target.value }))}
+          onKeyDown={(e) => { if (e.key === 'Enter') sendReply(a) }} />
+        <button onClick={() => sendReply(a)} disabled={!(replyDraft[a.id] || '').trim()}>回</button>
+      </div>
+    </div>
+  )
   // 中英对照：alt[k] 挂在中文第 k 段末尾。只中文就不切；只英文另画一份，不带划线
   const altArr = Array.isArray(chapter?.alt) ? chapter.alt : null
   const bilingual = !!altArr && altArr.some(Boolean)
@@ -1316,6 +1393,7 @@ export default function BookRead({ onClose }) {
                             <button className="bookread-card-link" disabled={savingCard} onClick={() => openExcerptCard(a.quote, a.note)}>书摘卡</button>
                             <button className="coread-anno-del" onClick={() => removeAnno(a.id)}>✕</button>
                           </div>
+                          {renderThread(a)}
                         </div>
                       ))}
                     </div>
@@ -1369,6 +1447,7 @@ export default function BookRead({ onClose }) {
               <p>{a.note || '（仅划线，暂无批注）'}</p>
               <small>{a.author}</small>
               <button className="bookread-card-link" onClick={() => openExcerptCard(a.quote, a.note)}>书摘卡</button>
+              {renderThread(a)}
             </div>)}
           </section>
         )}
