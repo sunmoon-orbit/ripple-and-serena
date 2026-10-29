@@ -1890,6 +1890,22 @@ const server = http.createServer((req, res) => {
     return
   }
 
+  // 每轮账单 / 上下文圆环（1029）：从会话记录里读 usage、工具调用、浮上来的记忆。见 turn-stats.js
+  if ((url.pathname === '/raven/turn-stats' || url.pathname === '/raven/context-stats') && req.method === 'GET') {
+    if (!externalAuthed(req, url)) { res.writeHead(401); res.end('{}'); return }
+    try {
+      const ts = require('./turn-stats')
+      let r
+      if (url.pathname === '/raven/turn-stats') r = ts.turnStats(Number(url.searchParams.get('at')) || Date.now())
+      else {
+        if (!global.__ctxCache || Date.now() - global.__ctxCache.t > 20000) global.__ctxCache = { t: Date.now(), v: ts.contextStats() }
+        r = global.__ctxCache.v
+      }
+      res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' }); res.end(JSON.stringify(r))
+    } catch (err) { res.writeHead(500, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ error: err.message })) }
+    return
+  }
+
   // 终端页往上翻（1007）：tmux 里没有回滚，压缩又清屏，她只看得到眼前一屏。从会话记录里倒着读给她，见 session-history.js
   if (url.pathname === '/raven/terminal/history' && req.method === 'GET') {
     if (!externalAuthed(req, url)) { res.writeHead(401); res.end('{}'); return }

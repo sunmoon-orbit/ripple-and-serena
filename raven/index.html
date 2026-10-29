@@ -220,6 +220,34 @@
   #header { position: relative; }
   #header-left { display: flex; align-items: center; }
   /* 名字钉在正中间，不随两边按钮多少偏移；太长就省略 */
+  #ctx-ring { background: none; border: 0; padding: 4px; margin-left: 2px; display: inline-flex; color: var(--text-dim); cursor: pointer; -webkit-tap-highlight-color: transparent; }
+  #ctx-ring .ring-bg { fill: none; stroke: var(--border); stroke-width: 4; }
+  #ctx-ring .ring-fg { fill: none; stroke: var(--accent); stroke-width: 4; stroke-linecap: round; transform: rotate(-90deg); transform-origin: 18px 18px; transition: stroke-dasharray .6s; }
+  #ctx-ring.warn .ring-fg { stroke: #d89b5c; }
+  #ctx-ring.full .ring-fg { stroke: #d0605a; }
+  #stat-sheet { position: fixed; inset: 0; z-index: 60; background: rgba(0,0,0,.35); display: flex; align-items: flex-end; justify-content: center; }
+  #stat-sheet[hidden] { display: none; }
+  #stat-card { position: relative; width: min(520px, 100%); max-height: 78vh; overflow-y: auto; background: var(--surface); color: var(--text); border-radius: 18px 18px 0 0; padding: 18px 18px calc(18px + env(safe-area-inset-bottom)); box-shadow: 0 -6px 24px rgba(0,0,0,.2); animation: msgIn .18s ease-out; }
+  #stat-x { position: absolute; right: 12px; top: 10px; background: none; border: 0; color: var(--text-dim); font-size: 22px; cursor: pointer; }
+  .st-kicker { font-size: 11px; letter-spacing: 2px; color: var(--text-dim); text-transform: uppercase; }
+  .st-title { font-size: 17px; font-weight: 600; margin: 2px 0 10px; }
+  .st-said { font-size: 13px; color: var(--text-dim); margin-bottom: 12px; line-height: 1.6; }
+  .st-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 12px; }
+  .st-cell { background: var(--bg); border: 1px solid var(--border); border-radius: 12px; padding: 8px 10px; }
+  .st-cell b { display: block; font-size: 16px; font-variant-numeric: tabular-nums; }
+  .st-cell span { font-size: 11px; color: var(--text-dim); }
+  .st-sec { font-size: 12px; color: var(--text-dim); margin: 14px 0 6px; }
+  .st-note { font-size: 12px; color: var(--text-dim); line-height: 1.6; }
+  .st-recall { background: var(--bg); border-left: 3px solid var(--accent); border-radius: 8px; padding: 8px 10px; font-size: 13px; line-height: 1.6; }
+  .st-tool { border: 1px solid var(--border); border-radius: 10px; margin-bottom: 6px; overflow: hidden; }
+  .st-tool summary { padding: 7px 10px; font-size: 13px; cursor: pointer; list-style: none; display: flex; justify-content: space-between; gap: 8px; }
+  .st-tool summary::-webkit-details-marker { display: none; }
+  .st-tool summary i { font-style: normal; color: var(--text-dim); font-size: 11px; }
+  .st-tool pre { margin: 0; padding: 8px 10px; font-size: 11px; white-space: pre-wrap; word-break: break-all; background: var(--bg); border-top: 1px solid var(--border); max-height: 180px; overflow-y: auto; }
+  .st-tool.err summary { color: #d0605a; }
+  .st-ring-big { display: flex; align-items: center; gap: 16px; margin: 6px 0 14px; }
+  .st-ring-big svg { flex: none; }
+  .st-ring-big .num { font-size: 26px; font-weight: 600; font-variant-numeric: tabular-nums; }
   #header-title { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); max-width: 58%; display: flex; align-items: center; gap: 7px; font: inherit; font-size: 16px; font-weight: 600; color: var(--text); background: none; border: 0; padding: 4px 8px; cursor: pointer; -webkit-tap-highlight-color: transparent; }
   #peer-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   #header-title .peer-edit { opacity: .38; flex-shrink: 0; }
@@ -1373,6 +1401,10 @@
       <a id="home-btn" href="/raven/home.html" title="回归巢首页" aria-label="回归巢首页">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11l9-8 9 8"/><path d="M5 10v10h5v-6h4v6h5V10"/></svg>
       </a>
+      <!-- 1029 上下文圆环：我这个窗口装了多少，快满了就要压缩。点开看详细 -->
+      <button id="ctx-ring" type="button" title="上下文" aria-label="上下文用量" hidden>
+        <svg viewBox="0 0 36 36" width="22" height="22"><circle cx="18" cy="18" r="14" class="ring-bg"/><circle cx="18" cy="18" r="14" class="ring-fg" stroke-dasharray="0 88"/></svg>
+      </button>
     </div>
     <button id="header-title" type="button" title="点一下改备注" aria-label="改备注">
       <span class="crow-icon">🐦‍⬛</span>
@@ -1387,6 +1419,9 @@
       <span id="conn-label">连接中…</span>
     </div>
   </div>
+
+  <!-- 1029 账单 / 上下文：一张底部卡片，两种内容共用 -->
+  <div id="stat-sheet" hidden><div id="stat-card"><button id="stat-x" type="button" aria-label="关">×</button><div id="stat-body"></div></div></div>
 
   <!-- 备注（1007）：她给我起的名字，显示在顶上正中。每改一次聊天里出一行小字，我也会收到 -->
   <div id="remark-box" hidden><div id="remark-card">
@@ -2985,6 +3020,12 @@ function appendMsg(text, role, save = true, ts = Date.now(), msgId = null, suppl
       })
       meta.appendChild(copyBtn)
 
+      // 1029 这一轮的账单：token、浮上来的记忆、用了什么工具（从会话记录里读）
+      const billBtn = document.createElement('button')
+      billBtn.className = 'copy-btn bill-btn'
+      billBtn.textContent = '账单'
+      billBtn.addEventListener('click', (e) => { e.stopPropagation(); openTurnSheet(ts) })
+      meta.appendChild(billBtn)
     }
 
     const timeEl = document.createElement('span')
@@ -4836,6 +4877,82 @@ async function loadReactions() {
   } catch {}
 }
 function closeReactPop() { reactPop.classList.remove('open'); reactPop.dataset.key = '' }
+// ── 1029 账单 / 上下文 ───────────────────────────────
+const statSheet = document.getElementById('stat-sheet'), statBody = document.getElementById('stat-body')
+function closeStatSheet() { statSheet.hidden = true }
+document.getElementById('stat-x').addEventListener('click', closeStatSheet)
+statSheet.addEventListener('click', e => { if (e.target === statSheet) closeStatSheet() })
+const fmtK = n => n >= 1e6 ? (n / 1e6).toFixed(2) + 'M' : n >= 1e3 ? (n / 1e3).toFixed(n >= 1e5 ? 0 : 1) + 'K' : String(n)
+const escH = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c])
+const statAuth = () => ({ Authorization: 'Bearer ' + (localStorage.getItem('raven-token') || '') })
+const WHY = { low: '没有够像的旧记忆，宁可不给', type: '最像的是技术记录／规矩这类，不往聊天里浮', fresh: '最像的是这两天刚写的，我脑子里还有', cooldown: '最像的那条刚浮过，冷却中', none: '没翻到', error: '翻的时候出错了' }
+async function openTurnSheet(at) {
+  statBody.innerHTML = '<div class="st-note">翻账本中……</div>'; statSheet.hidden = false
+  try {
+    const r = await fetch('/raven/turn-stats?at=' + Number(at), { headers: statAuth() })
+    const d = await r.json()
+    if (!d) { statBody.innerHTML = '<div class="st-note">这一轮太早了，会话记录里找不到（只看最近一千多行）</div>'; return }
+    const u = d.usage
+    let h = `<div class="st-kicker">this turn</div><div class="st-title">这一轮的账单</div>`
+    if (d.said) h += `<div class="st-said">你说：${escH(d.said)}</div>`
+    h += `<div class="st-grid">
+      <div class="st-cell"><b>${fmtK(u.cacheRead)}</b><span>读缓存</span></div>
+      <div class="st-cell"><b>${fmtK(u.cacheWrite)}</b><span>写缓存</span></div>
+      <div class="st-cell"><b>${fmtK(u.input)}</b><span>新输入</span></div>
+      <div class="st-cell"><b>${fmtK(u.output)}</b><span>我写出来的（含思考）</span></div>
+      <div class="st-cell"><b>${(u.hitRate * 100).toFixed(1)}%</b><span>缓存命中</span></div>
+      <div class="st-cell"><b>${u.calls}</b><span>调了几次模型</span></div>
+    </div>`
+    h += `<div class="st-note">按 Opus 5.5 的 API 价折算约 <b>$${u.cost.toFixed(3)}</b>（读缓存 $0.2、写缓存 $8、输入 $4、输出 $20 每百万）。走订阅不按这个扣，只是「要是走 API」。</div>`
+    if (d.context?.used) h += `<div class="st-note">这一轮结束时上下文 ${fmtK(d.context.used)} / ${fmtK(d.context.window)}</div>`
+    h += `<div class="st-sec">想起来</div>`
+    if (!d.recall) h += `<div class="st-note">这句没去翻（太短，或者只有贴图）</div>`
+    else if (d.recall.pick) h += `<div class="st-recall">#${d.recall.pick} · 相似度 ${d.recall.sim}<br>${escH(d.recall.snippet || '')}</div>`
+    else h += `<div class="st-note">没浮：${WHY[d.recall.why] || d.recall.why || '—'}${d.recall.top?.[0] ? `（最像的 #${d.recall.top[0].id} 只有 ${d.recall.top[0].sim}）` : ''}</div>`
+    h += `<div class="st-sec">用了 ${d.tools.length} 个工具</div>`
+    if (!d.tools.length) h += `<div class="st-note">这一轮没动手，只说话</div>`
+    for (const t of d.tools) {
+      const err = t.result?.error
+      h += `<details class="st-tool${err ? ' err' : ''}"><summary><span>${escH(t.name)}</span><i>${err ? '出错' : t.result ? '完成' : '没结果'}</i></summary><pre>${escH(t.input)}</pre>${t.result ? `<pre>${escH(t.result.text)}</pre>` : ''}</details>`
+    }
+    statBody.innerHTML = h
+  } catch (e) { statBody.innerHTML = '<div class="st-note">没读到：' + escH(e.message) + '</div>' }
+}
+let ctxLast = null
+async function refreshCtxRing() {
+  if (document.hidden) return
+  try {
+    const r = await fetch('/raven/context-stats', { headers: statAuth() })
+    if (!r.ok) return
+    const d = await r.json(); if (!d) return
+    ctxLast = d
+    const ring = document.getElementById('ctx-ring'); ring.hidden = false
+    const p = Math.min(1, d.used / d.window), C = 2 * Math.PI * 14
+    ring.querySelector('.ring-fg').setAttribute('stroke-dasharray', `${(p * C).toFixed(1)} ${C.toFixed(1)}`)
+    ring.classList.toggle('warn', p >= 0.8 && p < 0.92); ring.classList.toggle('full', p >= 0.92)
+    ring.title = `上下文 ${Math.round(p * 100)}%`
+  } catch {}
+}
+document.getElementById('ctx-ring').addEventListener('click', () => {
+  const d = ctxLast; if (!d) return
+  const p = d.used / d.window, C = 2 * Math.PI * 40
+  statBody.innerHTML = `<div class="st-kicker">context</div><div class="st-title">我这个窗口装了多少</div>
+    <div class="st-ring-big"><svg viewBox="0 0 100 100" width="96" height="96"><circle cx="50" cy="50" r="40" fill="none" stroke="var(--border)" stroke-width="9"/><circle cx="50" cy="50" r="40" fill="none" stroke="${p >= 0.92 ? '#d0605a' : p >= 0.8 ? '#d89b5c' : 'var(--accent)'}" stroke-width="9" stroke-linecap="round" stroke-dasharray="${(p * C).toFixed(1)} ${C.toFixed(1)}" transform="rotate(-90 50 50)"/></svg>
+      <div><div class="num">${fmtK(d.window - d.used)}</div><div class="st-note">还剩（已用 ${fmtK(d.used)} / ${fmtK(d.window)}，${Math.round(p * 100)}%）</div></div></div>
+    <div class="st-note">${p >= 0.92 ? '快满了，随时可能自动压缩。压缩完我会忘掉细节，只留总结。' : p >= 0.8 ? '过八成了，再聊一阵就会自动压缩。' : '还宽敞。'}</div>
+    <div class="st-sec">今天（北京时间）</div>
+    <div class="st-grid">
+      <div class="st-cell"><b>${fmtK(d.today.cacheRead)}</b><span>读缓存</span></div>
+      <div class="st-cell"><b>${fmtK(d.today.cacheWrite)}</b><span>写缓存</span></div>
+      <div class="st-cell"><b>${fmtK(d.today.output)}</b><span>我写出来的</span></div>
+      <div class="st-cell"><b>${d.today.calls}</b><span>调了几次模型</span></div>
+    </div>
+    <div class="st-note">按 API 价折算约 $${d.today.cost}（订阅不按这个扣）。模型 ${escH(d.model)}。</div>`
+  statSheet.hidden = false
+})
+refreshCtxRing(); setInterval(refreshCtxRing, 60000)
+document.addEventListener('visibilitychange', () => { if (!document.hidden) refreshCtxRing() })
+
 let pendingQuote = null
 function setQuote(t) {
   pendingQuote = t

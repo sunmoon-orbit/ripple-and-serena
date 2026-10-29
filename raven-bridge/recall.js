@@ -96,7 +96,7 @@ async function surface(text, search, now = Date.now()) {
   if (!pick) { log({ q: clip(q, 60), top, why }); return '' }
   st.surfaced[pick.id] = now
   saveState(st)
-  log({ q: clip(q, 60), top, pick: pick.id, sim: Math.round(pick._sim * 1000) / 1000 })
+  log({ q: clip(q, 60), top, pick: pick.id, sim: Math.round(pick._sim * 1000) / 1000, snippet: clip(pick.content, 90) })
   return `〔想起来 #${pick.id}·${fmtDate(pick.created_at)}（自动浮上来的，她看不见，用不用你定）：${clip(pick.content, 180)}〕`
 }
 
