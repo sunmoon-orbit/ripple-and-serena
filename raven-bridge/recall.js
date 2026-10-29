@@ -16,7 +16,7 @@ const path = require('path')
 const STATE_FILE = path.join(__dirname, 'recall-state.json')
 const LOG_FILE = path.join(__dirname, 'recall-log.jsonl')
 
-const MIN_SIM = 0.43              // 1029 拿几句话试的：真相关的 0.45–0.50，沾边的 0.32–0.40
+const MIN_SIM = 0.46              // 1029 拿几句话试的：真相关的 0.48–0.52，沾边的 0.32–0.44（第一条真浮的「手机没电定闹钟」0.436 是不相关的，从 0.43 抬上来）
 const COOLDOWN_MS = 6 * 3600e3
 const FRESH_MS = 48 * 3600e3
 const SKIP_TYPES = new Set(['tech', 'boot', 'handoff', 'deep', 'treasure', 'dream', 'window'])
