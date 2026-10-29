@@ -267,7 +267,7 @@ export async function fetchBookChapter(config, bookId, idx) {
 // 页边「新回音」（1029）：涟言写的、她还没看过的批注（多半是回她的）
 export async function fetchBookEchoes(config) {
   const { baseUrl, apiToken } = config
-  return request(baseUrl, '/books/annotations/unseen', { headers: headers(apiToken) })
+  return request(baseUrl, '/books/annotations/unseen?all=1', { headers: headers(apiToken) })
 }
 export async function markBookEchoesSeen(config, ids) {
   const { baseUrl, apiToken } = config

@@ -749,15 +749,22 @@ export default function BookRead({ onClose }) {
     if (readingMode !== 'page') setTimeout(() => annoRefs.current[a.id]?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 300)
   }
 
+  // 1029 改：看过的也留在清单里（她打开过一次，刷新后就找不到了）；新的标「新」，打开清单才算看过
+  const newEchoes = echoes.filter((e) => !e.seen_at)
   function openEchoes() {
     setEchoOpen(true)
-    const ids = echoes.map((e) => e.id)
-    if (ids.length) markBookEchoesSeen(cfg, ids).catch(() => {})   // 清单里就能读完，打开即算看过
+    const ids = newEchoes.map((e) => e.id)
+    if (ids.length) markBookEchoesSeen(cfg, ids).catch(() => {})
+  }
+  function closeEchoes() {
+    setEchoOpen(false)
+    const now = new Date().toISOString()
+    setEchoes((list) => list.map((e) => (e.seen_at ? e : { ...e, seen_at: now })))
   }
   async function goToEcho(e) {
     const book = books?.find((b) => b.id === e.book_id)
     if (!book) { showToast('这本书不在书架上了', 'error'); return }
-    setEchoOpen(false); setEchoes([])
+    closeEchoes()
     await openBook(book)
     const from = loadPos(book.id)
     await openChapter(book, e.chapter_idx, null, true)
@@ -1154,20 +1161,21 @@ export default function BookRead({ onClose }) {
             {books === null && <div className="roost-empty">加载中……</div>}
             {books?.length === 0 && <div className="roost-empty">书架还空着（跟阿言说一声想读什么，我来上架）</div>}
             {echoes.length > 0 && (
-              <button className="bookread-echo-banner" onClick={openEchoes}>
-                <span className="bookread-echo-dot" />页边有 {echoes.length} 条新回音
+              <button className={'bookread-echo-banner' + (newEchoes.length ? '' : ' quiet')} onClick={openEchoes}>
+                {newEchoes.length > 0 && <span className="bookread-echo-dot" />}
+                {newEchoes.length > 0 ? `页边有 ${newEchoes.length} 条新回音` : '页边回音'}
               </button>
             )}
             {echoOpen && (
-              <div className="bookread-echo-sheet" onClick={() => { setEchoOpen(false); setEchoes([]) }}>
+              <div className="bookread-echo-sheet" onClick={closeEchoes}>
                 <section onClick={(e) => e.stopPropagation()} aria-label="页边新回音">
                   <div className="bookread-echo-head">
-                    <strong>页边新回音</strong>
-                    <button onClick={() => { setEchoOpen(false); setEchoes([]) }} aria-label="关上">✕</button>
+                    <strong>页边回音</strong>
+                    <button onClick={closeEchoes} aria-label="关上">✕</button>
                   </div>
                   {echoes.map((e) => (
                     <div key={e.id} className="bookread-echo-item">
-                      <div className="bookread-echo-where">《{e.book_title}》{e.chapter_title ? ` · ${e.chapter_title}` : ''}</div>
+                      <div className="bookread-echo-where">{!e.seen_at && <span className="bookread-echo-new">新</span>}《{e.book_title}》{e.chapter_title ? ` · ${e.chapter_title}` : ''}</div>
                       <div className="bookread-anno-quote">「{e.quote}」</div>
                       {e.parent_note && <div className="bookread-echo-line"><span className="coread-anno-author">{e.parent_author}</span>{e.parent_note}</div>}
                       <div className="bookread-echo-line mine"><span className="coread-anno-author">{e.author}</span>{e.note || '（划了一道）'}</div>

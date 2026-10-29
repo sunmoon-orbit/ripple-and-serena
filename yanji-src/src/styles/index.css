@@ -6349,3 +6349,5 @@ button:focus:not(:focus-visible) { outline: none; }
           mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M6 3h12v18l-6-5-6 5z'/%3E%3C/svg%3E"); }
 /* 串门看回音时的「回到读到的地方」（1029） */
 .bookread-peek-back { position: absolute; z-index: 9; left: 50%; transform: translateX(-50%); top: 58px; padding: 7px 14px; border-radius: 18px; border: 1px solid var(--accent, #b88aa6); background: var(--bg); color: var(--accent, #b88aa6); font-size: 13px; box-shadow: var(--shadow-md); white-space: nowrap; }
+.bookread-echo-banner.quiet { background: transparent; color: var(--text-dim); font-size: 13px; padding: 7px 14px; }
+.bookread-echo-new { display: inline-block; margin-right: 6px; padding: 0 6px; border-radius: 8px; background: var(--accent, #b88aa6); color: #fff; font-size: 11px; line-height: 17px; }
