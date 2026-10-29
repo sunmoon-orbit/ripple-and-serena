@@ -6302,7 +6302,8 @@ body.mp-active .scroll-bottom-btn { bottom: 139px; }
 .bookread-alt-bar button { border: 1px solid var(--border); background: transparent; color: var(--text); border-radius: 999px; padding: 4px 10px; font-size: 12px; }
 .bookread-pair-preview { border: 1px solid var(--border); border-radius: 12px; padding: 10px 12px; margin-bottom: 10px; }
 .bookread-pair-offset { display: flex; align-items: center; gap: 8px; font-size: 13px; margin-bottom: 4px; }
-.bookread-pair-offset span { margin-right: auto; }
+.bookread-pair-offset span { margin-right: auto; min-width: 0; }
+.bookread-pair-offset em { font-style: normal; color: var(--text-faint); margin-left: 6px; font-size: 12px; }
 .bookread-pair-offset button { width: 28px; height: 28px; border-radius: 50%; border: 1px solid var(--border); background: transparent; color: var(--text); }
 .bookread-pair-chapter { margin-top: 10px; }
 .bookread-pair-title { font-size: 12px; font-weight: 600; margin-bottom: 4px; }

@@ -719,7 +719,7 @@ export default function BookRead({ onClose }) {
         const next = { ...prev, reading: null, fileName: file.name, chapters: r.chapters,
           title: prev.title || r.title, author: prev.author || r.author,
           pdfFile: isPdf ? file : null, pdfMode: isPdf ? 'text' : null, pdfImageOnly: false }
-        if (next.altChapters) next.altOffset = guessOffset(next.chapters, next.altChapters)
+        if (next.altChapters) { next.altOffset = guessOffset(next.chapters, next.altChapters); next.zhStart = undefined }
         return next
       })
     } catch (error) {
@@ -743,7 +743,7 @@ export default function BookRead({ onClose }) {
     try {
       const r = await readBookFile(file)
       setUpload((prev) => ({ ...prev, reading: null, altName: file.name, altChapters: r.chapters,
-        altOffset: prev.chapters ? guessOffset(prev.chapters, r.chapters) : 0 }))
+        altOffset: prev.chapters ? guessOffset(prev.chapters, r.chapters) : 0, zhStart: undefined }))
     } catch (error) {
       setUpload((prev) => ({ ...prev, reading: null }))
       showToast(error?.message || '读取文件失败', 'error')
@@ -782,7 +782,7 @@ export default function BookRead({ onClose }) {
         added_by: '阿颖',
         shelf: upload.shelf || '闲书层',
         ...(upload.bilingual && upload.altChapters
-          ? { alt_lang: 'en', chapters: pairBooks(upload.chapters, upload.altChapters, upload.altOffset || 0) }
+          ? { alt_lang: 'en', chapters: pairBooks(upload.chapters, upload.altChapters, upload.altOffset || 0, upload.zhStart ?? Math.max(0, -(upload.altOffset || 0))) }
           : { chapters: upload.chapters }),
       })
       showToast('上架好了')
@@ -886,16 +886,26 @@ export default function BookRead({ onClose }) {
             )}
             {upload.bilingual && upload.chapters?.length > 0 && upload.altChapters?.length > 0 && (() => {
               const off = upload.altOffset || 0
-              // 预览从两边第一对配上的章开始看（偏移是负的时候中文前几章没有英文）；只算这两章，有缓存
-              const preview = previewPairs(upload.chapters, upload.altChapters, off)
+              // 1029 她说：原来只有一组 ±，只挪英文；有时候是中文前面多了序和推荐语，要挪中文。
+              // 现在两边各自定「从第几章开始配」，偏移 = 英文起点 − 中文起点；中文起点之前的章不配英文
+              const zhS = upload.zhStart ?? Math.max(0, -off)
+              const enS = zhS + off
+              const setStarts = (z, e) => setUpload({ ...upload, zhStart: z, altOffset: e - z })
+              const preview = previewPairs(upload.chapters, upload.altChapters, off, zhS)
+              const short = (t) => { t = (t || '').trim(); return t.length > 14 ? t.slice(0, 14) + '…' : t }
               return (
                 <div className="bookread-pair-preview">
                   <div className="bookread-pair-offset">
-                    <span>{off >= 0 ? `中文第 1 章配英文第 ${off + 1} 章` : `英文第 1 章配中文第 ${1 - off} 章`}</span>
-                    <button disabled={off <= -(upload.chapters.length - 1)} onClick={() => setUpload({ ...upload, altOffset: off - 1 })}>−</button>
-                    <button disabled={off >= upload.altChapters.length - 1} onClick={() => setUpload({ ...upload, altOffset: off + 1 })}>＋</button>
+                    <span>中文从第 {zhS + 1} 章<em>{short(upload.chapters[zhS]?.title)}</em></span>
+                    <button disabled={zhS <= 0} onClick={() => setStarts(zhS - 1, enS)}>−</button>
+                    <button disabled={zhS >= upload.chapters.length - 1} onClick={() => setStarts(zhS + 1, enS)}>＋</button>
                   </div>
-                  <div className="bookread-foot-hint">中文 {upload.chapters.length} 章 · 英文 {upload.altChapters.length} 章。看下面前两章配得对不对，不对就挪上面的数字；段落错一两段，读的时候点英文可以挪。</div>
+                  <div className="bookread-pair-offset">
+                    <span>英文从第 {enS + 1} 章<em>{short(upload.altChapters[enS]?.title)}</em></span>
+                    <button disabled={enS <= 0} onClick={() => setStarts(zhS, enS - 1)}>−</button>
+                    <button disabled={enS >= upload.altChapters.length - 1} onClick={() => setStarts(zhS, enS + 1)}>＋</button>
+                  </div>
+                  <div className="bookread-foot-hint">中文 {upload.chapters.length} 章 · 英文 {upload.altChapters.length} 章。两边都调到正文第一章（序、推荐语跳过去），看下面配得对不对；段落错一两段，读的时候点英文可以挪。</div>
                   {preview.map((c, ci) => (
                     <div key={ci} className="bookread-pair-chapter">
                       <div className="bookread-pair-title">{c.title}{c.alt_title ? ` ⇄ ${c.alt_title}` : ' ⇄ （没有对应的英文章）'}</div>

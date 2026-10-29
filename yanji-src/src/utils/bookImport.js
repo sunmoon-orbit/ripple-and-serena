@@ -304,23 +304,25 @@ function proportional(zh, en) {
 
 // 上架预览只看前两对：缓存住，别每次界面刷新（打书名、点颜色）都重算（1029 她说卡）
 let previewCache = null
-export function previewPairs(zhChapters, enChapters, offset) {
-  if (previewCache && previewCache.zh === zhChapters && previewCache.en === enChapters && previewCache.off === offset) return previewCache.result
-  const start = Math.max(0, -offset)
+// start：中文从第几章（0 起）开始配；不给就从两边第一对配得上的开始（1029 她要两边能分别挪）
+export function previewPairs(zhChapters, enChapters, offset, zhStart) {
+  const start = zhStart ?? Math.max(0, -offset)
+  if (previewCache && previewCache.zh === zhChapters && previewCache.en === enChapters && previewCache.off === offset && previewCache.start === start) return previewCache.result
   const zh = zhChapters.slice(start, start + 2)
   const result = zh.map((c, i) => {
     const e = enChapters[start + i + offset]
     if (!e) return { ...c, alt: null, alt_title: '' }
     return { ...c, alt: alignParagraphs(paras(c.content).slice(0, 12), paras(e.content).slice(0, 40)), alt_title: e.title || '' }
   })
-  previewCache = { zh: zhChapters, en: enChapters, off: offset, result }
+  previewCache = { zh: zhChapters, en: enChapters, off: offset, start, result }
   return result
 }
 
-// 整本配对：中文第 i 章配英文第 i+offset 章；英文多出来的章接到最后一章后面不管，少了就空着
-export function pairBooks(zhChapters, enChapters, offset = 0) {
+// 整本配对：中文第 i 章配英文第 i+offset 章；英文多出来的章接到最后一章后面不管，少了就空着。
+// zhStart 之前的中文章（序、推荐语这类）不配英文
+export function pairBooks(zhChapters, enChapters, offset = 0, zhStart = 0) {
   return zhChapters.map((c, i) => {
-    const e = enChapters[i + offset]
+    const e = i < zhStart ? null : enChapters[i + offset]
     if (!e) return { ...c, alt: null, alt_title: '' }
     return { ...c, alt: alignParagraphs(paras(c.content), paras(e.content)), alt_title: e.title || '' }
   })
