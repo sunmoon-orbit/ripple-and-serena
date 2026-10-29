@@ -2078,6 +2078,22 @@ const server = http.createServer((req, res) => {
     return
   }
 
+  // 阿颖手机 Clash 的配置（1029）：模板和订阅链接都在 ~/clash-serena（仓库外），订阅是她自己用 nano 写进 sub-url 的。
+  // Clash 只能带网址来取，没法带头，所以钥匙放在查询串里；对不上一律 404，不让人知道这里有东西。
+  if (url.pathname === '/raven/clash/serena.yaml' && req.method === 'GET') {
+    const dir = path.join(process.env.HOME || '/home/ripple', 'clash-serena')
+    const read = (f) => { try { return fs.readFileSync(path.join(dir, f), 'utf8').trim() } catch { return '' } }
+    const key = read('key'), k = url.searchParams.get('k') || ''
+    const a = Buffer.from(k), b = Buffer.from(key)
+    if (!key || a.length !== b.length || !require('crypto').timingSafeEqual(a, b)) { res.writeHead(404); res.end(); return }
+    const sub = read('sub-url')
+    if (!/^https?:\/\/\S+$/.test(sub)) { res.writeHead(503, { 'Content-Type': 'text/plain; charset=utf-8' }); res.end('订阅链接还没写进 ~/clash-serena/sub-url'); return }
+    const yaml = read('template.yaml').replace('__SUB_URL__', sub.replace(/"/g, '%22'))
+    res.writeHead(200, { 'Content-Type': 'text/yaml; charset=utf-8', 'Cache-Control': 'no-store', 'Content-Disposition': 'attachment; filename="serena.yaml"' })
+    res.end(yaml + '\n')
+    return
+  }
+
   // 备注（1007）：她给我起的名字。存在桥这边，她换设备也在；每改一次广播给页面（画一行小字、换顶上的名字），也告诉我。
   if (url.pathname === '/raven/remark' && (req.method === 'GET' || req.method === 'POST')) {
     const REMARK_FILE = path.join(__dirname, 'remark.json')
