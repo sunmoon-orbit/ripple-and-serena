@@ -274,6 +274,16 @@ export async function markBookEchoesSeen(config, ids) {
   return request(baseUrl, '/books/annotations/seen', { method: 'POST', headers: headers(apiToken), body: JSON.stringify({ ids }) })
 }
 
+// 好句子书签（1029）
+export async function starBookAnnotation(config, annoId, by, on = true) {
+  const { baseUrl, apiToken } = config
+  return request(baseUrl, `/books/annotations/${annoId}/star`, { method: 'PUT', headers: headers(apiToken), body: JSON.stringify({ by, on }) })
+}
+export async function fetchStarredAnnotations(config, bookId) {
+  const { baseUrl, apiToken } = config
+  return request(baseUrl, `/books/${bookId}/starred`, { headers: headers(apiToken) })
+}
+
 export async function createBookAnnotation(config, bookId, body) {
   const { baseUrl, apiToken } = config
   return request(baseUrl, `/books/${bookId}/annotations`, {

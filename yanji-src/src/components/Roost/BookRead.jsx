@@ -3,7 +3,7 @@ import { useStore } from '../../store'
 import { showToast } from '../Toast'
 import {
   fetchBooks, fetchBook, fetchBookChapter, createBook, appendBookChapters,
-  deleteBook, createBookAnnotation, deleteBookAnnotation, saveBookBookmark, fetchBookEchoes, markBookEchoesSeen,
+  deleteBook, createBookAnnotation, deleteBookAnnotation, saveBookBookmark, fetchBookEchoes, markBookEchoesSeen, starBookAnnotation, fetchStarredAnnotations,
   sendReadingHeartbeat, fetchBookChat, createBookChatMessage, stampBook, unstampBook,
   fetchReadingActivity, fetchBookCover, saveBookCover, saveBookChapterAlt,
 } from '../../api/moonMemory'
@@ -181,6 +181,9 @@ export default function BookRead({ onClose }) {
   const [echoes, setEchoes] = useState([])
   const [echoOpen, setEchoOpen] = useState(false)
   const [replyDraft, setReplyDraft] = useState({})  // {批注id: 正在写的回复}
+  // 好句子书签（1029 她：留了很棒的句子就夹个书签，下次直接翻到那儿看）
+  const [starOpen, setStarOpen] = useState(false)
+  const [starred, setStarred] = useState(null)
   const [upload, setUpload] = useState(null)       // 上架表单 {title,author,intro,color,shelf,chapters,fileName, bilingual,altChapters,altName,altOffset}
   const altFileRef = useRef(null)
   const [pdfBook, setPdfBook] = useState(null)      // 打开的是原样 PDF（1023）
@@ -714,6 +717,25 @@ export default function BookRead({ onClose }) {
     } catch { showToast('没回上，再试一次', 'error') }
   }
 
+  async function toggleStar(a) {
+    const on = !a.starred_by
+    try {
+      await starBookAnnotation(cfg, a.id, annoAuthor, on)
+      setChapter((prev) => ({ ...prev, annotations: prev.annotations.map((x) => x.id === a.id ? { ...x, starred_by: on ? annoAuthor : null } : x) }))
+      showToast(on ? '夹上书签了' : '书签取下了')
+    } catch { showToast('没夹上，再试一次', 'error') }
+  }
+  async function openStars() {
+    setStarOpen(true); setStarred(null)
+    try { const list = await fetchStarredAnnotations(cfg, active.id); setStarred(Array.isArray(list) ? list : []) } catch { setStarred([]) }
+  }
+  async function goToStar(a) {
+    setStarOpen(false)
+    if (chapter?.idx !== a.chapter_idx) await openChapter(active, a.chapter_idx)
+    setFocusAnno(a.id)
+    if (readingMode !== 'page') setTimeout(() => annoRefs.current[a.id]?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 300)
+  }
+
   function openEchoes() {
     setEchoOpen(true)
     const ids = echoes.map((e) => e.id)
@@ -1207,6 +1229,10 @@ export default function BookRead({ onClose }) {
   const annoIds = new Set(allAnnos.map((a) => a.id))
   const annos = allAnnos.filter((a) => a.parent_id == null || !annoIds.has(a.parent_id))
   const repliesOf = (id) => allAnnos.filter((a) => a.parent_id === id)
+  const starBtn = (a) => (
+    <button className={'bookread-star-btn' + (a.starred_by ? ' on' : '')} onClick={(e) => { e.stopPropagation(); toggleStar(a) }}
+      aria-label={a.starred_by ? '取下书签' : '夹书签'} title={a.starred_by ? `${a.starred_by}夹的书签，点一下取下` : '夹个书签'} />
+  )
   const renderThread = (a) => (
     <div className="bookread-anno-thread" onClick={(e) => e.stopPropagation()}>
       {repliesOf(a.id).map((r) => (
@@ -1263,6 +1289,7 @@ export default function BookRead({ onClose }) {
           <button className="coread-back" onClick={() => { setActive(null); setChapter(null); setPending(null); setComposing(false) }}>‹ 书架</button>
           <span className="coread-reader-title">{active.title}</span>
           <div className="bookread-header-actions">
+            <button className="bookread-mode-toggle" onClick={openStars} title="夹了书签的好句子">书签</button>
             {bilingual && (
               <button className="bookread-mode-toggle" onClick={() => {
                 const next = { both: 'zh', zh: 'en', en: 'both' }[langMode] || 'both'
@@ -1390,6 +1417,7 @@ export default function BookRead({ onClose }) {
                           <div className="bookread-anno-row">
                             <span className="coread-anno-author">{a.author}</span>
                             <span className="coread-anno-note">{a.note || '（划线）'}</span>
+                            {starBtn(a)}
                             <button className="bookread-card-link" disabled={savingCard} onClick={() => openExcerptCard(a.quote, a.note)}>书摘卡</button>
                             <button className="coread-anno-del" onClick={() => removeAnno(a.id)}>✕</button>
                           </div>
@@ -1446,10 +1474,32 @@ export default function BookRead({ onClose }) {
               <div className="bookread-anno-quote">「{a.quote}」</div>
               <p>{a.note || '（仅划线，暂无批注）'}</p>
               <small>{a.author}</small>
+              {starBtn(a)}
               <button className="bookread-card-link" onClick={() => openExcerptCard(a.quote, a.note)}>书摘卡</button>
               {renderThread(a)}
             </div>)}
           </section>
+        )}
+        {starOpen && (
+          <div className="bookread-echo-sheet" onClick={() => setStarOpen(false)}>
+            <section onClick={(e) => e.stopPropagation()} aria-label="书签">
+              <div className="bookread-echo-head">
+                <strong>书签 · 夹起来的好句子</strong>
+                <button onClick={() => setStarOpen(false)} aria-label="关上">✕</button>
+              </div>
+              {starred === null && <div className="roost-empty">翻书签……</div>}
+              {starred?.length === 0 && <div className="roost-empty">还没夹过书签。点批注旁边的小书签，喜欢的句子就收在这儿。</div>}
+              {starred?.map((a) => (
+                <div key={a.id} className="bookread-echo-item">
+                  <div className="bookread-echo-where">{a.chapter_title || `第 ${a.chapter_idx + 1} 章`} · {a.starred_by}夹的</div>
+                  <div className="bookread-anno-quote">「{a.quote}」</div>
+                  {a.note && <div className="bookread-echo-line"><span className="coread-anno-author">{a.author}</span>{a.note}</div>}
+                  {a.replies?.map((r) => <div key={r.id} className="bookread-echo-line mine"><span className="coread-anno-author">{r.author}</span>{r.note}</div>)}
+                  <button className="bookread-card-link" onClick={() => goToStar(a)}>翻到那儿</button>
+                </div>
+              ))}
+            </section>
+          </div>
         )}
         {excerptCard && (
           <div className="bookread-card-editor-backdrop" onClick={closeExcerptCard}>

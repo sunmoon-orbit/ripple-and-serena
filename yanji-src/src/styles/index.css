@@ -6337,3 +6337,10 @@ button:focus:not(:focus-visible) { outline: none; }
 .bookread-echo-line { font-size: 14px; line-height: 1.6; margin-top: 4px; }
 .bookread-echo-line .coread-anno-author { margin-right: 6px; }
 .bookread-echo-line.mine { padding-left: 10px; border-left: 2px solid var(--accent, #b88aa6); }
+/* 好句子书签（1029）：小书签缎带，用 mask 画，夹上了填满主题色 */
+.bookread-star-btn { flex: none; width: 22px; height: 22px; padding: 0; border: none; background: var(--text-faint); opacity: .55;
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linejoin='round'%3E%3Cpath d='M6 3h12v18l-6-5-6 5z'/%3E%3C/svg%3E") center / 18px no-repeat;
+          mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linejoin='round'%3E%3Cpath d='M6 3h12v18l-6-5-6 5z'/%3E%3C/svg%3E") center / 18px no-repeat; }
+.bookread-star-btn.on { opacity: 1; background: var(--accent, #b88aa6);
+  -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M6 3h12v18l-6-5-6 5z'/%3E%3C/svg%3E");
+          mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M6 3h12v18l-6-5-6 5z'/%3E%3C/svg%3E"); }
