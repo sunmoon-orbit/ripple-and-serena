@@ -1231,7 +1231,9 @@ export default function BookRead({ onClose }) {
   const repliesOf = (id) => allAnnos.filter((a) => a.parent_id === id)
   const starBtn = (a) => (
     <button className={'bookread-star-btn' + (a.starred_by ? ' on' : '')} onClick={(e) => { e.stopPropagation(); toggleStar(a) }}
-      aria-label={a.starred_by ? '取下书签' : '夹书签'} title={a.starred_by ? `${a.starred_by}夹的书签，点一下取下` : '夹个书签'} />
+      aria-label={a.starred_by ? '取下书签' : '夹书签'} title={a.starred_by ? `${a.starred_by}夹的书签，点一下取下` : '夹个书签'}>
+      {a.starred_by ? '已夹' : '夹书签'}
+    </button>
   )
   const renderThread = (a) => (
     <div className="bookread-anno-thread" onClick={(e) => e.stopPropagation()}>
@@ -1289,7 +1291,6 @@ export default function BookRead({ onClose }) {
           <button className="coread-back" onClick={() => { setActive(null); setChapter(null); setPending(null); setComposing(false) }}>‹ 书架</button>
           <span className="coread-reader-title">{active.title}</span>
           <div className="bookread-header-actions">
-            <button className="bookread-mode-toggle" onClick={openStars} title="夹了书签的好句子">书签</button>
             {bilingual && (
               <button className="bookread-mode-toggle" onClick={() => {
                 const next = { both: 'zh', zh: 'en', en: 'both' }[langMode] || 'both'
@@ -1381,7 +1382,7 @@ export default function BookRead({ onClose }) {
                   </div>
                   <div className="bookread-page-footer">
                     <button onClick={() => turnPage(-1)} aria-label="上一页">‹</button>
-                    <button className="bookread-page-tool" onClick={markBookmark}>书签</button>
+                    <button className="bookread-page-tool" onClick={openStars}>书签</button>
                     <span>{pageIndex + 1} / {pageCount}</span>
                     <button className="bookread-page-tool" onClick={toggleStamp}>{stamps.some((s) => s.reader === '阿颖') ? '读讫 ✓' : '读讫'}</button>
                     <button className="bookread-page-tool bookread-page-chat" onClick={() => setChatOpen(true)} aria-label="打开随读随聊">聊</button>
@@ -1394,7 +1395,7 @@ export default function BookRead({ onClose }) {
                     {englishOnly || renderSegs(false)}
                   </div>
                   <div className="bookread-foot">
-                    <button className="roost-btn roost-btn-ghost roost-btn-sm" onClick={markBookmark}>夹书签</button>
+                    <button className="roost-btn roost-btn-ghost roost-btn-sm" onClick={openStars}>书签</button>
                     <button
                       className={'roost-btn roost-btn-ghost roost-btn-sm' + (stamps.some((s) => s.reader === '阿颖') ? ' bookread-stamped' : '')}
                       onClick={toggleStamp}
@@ -1484,9 +1485,12 @@ export default function BookRead({ onClose }) {
           <div className="bookread-echo-sheet" onClick={() => setStarOpen(false)}>
             <section onClick={(e) => e.stopPropagation()} aria-label="书签">
               <div className="bookread-echo-head">
-                <strong>书签 · 夹起来的好句子</strong>
+                <strong>书签</strong>
                 <button onClick={() => setStarOpen(false)} aria-label="关上">✕</button>
               </div>
+              {/* 1029 她截图：底栏「书签」原来是「读到哪儿」，跟好句子书签撞名。合成一个入口：上面夹读到哪儿，下面是好句子 */}
+              <button className="roost-btn roost-btn-ghost" style={{ width: '100%', margin: '4px 0 10px' }} onClick={() => { markBookmark(); setStarOpen(false) }}>把「读到这儿」夹在这一章</button>
+              <div className="bookread-echo-where" style={{ marginBottom: 2 }}>夹起来的好句子（批注旁边点小缎带就能夹）</div>
               {starred === null && <div className="roost-empty">翻书签……</div>}
               {starred?.length === 0 && <div className="roost-empty">还没夹过书签。点批注旁边的小书签，喜欢的句子就收在这儿。</div>}
               {starred?.map((a) => (
