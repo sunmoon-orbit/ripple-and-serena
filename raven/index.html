@@ -2749,7 +2749,7 @@ function attachToHtml(p) {
     const tok = encodeURIComponent(localStorage.getItem('raven-token') || '')
     return `<audio class="voice-attach" controls preload="metadata" src="/raven/uploads/${encodeURIComponent(name)}?token=${tok}"></audio>`
   }
-  // 1029：原来只是个不能点的小标签，她点我发的 yaml 没反应。改成能下载的链接（壳里会交给浏览器下）
+  // 1029：原来只是个不能点的小标签，她点我发的 yaml 没反应。改成能下载的链接（桥带 dl=1 回 attachment，壳里走系统下载器存进「下载」）
   const tok = encodeURIComponent(localStorage.getItem('raven-token') || '')
   return `<a class="attach-chip" href="/raven/uploads/${encodeURIComponent(name)}?token=${tok}&dl=1">📎 ${name}</a>`
 }
