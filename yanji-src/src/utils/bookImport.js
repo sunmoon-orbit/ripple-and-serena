@@ -312,7 +312,9 @@ export function previewPairs(zhChapters, enChapters, offset, zhStart) {
   const result = zh.map((c, i) => {
     const e = enChapters[start + i + offset]
     if (!e) return { ...c, alt: null, alt_title: '' }
-    return { ...c, alt: alignParagraphs(paras(c.content).slice(0, 12), paras(e.content).slice(0, 40)), alt_title: e.title || '' }
+    // 1029：原来只拿中文前 12 段配英文前 40 段，英文多出一大截，动态规划只好把英文往前几段里塞，预览看着歪一格，
+    // 其实整本上架时配得没这么歪。现在跟上架用同一种算法、整章配（两章，有缓存）
+    return { ...c, alt: alignParagraphs(paras(c.content), paras(e.content)), alt_title: e.title || '' }
   })
   previewCache = { zh: zhChapters, en: enChapters, off: offset, start, result }
   return result
