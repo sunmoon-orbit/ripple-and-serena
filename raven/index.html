@@ -2749,7 +2749,9 @@ function attachToHtml(p) {
     const tok = encodeURIComponent(localStorage.getItem('raven-token') || '')
     return `<audio class="voice-attach" controls preload="metadata" src="/raven/uploads/${encodeURIComponent(name)}?token=${tok}"></audio>`
   }
-  return `<span class="attach-chip">${name}</span>`
+  // 1029：原来只是个不能点的小标签，她点我发的 yaml 没反应。改成能下载的链接（壳里会交给浏览器下）
+  const tok = encodeURIComponent(localStorage.getItem('raven-token') || '')
+  return `<a class="attach-chip" href="/raven/uploads/${encodeURIComponent(name)}?token=${tok}&dl=1">📎 ${name}</a>`
 }
 
 // [sticker:名字] 容错：没写扩展名先试 .jpg，onerror 再退 .png（乌鸦忘写 .jpg 的三连裂图教训，2026-07-12）

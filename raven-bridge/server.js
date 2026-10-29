@@ -1397,6 +1397,7 @@ const server = http.createServer((req, res) => {
       'Cache-Control': 'private, max-age=31536000, immutable',  // 文件名带时间戳，内容不会变
       'X-Content-Type-Options': 'nosniff',
       'Content-Security-Policy': "sandbox; default-src 'none'; style-src 'unsafe-inline'",
+      ...(url.searchParams.get('dl') ? { 'Content-Disposition': `attachment; filename*=UTF-8''${encodeURIComponent(name)}` } : {}),
     })
     streamFile(file, res)
     return
