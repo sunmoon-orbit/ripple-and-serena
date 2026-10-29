@@ -6311,3 +6311,7 @@ body.mp-active .scroll-bottom-btn { bottom: 139px; }
 /* 原样 PDF（1023）：一页一张 canvas，放大时左右也能滑 */
 .bookread-pdf-body { overflow: auto; padding: 8px; -webkit-overflow-scrolling: touch; }
 .bookread-pdf-canvas { margin: 0 auto; background: #fff; box-shadow: 0 2px 12px rgba(0,0,0,.12); border-radius: 4px; }
+
+/* 1029 她截图：书里点「EN」冒出安卓系统的蓝色点按框。全局关掉点按高亮，按钮自己有按下的样子 */
+button, a, [role="button"], label { -webkit-tap-highlight-color: transparent; }
+button:focus:not(:focus-visible) { outline: none; }

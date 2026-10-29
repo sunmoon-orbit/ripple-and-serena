@@ -16,29 +16,61 @@ async function readTxt(file) {
   }
 }
 
-// EPUB：container.xml → opf → spine 顺序读每个 xhtml，一个 xhtml 当一章（太短的封面、版权页跳过）
+// EPUB：container.xml → opf → spine 顺序读每个 xhtml。
+// 1029 她导的英文版只认出 2 章：整本书塞在一两个 xhtml 里、章名也不写 Chapter N。
+// 所以不再「一个文件一章」，而是把全书段落连起来、按标题标签切；挑哪一级标题切，看哪一级切出来的像样章节最多。
 const BLOCK_TAGS = new Set(['P', 'DIV', 'LI', 'H1', 'H2', 'H3', 'H4', 'H5', 'H6', 'BLOCKQUOTE', 'PRE', 'TR', 'SECTION', 'ARTICLE', 'DD', 'DT'])
-function htmlToParas(doc) {
+const HEAD_RE = /^H([1-6])$/
+function htmlToItems(doc) {
   const out = []
-  let buf = ''
-  const flush = () => { const t = buf.replace(/\s+/g, ' ').trim(); if (t) out.push(t); buf = '' }
-  const walk = (node) => {
+  let buf = '', level = 0
+  const flush = () => { const t = buf.replace(/\s+/g, ' ').trim(); if (t) out.push({ text: t, h: level }); buf = '' }
+  const walk = (node, inHead) => {
     for (const n of node.childNodes) {
       if (n.nodeType === 3) buf += n.nodeValue
       else if (n.nodeType === 1) {
         const tag = n.tagName.toUpperCase()
         if (tag === 'SCRIPT' || tag === 'STYLE' || tag === 'HEAD') continue
-        if (tag === 'BR') { flush(); continue }
+        if (tag === 'BR') { if (!inHead) flush(); else buf += ' '; continue }
+        const hm = HEAD_RE.exec(tag)
+        // 有的书用 <p class="chapter-title"> 之类当标题，认不全；先认 h1–h6
+        if (hm) { flush(); level = +hm[1]; walk(n, true); flush(); level = 0; continue }
         const block = BLOCK_TAGS.has(tag)
-        if (block) flush()
-        walk(n)
-        if (block) flush()
+        if (block && !inHead) flush()
+        walk(n, inHead)
+        if (block && !inHead) flush()
       }
     }
   }
-  walk(doc.body || doc.documentElement)
+  walk(doc.body || doc.documentElement, false)
   flush()
   return out
+}
+
+// 把全书条目按「≤lvl 级标题或文件开头」切成节。连着的几个标题合成一个章名（Chapter I + Mrs. Rachel Lynde Is Surprised）
+function sectionize(docs, lvl) {
+  const secs = []
+  let cur = null
+  const start = (title) => { cur = { titles: title ? [title] : [], paras: [] }; secs.push(cur) }
+  for (const items of docs) {
+    start('')
+    for (const it of items) {
+      if (it.h && it.h <= lvl && cur.paras.length) start(it.text)
+      else if (it.h && !cur.paras.length) cur.titles.push(it.text)   // 节开头连着的标题（不管几级）都算章名
+      else cur.paras.push(it.text)
+    }
+  }
+  return secs
+}
+
+// 目录页：很多短行、没有一段像正文
+function looksLikeToc(sec) {
+  const t = sec.titles.join(' ')
+  if (/^(contents|table of contents|目录|目次)$/i.test(t.trim())) return true
+  const ps = sec.paras
+  if (ps.length < 8) return false
+  const short = ps.filter(p => p.length < 70).length
+  return short / ps.length > 0.8 && Math.max(...ps.map(p => p.length)) < 220
 }
 
 async function readEpub(file) {
@@ -60,25 +92,36 @@ async function readEpub(file) {
     const enc = await zip.file('META-INF/encryption.xml')?.async('string')
     if (enc && /EncryptedData/.test(enc) && !/fonts?\//i.test(enc)) throw new Error('这本 EPUB 带版权加密（DRM），读不出正文')
   }
-  const chapters = []
+  const docs = []
   for (const ref of opf.querySelectorAll('spine > itemref')) {
     const href = manifest[ref.getAttribute('idref')]
     if (!href) continue
     const path = decodeURIComponent(base + href.split('#')[0])
     const f = zip.file(path)
     if (!f) continue
-    const doc = parser.parseFromString(await f.async('string'), 'application/xhtml+xml')
-    const bad = doc.querySelector('parsererror')
-    const html = bad ? parser.parseFromString(await f.async('string'), 'text/html') : doc
-    const paras = htmlToParas(html)
-    const text = paras.join('\n')
-    if (text.replace(/\s/g, '').length < 40) continue
-    const h = html.querySelector('h1, h2, h3')?.textContent?.replace(/\s+/g, ' ').trim()
-    let body = paras
-    if (h && paras[0] === h) body = paras.slice(1)
-    chapters.push({ title: (h || html.querySelector('title')?.textContent?.trim() || '').slice(0, 60), content: body.join('\n') })
+    const raw = await f.async('string')
+    const doc = parser.parseFromString(raw, 'application/xhtml+xml')
+    const html = doc.querySelector('parsererror') ? parser.parseFromString(raw, 'text/html') : doc
+    docs.push(htmlToItems(html))
   }
+  // 挑切分级别：像样的节（正文 ≥ 800 字）最多的那一级；一样多取更高一级（数字小）
+  let best = null
+  for (let lvl = 0; lvl <= 4; lvl++) {
+    const secs = sectionize(docs, lvl)
+    const good = secs.filter(s => s.paras.join('').length >= 800).length
+    const titled = secs.filter(s => s.titles.length && s.paras.length).length
+    if (!best || good > best.good || (good === best.good && titled > best.titled)) best = { lvl, secs, good, titled }
+  }
+  const chapters = best.secs
+    .filter(s => s.paras.join('').replace(/\s/g, '').length >= 40 && !looksLikeToc(s))
+    .map(s => ({ title: s.titles.join(' ').slice(0, 60), content: s.paras.join('\n') }))
   if (!chapters.length) throw new Error('EPUB 里没读到正文')
+  // 标题不是 h 标签（有的书用加粗的 <p> 当章名）：章太少又很长，就退回按「第X章 / Chapter N」文字切一遍，切得多就用它
+  const total = chapters.reduce((n, c) => n + c.content.length, 0)
+  if (chapters.length < 3 && total > 30000) {
+    const byText = splitChapters(chapters.map(c => (c.title ? c.title + '\n' : '') + c.content).join('\n'))
+    if (byText.length > chapters.length) return { chapters: byText, title, author }
+  }
   chapters.forEach((c, i) => { if (!c.title) c.title = `第 ${i + 1} 部分` })
   return { chapters, title, author }
 }
@@ -206,6 +249,8 @@ export function alignParagraphs(zh, en) {
   const n = zh.length, m = en.length
   if (!n) return []
   if (!m) return zh.map(() => '')
+  // 两边段数差太多（章配错了、一边是整本）就别跑动态规划了，手机会卡死；按比例粗分
+  if (m > n * 4 + 20 || n > m * 4 + 20 || n * m > 400000) return proportional(zh, en)
   const lz = zh.map(s => s.length + 1), le = en.map(s => s.length + 1)
   const ratio = le.reduce((a, b) => a + b, 0) / lz.reduce((a, b) => a + b, 0)
   const cost = (a, b) => { const x = Math.log((b + 1) / (ratio * a + 1)); return x * x * 4 }
@@ -255,6 +300,21 @@ function proportional(zh, en) {
     acc += s.length
   }
   return out
+}
+
+// 上架预览只看前两对：缓存住，别每次界面刷新（打书名、点颜色）都重算（1029 她说卡）
+let previewCache = null
+export function previewPairs(zhChapters, enChapters, offset) {
+  if (previewCache && previewCache.zh === zhChapters && previewCache.en === enChapters && previewCache.off === offset) return previewCache.result
+  const start = Math.max(0, -offset)
+  const zh = zhChapters.slice(start, start + 2)
+  const result = zh.map((c, i) => {
+    const e = enChapters[start + i + offset]
+    if (!e) return { ...c, alt: null, alt_title: '' }
+    return { ...c, alt: alignParagraphs(paras(c.content).slice(0, 12), paras(e.content).slice(0, 40)), alt_title: e.title || '' }
+  })
+  previewCache = { zh: zhChapters, en: enChapters, off: offset, result }
+  return result
 }
 
 // 整本配对：中文第 i 章配英文第 i+offset 章；英文多出来的章接到最后一章后面不管，少了就空着

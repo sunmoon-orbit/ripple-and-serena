@@ -7,7 +7,7 @@ import {
   sendReadingHeartbeat, fetchBookChat, createBookChatMessage, stampBook, unstampBook,
   fetchReadingActivity, fetchBookCover, saveBookCover, saveBookChapterAlt,
 } from '../../api/moonMemory'
-import { readBookFile, splitChapters, pairBooks, guessOffset, paragraphEnds } from '../../utils/bookImport'
+import { readBookFile, splitChapters, pairBooks, guessOffset, paragraphEnds, previewPairs } from '../../utils/bookImport'
 import { savePdfBlob, deletePdfBlob, openPdf } from '../../utils/pdfBooks'
 import PdfBookReader from './PdfBookReader'
 import { sendMessage } from '../../api/llm'
@@ -886,9 +886,8 @@ export default function BookRead({ onClose }) {
             )}
             {upload.bilingual && upload.chapters?.length > 0 && upload.altChapters?.length > 0 && (() => {
               const off = upload.altOffset || 0
-              // 预览从两边第一对配上的章开始看（偏移是负的时候中文前几章没有英文）
-              const start = Math.max(0, -off)
-              const preview = pairBooks(upload.chapters, upload.altChapters, off).slice(start, start + 2)
+              // 预览从两边第一对配上的章开始看（偏移是负的时候中文前几章没有英文）；只算这两章，有缓存
+              const preview = previewPairs(upload.chapters, upload.altChapters, off)
               return (
                 <div className="bookread-pair-preview">
                   <div className="bookread-pair-offset">
