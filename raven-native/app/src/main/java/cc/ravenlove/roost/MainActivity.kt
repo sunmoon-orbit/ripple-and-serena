@@ -15,7 +15,6 @@ import android.view.View
 import android.webkit.*
 import android.widget.FrameLayout
 import android.widget.Toast
-import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
@@ -134,6 +133,31 @@ class MainActivity : AppCompatActivity() {
                 fileCallback = callback
                 val intent = params?.createIntent() ?: return false
                 startActivityForResult(intent, FILE_CHOOSER_CODE)
+                return true
+            }
+
+            // 网页里的 alert / confirm / prompt 也换成同一张卡（不接管的话是系统白框，顶上还写着网址）
+            override fun onJsAlert(view: WebView?, url: String?, message: String?, result: JsResult?): Boolean {
+                if (result == null || isFinishing) return false
+                ThemedDialog(this@MainActivity).show(body = message ?: "") { result.confirm() }
+                return true
+            }
+
+            override fun onJsConfirm(view: WebView?, url: String?, message: String?, result: JsResult?): Boolean {
+                if (result == null || isFinishing) return false
+                ThemedDialog(this@MainActivity).show(body = message ?: "", negative = "取消") { ok ->
+                    if (ok) result.confirm() else result.cancel()
+                }
+                return true
+            }
+
+            override fun onJsPrompt(view: WebView?, url: String?, message: String?, defaultValue: String?, result: JsPromptResult?): Boolean {
+                if (result == null || isFinishing) return false
+                val d = ThemedDialog(this@MainActivity)
+                val field = d.input(defaultValue ?: "")
+                d.show(body = message ?: "", content = field, negative = "取消") { ok ->
+                    if (ok) result.confirm(field.text.toString()) else result.cancel()
+                }
                 return true
             }
 
@@ -312,58 +336,15 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    // 1030 她嫌系统白框丑：「这个提醒框要不要美化一下」。照归巢的纸色/黄铜画一张圆角卡，跟着深浅色走。
+    // 1030 她嫌系统白框丑：「这个提醒框要不要美化一下」。样子在 ThemedDialog 里。
     private fun showUpdateDialog(latest: Int, note: String, url: String) {
-        val night = (resources.configuration.uiMode and android.content.res.Configuration.UI_MODE_NIGHT_MASK) ==
-            android.content.res.Configuration.UI_MODE_NIGHT_YES
-        val paper = if (night) 0xFF1C2230.toInt() else 0xFFFBF6EC.toInt()
-        val ink = if (night) 0xFFE8E2D6.toInt() else 0xFF4A3726.toInt()
-        val dim = if (night) 0xFF9AA0AE.toInt() else 0xFF8B7A66.toInt()
-        val brass = if (night) 0xFFC9A46A.toInt() else 0xFFA0703C.toInt()
-        val dp = resources.displayMetrics.density
-        fun px(v: Int) = (v * dp).toInt()
-        fun round(color: Int, r: Int, stroke: Int? = null) = android.graphics.drawable.GradientDrawable().apply {
-            setColor(color); cornerRadius = r * dp
-            if (stroke != null) setStroke(px(1), stroke)
-        }
-        fun text(t: String, size: Float, color: Int, bold: Boolean = false) = android.widget.TextView(this).apply {
-            text = t; textSize = size; setTextColor(color); setLineSpacing(0f, 1.35f)
-            if (bold) typeface = android.graphics.Typeface.DEFAULT_BOLD
-        }
-        val card = android.widget.LinearLayout(this).apply {
-            orientation = android.widget.LinearLayout.VERTICAL
-            background = round(paper, 22)
-            setPadding(px(24), px(22), px(24), px(18))
-        }
-        card.addView(text("🐦‍⬛", 30f, ink).apply { gravity = android.view.Gravity.CENTER })
-        card.addView(text("归巢有新版本了", 19f, ink, true).apply {
-            gravity = android.view.Gravity.CENTER; setPadding(0, px(6), 0, px(4))
-        })
-        card.addView(text("${BuildConfig.VERSION_NAME}  →  1.0.$latest", 13f, brass).apply {
-            gravity = android.view.Gravity.CENTER; setPadding(0, 0, 0, px(14))
-        })
-        if (note.isNotEmpty()) card.addView(text(note, 15f, ink).apply {
-            background = round(ColorUtils.setAlphaComponent(brass, 0x22), 14)
-            setPadding(px(14), px(10), px(14), px(10))
-        })
-        card.addView(text("下载后直接安装覆盖就行，不用卸载，聊天记录都在。", 12.5f, dim).apply {
-            setPadding(0, px(12), 0, px(18))
-        })
-        val dialog = AlertDialog.Builder(this).setView(card).create()
-        val row = android.widget.LinearLayout(this).apply { orientation = android.widget.LinearLayout.HORIZONTAL }
-        fun button(t: String, primary: Boolean, onClick: () -> Unit) = android.widget.TextView(this).apply {
-            text = t; textSize = 15f; gravity = android.view.Gravity.CENTER
-            setTextColor(if (primary) paper else brass)
-            background = if (primary) round(brass, 999) else round(android.graphics.Color.TRANSPARENT, 999, ColorUtils.setAlphaComponent(brass, 0x88))
-            setPadding(0, px(11), 0, px(11))
-            setOnClickListener { onClick(); dialog.dismiss() }
-        }
-        row.addView(button("以后再说", false) {}, android.widget.LinearLayout.LayoutParams(0, -2, 1f).apply { marginEnd = px(10) })
-        row.addView(button("去下载", true) { startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url))) },
-            android.widget.LinearLayout.LayoutParams(0, -2, 1f))
-        card.addView(row)
-        dialog.window?.setBackgroundDrawable(android.graphics.drawable.ColorDrawable(android.graphics.Color.TRANSPARENT))
-        dialog.show()
+        val d = ThemedDialog(this)
+        d.show(
+            icon = "🐦‍⬛", title = "归巢有新版本了", sub = "${BuildConfig.VERSION_NAME}  →  1.0.$latest",
+            content = if (note.isNotEmpty()) d.noteBox(note) else null,
+            foot = "下载后直接安装覆盖就行，不用卸载，聊天记录都在。",
+            positive = "去下载", negative = "以后再说",
+        ) { ok -> if (ok) startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url))) }
     }
 
     // 版本检查：服务端去问 GitHub Release 的构建号，本地拿 versionCode 比大小。
@@ -445,20 +426,21 @@ class MainActivity : AppCompatActivity() {
     // 桌面小乌鸦的设置（1015）：两个开关；开小乌鸦时没有悬浮窗权限就先去系统设置里给
     fun openCrowSettings() {
         val crow = CrowOverlay.get(this)
-        val checked = booleanArrayOf(crow.enabled, mediaHelper.chipEnabled)
-        AlertDialog.Builder(this)
-            .setTitle("桌面小乌鸦")
-            .setMultiChoiceItems(arrayOf("离开归巢时，屏幕边上蹲一只小乌鸦（放歌时带歌词）", "状态栏歌词胶囊（试验，系统不一定肯显示）"), checked) { _, i, v -> checked[i] = v }
-            .setPositiveButton("好") { _, _ ->
-                crow.enabled = checked[0]
-                mediaHelper.chipEnabled = checked[1]
-                if (checked[0] && !crow.canDraw()) {
-                    Toast.makeText(this, "要先允许「显示在其他应用上层」", Toast.LENGTH_LONG).show()
-                    try { startActivity(Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:$packageName"))) } catch (_: Exception) {}
-                }
+        val d = ThemedDialog(this)
+        val c1 = d.check("离开归巢时，屏幕边上蹲一只小乌鸦（放歌时带歌词）", crow.enabled)
+        val c2 = d.check("状态栏歌词胶囊（试验，系统不一定肯显示）", mediaHelper.chipEnabled)
+        val box = android.widget.LinearLayout(this).apply {
+            orientation = android.widget.LinearLayout.VERTICAL; addView(c1); addView(c2)
+        }
+        d.show(title = "桌面小乌鸦", content = box, positive = "好", negative = "算了") { ok ->
+            if (!ok) return@show
+            crow.enabled = c1.isChecked
+            mediaHelper.chipEnabled = c2.isChecked
+            if (c1.isChecked && !crow.canDraw()) {
+                Toast.makeText(this, "要先允许「显示在其他应用上层」", Toast.LENGTH_LONG).show()
+                try { startActivity(Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:$packageName"))) } catch (_: Exception) {}
             }
-            .setNegativeButton("算了", null)
-            .show()
+        }
     }
 
     override fun onDestroy() {
