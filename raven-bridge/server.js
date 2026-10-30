@@ -627,18 +627,30 @@ function tmuxSend(text) {
 // 紧跟着的回车被算进粘贴里，消息就卡在输入框没提交，直到她下一条的回车才一起送进来。
 // 所以发完 1.2 秒看一眼：输入框那行还挂着这段话的开头，就补一个回车。只补一次，
 // 查不到就算了（宁可不补，也别往正在干活的 CC 里多敲回车）。
+// 1030：10-29 23:04 她一条普通的话（没颜文字、七十来字）也卡在输入框里两分钟，直到她改成「没事」那条的回车才一起送进来，
+// 那次这里一声没吭——多半是 1.2 秒时 CC 还没把字画出来（那阵子桥的事件循环也在卡），看了一眼输入框是空的就走了。
+// 改成 1.2 / 3 / 6 秒各看一次，还挂着就补回车，最多补两次；提示符后面可能是不换行空格（\u00a0），一起认。
 function verifySubmitted(target, sent) {
   const probe = sent.slice(0, 12)
-  setTimeout(() => {
-    try {
-      const pane = boundedSync.spawnBounded('tmux-verify', 'tmux', ['capture-pane', '-p', '-t', target]).stdout || ''
-      const promptLine = pane.split('\n').reverse().find(l => /^❯ /.test(l)) || ''
-      if (probe && promptLine.includes(probe)) {
-        console.log('[tmux] 回车像是被吞了，补一个')
-        boundedSync.execFileBounded('tmux-send-enter-retry', 'tmux', ['send-keys', '-t', target, 'Enter'])
-      }
-    } catch { /* 兜底失败不影响主流程 */ }
-  }, 1200)
+  if (!probe) return
+  let retries = 0
+  const look = (i) => {
+    const delays = [1200, 3000, 6000]
+    if (i >= delays.length || retries >= 2) return
+    setTimeout(() => {
+      try {
+        const pane = boundedSync.spawnBounded('tmux-verify', 'tmux', ['capture-pane', '-p', '-t', target]).stdout || ''
+        const promptLine = pane.split('\n').reverse().find(l => /^❯[ \u00a0]/.test(l)) || ''
+        if (promptLine.includes(probe)) {
+          retries++
+          console.log(`[tmux] 回车像是被吞了，补一个（${delays[i] / 1000}s）`)
+          boundedSync.execFileBounded('tmux-send-enter-retry', 'tmux', ['send-keys', '-t', target, 'Enter'])
+        }
+      } catch { /* 兜底失败不影响主流程 */ }
+      look(i + 1)
+    }, delays[i] - (i ? delays[i - 1] : 0))
+  }
+  look(0)
 }
 
 // 在线 = 「这条消息有人会收到」，不是「终端里有没有 CC」。
