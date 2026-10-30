@@ -547,7 +547,7 @@ function ingestUserMessageCore(text, cid, note = '', recallLine = '') {
   // 先回执让她看到发出去了，等窗口过了再送；存档上面已经做了，不会丢。
   const wait = switchQuietUntil - Date.now()
   if (wait > 0) {
-    { const sentTs = Date.now(); lastUserReactKey = `user:${sentTs}`; broadcast({ type: 'sent', text, ts: sentTs, cid: cid || null, supplemental }) }
+    { const sentTs = Date.now(); lastUserReactKey = `user:${sentTs}`; noteRecentUser(sentTs, text); broadcast({ type: 'sent', text, ts: sentTs, cid: cid || null, supplemental }) }
     console.log(`[tmux] 刚切模型，${wait}ms 后再送她的消息`)
     setTimeout(() => {
       if (!tmuxSend(senderPrefix + note + forMe + stamp) && remoteListenerAlive()) pendingForRemote.push({ text: note + forMe, supplemental, ts: Date.now() })
@@ -555,7 +555,7 @@ function ingestUserMessageCore(text, cid, note = '', recallLine = '') {
     return
   }
   const delivered = tmuxSend(senderPrefix + note + forMe + stamp)
-  { const sentTs = Date.now(); lastUserReactKey = `user:${sentTs}`; broadcast({ type: 'sent', text, ts: sentTs, cid: cid || null, supplemental }) }
+  { const sentTs = Date.now(); lastUserReactKey = `user:${sentTs}`; noteRecentUser(sentTs, text); broadcast({ type: 'sent', text, ts: sentTs, cid: cid || null, supplemental }) }
   // 这一条是放过去探路的：半分钟后看一眼，换回来的还是报错就告诉她，别让它悄悄沉下去
   if (delivered && Date.now() - lastAuthProbeAt < 2000) {
     setTimeout(() => { ccAuthCache.ts = 0; if (ccAuthLook().broken) warnUndelivered('probe') }, 30000)
@@ -743,6 +743,9 @@ function normalizeDrawerPixel(d) {
   return { w, h, palette, grid: grid.concat(new Array(w * h).fill(0)).slice(0, w * h) }
 }
 const REACTIONS_FILE = path.join(__dirname, 'reactions.json')
+// 她最近说的几条（1030）：我自己收藏她的话时要那条的钥匙（归巢气泡的 key 是 user:<桥收到的时刻>），GET /raven/recent 本机才给
+const recentUser = []
+function noteRecentUser(ts, text) { recentUser.push({ key: `user:${ts}`, text }); if (recentUser.length > 30) recentUser.shift() }
 let lastUserReactKey = ''   // 她最近一条消息的贴表情 key（前端画气泡用的就是 sent 的 ts），给我用 user:latest
 function loadReactions() {
   try { return JSON.parse(fs.readFileSync(REACTIONS_FILE, 'utf8')) || {} } catch { return {} }
@@ -1481,6 +1484,15 @@ const server = http.createServer((req, res) => {
       res.writeHead(200, { 'Content-Type': 'audio/mpeg', 'Content-Length': buf.length, 'Cache-Control': 'private, no-store' })
       res.end(buf)
     })
+    return
+  }
+
+  // 最近的消息和它们在归巢里的钥匙（1030）：给我自己收藏用，只给本机
+  if (url.pathname === '/raven/recent' && req.method === 'GET') {
+    if (isExternal(req)) { res.writeHead(403); res.end(); return }
+    const mine = lastReplyMsgs.filter(m => m.type === 'reply' && m.text).slice(-30).map(m => ({ key: `assistant:${m.ts}`, text: m.text }))
+    res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' })
+    res.end(JSON.stringify({ her: recentUser, mine }))
     return
   }
 

@@ -148,7 +148,7 @@ function fmtWhen(f) {
 function card(f) {
   const el = document.createElement('div'); el.className = 'item'
   const who = document.createElement('div'); who.className = 'who'
-  who.innerHTML = `<span>${f.role === 'assistant' ? '阿言' : '我'}</span><span class="tag">${f.source === 'yanji' ? '言叽' : '归巢'}</span><span class="when">${esc(fmtWhen(f))}</span>`
+  who.innerHTML = `<span>${f.role === 'assistant' ? '阿言' : '我'}</span><span class="tag">${f.source === 'yanji' ? '言叽' : '归巢'}</span>${f.saved_by === '涟言' ? '<span class="tag">阿言收的</span>' : ''}<span class="when">${esc(fmtWhen(f))}</span>`
   el.append(who, renderBody(f))
   const note = Object.assign(document.createElement('div'), { className: 'note', textContent: f.note || '' })
   if (!f.note) note.hidden = true
