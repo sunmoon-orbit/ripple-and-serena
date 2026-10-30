@@ -1586,12 +1586,31 @@ const server = http.createServer((req, res) => {
     return
   }
 
+  // 小票上的账单（1030 她要的）：cost-ledger.js 每天零点按北京日期记一笔，这里按月 / 按年加起来
+  function costForPeriod(period) {
+    let ledger = {}
+    try { ledger = JSON.parse(fs.readFileSync('/home/ripple/raven-private/cost-ledger.json', 'utf8')) } catch { return null }
+    const days = Object.entries(ledger).filter(([k]) => k.startsWith(period))
+    if (!days.length) return null
+    const r2 = x => Math.round(x * 100) / 100
+    const total = r2(days.reduce((a, [, v]) => a + v.cost, 0))
+    const calls = days.reduce((a, [, v]) => a + v.calls, 0)
+    const max = days.reduce((a, b) => (b[1].cost > a[1].cost ? b : a))
+    let items
+    if (period.length === 4) {
+      const m = {}
+      for (const [k, v] of days) m[k.slice(0, 7)] = (m[k.slice(0, 7)] || 0) + v.cost
+      items = Object.entries(m).map(([k, v]) => ({ label: k.slice(5) + '月', cost: r2(v) }))
+    } else items = days.map(([k, v]) => ({ label: k.slice(5).replace('-', '/'), cost: v.cost }))
+    return { total, calls, days: days.length, avg: r2(total / days.length), max: { day: max[0], cost: max[1].cost }, items }
+  }
+
   // 聊天小票（1003）：月度 / 年终，统计在 moon-memory 里算
   if (req.method === 'GET' && url.pathname === '/raven/receipt') {
     const period = String(url.searchParams.get('period') || '')
     if (period && !/^\d{4}(-\d{2})?$/.test(period)) { res.writeHead(400); res.end('{}'); return }
     moonGet('/receipt' + (period ? '?period=' + period : ''))
-      .then(d => { res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' }); res.end(JSON.stringify(d)) })
+      .then(d => { if (d && d.period) d.cost = costForPeriod(d.period); res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' }); res.end(JSON.stringify(d)) })
       .catch(() => { res.writeHead(500); res.end('{}') })
     return
   }
