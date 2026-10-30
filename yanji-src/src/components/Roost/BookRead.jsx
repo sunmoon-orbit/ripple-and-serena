@@ -1170,12 +1170,13 @@ export default function BookRead({ onClose }) {
               <div className="bookread-echo-sheet" onClick={closeEchoes}>
                 <section onClick={(e) => e.stopPropagation()} aria-label="页边新回音">
                   <div className="bookread-echo-head">
-                    <strong>页边回音</strong>
+                    <strong>页边回音{echoes.some((x) => !x.her_replied) ? <small className="bookread-echo-left"> · 还有 {echoes.filter((x) => !x.her_replied).length} 条没回</small> : null}</strong>
                     <button onClick={closeEchoes} aria-label="关上">✕</button>
                   </div>
-                  {echoes.map((e) => (
-                    <div key={e.id} className="bookread-echo-item">
-                      <div className="bookread-echo-where">{!e.seen_at && <span className="bookread-echo-new">新</span>}《{e.book_title}》{e.chapter_title ? ` · ${e.chapter_title}` : ''}</div>
+                  {/* 1030 她：「我已经回复你的批注能不能留个标记？」——回过的打勾变淡、排到后面，没回的在前面亮着 */}
+                  {[...echoes.filter((x) => !x.her_replied), ...echoes.filter((x) => x.her_replied)].map((e) => (
+                    <div key={e.id} className={'bookread-echo-item' + (e.her_replied ? ' replied' : '')}>
+                      <div className="bookread-echo-where">{!e.seen_at && <span className="bookread-echo-new">新</span>}{e.her_replied ? <span className="bookread-echo-done">已回 ✓</span> : null}《{e.book_title}》{e.chapter_title ? ` · ${e.chapter_title}` : ''}</div>
                       <div className="bookread-anno-quote">「{e.quote}」</div>
                       {e.parent_note && <div className="bookread-echo-line"><span className="coread-anno-author">{e.parent_author}</span>{e.parent_note}</div>}
                       <div className="bookread-echo-line mine"><span className="coread-anno-author">{e.author}</span>{e.note || '（划了一道）'}</div>

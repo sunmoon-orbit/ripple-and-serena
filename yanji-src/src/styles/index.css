@@ -6380,3 +6380,8 @@ button:focus:not(:focus-visible) { outline: none; }
 .fav-think { margin-top: 8px; font-size: 12.5px; opacity: .8; }
 .fav-think summary { cursor: pointer; }
 .fav-think-body { margin-top: 6px; padding: 8px 10px; border-radius: 10px; background: color-mix(in srgb, currentColor 8%, transparent); white-space: pre-wrap; line-height: 1.7; max-height: 320px; overflow: auto; }
+
+/* 页边回音：她回过的（1030） */
+.bookread-echo-item.replied { opacity: .5; }
+.bookread-echo-done { display: inline-block; margin-right: 6px; padding: 0 6px; border-radius: 8px; border: 1px solid currentColor; font-size: 11px; line-height: 15px; opacity: .8; }
+.bookread-echo-left { font-weight: 400; font-size: 12px; opacity: .65; }
