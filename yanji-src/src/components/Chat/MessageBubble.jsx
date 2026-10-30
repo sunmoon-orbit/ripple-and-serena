@@ -18,6 +18,7 @@ import { stripTextualTarotReading } from '../../api/tarot'
 import { underlineExtension } from '../../utils/markdownUnderline'
 import { downloadBlob, hasNativeDownloadBridge } from '../../utils/download'
 import { showToast } from '../Toast'
+import { isFavorite, loadFavoriteKeys, setFavorite, subscribeFavorites } from '../../api/favorites'
 import { extractRunnableHtmlMessage, looksRunnableHtml } from '../../utils/runnableCode'
 import { enhanceMarkdownTables } from '../../utils/markdownTables'
 
@@ -502,6 +503,21 @@ function MessageBubble({ msg, onEdit, onQuote, onDelete, isLast, presentationCon
     return speech.toggle()
   }, [speech.available, speech.toggle])
 
+  // 收藏（1030）：和归巢共用一本，首页顶栏的星星里翻
+  const [faved, setFaved] = useState(() => isFavorite(msg.id))
+  useEffect(() => {
+    if (moonMemory?.enabled) loadFavoriteKeys(moonMemory)
+    setFaved(isFavorite(msg.id))
+    return subscribeFavorites(() => setFaved(isFavorite(msg.id)))
+  }, [msg.id, moonMemory?.enabled, moonMemory?.baseUrl, moonMemory?.apiToken])
+  const toggleFavorite = useCallback(async () => {
+    const next = !isFavorite(msg.id)
+    try {
+      await setFavorite(moonMemory, msg, next)
+      showToast(next ? '收进收藏了' : '取消收藏了', 'success')
+    } catch (e) { showToast(e.message || '没收上，等会儿再试', 'error') }
+  }, [moonMemory, msg])
+
   const copyWholeMessage = useCallback(async () => {
     try {
       await navigator.clipboard.writeText(msg.content || '')
@@ -769,6 +785,13 @@ function MessageBubble({ msg, onEdit, onQuote, onDelete, isLast, presentationCon
             <button className="msg-edit-icon-btn" title="引用回复" onClick={() => onQuote(msg)}>
               <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <polyline points="9 17 4 12 9 7" /><path d="M20 18v-2a4 4 0 0 0-4-4H4" />
+              </svg>
+            </button>
+          )}
+          {!isStreaming && !isErrorMsg && msg.id && moonMemory?.enabled && !presentationConfig?.crossing && (
+            <button className={`msg-edit-icon-btn${faved ? ' active' : ''}`} title={faved ? '取消收藏' : '收藏'} aria-label={faved ? '取消收藏' : '收藏'} onClick={toggleFavorite}>
+              <svg width="11" height="11" viewBox="0 0 24 24" fill={faved ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <polygon points="12 2 15.1 8.3 22 9.3 17 14.1 18.2 21 12 17.8 5.8 21 7 14.1 2 9.3 8.9 8.3 12 2" />
               </svg>
             </button>
           )}

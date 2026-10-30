@@ -59,6 +59,7 @@ import AnniversaryCard from './AnniversaryCard'
 import HeartCard from './HeartCard'
 import HeartCardAlbum from './HeartCardAlbum'
 import PhotoAlbum, { AlbumIcon } from './PhotoAlbum'
+import Favorites, { StarIcon } from './Favorites'
 import { surfaceMemory } from '../../utils/autoRecall'
 import { fetchAnniversaryToday, fetchUnseenHeartCards, markHeartCardSeen, formatWeatherLine, fetchContactLastSeen } from '../../api/moonMemory'
 import CompletionEgg, { pickEgg } from './CompletionEgg'
@@ -314,6 +315,7 @@ export default function Chat() {
   const [fortuneOpen, setFortuneOpen] = useState(false)
   const [quoted, setQuoted] = useState(null)
   const [photoAlbumOpen, setPhotoAlbumOpen] = useState(false)
+  const [favoritesOpen, setFavoritesOpen] = useState(false)
   const [modelPanelOpen, setModelPanelOpen] = useState(false)
   const [isSending, setIsSending] = useState(false)
   const [status, setStatus] = useState('')
@@ -1850,6 +1852,14 @@ export default function Chat() {
             <AlbumIcon />
           </button>
           <button
+            className="topbar-btn"
+            onClick={() => setFavoritesOpen(true)}
+            title="收藏"
+            aria-label="打开收藏"
+          >
+            <StarIcon size={18} />
+          </button>
+          <button
             className={'topbar-btn' + (injectMode ? ' active' : '')}
             onClick={() => setInjectMode(!injectMode)}
             title={injectMode ? '关闭注入模式' : '开启注入模式'}
@@ -2040,6 +2050,7 @@ export default function Chat() {
       {periodOpen && <PeriodCard onClose={() => setPeriodOpen(false)} />}
       {albumOpen && <HeartCardAlbum onClose={() => setAlbumOpen(false)} />}
       {photoAlbumOpen && <PhotoAlbum messages={messages} onClose={() => setPhotoAlbumOpen(false)} />}
+      {favoritesOpen && <Favorites onClose={() => setFavoritesOpen(false)} />}
       {idleJournalOpen && <IdleJournal onClose={() => setIdleJournalOpen(false)} />}
       {boardOpen && <BoardWall onClose={() => setBoardOpen(false)} />}
       {incomingCall && (
