@@ -561,7 +561,14 @@ export default function Chat() {
           const cursorId = currentChat?.compactedThrough || null
           const cursorIdx = cursorId ? allMsgs.findIndex((m) => m.id === cursorId) : -1
           const start = cursorIdx >= 0 ? cursorIdx + 1 : 0
-          const cutMsgs = prepared.slice(start, cutCount)
+          // 1030 借《不换窗》11.3：触发主动开口的隐藏消息是系统写的，不是她说的，不进笔记；
+          // 我主动开口的那条标出来，免得被压成「我们聊过 XX」
+          const cutMsgs = prepared.slice(start, cutCount).flatMap((p, k) => {
+            const src = allMsgs[start + k]
+            if (src?.hidden && p.role === 'user') return []
+            if (src?.proactive && p.role === 'assistant') return [{ ...p, content: `（这条是涟言自己主动开口发的）${p.content || ''}` }]
+            return [p]
+          })
 
           if (cutMsgs.length && boundaryId) {
             let job = compactionJobs.get(chat.id)
