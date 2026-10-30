@@ -2936,6 +2936,7 @@ function appendMsg(text, role, save = true, ts = Date.now(), msgId = null, suppl
   if (role === 'user' || role === 'assistant') el.dataset.rkey = `${role}:${ts}`
   if (msgId) el.dataset.msgId = msgId
   if (role === 'user') el._raw = text   // 编辑时要原文（气泡里的是画过的）
+  if (role === 'user' || role === 'assistant') el._favText = text   // 收藏存原文（1030）
   // [voice] = 点播放时现合成；[voice:文件名.mp3] = 播放事先做好的音频（1006：混了亲吻和水声的那种，现合成做不出来）
   const voiceRequested = role === 'assistant' && VOICE_MARK_RE.test(text)
   const voiceFile = voiceRequested ? ((/\[voice:\s*([^\]\s\/]+\.(?:mp3|m4a|wav|ogg))\s*\]/i.exec(text) || [])[1] || '') : ''
@@ -4973,6 +4974,34 @@ function setQuote(t) {
 function clearQuote() { pendingQuote = null; document.getElementById('quote-bar').hidden = true }
 document.getElementById('quote-x').addEventListener('click', clearQuote)
 
+// ── 收藏（1030）────────────────────────────────────────────────────────
+const favKeys = new Set()
+async function loadFavKeys() {
+  try {
+    const r = await fetch('/raven/favorites?source=raven&keys=1', { headers: { Authorization: 'Bearer ' + (localStorage.getItem('raven-token') || '') }, cache: 'no-store' })
+    if (r.ok) { favKeys.clear(); for (const x of await r.json()) favKeys.add(x.msg_key) }
+  } catch {}
+}
+async function toggleFavorite(msgEl, key, on) {
+  const ts = Number(key.split(':')[1])
+  const headers = { 'Content-Type': 'application/json', Authorization: 'Bearer ' + (localStorage.getItem('raven-token') || '') }
+  try {
+    const r = on
+      ? await fetch('/raven/favorites', { method: 'POST', headers, body: JSON.stringify({ source: 'raven', msg_key: key, role: key.split(':')[0], text: msgEl._favText, msg_at: ts ? new Date(ts).toISOString() : '' }) })
+      : await fetch('/raven/favorites?source=raven&key=' + encodeURIComponent(key), { method: 'DELETE', headers })
+    if (!r.ok) throw new Error()
+    if (on) favKeys.add(key); else favKeys.delete(key)
+    showFavToast(on ? '收进收藏了，首页「收藏」里翻' : '取消收藏了')
+  } catch { showFavToast('没收上，等会儿再试') }
+}
+function showFavToast(t) {
+  let el = document.getElementById('fav-toast')
+  if (!el) { el = document.createElement('div'); el.id = 'fav-toast'; el.style.cssText = 'position:fixed;left:50%;bottom:110px;transform:translateX(-50%);background:rgba(30,28,26,.86);color:#fff;font-size:13px;padding:8px 16px;border-radius:99px;z-index:9999;pointer-events:none;transition:opacity .3s'; document.body.appendChild(el) }
+  el.textContent = t; el.style.opacity = '1'
+  clearTimeout(el._t); el._t = setTimeout(() => { el.style.opacity = '0' }, 1800)
+}
+loadFavKeys()
+
 function openReactPop(msgEl) {
   const key = msgEl.dataset.rkey; if (!key) return
   lastLongPressAt = Date.now()
@@ -5044,6 +5073,14 @@ function openReactPop(msgEl) {
     setQuote(raw.replace(/\s+/g, ' ').trim().slice(0, 60) || '[贴图或附件]')
   })
   reactPop.appendChild(qb)
+  // 收藏（1030 她要的：「能不能收藏你的语音条？」「或者文字？」）：我的她的都能收，和言叽共用一本，在首页「收藏」里翻
+  if (typeof msgEl._favText === 'string' && !msgEl.classList.contains('call-record')) {
+    const faved = favKeys.has(key)
+    const fb = document.createElement('button'); fb.type = 'button'; fb.className = 'react-quote' + (faved ? ' on' : ''); fb.title = faved ? '取消收藏' : '收藏'; fb.dataset.label = faved ? '已收藏' : '收藏'
+    fb.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="${faved ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.1 8.3 22 9.3 17 14.1 18.2 21 12 17.8 5.8 21 7 14.1 2 9.3 8.9 8.3 12 2"/></svg>`
+    fb.addEventListener('click', ev => { ev.stopPropagation(); closeReactPop(); toggleFavorite(msgEl, key, !faved) })
+    reactPop.appendChild(fb)
+  }
   // 编辑（1006）：只有她自己的消息有，哪一条都行，不限最近一条
   if (msgEl.classList.contains('user') && !msgEl.classList.contains('call-record') && typeof msgEl._raw === 'string') {
     const eb = document.createElement('button'); eb.type = 'button'; eb.className = 'react-quote'; eb.title = '编辑'; eb.dataset.label = '编辑'

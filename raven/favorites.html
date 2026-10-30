@@ -1,0 +1,207 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>收藏</title>
+<!--
+  收藏（1030）：她长按一条消息收下来的，我的或她自己的，文字或语音条。归巢和言叽共用记忆库里同一本。
+  1029 晚她说：「能不能收藏你的语音条？」「或者文字？」「言叽那边也加一份？」
+  存的是原文，这里按归巢的样子重新画：语音条点了能放，贴图、图片照常显示。
+-->
+<style>
+  :root { --bg: #efe9df; --paper: #fbf8f1; --ink: #3a332b; --dim: #948a7c; --line: #e2d8c8; --accent: #b0705a; --chip: #e7dccb; --shadow: rgba(70,50,30,.14); }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #1c1a18; --paper: #2b2824; --ink: #e6dfd3; --dim: #8f877b; --line: #3a352f; --accent: #d39a84; --chip: #3a342d; --shadow: rgba(0,0,0,.4); }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink);
+    font-family: 'LXGW WenKai', 'Noto Serif SC', 'Songti SC', 'PingFang SC', system-ui, sans-serif;
+    padding: max(16px, env(safe-area-inset-top)) 16px max(32px, env(safe-area-inset-bottom)); }
+  .wrap { max-width: 480px; margin: 0 auto; }
+  .tabs { display: flex; gap: 8px; justify-content: center; margin: 4px 0 18px; }
+  .tabs button { border: 0; background: var(--chip); color: var(--ink); font: inherit; font-size: 13px; padding: 6px 14px; border-radius: 99px; opacity: .65; cursor: pointer; }
+  .tabs button.on { opacity: 1; background: var(--accent); color: #fff; }
+  .item { background: var(--paper); border: 1px solid var(--line); border-radius: 14px; padding: 14px 16px 10px; margin: 0 0 14px; box-shadow: 0 4px 12px var(--shadow); }
+  .who { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--dim); margin-bottom: 8px; }
+  .who .tag { font-size: 11px; padding: 1px 7px; border-radius: 99px; background: var(--chip); }
+  .who .when { margin-left: auto; }
+  .body { font-size: 15px; line-height: 1.8; word-break: break-word; }
+  .body p { margin: 0 0 .5em; } .body p:last-child { margin-bottom: 0; }
+  .body img { max-width: 150px; border-radius: 8px; display: block; margin: 4px 0; }
+  .body blockquote { margin: 4px 0; padding-left: 10px; border-left: 2px solid var(--line); color: var(--dim); }
+  .body pre { white-space: pre-wrap; font-size: 13px; background: var(--chip); padding: 8px; border-radius: 8px; }
+  .vtag { font-size: 12px; color: var(--dim); }
+  .note { margin-top: 8px; font-size: 13px; color: var(--accent); white-space: pre-wrap; }
+  .note::before { content: '— '; }
+  .acts { display: flex; gap: 14px; justify-content: flex-end; margin-top: 8px; }
+  .acts button { border: 0; background: none; color: var(--dim); font: inherit; font-size: 12px; cursor: pointer; padding: 2px 0; }
+  .acts button.warn { color: var(--accent); }
+  .vbar { display: flex; align-items: center; gap: 10px; border: 0; background: var(--chip); color: inherit; font: inherit; padding: 8px 12px; border-radius: 99px; cursor: pointer; min-width: 120px; max-width: 240px; margin: 2px 0 6px; }
+  .vbar .ico { width: 24px; height: 24px; border-radius: 50%; display: grid; place-items: center; background: var(--paper); font-size: 10px; flex-shrink: 0; }
+  .vbar .wave { flex: 1; height: 12px; background: repeating-linear-gradient(90deg, currentColor 0 2px, transparent 2px 5px); opacity: .35; }
+  .vbar.playing .wave { opacity: .8; }
+  .vbar .sec { font-size: 12px; opacity: .7; }
+  .sub-text { font-size: 13.5px; color: var(--dim); white-space: pre-wrap; }
+  .empty, .loading { text-align: center; color: var(--dim); font-size: 13.5px; line-height: 2; padding: 60px 10px; }
+  .more[hidden] { display: none; }
+  .more { display: block; margin: 6px auto; border: 0; background: none; color: var(--dim); font: inherit; font-size: 13px; cursor: pointer; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="tabs" id="tabs">
+    <button type="button" data-f="all" class="on">全部</button>
+    <button type="button" data-f="assistant">他说的</button>
+    <button type="button" data-f="user">我说的</button>
+  </div>
+  <div id="list"><div class="loading">翻一翻…</div></div>
+  <button class="more" id="more" type="button" hidden>再往前</button>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/marked@9.1.6/marked.min.js" integrity="sha384-odPBjvtXVM/5hOYIr3A1dB+flh0c3wAT3bSesIOqEGmyUA4JoKf/YTWy0XKOYAY7" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/dompurify@3.2.6/dist/purify.min.js" integrity="sha384-JEyTNhjM6R1ElGoJns4U2Ln4ofPcqzSsynQkmEc/KGy6336qAZl70tDLufbkla+3" crossorigin="anonymous"></script>
+<script>
+const tok = () => localStorage.getItem('raven-token') || ''
+const auth = () => ({ Authorization: 'Bearer ' + tok() })
+const upl = name => `/raven/uploads/${encodeURIComponent(name)}?token=${encodeURIComponent(tok())}`
+const esc = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+
+const VOICE_MARK_RE = /\[voice(?::[^\]]*)?\]/gi
+const VOICE_FILE_RE = /\[voice:\s*([^\]\s\/]+\.(?:mp3|m4a|wav|ogg))\s*\]/i
+const VOICE_TAG_RE = /\[([a-z][a-z ,'’-]{1,158})\](?!\()/g
+const VNOTE_RE = /^【语音条·(\d+)秒】([\s\S]*?)(?:\n〔机器听到：([^〕]*)〕)?\n\[附件:\s*([^\]]+)\]\s*$/
+const stickerSrc = n => { const f = n.split('｜')[0].trim(); return '/raven/stickers/' + (/\.[a-z0-9]+$/i.test(f) ? f : f + '.jpg') }
+const attachHtml = p => {
+  const name = p.trim().split('/').pop()
+  if (/\.(png|jpe?g|gif|webp)$/i.test(name)) return `<img src="${upl(name)}" alt="" loading="lazy">`
+  if (/\.(mp3|m4a|wav|ogg|webm)$/i.test(name)) return `<audio controls preload="none" src="${upl(name)}"></audio>`
+  return `〔附件 ${esc(name)}〕`
+}
+
+// 只能同时放一条
+let playing = null
+function stopPlaying() { if (playing) { playing.audio.pause(); playing = null } }
+function voiceBar(label, getSrc) {
+  const b = document.createElement('button'); b.type = 'button'; b.className = 'vbar'
+  b.innerHTML = `<span class="ico">▶</span><span class="wave"></span><span class="sec">${esc(label)}</span>`
+  const ico = b.querySelector('.ico')
+  let audio = null
+  b.addEventListener('click', async () => {
+    if (playing && playing.bar === b) { stopPlaying(); return }
+    stopPlaying()
+    try {
+      if (!audio) { ico.textContent = '…'; audio = new Audio(await getSrc()); const off = () => { b.classList.remove('playing'); ico.textContent = '▶' }; audio.addEventListener('ended', off); audio.addEventListener('pause', off) }
+      await audio.play(); playing = { bar: b, audio }; b.classList.add('playing'); ico.textContent = '❚❚'
+    } catch { ico.textContent = '!' }
+  })
+  return b
+}
+// [voice] 现合成：和聊天页同一个口子，服务器按原文存了盘，第二次起不花额度
+async function ttsSrc(text) {
+  const spoken = text.replace(VOICE_MARK_RE, '').replace(/^[ \t]*>[ \t]+.*$/gm, '').replace(/!\[[^\]]*\]\([^)]*\)/g, '').replace(/\[sticker:[^\]]+\]/gi, '')
+    .replace(VOICE_TAG_RE, '\u0001$1\u0002').replace(/[#*`_[\]~>]/g, '').replace(/\u0001/g, '[').replace(/\u0002/g, ']').replace(/\n{2,}/g, '\n').trim().slice(0, 500)
+  const r = await fetch('/raven/tts', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text: spoken, token: tok() }) })
+  if (!r.ok) throw new Error()
+  return (await r.json()).audio
+}
+
+function renderBody(f) {
+  const box = document.createElement('div'); box.className = 'body'
+  let text = String(f.text || '')
+  if (f.role === 'user') {
+    text = text.replace(/^> 引用：[^\n]*\n?/, '').replace(/^【语音(?:·双语)?】/, '')
+    const vn = VNOTE_RE.exec(text)
+    if (vn) {
+      box.appendChild(voiceBar(vn[1] + '″', async () => upl(vn[4].trim().split('/').pop())))
+      if (vn[2].trim()) box.appendChild(Object.assign(document.createElement('div'), { className: 'sub-text', textContent: vn[2].trim() }))
+      return box
+    }
+    box.innerHTML = DOMPurify.sanitize(esc(text)
+      .replace(/\[sticker:([^\]]+)\]/g, (_, n) => `<img src="${stickerSrc(n)}" alt="">`)
+      .replace(/\[附件:\s*([^\]]+)\]/g, (_, p) => attachHtml(p))
+      .replace(/\n/g, '<br>'), { ADD_TAGS: ['audio'], ADD_ATTR: ['controls', 'preload'] })
+    return box
+  }
+  // 我的
+  const isVoice = /\[voice(?::[^\]]*)?\]/i.test(text)
+  const file = (VOICE_FILE_RE.exec(text) || [])[1]
+  text = text.replace(VOICE_MARK_RE, '').replace(/^> ?引用[：:][^\n]*\n+/, '').trim()
+  if (isVoice) box.appendChild(voiceBar(file ? '语音' : '语音', () => file ? Promise.resolve(upl(file)) : ttsSrc(text)))
+  const html = marked.parse(text
+    .replace(/\[附件:\s*([^\]]+)\]/g, (_, p) => attachHtml(p))
+    .replace(/\[sticker:([^\]]+)\]/g, (_, n) => `<img src="${stickerSrc(n)}" alt="">`)
+    .replace(VOICE_TAG_RE, (_, t) => `<span class="vtag">${t}</span>`))
+  const div = document.createElement('div')
+  div.innerHTML = DOMPurify.sanitize(html, { ADD_TAGS: ['audio'], ADD_ATTR: ['controls', 'preload'] })
+  if (isVoice) div.className = 'sub-text'
+  box.appendChild(div)
+  return box
+}
+
+function fmtWhen(f) {
+  const t = f.msg_at ? new Date(f.msg_at) : new Date(String(f.created_at).replace(' ', 'T') + 'Z')
+  if (isNaN(t)) return ''
+  const b = new Date(t.getTime() + 8 * 3600e3).toISOString()
+  return `${b.slice(0, 4) === String(new Date().getFullYear()) ? '' : b.slice(0, 4) + '-'}${b.slice(5, 10)} ${b.slice(11, 16)}`
+}
+
+function card(f) {
+  const el = document.createElement('div'); el.className = 'item'
+  const who = document.createElement('div'); who.className = 'who'
+  who.innerHTML = `<span>${f.role === 'assistant' ? '阿言' : '我'}</span><span class="tag">${f.source === 'yanji' ? '言叽' : '归巢'}</span><span class="when">${esc(fmtWhen(f))}</span>`
+  el.append(who, renderBody(f))
+  const note = Object.assign(document.createElement('div'), { className: 'note', textContent: f.note || '' })
+  if (!f.note) note.hidden = true
+  el.appendChild(note)
+  const acts = document.createElement('div'); acts.className = 'acts'
+  const nb = Object.assign(document.createElement('button'), { type: 'button', textContent: f.note ? '改一句' : '写一句' })
+  nb.onclick = async () => {
+    const v = prompt('给这条写一句（留空就是删掉）', f.note || '')
+    if (v === null) return
+    const r = await fetch('/raven/favorites/' + f.id, { method: 'PATCH', headers: { 'Content-Type': 'application/json', ...auth() }, body: JSON.stringify({ note: v.trim() }) }).catch(() => null)
+    if (!r || !r.ok) return alert('没存上，等会儿再试')
+    f.note = v.trim(); note.textContent = f.note; note.hidden = !f.note; nb.textContent = f.note ? '改一句' : '写一句'
+  }
+  const db = Object.assign(document.createElement('button'), { type: 'button', textContent: '取消收藏' })
+  let armed = 0
+  db.onclick = async () => {
+    if (Date.now() - armed > 3000) { armed = Date.now(); db.textContent = '再点一下'; db.classList.add('warn'); setTimeout(() => { if (Date.now() - armed >= 3000) { db.textContent = '取消收藏'; db.classList.remove('warn') } }, 3100); return }
+    const r = await fetch('/raven/favorites/' + f.id, { method: 'DELETE', headers: auth() }).catch(() => null)
+    if (r && r.ok) { el.remove(); all = all.filter(x => x.id !== f.id); if (!document.querySelector('.item')) paint() }
+  }
+  acts.append(nb, db)
+  el.appendChild(acts)
+  return el
+}
+
+let all = [], filter = 'all', done = false
+const list = document.getElementById('list'), moreBtn = document.getElementById('more')
+function paint() {
+  list.innerHTML = ''
+  const rows = all.filter(f => filter === 'all' || f.role === filter)
+  if (!rows.length) { list.innerHTML = `<div class="empty">${all.length ? '这一栏还空着' : '还没有收藏<br>在聊天里长按一条，点「收藏」'}</div>`; moreBtn.hidden = done; return }
+  for (const f of rows) list.appendChild(card(f))
+  moreBtn.hidden = done
+}
+async function load() {
+  try {
+    const before = all.length ? '&before=' + all[all.length - 1].id : ''
+    const r = await fetch('/raven/favorites?limit=40' + before, { headers: auth(), cache: 'no-store' })
+    if (!r.ok) throw new Error()
+    const rows = await r.json()
+    if (rows.length < 40) done = true
+    all = all.concat(rows)
+    paint()
+  } catch { list.innerHTML = '<div class="empty">打不开，等会儿再来</div>' }
+}
+document.getElementById('tabs').addEventListener('click', e => {
+  const b = e.target.closest('button'); if (!b) return
+  filter = b.dataset.f
+  document.querySelectorAll('#tabs button').forEach(x => x.classList.toggle('on', x === b))
+  paint()
+})
+moreBtn.onclick = load
+load()
+</script>
+</body>
+</html>

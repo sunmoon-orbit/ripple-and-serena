@@ -1461,6 +1461,26 @@ const server = http.createServer((req, res) => {
     return
   }
 
+  // 收藏（1030）：长按收下的消息，和言叽共用记忆库那一本。GET|POST|DELETE /raven/favorites ／ PATCH|DELETE /raven/favorites/<id>
+  const favMatch = url.pathname.match(/^\/raven\/favorites(?:\/(\d+))?$/)
+  if (favMatch) {
+    if (!externalAuthed(req, url)) { res.writeHead(401, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ error: 'unauthorized' })); return }
+    const m = req.method
+    if (!(favMatch[1] ? ['PATCH', 'DELETE'] : ['GET', 'POST', 'DELETE']).includes(m)) { res.writeHead(405, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ error: 'method not allowed' })); return }
+    const qs = new URLSearchParams()
+    for (const k of ['source', 'keys', 'key', 'limit', 'before']) if (url.searchParams.get(k)) qs.set(k, url.searchParams.get(k))
+    const headers = { Authorization: `Bearer ${MOON_TOKEN}` }
+    for (const h of ['content-type', 'content-length']) if (req.headers[h]) headers[h] = req.headers[h]
+    const up = http.request({ hostname: '127.0.0.1', port: 3210, method: m, headers,
+      path: '/favorites' + (favMatch[1] ? '/' + favMatch[1] : '') + (qs.toString() ? '?' + qs : '') }, r => {
+      res.writeHead(r.statusCode, { 'Content-Type': r.headers['content-type'] || 'application/json', 'Cache-Control': 'private, no-store' })
+      r.pipe(res)
+    })
+    up.on('error', () => { if (!res.headersSent) res.writeHead(502, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ error: '收藏暂时打不开' })) })
+    req.pipe(up)
+    return
+  }
+
   // 听歌（1014）：「涟言点给你的歌」和歌单在记忆库，跟言叽是同一份。这里按名单放行方法和路径，带钥匙转发
   //   GET|POST /raven/music/picks ／ PATCH /raven/music/picks/<id>/like ／ DELETE /raven/music/picks/<id>
   //   GET|POST /raven/music/playlists ／ PUT|DELETE /raven/music/playlists/<id>
