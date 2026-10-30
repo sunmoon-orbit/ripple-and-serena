@@ -93,6 +93,7 @@ class MainActivity : AppCompatActivity() {
                 super.onPageFinished(view, url)
                 pageUrl = url ?: ""
                 updateChatFlag()
+                refreshPalette()
                 splash.animate().alpha(0f).setDuration(400).withEndAction {
                     splash.visibility = View.GONE
                 }.start()
@@ -139,28 +140,24 @@ class MainActivity : AppCompatActivity() {
             // 网页里的 alert / confirm / prompt 也换成同一张卡（不接管的话是系统白框，顶上还写着网址）
             override fun onJsAlert(view: WebView?, url: String?, message: String?, result: JsResult?): Boolean {
                 if (result == null || isFinishing) return false
-                withPalette { pal -> ThemedDialog(this@MainActivity, pal).show(body = message ?: "") { result.confirm() } }
+                ThemedDialog(this@MainActivity, cachedPalette).show(body = message ?: "") { result.confirm() }
                 return true
             }
 
             override fun onJsConfirm(view: WebView?, url: String?, message: String?, result: JsResult?): Boolean {
                 if (result == null || isFinishing) return false
-                withPalette { pal ->
-                    ThemedDialog(this@MainActivity, pal).show(body = message ?: "", negative = "取消") { ok ->
-                        if (ok) result.confirm() else result.cancel()
-                    }
+                ThemedDialog(this@MainActivity, cachedPalette).show(body = message ?: "", negative = "取消") { ok ->
+                    if (ok) result.confirm() else result.cancel()
                 }
                 return true
             }
 
             override fun onJsPrompt(view: WebView?, url: String?, message: String?, defaultValue: String?, result: JsPromptResult?): Boolean {
                 if (result == null || isFinishing) return false
-                withPalette { pal ->
-                    val d = ThemedDialog(this@MainActivity, pal)
-                    val field = d.input(defaultValue ?: "")
-                    d.show(body = message ?: "", content = field, negative = "取消") { ok ->
-                        if (ok) result.confirm(field.text.toString()) else result.cancel()
-                    }
+                val d = ThemedDialog(this@MainActivity, cachedPalette)
+                val field = d.input(defaultValue ?: "")
+                d.show(body = message ?: "", content = field, negative = "取消") { ok ->
+                    if (ok) result.confirm(field.text.toString()) else result.cancel()
                 }
                 return true
             }
@@ -263,7 +260,7 @@ class MainActivity : AppCompatActivity() {
         val path = android.net.Uri.parse(pageUrl).path ?: ""
         onChatPage = resumed && (path == "/raven/" || path == "/raven" || path.endsWith("/raven/index.html"))
     }
-    override fun onResume() { super.onResume(); resumed = true; updateChatFlag(); CallRingService.stop(this) }
+    override fun onResume() { super.onResume(); resumed = true; updateChatFlag(); CallRingService.stop(this); refreshPalette() }
     override fun onPause() { super.onPause(); resumed = false; updateChatFlag() }
 
     // 来电页点了接听：开着聊天页就直接接，不然带着 ?answer= 打开聊天页
@@ -350,6 +347,12 @@ var a=sf.length>3?sf[3]:1,b=bg.length>3?bg[3]:1;if(b<0.5)return null;
 var h=function(c){return '#'+c.slice(0,3).map(function(x){return Math.round(x).toString(16).padStart(2,'0')}).join('')};
 var paper=[0,1,2].map(function(i){return sf[i]*a+bg[i]*(1-a)});
 return [h(paper),h(tx),h(dm.length>=3?dm:tx),h(ac)].join(',')}catch(e){return null}})()"""
+
+    // ⚠️ 1030 23:42 她点「写一句」整个卡死：网页的 alert/confirm/prompt 是同步的，页面 JS 停在那儿等回答，
+    // 这时再 evaluateJavascript 去读颜色，回调永远排不上队 → 弹窗永远出不来 → 互相等死。
+    // 所以网页弹窗只用缓存的颜色；缓存在页面加载完、回到前台时刷新（那时 JS 是空闲的）。
+    @Volatile private var cachedPalette: IntArray? = null
+    fun refreshPalette() = withPalette { if (it != null) cachedPalette = it }
 
     private fun withPalette(cb: (IntArray?) -> Unit) {
         try {
