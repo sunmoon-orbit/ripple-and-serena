@@ -47,7 +47,7 @@ function FavCard({ row, config, onRemove, onNote }) {
   const p = parse(row)
   const speech = useMessageSpeech(p.isVoice ? p.spoken : '', config, !!p.isVoice)
   return <article className="fav-card">
-    <div className="fav-who"><span>{row.role === 'assistant' ? '阿言' : '我'}</span><span className="fav-tag">{row.source === 'yanji' ? '言叽' : '归巢'}</span><span className="fav-when">{when(row)}</span></div>
+    <div className="fav-who"><span>{row.role === 'assistant' ? '阿言' : '我'}</span><span className="fav-tag">{row.source === 'yanji' ? '言叽' : '归巢'}</span>{row.saved_by === '涟言' && <span className="fav-tag">阿言收的</span>}<span className="fav-when">{when(row)}</span></div>
     {p.voiceNote ? <>
       <div className="fav-voice is-static">🎙 语音条 {p.voiceNote.sec}″<small>录音在归巢里听</small></div>
       {p.voiceNote.text && <div className="fav-sub">{p.voiceNote.text}</div>}
