@@ -106,7 +106,9 @@ class MainActivity : AppCompatActivity() {
                 if (request?.isForMainFrame != true) return
                 val failed = request.url?.toString() ?: return
                 if (failed.startsWith("file:///android_asset/")) return
-                view?.loadUrl("file:///android_asset/offline.html#" + Uri.encode(failed))
+                // 1030：把错误原因带过去显示（ERR_PROXY_CONNECTION_FAILED / ERR_NAME_NOT_RESOLVED…），她截图就能分清是代理还是没网
+                val why = "${error?.errorCode ?: ""} ${error?.description ?: ""}".trim()
+                view?.loadUrl("file:///android_asset/offline.html?e=" + Uri.encode(why) + "#" + Uri.encode(failed))
             }
 
             override fun shouldOverrideUrlLoading(view: WebView?, request: WebResourceRequest?): Boolean {

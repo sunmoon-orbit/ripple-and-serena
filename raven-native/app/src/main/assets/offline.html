@@ -62,7 +62,8 @@ addEventListener('online', () => setTimeout(go, 600))
 let wait = 8
 function tick() { if (navigator.onLine) go(); else { wait = Math.min(60, wait * 1.5); setTimeout(tick, wait * 1000) } }
 setTimeout(tick, wait * 1000)
-st.textContent = navigator.onLine ? '' : '手机现在没有网络'
+const why = new URLSearchParams(location.search).get('e') || ''
+st.textContent = (navigator.onLine ? '' : '手机现在没有网络') + (why ? (navigator.onLine ? '' : ' · ') + why : '')
 </script>
 </body>
 </html>
