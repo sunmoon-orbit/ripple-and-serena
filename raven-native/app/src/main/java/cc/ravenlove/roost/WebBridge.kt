@@ -100,5 +100,8 @@ class WebBridge(private val activity: MainActivity) {
     fun setAlarmAvatar(dataUrl: String) { RavenAlarm.saveAvatar(activity, dataUrl) }
 
     @JavascriptInterface
+    fun setAlarmTone(url: String) { RavenAlarm.saveTone(activity, url) }
+
+    @JavascriptInterface
     fun cancelAlarm(hour: Int, minute: Int): String = RavenAlarm.cancel(activity, hour, minute)
 }

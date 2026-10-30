@@ -2318,6 +2318,8 @@ function fillAlarmCards(root, msgKey, autoSet = false) {
     btn.onclick = e => {
       e?.stopPropagation()
       try { if (typeof N.setAlarmAvatar === 'function') N.setAlarmAvatar(localStorage.getItem('raven-avatar') || '') } catch {}
+      // 铃声从服务器取（1030 起的壳才有这个口子；旧壳照旧响包里那首）
+      try { if (typeof N.setAlarmTone === 'function') N.setAlarmTone(location.origin + '/raven/alarm-tone?token=' + encodeURIComponent(localStorage.getItem('raven-token') || '')) } catch {}
       let r = ''; try { r = String(N.setAlarm(h, m, msg)) } catch (err) { r = err.message || '设不上' }
       if (!r.startsWith('ok')) { card.querySelector('.rv-alarm-msg').textContent = '没设上：' + r; return }
       try { const all = JSON.parse(localStorage.getItem(ALARM_DONE_KEY) || '{}'); all[key] = Date.now(); localStorage.setItem(ALARM_DONE_KEY, JSON.stringify(all)) } catch {}

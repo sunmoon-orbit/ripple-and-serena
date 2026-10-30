@@ -66,6 +66,24 @@ object RavenAlarm {
         try { f.writeBytes(android.util.Base64.decode(dataUrl.substringAfter(","), android.util.Base64.DEFAULT)) } catch (_: Exception) {}
     }
 
+    // 铃声从服务器拿（1030）：以前烤死在 res/raw 里，换一首就得重新装包。设闹钟时网页把地址递过来，
+    // 这里先下到临时文件、下完整了再换上；断网或下坏了就留着上一首，再没有就用包里那首。
+    fun saveTone(ctx: Context, url: String) {
+        if (!url.startsWith("https://") && !url.startsWith("http://")) return
+        Thread {
+            val tmp = java.io.File(ctx.filesDir, "alarm_tone.tmp")
+            try {
+                val c = java.net.URL(url).openConnection() as java.net.HttpURLConnection
+                c.connectTimeout = 10000; c.readTimeout = 20000
+                if (c.responseCode == 200) {
+                    c.inputStream.use { inp -> tmp.outputStream().use { inp.copyTo(it) } }
+                    if (tmp.length() > 10_000) tmp.renameTo(java.io.File(ctx.filesDir, "alarm_tone.mp3"))
+                }
+                c.disconnect()
+            } catch (_: Exception) {} finally { tmp.delete() }
+        }.start()
+    }
+
     fun cancel(ctx: Context, hour: Int, minute: Int): String {
         val id = hour * 60 + minute
         val pi = PendingIntent.getBroadcast(ctx, id, Intent(ctx, AlarmReceiver::class.java),

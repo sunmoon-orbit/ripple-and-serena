@@ -1461,6 +1461,17 @@ const server = http.createServer((req, res) => {
     return
   }
 
+  // 闹钟铃声（1030）：壳设闹钟时来这儿取一份存下（断网也能响）。换铃声＝把 raven-uploads/alarm-tone.mp3 这个链接指向新文件，不用再装包
+  if (url.pathname === '/raven/alarm-tone' && req.method === 'GET') {
+    if (!externalAuthed(req, url)) { res.writeHead(401); res.end(); return }
+    fs.readFile(path.join(UPLOAD_DIR, 'alarm-tone.mp3'), (err, buf) => {
+      if (err) { res.writeHead(404); res.end(); return }
+      res.writeHead(200, { 'Content-Type': 'audio/mpeg', 'Content-Length': buf.length, 'Cache-Control': 'private, no-store' })
+      res.end(buf)
+    })
+    return
+  }
+
   // 收藏（1030）：长按收下的消息，和言叽共用记忆库那一本。GET|POST|DELETE /raven/favorites ／ PATCH|DELETE /raven/favorites/<id>
   const favMatch = url.pathname.match(/^\/raven\/favorites(?:\/(\d+))?$/)
   if (favMatch) {

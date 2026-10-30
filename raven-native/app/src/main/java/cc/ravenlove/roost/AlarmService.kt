@@ -87,9 +87,20 @@ class AlarmService : Service() {
                 setAudioAttributes(AudioAttributes.Builder()
                     .setUsage(AudioAttributes.USAGE_ALARM)
                     .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH).build())
-                setDataSource(this@AlarmService, Uri.parse("android.resource://$packageName/${R.raw.crow_alarm}"))
+                // 服务器上拿来的那首优先（1030），打不开就退回包里那首
+                val tone = java.io.File(filesDir, "alarm_tone.mp3")
+                try {
+                    if (!tone.exists()) throw Exception()
+                    setDataSource(tone.path); prepare()
+                } catch (_: Exception) {
+                    reset()
+                    setAudioAttributes(AudioAttributes.Builder()
+                        .setUsage(AudioAttributes.USAGE_ALARM)
+                        .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH).build())
+                    setDataSource(this@AlarmService, Uri.parse("android.resource://$packageName/${R.raw.crow_alarm}"))
+                    prepare()
+                }
                 isLooping = true
-                prepare()
                 start()
             }
         } catch (_: Exception) {}
