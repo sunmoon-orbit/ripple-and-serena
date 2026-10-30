@@ -786,8 +786,33 @@ function applyTheme(t) {
   theme = t
   if (typeof applyWall === 'function') applyWall()   // 1021：亮暗分开设壁纸时，换主题跟着换图
 }
-applyTheme(theme)
-function toggleTheme() { applyTheme(theme === 'dark' ? 'light' : 'dark') }
+// 1030 她要的：白天亮色、夜里自动换夜色（按北京时间 6:30 / 18:00）。
+// 手动点开关算数，一直管到下一个切换点，过了点再交回自动。
+const DAY_FROM = 6 * 60 + 30, NIGHT_FROM = 18 * 60
+const OVR_KEY = 'home-theme-override'
+function bjMinutes(ms = Date.now()) { const d = new Date(ms + 8 * 3600e3); return d.getUTCHours() * 60 + d.getUTCMinutes() }
+function autoTheme() { const m = bjMinutes(); return m >= DAY_FROM && m < NIGHT_FROM ? 'light' : 'dark' }
+function nextSwitchAt() {
+  const now = Date.now(), m = bjMinutes(now)
+  const target = m < DAY_FROM ? DAY_FROM : m < NIGHT_FROM ? NIGHT_FROM : DAY_FROM + 1440
+  return now - (now % 60000) + (target - m) * 60000
+}
+function wantedTheme() {
+  try {
+    const o = JSON.parse(localStorage.getItem(OVR_KEY) || 'null')
+    if (o && o.until > Date.now() && (o.t === 'light' || o.t === 'dark')) return o.t
+  } catch {}
+  return autoTheme()
+}
+function syncTheme() { const t = wantedTheme(); if (t !== theme) applyTheme(t) }
+applyTheme(wantedTheme())
+function toggleTheme() {
+  const t = theme === 'dark' ? 'light' : 'dark'
+  try { localStorage.setItem(OVR_KEY, JSON.stringify({ t, until: nextSwitchAt() })) } catch {}
+  applyTheme(t)
+}
+setInterval(syncTheme, 60000)
+document.addEventListener('visibilitychange', () => { if (!document.hidden) syncTheme() })
 
 // ── PIN / lock ──────────────────────────────────────
 const AUTH_KEY = 'home-auth'
