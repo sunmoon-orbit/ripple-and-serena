@@ -113,13 +113,15 @@ class CallRingService : Service() {
     private fun startRinging() {
         if (player != null) return
         try {
+            // 1030：她在听歌面板里设过来电铃声就放那首（call_tone.mp3），没设就用手机的默认铃声
+            val custom = java.io.File(filesDir, "call_tone.mp3")
             val uri = RingtoneManager.getActualDefaultRingtoneUri(this, RingtoneManager.TYPE_RINGTONE)
                 ?: RingtoneManager.getDefaultUri(RingtoneManager.TYPE_RINGTONE)
             player = MediaPlayer().apply {
                 setAudioAttributes(AudioAttributes.Builder()
                     .setUsage(AudioAttributes.USAGE_NOTIFICATION_RINGTONE)
                     .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION).build())
-                setDataSource(this@CallRingService, uri)
+                if (custom.exists() && custom.length() > 10_000) setDataSource(custom.path) else setDataSource(this@CallRingService, uri)
                 isLooping = true
                 prepare()
                 start()

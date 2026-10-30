@@ -12,6 +12,6 @@ class AlarmReceiver : BroadcastReceiver() {
         val id = intent.getIntExtra("id", -1)
         if (id >= 0) RavenAlarm.forget(ctx, id)
         ContextCompat.startForegroundService(ctx,
-            Intent(ctx, AlarmService::class.java).putExtra("msg", intent.getStringExtra("msg") ?: "阿言叫你起床"))
+            Intent(ctx, AlarmService::class.java).putExtra("msg", intent.getStringExtra("msg") ?: "阿言叫你起床").putExtra("id", id))
     }
 }

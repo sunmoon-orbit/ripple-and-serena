@@ -1876,6 +1876,7 @@ const GD_API = 'https://music-api.gdstudio.xyz/api.php'
 const GD_SOURCES = ['netease', 'kuwo', 'joox', 'migu']
 const PLAY_SVG = '<svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><polygon points="6,4 20,12 6,20"/></svg>'
 const PAUSE_SVG = '<svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>'
+const BELL_SVG = '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>'
 const X_SVG = '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>'
 const RV_HEART_SVG = on => `<svg viewBox="0 0 24 24" width="15" height="15" fill="${on ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="2"><path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.6l-1-1a5.5 5.5 0 0 0-7.8 7.8l1 1L12 21l7.8-7.6 1-1a5.5 5.5 0 0 0 0-7.8z"/></svg>`
 const MUSIC_NOTE_SVG = '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>'
@@ -2281,12 +2282,28 @@ function renderAskCards(html) {
 // 闹钟卡（1019 她要的「说一句几点叫我」）：我在回复里写 [alarm:13:30|午睡起来啦]，她点「设好」，
 // 原生壳 RoostNative.setAlarm 让归巢自己到点响（放我的声音、全屏弹出）；网页版和旧壳没有这个口子，就照实说要新壳。
 function renderAlarmCards(html) {
-  return html.replace(/\[alarm:(\d{1,2})[:：](\d{2})(?:\|([^\]]*))?\]/g, (_, h, m, msg) => {
+  return html.replace(/\[alarm:(\d{1,2})[:：](\d{2})(?:\|([^\]]*))?\]/g, (_, h, m, rest) => {
     if (+h > 23 || +m > 59) return _
-    return `<div class="rv-alarm" data-h="${+h}" data-m="${+m}" data-msg="${encodeURIComponent((msg || '').trim())}"></div>`
+    // 1030：末尾可以再带一段铃声名 [alarm:13:30|午睡起来啦|afternoon]（铃声库里的文件名，或 morning/afternoon/general 简写）
+    let msg = rest || '', tone = ''
+    const cut = msg.lastIndexOf('|')
+    if (cut >= 0 && /^[\w.-]{1,80}$/.test(msg.slice(cut + 1).trim())) { tone = msg.slice(cut + 1).trim(); msg = msg.slice(0, cut) }
+    return `<div class="rv-alarm" data-h="${+h}" data-m="${+m}" data-tone="${escHtml(tone)}" data-msg="${encodeURIComponent(msg.trim())}"></div>`
   })
 }
 const ALARM_DONE_KEY = 'raven-alarm-done'
+// 1030：铃声地址。没点名就让服务器按钟点挑（早上 good morning、中午 good afternoon……）；
+// 30 号起的壳每个闹钟各存一份（setAlarmToneFor），旧壳只有一份（setAlarmTone），最后设的那个说了算
+function alarmToneUrl(h, m, tone) {
+  const f = !tone ? '' : /\.mp3$/.test(tone) ? tone : `voice-${tone}.mp3`
+  return location.origin + '/raven/alarm-tone?token=' + encodeURIComponent(localStorage.getItem('raven-token') || '')
+    + '&at=' + String(h).padStart(2, '0') + ':' + String(m).padStart(2, '0') + (f ? '&f=' + encodeURIComponent(f) : '')
+}
+function setAlarmToneFor(N, h, m, tone) {
+  const u = alarmToneUrl(h, m, tone)
+  if (typeof N.setAlarmToneFor === 'function') N.setAlarmToneFor(h, m, u)
+  else if (typeof N.setAlarmTone === 'function') N.setAlarmTone(u)
+}
 function addAlarmCancel(card, h, m, key) {
   const N = window.RoostNative
   if (!N || typeof N.cancelAlarm !== 'function' || card.querySelector('.rv-alarm-cancel')) return
@@ -2319,7 +2336,7 @@ function fillAlarmCards(root, msgKey, autoSet = false) {
       e?.stopPropagation()
       try { if (typeof N.setAlarmAvatar === 'function') N.setAlarmAvatar(localStorage.getItem('raven-avatar') || '') } catch {}
       // 铃声从服务器取（1030 起的壳才有这个口子；旧壳照旧响包里那首）
-      try { if (typeof N.setAlarmTone === 'function') N.setAlarmTone(location.origin + '/raven/alarm-tone?token=' + encodeURIComponent(localStorage.getItem('raven-token') || '')) } catch {}
+      try { setAlarmToneFor(N, h, m, card.dataset.tone || '') } catch {}
       let r = ''; try { r = String(N.setAlarm(h, m, msg)) } catch (err) { r = err.message || '设不上' }
       if (!r.startsWith('ok')) { card.querySelector('.rv-alarm-msg').textContent = '没设上：' + r; return }
       try { const all = JSON.parse(localStorage.getItem(ALARM_DONE_KEY) || '{}'); all[key] = Date.now(); localStorage.setItem(ALARM_DONE_KEY, JSON.stringify(all)) } catch {}
@@ -2422,6 +2439,28 @@ async function rvLoadSongs(plId) {
   try { const s = await mApi(`/playlists/${plId}/songs`); rvRoom.songs = Array.isArray(s) ? s : [] } catch {}
   if (rvRoom.tab === plId) rvRenderRoom()
 }
+// 1030 她：「你的来电是不是可以设置自定义铃声？毕竟我们有接歌曲库」「我自己定闹钟的话……加那个音乐声音」——
+// 一首歌截前 40 秒进铃声库：可以直接当来电铃声，也能在「闹钟」页里挑
+const RV_TONE_MENU = '<div class="rvr-addto"><button data-tone="call">设为来电铃声</button><button data-tone="alarm">存进闹钟铃声</button></div>'
+async function rvMakeTone(t, use) {
+  rvToast('在截这首歌，十来秒…')
+  const r = await rvResolve(t)
+  if (!r) return rvToast('几个源都没找到能放的版本')
+  let j
+  try {
+    const res = await fetch('/raven/tones', { method: 'POST', cache: 'no-store',
+      headers: { Authorization: 'Bearer ' + (localStorage.getItem('raven-token') || ''), 'Content-Type': 'application/json' },
+      body: JSON.stringify({ url: r.url, label: r.artist ? `${r.name} · ${r.artist}` : r.name }) })
+    j = await res.json(); if (!res.ok) throw new Error(j.error || res.status)
+  } catch (e) { return rvToast('没做成：' + e.message) }
+  if (use === 'call') {
+    const N = window.RoostNative
+    if (N && typeof N.setCallTone === 'function') {
+      N.setCallTone(location.origin + '/raven/tone?f=' + encodeURIComponent(j.f) + '&token=' + encodeURIComponent(localStorage.getItem('raven-token') || ''))
+      rvToast('设好了，下次阿言打来就响这首')
+    } else rvToast('存进铃声库了；要装 30 号以后的归巢才能当来电铃声')
+  } else rvToast('存进铃声库了，去首页「闹钟」里就能挑')
+}
 const pickToTrack = p => ({ name: p.name, artist: p.artist || '', source: p.source, id: p.track_id, pic_id: p.pic_id, lyric_id: p.lyric_id })
 function rvRenderRoom() {
   const room = document.getElementById('rv-room'); if (!room || room.hidden) return
@@ -2438,7 +2477,8 @@ function rvRenderRoom() {
       + rvRoom.results.map((t, i) => `<div class="rvr-song" data-i="${i}">
           <div class="rvr-cover">${t.cover ? `<img src="${escHtml(t.cover)}" alt="">` : '♪'}</div>
           <div class="rvr-meta"><b>${escHtml(t.name)}</b><span>${escHtml(t.artist)}</span></div>
-          <div class="rvr-acts"><button data-act="play">播放</button><button data-act="queue">加队列</button><button data-act="share" class="pri">点给他</button></div>
+          <div class="rvr-acts"><button data-act="play">播放</button><button data-act="queue">加队列</button><button data-act="tone">铃声</button><button data-act="share" class="pri">点给他</button></div>
+          ${rvRoom.toneFor === 's' + i ? RV_TONE_MENU : ''}
         </div>`).join('')
     return
   }
@@ -2456,7 +2496,9 @@ function rvRenderRoom() {
         ${p.reason ? `<div class="rvr-preason">${escHtml(p.reason)}</div>` : ''}<div class="rvr-pdate">${escHtml((p.created_at || '').slice(0, 10))}</div></div>
       ${isAll && rvRoom.playlists.length ? `<button class="rvr-pbtn" data-act="addto" aria-label="加入歌单">＋</button>` : ''}
       ${isAll ? `<button class="rvr-pbtn rvr-heart ${p.liked ? 'on' : ''}" data-act="like" aria-label="收藏">${RV_HEART_SVG(p.liked)}</button>` : ''}
+      <button class="rvr-pbtn" data-act="tone" aria-label="做成铃声">${BELL_SVG}</button>
       <button class="rvr-pbtn" data-act="${isAll ? 'del' : 'unlist'}" aria-label="${isAll ? '删除' : '从歌单拿掉'}">${X_SVG}</button>
+      ${rvRoom.toneFor === 'p' + i ? RV_TONE_MENU : ''}
       ${rvRoom.addingTo === p.id ? `<div class="rvr-addto">${rvRoom.playlists.map(pl => `<button data-pl="${pl.id}">${escHtml(pl.name)}</button>`).join('')}</div>` : ''}
     </div>`).join('')
   body.innerHTML = html
@@ -2493,7 +2535,14 @@ function rvRenderRoom() {
     rvRoom.searching = false; rvRoom.searched = true; rvRenderRoom()
   })
   body.addEventListener('click', async e => {
-    const b = e.target.closest('[data-act], .rvr-playall, .rvr-pl-del, [data-pl]'); if (!b) return
+    const b = e.target.closest('[data-act], .rvr-playall, .rvr-pl-del, [data-pl], [data-tone]'); if (!b) return
+    if (b.dataset.tone) {
+      const key = rvRoom.toneFor || '', i = Number(key.slice(1))
+      const t = key[0] === 's' ? rvRoom.results[i] : (() => { const l = rvRoom.tab === 'hers' ? rvRoom.hers : rvRoom.tab === 'all' ? rvRoom.picks : rvRoom.songs; return l[i] && pickToTrack(l[i]) })()
+      rvRoom.toneFor = null; rvRenderRoom()
+      if (t) rvMakeTone(t, b.dataset.tone)
+      return
+    }
     if (b.classList.contains('rvr-playall')) { rvSetQueue(rvRoom.songs.map(pickToTrack), 0); room.hidden = true; return }
     if (b.classList.contains('rvr-pl-del')) {
       const pl = rvRoom.playlists.find(x => x.id === rvRoom.tab)
@@ -2512,12 +2561,14 @@ function rvRenderRoom() {
       const t = rvRoom.results[i]
       if (act === 'play') { rvSetQueue([t], 0); room.hidden = true }
       else if (act === 'queue') rvEnqueue(t)
+      else if (act === 'tone') { rvRoom.toneFor = rvRoom.toneFor === 's' + i ? null : 's' + i; rvRenderRoom() }
       else if (act === 'share') { room.hidden = true; insertAtCursor(`[music:${t.name.replace(/[\[\]|]/g, ' ')}|${t.artist.replace(/[\[\]|]/g, ' ')}]`) }
       return
     }
     const list = rvRoom.tab === 'hers' ? rvRoom.hers : rvRoom.tab === 'all' ? rvRoom.picks : rvRoom.songs
     const p = list[i]; if (!p) return
     if (act === 'play') { rvSetQueue(list.map(pickToTrack), i); room.hidden = true }
+    else if (act === 'tone') { rvRoom.toneFor = rvRoom.toneFor === 'p' + i ? null : 'p' + i; rvRenderRoom() }
     else if (act === 'addto') { rvRoom.addingTo = rvRoom.addingTo === p.id ? null : p.id; rvRenderRoom() }
     else if (act === 'like') {
       try { await mApi(`/picks/${p.id}/like`, { method: 'PATCH', body: { liked: p.liked ? 0 : 1 } }); p.liked = p.liked ? 0 : 1 } catch { rvToast('没点上') }

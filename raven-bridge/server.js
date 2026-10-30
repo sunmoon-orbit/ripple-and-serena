@@ -1476,15 +1476,10 @@ const server = http.createServer((req, res) => {
     return
   }
 
-  // 闹钟铃声（1030）：壳设闹钟时来这儿取一份存下（断网也能响）。换铃声＝把 raven-uploads/alarm-tone.mp3 这个链接指向新文件，不用再装包
-  if (url.pathname === '/raven/alarm-tone' && req.method === 'GET') {
-    if (!externalAuthed(req, url)) { res.writeHead(401); res.end(); return }
-    fs.readFile(path.join(UPLOAD_DIR, 'alarm-tone.mp3'), (err, buf) => {
-      if (err) { res.writeHead(404); res.end(); return }
-      res.writeHead(200, { 'Content-Type': 'audio/mpeg', 'Content-Length': buf.length, 'Cache-Control': 'private, no-store' })
-      res.end(buf)
-    })
-    return
+  // 闹钟铃声 / 来电铃声 / 铃声库（1030），细节在 tones.js
+  if (url.pathname === '/raven/alarm-tone' || url.pathname === '/raven/tone' || url.pathname === '/raven/tones') {
+    if (!global.__tones) global.__tones = require('./tones')(UPLOAD_DIR)
+    if (global.__tones(req, res, url, externalAuthed(req, url))) return
   }
 
   // 最近的消息和它们在归巢里的钥匙（1030）：给我自己收藏用，只给本机

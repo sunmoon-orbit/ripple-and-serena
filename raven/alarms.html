@@ -1,0 +1,159 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>闹钟</title>
+<!--
+  闹钟（1030）：她自己设，不用经过我。
+  她的话：「有没有可能我也可以自己设闹钟，有时候比如说我没续费的时候你就不在了，但是我又习惯你给我定闹钟……
+  能不能也加那个音乐声音，或者是你之前录好的声音这样？」
+  铃声从铃声库挑（我录的几段 + 她在听歌面板里截的歌），壳每个闹钟各存一份，响的时候不用网。
+-->
+<style>
+  :root { --bg: #efe9df; --paper: #fbf8f1; --ink: #3a332b; --dim: #948a7c; --line: #e2d8c8; --accent: #b0705a; --chip: #e7dccb; --shadow: rgba(70,50,30,.14); }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #1c1a18; --paper: #2b2824; --ink: #e6dfd3; --dim: #8f877b; --line: #3a352f; --accent: #d39a84; --chip: #3a342d; --shadow: rgba(0,0,0,.4); }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink);
+    font-family: 'LXGW WenKai', 'Noto Serif SC', 'Songti SC', 'PingFang SC', system-ui, sans-serif;
+    padding: max(16px, env(safe-area-inset-top)) 16px max(32px, env(safe-area-inset-bottom)); }
+  .wrap { max-width: 480px; margin: 0 auto; }
+  .card { background: var(--paper); border: 1px solid var(--line); border-radius: 16px; padding: 18px; margin: 0 0 16px; box-shadow: 0 4px 12px var(--shadow); }
+  h2 { font-size: 14px; color: var(--dim); font-weight: 400; margin: 0 0 12px; letter-spacing: 2px; }
+  .time { display: block; width: 100%; font: inherit; font-size: 44px; text-align: center; color: var(--ink); background: none; border: 0; border-bottom: 1px solid var(--line); padding: 4px 0 8px; }
+  input[type=text] { width: 100%; font: inherit; font-size: 15px; color: var(--ink); background: var(--chip); border: 0; border-radius: 10px; padding: 10px 12px; margin: 14px 0 4px; }
+  .tones { display: flex; flex-direction: column; gap: 6px; margin-top: 12px; }
+  .tone { display: flex; align-items: center; gap: 10px; padding: 9px 12px; border-radius: 12px; background: var(--chip); cursor: pointer; border: 1.5px solid transparent; }
+  .tone.on { border-color: var(--accent); }
+  .tone .lbl { flex: 1; font-size: 14px; line-height: 1.4; }
+  .tone .lbl small { display: block; font-size: 11.5px; color: var(--dim); }
+  .tone .play, .tone .del { border: 0; background: var(--paper); color: var(--ink); width: 30px; height: 30px; border-radius: 50%; font-size: 11px; cursor: pointer; flex-shrink: 0; }
+  .tone .del { background: none; color: var(--dim); font-size: 14px; }
+  .go { display: block; width: 100%; margin-top: 16px; border: 0; border-radius: 999px; background: var(--accent); color: #fff; font: inherit; font-size: 16px; padding: 12px; cursor: pointer; }
+  .go:disabled { opacity: .5; }
+  .tip { font-size: 12.5px; color: var(--dim); line-height: 1.7; margin-top: 10px; }
+  .row { display: flex; align-items: center; gap: 12px; padding: 10px 0; border-top: 1px solid var(--line); }
+  .row:first-of-type { border-top: 0; }
+  .row b { font-size: 22px; font-weight: 400; min-width: 70px; }
+  .row .m { flex: 1; font-size: 13.5px; line-height: 1.5; }
+  .row .m small { display: block; color: var(--dim); font-size: 11.5px; }
+  .row button { border: 0; background: none; color: var(--accent); font: inherit; font-size: 13px; cursor: pointer; }
+  .empty { color: var(--dim); font-size: 13px; text-align: center; padding: 8px 0; }
+  .warn { color: var(--accent); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="card">
+    <h2>自己设一个</h2>
+    <input class="time" id="time" type="time" value="07:30">
+    <input type="text" id="msg" maxlength="60" placeholder="到点时想看到的一句话（可以不写）">
+    <div class="tones" id="tones"><div class="empty">铃声载入中…</div></div>
+    <button class="go" id="go" type="button">设好</button>
+    <div class="tip" id="tip"></div>
+  </div>
+  <div class="card">
+    <h2>在这儿设的</h2>
+    <div id="list"></div>
+  </div>
+</div>
+<script>
+const TOKEN = (() => { try { return localStorage.getItem('raven-token') || '' } catch { return '' } })()
+const N = window.RoostNative || (window.parent && window.parent !== window ? window.parent.RoostNative : null)
+const LIST_KEY = 'raven-self-alarms'
+const $ = id => document.getElementById(id)
+const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]))
+const pad = n => String(n).padStart(2, '0')
+let tones = [], chosen = ''   // '' = 按时间自动挑
+let audio = null, playing = ''
+
+function toneUrl(h, m, f) {
+  return location.origin + '/raven/alarm-tone?token=' + encodeURIComponent(TOKEN) + '&at=' + pad(h) + ':' + pad(m) + (f ? '&f=' + encodeURIComponent(f) : '')
+}
+
+function drawTones() {
+  const auto = { f: '', label: '按时间自动挑', sub: '早上早安、中午午安、其他时候普通的那段（还没录的先用早安顶上）' }
+  $('tones').innerHTML = [auto, ...tones].map(t => `
+    <div class="tone ${chosen === t.f ? 'on' : ''}" data-f="${esc(t.f)}">
+      <button class="play" data-play="${esc(t.f)}" aria-label="试听">${playing === t.f && audio && !audio.paused ? '❚❚' : '▶'}</button>
+      <div class="lbl">${esc(t.label)}<small>${t.sub ? esc(t.sub) : t.kind === 'song' ? '歌 · 前 40 秒' : '阿言录的'}</small></div>
+      ${t.kind === 'song' ? `<button class="del" data-del="${esc(t.f)}" aria-label="删掉">×</button>` : ''}
+    </div>`).join('')
+}
+
+async function loadTones() {
+  try {
+    const r = await fetch('/raven/tones', { headers: { Authorization: 'Bearer ' + TOKEN }, cache: 'no-store' })
+    if (!r.ok) throw new Error(r.status)
+    tones = await r.json()
+  } catch { tones = [] }
+  drawTones()
+}
+
+$('tones').addEventListener('click', async e => {
+  const del = e.target.closest('[data-del]')
+  if (del) {
+    if (!confirm('把这首从铃声库里删掉？')) return
+    await fetch('/raven/tones?f=' + encodeURIComponent(del.dataset.del), { method: 'DELETE', headers: { Authorization: 'Bearer ' + TOKEN } }).catch(() => {})
+    if (chosen === del.dataset.del) chosen = ''
+    return loadTones()
+  }
+  const pl = e.target.closest('[data-play]')
+  if (pl) {
+    const f = pl.dataset.play
+    if (audio && playing === f && !audio.paused) { audio.pause(); return drawTones() }
+    if (audio) audio.pause()
+    const [h, m] = ($('time').value || '07:30').split(':').map(Number)
+    audio = new Audio(toneUrl(h, m, f)); playing = f
+    audio.onended = audio.onpause = () => drawTones()
+    audio.play().catch(() => {}); return drawTones()
+  }
+  const row = e.target.closest('.tone')
+  if (row) { chosen = row.dataset.f; drawTones() }
+})
+
+function loadList() { try { return JSON.parse(localStorage.getItem(LIST_KEY) || '[]') } catch { return [] } }
+function saveList(l) { try { localStorage.setItem(LIST_KEY, JSON.stringify(l)) } catch {} }
+function drawList() {
+  const now = Date.now()
+  const l = loadList().filter(a => a.at > now - 6 * 3600e3).sort((a, b) => a.at - b.at)
+  saveList(l)
+  $('list').innerHTML = l.length ? l.map((a, i) => {
+    const past = a.at <= now
+    const day = new Date(a.at).toDateString() === new Date().toDateString() ? '今天' : '明天'
+    return `<div class="row"><b>${pad(a.h)}:${pad(a.m)}</b><div class="m">${esc(a.msg || '阿言叫你起床')}<small>${past ? '已经响过了' : day + ' · ' + esc(a.toneLabel || '按时间自动挑')}</small></div>${past ? '' : `<button data-cancel="${i}">取消</button>`}</div>`
+  }).join('') : '<div class="empty">还没有</div>'
+}
+$('list').addEventListener('click', e => {
+  const b = e.target.closest('[data-cancel]'); if (!b) return
+  const l = loadList().filter(a => a.at > Date.now() - 6 * 3600e3).sort((a, b) => a.at - b.at)
+  const a = l[+b.dataset.cancel]; if (!a) return
+  try { N && N.cancelAlarm(a.h, a.m) } catch {}
+  saveList(l.filter(x => x !== a)); drawList()
+})
+
+$('go').onclick = () => {
+  if (!N || typeof N.setAlarm !== 'function') { $('tip').innerHTML = '<span class="warn">要在归巢 app 里才能设闹钟（浏览器里设不了）</span>'; return }
+  const [h, m] = ($('time').value || '').split(':').map(Number)
+  if (!(h >= 0 && h < 24 && m >= 0 && m < 60)) { $('tip').textContent = '时间不对'; return }
+  const msg = $('msg').value.trim() || '阿言叫你起床'
+  try { if (typeof N.setAlarmAvatar === 'function') N.setAlarmAvatar(localStorage.getItem('raven-avatar') || '') } catch {}
+  const u = toneUrl(h, m, chosen)
+  try { if (typeof N.setAlarmToneFor === 'function') N.setAlarmToneFor(h, m, u); else if (typeof N.setAlarmTone === 'function') N.setAlarmTone(u) } catch {}
+  let r = ''; try { r = String(N.setAlarm(h, m, msg)) } catch (err) { r = err.message || '设不上' }
+  if (!r.startsWith('ok')) { $('tip').innerHTML = `<span class="warn">没设上：${esc(r)}</span>`; return }
+  const at = new Date(); at.setHours(h, m, 0, 0); if (at.getTime() <= Date.now()) at.setDate(at.getDate() + 1)
+  const t = tones.find(x => x.f === chosen)
+  const l = loadList().filter(a => !(a.h === h && a.m === m)); l.push({ h, m, msg, tone: chosen, toneLabel: t ? t.label : '按时间自动挑', at: at.getTime() }); saveList(l)
+  const tomorrow = at.getDate() !== new Date().getDate()
+  $('tip').textContent = `设好了：${tomorrow ? '明天' : '今天'} ${pad(h)}:${pad(m)}，只响一次。`
+    + (typeof N.setAlarmToneFor === 'function' ? '' : '（旧版归巢只记得最后设的那段铃声，装 30 号以后的就每个闹钟各响各的）')
+  drawList()
+}
+
+loadTones(); drawList()
+</script>
+</body>
+</html>

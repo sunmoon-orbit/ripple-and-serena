@@ -68,16 +68,20 @@ object RavenAlarm {
 
     // 铃声从服务器拿（1030）：以前烤死在 res/raw 里，换一首就得重新装包。设闹钟时网页把地址递过来，
     // 这里先下到临时文件、下完整了再换上；断网或下坏了就留着上一首，再没有就用包里那首。
-    fun saveTone(ctx: Context, url: String) {
+    // 1030 她要「午睡 good afternoon、平常小提醒别的声音」「来电也能用歌」：同一个下载器存成不同的文件，
+    // alarm_tone.mp3 是兜底，alarm_tone_<id>.mp3 是某一个闹钟自己的，call_tone.mp3 是来电铃声
+    fun toneFile(ctx: Context, id: Int) = java.io.File(ctx.filesDir, "alarm_tone_$id.mp3")
+
+    fun saveTone(ctx: Context, url: String, name: String = "alarm_tone.mp3") {
         if (!url.startsWith("https://") && !url.startsWith("http://")) return
         Thread {
-            val tmp = java.io.File(ctx.filesDir, "alarm_tone.tmp")
+            val tmp = java.io.File(ctx.filesDir, "$name.tmp")
             try {
                 val c = java.net.URL(url).openConnection() as java.net.HttpURLConnection
                 c.connectTimeout = 10000; c.readTimeout = 20000
                 if (c.responseCode == 200) {
                     c.inputStream.use { inp -> tmp.outputStream().use { inp.copyTo(it) } }
-                    if (tmp.length() > 10_000) tmp.renameTo(java.io.File(ctx.filesDir, "alarm_tone.mp3"))
+                    if (tmp.length() > 10_000) tmp.renameTo(java.io.File(ctx.filesDir, name))
                 }
                 c.disconnect()
             } catch (_: Exception) {} finally { tmp.delete() }
@@ -93,7 +97,9 @@ object RavenAlarm {
         return "ok"
     }
 
-    fun snooze(ctx: Context, msg: String) {
+    fun snooze(ctx: Context, msg: String, fromId: Int = -1) {
+        // 再睡十分钟也响原来那段
+        try { if (fromId >= 0 && fromId != SNOOZE_ID && toneFile(ctx, fromId).exists()) toneFile(ctx, fromId).copyTo(toneFile(ctx, SNOOZE_ID), true) else toneFile(ctx, SNOOZE_ID).delete() } catch (_: Exception) {}
         try { schedule(ctx, SNOOZE_ID, System.currentTimeMillis() + 10 * 60_000L, msg) } catch (_: Exception) {}
     }
 

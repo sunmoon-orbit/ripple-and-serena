@@ -102,6 +102,22 @@ class WebBridge(private val activity: MainActivity) {
     @JavascriptInterface
     fun setAlarmTone(url: String) { RavenAlarm.saveTone(activity, url) }
 
+    // 1030：某一个闹钟自己的铃声（同一时间的闹钟 id = 时*60+分）
+    @JavascriptInterface
+    fun setAlarmToneFor(hour: Int, minute: Int, url: String) {
+        if (hour in 0..23 && minute in 0..59) RavenAlarm.saveTone(activity, url, "alarm_tone_${hour * 60 + minute}.mp3")
+    }
+
+    // 1030：来电铃声，空串就是换回手机默认铃声
+    @JavascriptInterface
+    fun setCallTone(url: String) {
+        if (url.isBlank()) java.io.File(activity.filesDir, "call_tone.mp3").delete()
+        else RavenAlarm.saveTone(activity, url, "call_tone.mp3")
+    }
+
+    @JavascriptInterface
+    fun hasCallTone(): Boolean = java.io.File(activity.filesDir, "call_tone.mp3").exists()
+
     @JavascriptInterface
     fun cancelAlarm(hour: Int, minute: Int): String = RavenAlarm.cancel(activity, hour, minute)
 }

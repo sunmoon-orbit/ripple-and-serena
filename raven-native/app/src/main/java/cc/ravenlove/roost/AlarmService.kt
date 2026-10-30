@@ -30,6 +30,7 @@ class AlarmService : Service() {
 
     private var player: MediaPlayer? = null
     private var msg = "阿言叫你起床"
+    private var alarmId = -1
     private val handler = Handler(Looper.getMainLooper())
 
     override fun onBind(intent: Intent?): IBinder? = null
@@ -37,9 +38,10 @@ class AlarmService : Service() {
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         when (intent?.action) {
             ACTION_STOP -> { stopAll(); return START_NOT_STICKY }
-            ACTION_SNOOZE -> { RavenAlarm.snooze(this, msg); stopAll(); return START_NOT_STICKY }
+            ACTION_SNOOZE -> { RavenAlarm.snooze(this, msg, alarmId); stopAll(); return START_NOT_STICKY }
         }
         msg = intent?.getStringExtra("msg") ?: msg
+        alarmId = intent?.getIntExtra("id", -1) ?: -1
         val n = buildNotification()
         if (Build.VERSION.SDK_INT >= 29) startForeground(NOTIF_ID, n, ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK)
         else startForeground(NOTIF_ID, n)
@@ -88,7 +90,9 @@ class AlarmService : Service() {
                     .setUsage(AudioAttributes.USAGE_ALARM)
                     .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH).build())
                 // 服务器上拿来的那首优先（1030），打不开就退回包里那首
-                val tone = java.io.File(filesDir, "alarm_tone.mp3")
+                // 这个闹钟自己的铃声 → 兜底那段 → 包里那首
+                val own = if (alarmId >= 0) RavenAlarm.toneFile(this@AlarmService, alarmId) else null
+                val tone = if (own != null && own.exists()) own else java.io.File(filesDir, "alarm_tone.mp3")
                 try {
                     if (!tone.exists()) throw Exception()
                     setDataSource(tone.path); prepare()
