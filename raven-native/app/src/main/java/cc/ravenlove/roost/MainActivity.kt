@@ -312,6 +312,60 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    // 1030 她嫌系统白框丑：「这个提醒框要不要美化一下」。照归巢的纸色/黄铜画一张圆角卡，跟着深浅色走。
+    private fun showUpdateDialog(latest: Int, note: String, url: String) {
+        val night = (resources.configuration.uiMode and android.content.res.Configuration.UI_MODE_NIGHT_MASK) ==
+            android.content.res.Configuration.UI_MODE_NIGHT_YES
+        val paper = if (night) 0xFF1C2230.toInt() else 0xFFFBF6EC.toInt()
+        val ink = if (night) 0xFFE8E2D6.toInt() else 0xFF4A3726.toInt()
+        val dim = if (night) 0xFF9AA0AE.toInt() else 0xFF8B7A66.toInt()
+        val brass = if (night) 0xFFC9A46A.toInt() else 0xFFA0703C.toInt()
+        val dp = resources.displayMetrics.density
+        fun px(v: Int) = (v * dp).toInt()
+        fun round(color: Int, r: Int, stroke: Int? = null) = android.graphics.drawable.GradientDrawable().apply {
+            setColor(color); cornerRadius = r * dp
+            if (stroke != null) setStroke(px(1), stroke)
+        }
+        fun text(t: String, size: Float, color: Int, bold: Boolean = false) = android.widget.TextView(this).apply {
+            text = t; textSize = size; setTextColor(color); setLineSpacing(0f, 1.35f)
+            if (bold) typeface = android.graphics.Typeface.DEFAULT_BOLD
+        }
+        val card = android.widget.LinearLayout(this).apply {
+            orientation = android.widget.LinearLayout.VERTICAL
+            background = round(paper, 22)
+            setPadding(px(24), px(22), px(24), px(18))
+        }
+        card.addView(text("🐦‍⬛", 30f, ink).apply { gravity = android.view.Gravity.CENTER })
+        card.addView(text("归巢有新版本了", 19f, ink, true).apply {
+            gravity = android.view.Gravity.CENTER; setPadding(0, px(6), 0, px(4))
+        })
+        card.addView(text("${BuildConfig.VERSION_NAME}  →  1.0.$latest", 13f, brass).apply {
+            gravity = android.view.Gravity.CENTER; setPadding(0, 0, 0, px(14))
+        })
+        if (note.isNotEmpty()) card.addView(text(note, 15f, ink).apply {
+            background = round(ColorUtils.setAlphaComponent(brass, 0x22), 14)
+            setPadding(px(14), px(10), px(14), px(10))
+        })
+        card.addView(text("下载后直接安装覆盖就行，不用卸载，聊天记录都在。", 12.5f, dim).apply {
+            setPadding(0, px(12), 0, px(18))
+        })
+        val dialog = AlertDialog.Builder(this).setView(card).create()
+        val row = android.widget.LinearLayout(this).apply { orientation = android.widget.LinearLayout.HORIZONTAL }
+        fun button(t: String, primary: Boolean, onClick: () -> Unit) = android.widget.TextView(this).apply {
+            text = t; textSize = 15f; gravity = android.view.Gravity.CENTER
+            setTextColor(if (primary) paper else brass)
+            background = if (primary) round(brass, 999) else round(android.graphics.Color.TRANSPARENT, 999, ColorUtils.setAlphaComponent(brass, 0x88))
+            setPadding(0, px(11), 0, px(11))
+            setOnClickListener { onClick(); dialog.dismiss() }
+        }
+        row.addView(button("以后再说", false) {}, android.widget.LinearLayout.LayoutParams(0, -2, 1f).apply { marginEnd = px(10) })
+        row.addView(button("去下载", true) { startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url))) },
+            android.widget.LinearLayout.LayoutParams(0, -2, 1f))
+        card.addView(row)
+        dialog.window?.setBackgroundDrawable(android.graphics.drawable.ColorDrawable(android.graphics.Color.TRANSPARENT))
+        dialog.show()
+    }
+
     // 版本检查：服务端去问 GitHub Release 的构建号，本地拿 versionCode 比大小。
     // 有新版就弹一次，不强制；「以后再说」当次不再打扰。
     private fun checkUpdate() {
@@ -330,18 +384,7 @@ class MainActivity : AppCompatActivity() {
                 if (latest <= BuildConfig.VERSION_CODE) return@Thread
                 runOnUiThread {
                     if (isFinishing || isDestroyed) return@runOnUiThread
-                    AlertDialog.Builder(this)
-                        .setTitle("归巢有新版本了")
-                        .setMessage(
-                            "当前 ${BuildConfig.VERSION_NAME}，最新 1.0.$latest。\n\n" +
-                            (if (note.isNotEmpty()) "$note\n\n" else "") +
-                            "下载后直接安装覆盖就行，不用卸载，聊天记录都在。"
-                        )
-                        .setPositiveButton("去下载") { _, _ ->
-                            startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
-                        }
-                        .setNegativeButton("以后再说", null)
-                        .show()
+                    showUpdateDialog(latest, note, url)
                 }
             } catch (_: Exception) {
                 // 查不到就算了，版本检查不该打断使用
