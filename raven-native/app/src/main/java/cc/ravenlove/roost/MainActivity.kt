@@ -139,24 +139,28 @@ class MainActivity : AppCompatActivity() {
             // 网页里的 alert / confirm / prompt 也换成同一张卡（不接管的话是系统白框，顶上还写着网址）
             override fun onJsAlert(view: WebView?, url: String?, message: String?, result: JsResult?): Boolean {
                 if (result == null || isFinishing) return false
-                ThemedDialog(this@MainActivity).show(body = message ?: "") { result.confirm() }
+                withPalette { pal -> ThemedDialog(this@MainActivity, pal).show(body = message ?: "") { result.confirm() } }
                 return true
             }
 
             override fun onJsConfirm(view: WebView?, url: String?, message: String?, result: JsResult?): Boolean {
                 if (result == null || isFinishing) return false
-                ThemedDialog(this@MainActivity).show(body = message ?: "", negative = "取消") { ok ->
-                    if (ok) result.confirm() else result.cancel()
+                withPalette { pal ->
+                    ThemedDialog(this@MainActivity, pal).show(body = message ?: "", negative = "取消") { ok ->
+                        if (ok) result.confirm() else result.cancel()
+                    }
                 }
                 return true
             }
 
             override fun onJsPrompt(view: WebView?, url: String?, message: String?, defaultValue: String?, result: JsPromptResult?): Boolean {
                 if (result == null || isFinishing) return false
-                val d = ThemedDialog(this@MainActivity)
-                val field = d.input(defaultValue ?: "")
-                d.show(body = message ?: "", content = field, negative = "取消") { ok ->
-                    if (ok) result.confirm(field.text.toString()) else result.cancel()
+                withPalette { pal ->
+                    val d = ThemedDialog(this@MainActivity, pal)
+                    val field = d.input(defaultValue ?: "")
+                    d.show(body = message ?: "", content = field, negative = "取消") { ok ->
+                        if (ok) result.confirm(field.text.toString()) else result.cancel()
+                    }
                 }
                 return true
             }
@@ -336,9 +340,33 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    // 弹窗前去页面读当前调色盘：--surface（半透明的话叠在 --bg 上）、--text、--text-dim、--accent
+    private val PALETTE_JS = """(function(){try{var cs=getComputedStyle(document.documentElement),v=function(n){return cs.getPropertyValue(n).trim()};
+var el=document.createElement('i');document.body.appendChild(el);
+var rgb=function(c){if(!c)return[];el.style.color='';el.style.color=c;return (getComputedStyle(el).color.match(/[\d.]+/g)||[]).map(Number)};
+var bg=rgb(v('--bg')),sf=rgb(v('--surface')||v('--bg')),tx=rgb(v('--text')),ac=rgb(v('--accent')),dm=rgb(v('--text-dim'));el.remove();
+if(bg.length<3||sf.length<3||tx.length<3||ac.length<3)return null;
+var a=sf.length>3?sf[3]:1,b=bg.length>3?bg[3]:1;if(b<0.5)return null;
+var h=function(c){return '#'+c.slice(0,3).map(function(x){return Math.round(x).toString(16).padStart(2,'0')}).join('')};
+var paper=[0,1,2].map(function(i){return sf[i]*a+bg[i]*(1-a)});
+return [h(paper),h(tx),h(dm.length>=3?dm:tx),h(ac)].join(',')}catch(e){return null}})()"""
+
+    private fun withPalette(cb: (IntArray?) -> Unit) {
+        try {
+            webView.evaluateJavascript(PALETTE_JS) { raw ->
+                val pal = try {
+                    val str = org.json.JSONTokener(raw ?: "null").nextValue() as? String
+                    str?.split(',')?.map { android.graphics.Color.parseColor(it) }?.toIntArray()?.takeIf { it.size == 4 }
+                } catch (_: Exception) { null }
+                cb(pal)
+            }
+        } catch (_: Exception) { cb(null) }
+    }
+
     // 1030 她嫌系统白框丑：「这个提醒框要不要美化一下」。样子在 ThemedDialog 里。
-    private fun showUpdateDialog(latest: Int, note: String, url: String) {
-        val d = ThemedDialog(this)
+    private fun showUpdateDialog(latest: Int, note: String, url: String) = withPalette { pal ->
+        if (isFinishing || isDestroyed) return@withPalette
+        val d = ThemedDialog(this, pal)
         d.show(
             icon = "🐦‍⬛", title = "归巢有新版本了", sub = "${BuildConfig.VERSION_NAME}  →  1.0.$latest",
             content = if (note.isNotEmpty()) d.noteBox(note) else null,
@@ -426,7 +454,11 @@ class MainActivity : AppCompatActivity() {
     // 桌面小乌鸦的设置（1015）：两个开关；开小乌鸦时没有悬浮窗权限就先去系统设置里给
     fun openCrowSettings() {
         val crow = CrowOverlay.get(this)
-        val d = ThemedDialog(this)
+        withPalette { pal -> crowSettingsDialog(crow, pal) }
+    }
+
+    private fun crowSettingsDialog(crow: CrowOverlay, pal: IntArray?) {
+        val d = ThemedDialog(this, pal)
         val c1 = d.check("离开归巢时，屏幕边上蹲一只小乌鸦（放歌时带歌词）", crow.enabled)
         val c2 = d.check("状态栏歌词胶囊（试验，系统不一定肯显示）", mediaHelper.chipEnabled)
         val box = android.widget.LinearLayout(this).apply {

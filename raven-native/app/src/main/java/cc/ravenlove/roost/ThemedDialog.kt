@@ -18,12 +18,13 @@ import androidx.core.graphics.ColorUtils
 
 // 1030 她嫌系统白框丑：「这个提醒框要不要美化一下」「但是有其他弹窗？」。
 // 壳里所有弹窗（更新提醒、桌面小乌鸦设置、网页的 alert / confirm / prompt）都走这一张纸色/黄铜圆角卡，跟着深浅色走。
-class ThemedDialog(private val act: Activity) {
+// 颜色先跟页面当前的调色盘走（她问「随调色盘变换颜色……会更好吗？」），读不到才用下面的纸色/黄铜。
+class ThemedDialog(private val act: Activity, palette: IntArray? = null) {
     private val night = (act.resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK) == Configuration.UI_MODE_NIGHT_YES
-    val paper = if (night) 0xFF1C2230.toInt() else 0xFFFBF6EC.toInt()
-    val ink = if (night) 0xFFE8E2D6.toInt() else 0xFF4A3726.toInt()
-    val dim = if (night) 0xFF9AA0AE.toInt() else 0xFF8B7A66.toInt()
-    val brass = if (night) 0xFFC9A46A.toInt() else 0xFFA0703C.toInt()
+    val paper = palette?.get(0) ?: if (night) 0xFF1C2230.toInt() else 0xFFFBF6EC.toInt()
+    val ink = palette?.get(1) ?: if (night) 0xFFE8E2D6.toInt() else 0xFF4A3726.toInt()
+    val dim = palette?.get(2) ?: if (night) 0xFF9AA0AE.toInt() else 0xFF8B7A66.toInt()
+    val brass = palette?.get(3) ?: if (night) 0xFFC9A46A.toInt() else 0xFFA0703C.toInt()
     private val dp = act.resources.displayMetrics.density
     fun px(v: Int) = (v * dp).toInt()
 
