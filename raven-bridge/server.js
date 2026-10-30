@@ -2448,7 +2448,7 @@ const server = http.createServer((req, res) => {
       const local = JSON.parse(fs.readFileSync('/home/ripple/raven-private/builds/latest.json', 'utf8'))
       if (local.versionCode > 0 && local.zip) {
         res.writeHead(200, { 'Content-Type': 'application/json' })
-        res.end(JSON.stringify({ versionCode: local.versionCode, url: `https://memory.ravenlove.cc/raven/download/${local.zip}`, note: '通知栏能控制听歌了' }))
+        res.end(JSON.stringify({ versionCode: local.versionCode, url: `https://memory.ravenlove.cc/raven/download/${local.zip}`, note: local.note || '修了点小东西' }))  // 1030：说明写进 latest.json 的 note，别再写死
         return
       }
     } catch {}
