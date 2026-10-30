@@ -57,6 +57,7 @@ function FavCard({ row, config, onRemove, onNote }) {
       </button>}
       <div className={`fav-body${p.isVoice ? ' fav-sub' : ''}`} dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(p.html) }} />
     </>}
+    {row.thinking && <details className="fav-think"><summary>当时在想</summary><div className="fav-think-body">{String(row.thinking).replace(/<\/?[a-zA-Z_][\w:-]*>/g, '').trim()}</div></details>}
     {row.note && <div className="fav-note">— {row.note}</div>}
     <div className="fav-acts"><button type="button" onClick={() => onNote(row)}>{row.note ? '改一句' : '写一句'}</button><button type="button" onClick={() => onRemove(row)}>取消收藏</button></div>
   </article>

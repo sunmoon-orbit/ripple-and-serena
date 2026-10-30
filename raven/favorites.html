@@ -32,6 +32,11 @@
   .body blockquote { margin: 4px 0; padding-left: 10px; border-left: 2px solid var(--line); color: var(--dim); }
   .body pre { white-space: pre-wrap; font-size: 13px; background: var(--chip); padding: 8px; border-radius: 8px; }
   .vtag { font-size: 12px; color: var(--dim); }
+  .think { margin-top: 8px; font-size: 12.5px; color: var(--dim); }
+  .think summary { cursor: pointer; list-style: none; }
+  .think summary::before { content: '› '; }
+  .think[open] summary::before { content: '⌄ '; }
+  .think-body { margin-top: 6px; padding: 8px 10px; background: var(--chip); border-radius: 10px; white-space: pre-wrap; line-height: 1.7; max-height: 320px; overflow: auto; }
   .note { margin-top: 8px; font-size: 13px; color: var(--accent); white-space: pre-wrap; }
   .note::before { content: '— '; }
   .acts { display: flex; gap: 14px; justify-content: flex-end; margin-top: 8px; }
@@ -150,6 +155,13 @@ function card(f) {
   const who = document.createElement('div'); who.className = 'who'
   who.innerHTML = `<span>${f.role === 'assistant' ? '阿言' : '我'}</span><span class="tag">${f.source === 'yanji' ? '言叽' : '归巢'}</span>${f.saved_by === '涟言' ? '<span class="tag">阿言收的</span>' : ''}<span class="when">${esc(fmtWhen(f))}</span>`
   el.append(who, renderBody(f))
+  // 1030：当时在想什么（收藏时一起存的思考），默认收起
+  if (f.thinking) {
+    const th = document.createElement('details'); th.className = 'think'
+    th.innerHTML = '<summary>当时在想</summary>'
+    th.appendChild(Object.assign(document.createElement('div'), { className: 'think-body', textContent: f.thinking }))
+    el.appendChild(th)
+  }
   const note = Object.assign(document.createElement('div'), { className: 'note', textContent: f.note || '' })
   if (!f.note) note.hidden = true
   el.appendChild(note)

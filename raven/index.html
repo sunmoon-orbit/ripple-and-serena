@@ -3807,6 +3807,7 @@ function appendThinkingBlock(text, beforeEl) {
   el.innerHTML = `
     <summary><span><em class="thinking-chevron">›</em>乌鸦在想什么…</span></summary>
     <div class="thinking-body"></div>`
+  el._text = text   // 收藏时一起存（1030）
   const bodyEl = el.querySelector('.thinking-body')
   const textEl = document.createElement('div')
   textEl.textContent = text
@@ -5035,12 +5036,23 @@ async function loadFavKeys() {
     if (r.ok) { favKeys.clear(); for (const x of await r.json()) favKeys.add(x.msg_key) }
   } catch {}
 }
+// 1030 晚她：「我收藏你消息的时候，你的想法可以一起收藏吗？」——往前找这一轮的「乌鸦在想什么」，碰到她的消息就停
+function favThinkingFor(msgEl) {
+  if (!msgEl.classList.contains('assistant')) return ''
+  let n = (msgEl.parentElement && msgEl.parentElement.classList.contains('msg-wrap') ? msgEl.parentElement : msgEl).previousElementSibling
+  while (n) {
+    if (n.classList.contains('thinking-block')) return n._text || ''
+    if (n.classList.contains('user') || n.querySelector?.(':scope > .msg.user')) return ''
+    n = n.previousElementSibling
+  }
+  return ''
+}
 async function toggleFavorite(msgEl, key, on) {
   const ts = Number(key.split(':')[1])
   const headers = { 'Content-Type': 'application/json', Authorization: 'Bearer ' + (localStorage.getItem('raven-token') || '') }
   try {
     const r = on
-      ? await fetch('/raven/favorites', { method: 'POST', headers, body: JSON.stringify({ source: 'raven', msg_key: key, role: key.split(':')[0], text: msgEl._favText, msg_at: ts ? new Date(ts).toISOString() : '' }) })
+      ? await fetch('/raven/favorites', { method: 'POST', headers, body: JSON.stringify({ source: 'raven', msg_key: key, role: key.split(':')[0], text: msgEl._favText, thinking: favThinkingFor(msgEl), msg_at: ts ? new Date(ts).toISOString() : '' }) })
       : await fetch('/raven/favorites?source=raven&key=' + encodeURIComponent(key), { method: 'DELETE', headers })
     if (!r.ok) throw new Error()
     if (on) favKeys.add(key); else favKeys.delete(key)

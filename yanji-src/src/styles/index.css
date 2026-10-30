@@ -6375,3 +6375,8 @@ button:focus:not(:focus-visible) { outline: none; }
 .fav-acts { display: flex; justify-content: flex-end; gap: 14px; margin-top: 6px; }
 .fav-acts button, .fav-more { border: 0; background: none; color: var(--text); opacity: .55; font: inherit; font-size: 12px; padding: 2px 0; }
 .fav-more { align-self: center; font-size: 13px; }
+
+/* 收藏里的「当时在想」（1030） */
+.fav-think { margin-top: 8px; font-size: 12.5px; opacity: .8; }
+.fav-think summary { cursor: pointer; }
+.fav-think-body { margin-top: 6px; padding: 8px 10px; border-radius: 10px; background: color-mix(in srgb, currentColor 8%, transparent); white-space: pre-wrap; line-height: 1.7; max-height: 320px; overflow: auto; }

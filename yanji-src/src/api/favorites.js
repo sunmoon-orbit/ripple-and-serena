@@ -32,7 +32,7 @@ export async function setFavorite(config, msg, on) {
   const key = String(msg.id)
   if (on) {
     await favRequest(config, '', { method: 'POST', body: JSON.stringify({
-      source: 'yanji', msg_key: key, role: msg.role, text: msg.content || '',
+      source: 'yanji', msg_key: key, role: msg.role, text: msg.content || '', thinking: msg.role === 'assistant' ? (msg.thinking || '') : '',
       msg_at: msg.createdAt ? new Date(msg.createdAt).toISOString() : '',
     }) })
     keys.add(key)
