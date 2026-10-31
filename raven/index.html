@@ -152,17 +152,18 @@
       border-bottom: none; border-right: 1px solid var(--border);
       padding: 12px 0 0; width: 130px; overflow-y: auto;
     }
-    .tab {
-      /* 1031 平板上四个标签各占四分之一高（她：「侧边的选择栏特别大」）——手机上的 flex:1 是给横排平分用的，竖排要取消 */
+    #tabs .tab {
+      /* 1031 平板上四个标签各占四分之一高（她：「侧边的选择栏特别大」）——手机上的 flex:1 是给横排平分用的，竖排要取消。
+         ⚠️ 选择器必须带 #tabs：这段媒体查询写在基础 .tab 规则（下面三百多行）之前，同权重后写的赢，原来这几行一直没生效 */
       flex: 0 0 auto;
       padding: 13px 16px; font-size: 13px; text-align: left;
       border-bottom: none; letter-spacing: 0;
     }
-    .tab.active {
+    #tabs .tab.active {
       border-bottom: none; border-right: 2px solid var(--accent);
       background: rgba(128,100,80,0.07);
     }
-    [data-theme="pink"] .tab.active { background: rgba(242,200,202,0.18); }
+    [data-theme="pink"] #tabs .tab.active { background: rgba(242,200,202,0.18); }
 
     .panel { grid-column: 2; grid-row: 2; }
 
