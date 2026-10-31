@@ -62,6 +62,7 @@ class ThemedDialog(private val act: Activity, palette: IntArray? = null) {
      */
     fun show(
         title: String? = null, body: String? = null, icon: String? = null, sub: String? = null,
+        iconRes: Int? = null,   // 1101：🐦‍⬛ 在她 vivo 上画成一只灰鸽子（「这个乌鸦看起来很不像」），要乌鸦就传图
         content: View? = null, foot: String? = null,
         positive: String = "好", negative: String? = null,
         onNegative: (() -> Unit)? = null,   // 1101：只在点了「否」那个按钮时来（点外面、返回键不算），要分清「选了不要」和「没选」的用它
@@ -72,9 +73,13 @@ class ThemedDialog(private val act: Activity, palette: IntArray? = null) {
             background = round(paper, 22)
             setPadding(px(24), px(22), px(24), px(18))
         }
-        if (icon != null) card.addView(text(icon, 30f).apply { gravity = Gravity.CENTER })
+        if (iconRes != null) card.addView(android.widget.ImageView(act).apply {
+            setImageResource(iconRes); scaleType = android.widget.ImageView.ScaleType.FIT_CENTER
+            clipToOutline = true; background = round(Color.TRANSPARENT, 14)
+        }, LinearLayout.LayoutParams(px(52), px(52)).apply { gravity = Gravity.CENTER_HORIZONTAL })
+        else if (icon != null) card.addView(text(icon, 30f).apply { gravity = Gravity.CENTER })
         if (title != null) card.addView(text(title, 19f, bold = true).apply {
-            gravity = Gravity.CENTER; setPadding(0, if (icon != null) px(6) else 0, 0, px(4))
+            gravity = Gravity.CENTER; setPadding(0, if (icon != null || iconRes != null) px(8) else 0, 0, px(4))
         })
         if (sub != null) card.addView(text(sub, 13f, brass).apply { gravity = Gravity.CENTER; setPadding(0, 0, 0, px(10)) })
         if (body != null) card.addView(text(body, 15.5f).apply {

@@ -371,7 +371,7 @@ return [h(paper),h(tx),h(dm.length>=3?dm:tx),h(ac)].join(',')}catch(e){return nu
         if (isFinishing || isDestroyed) return@withPalette
         val d = ThemedDialog(this, pal)
         d.show(
-            icon = "🐦‍⬛", title = "归巢有新版本了", sub = "${BuildConfig.VERSION_NAME}  →  1.0.$latest",
+            iconRes = R.mipmap.ic_launcher, title = "归巢有新版本了", sub = "${BuildConfig.VERSION_NAME}  →  1.0.$latest",
             content = if (note.isNotEmpty()) d.noteBox(note) else null,
             foot = "下载后直接安装覆盖就行，不用卸载，聊天记录都在。",
             positive = "去下载", negative = "以后再说",
@@ -466,7 +466,7 @@ return [h(paper),h(tx),h(dm.length>=3?dm:tx),h(ac)].join(',')}catch(e){return nu
         mediaHelper.chipEnabled = false   // 恒为 false，顺手收掉旧包留下的胶囊通知
         val d = ThemedDialog(this, pal)
         val now = if (crow.enabled) "现在：离开归巢时，它蹲在屏幕边上陪你（放歌时带歌词）" else "现在：收起来了，桌面上没有它"
-        d.show(title = "桌面小乌鸦", icon = "🐦‍⬛", body = now, foot = "长按小乌鸦换衣服，拖着能挪位置，点一下回归巢",
+        d.show(title = "桌面小乌鸦", iconRes = R.mipmap.ic_launcher, body = now, foot = "长按小乌鸦换衣服，拖着能挪位置，点一下回归巢",
             positive = "留在桌面", negative = "先收起来",
             onNegative = { crow.enabled = false; Toast.makeText(this, "小乌鸦收起来了，想它了再来这儿叫", Toast.LENGTH_SHORT).show() },
             onDismiss = { ok ->
