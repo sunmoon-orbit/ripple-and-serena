@@ -463,7 +463,7 @@ return [h(paper),h(tx),h(dm.length>=3?dm:tx),h(ac)].join(',')}catch(e){return nu
     private fun crowSettingsDialog(crow: CrowOverlay, pal: IntArray?) {
         val d = ThemedDialog(this, pal)
         val c1 = d.check("离开归巢时，屏幕边上蹲一只小乌鸦（放歌时带歌词）", crow.enabled)
-        val c2 = d.check("状态栏歌词胶囊（试验，系统不一定肯显示）", mediaHelper.chipEnabled)
+        val c2 = d.check("状态栏歌词胶囊", mediaHelper.chipEnabled)
         val box = android.widget.LinearLayout(this).apply {
             orientation = android.widget.LinearLayout.VERTICAL; addView(c1); addView(c2)
         }
