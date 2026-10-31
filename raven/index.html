@@ -2462,6 +2462,13 @@ async function rvMakeTone(t, use) {
     } else rvToast('存进铃声库了；要装 30 号以后的归巢才能当来电铃声')
   } else rvToast('存进铃声库了，去首页「闹钟」里就能挑')
 }
+// 1031 她：「归巢是不是没做喜欢的歌可以收藏的那个功能」——心一直有，缺的是把点过心的歌放一处：两本里亮着心的合起来
+function rvList() {
+  if (rvRoom.tab === 'hers') return rvRoom.hers
+  if (rvRoom.tab === 'all') return rvRoom.picks
+  if (rvRoom.tab === 'liked') { const seen = new Set(); return [...rvRoom.picks, ...rvRoom.hers].filter(p => p.liked && !seen.has(p.id) && seen.add(p.id)) }
+  return rvRoom.songs
+}
 const pickToTrack = p => ({ name: p.name, artist: p.artist || '', source: p.source, id: p.track_id, pic_id: p.pic_id, lyric_id: p.lyric_id })
 function rvRenderRoom() {
   const room = document.getElementById('rv-room'); if (!room || room.hidden) return
@@ -2469,6 +2476,7 @@ function rvRenderRoom() {
   tabs.innerHTML = `<button data-tab="search" class="${rvRoom.tab === 'search' ? 'on' : ''}">选歌</button>`
     + `<button data-tab="all" class="${rvRoom.tab === 'all' ? 'on' : ''}">涟言点的歌</button>`
     + `<button data-tab="hers" class="${rvRoom.tab === 'hers' ? 'on' : ''}">我点给他的</button>`
+    + `<button data-tab="liked" class="${rvRoom.tab === 'liked' ? 'on' : ''}">收藏</button>`
     + rvRoom.playlists.map(pl => `<button data-tab="${pl.id}" class="${rvRoom.tab === pl.id ? 'on' : ''}">${escHtml(pl.name)} <small>${pl.song_count || 0}</small></button>`).join('')
     + '<button data-tab="new" class="rvr-new" aria-label="新建歌单">＋</button>'
   const body = room.querySelector('.rvr-body')
@@ -2483,14 +2491,15 @@ function rvRenderRoom() {
         </div>`).join('')
     return
   }
-  const isHers = rvRoom.tab === 'hers'
-  const isAll = rvRoom.tab === 'all' || isHers   // 她点的那本和我那本一样的玩法：能收藏、能删、能加进歌单
-  const list = isHers ? rvRoom.hers : rvRoom.tab === 'all' ? rvRoom.picks : rvRoom.songs
+  const isHers = rvRoom.tab === 'hers', isLiked = rvRoom.tab === 'liked'
+  const isAll = rvRoom.tab === 'all' || isHers || isLiked   // 她点的那本和我那本一样的玩法：能收藏、能删、能加进歌单
+  const list = rvList()
   if (!rvRoom.loaded) { body.innerHTML = '<div class="rvr-empty">载入中…</div>'; return }
   if (rvRoom.error) { body.innerHTML = '<div class="rvr-empty">记忆库那边没连上，等会儿再试</div>'; return }
   let html = ''
   if (!isAll) html += `<div class="rvr-pl-bar">${list.length > 1 ? `<button class="rvr-playall">播放全部（${list.length} 首）</button>` : ''}<button class="rvr-pl-del">删除歌单</button></div>`
-  if (!list.length) html += `<div class="rvr-empty">${isHers ? '还没点过。在「选歌」里点「点给他」，或者长按歌词分享，都会记在这儿。' : isAll ? '还没有点过歌。等我某个瞬间想到一首合适的，会放进来的。' : '歌单是空的，去「涟言点的歌」里点 ＋ 把歌加进来'}</div>`
+  if (isLiked && list.length > 1) html += `<div class="rvr-pl-bar"><button class="rvr-playall">播放全部（${list.length} 首）</button></div>`
+  if (!list.length) html += `<div class="rvr-empty">${isLiked ? '还没有点过心的歌。在「涟言点的歌」「我点给他的」里点歌右边的小爱心，就会收到这儿。' : isHers ? '还没点过。在「选歌」里点「点给他」，或者长按歌词分享，都会记在这儿。' : isAll ? '还没有点过歌。等我某个瞬间想到一首合适的，会放进来的。' : '歌单是空的，去「涟言点的歌」里点 ＋ 把歌加进来'}</div>`
   html += list.map((p, i) => `<div class="rvr-pick" data-i="${i}">
       <button class="rvr-pplay" data-act="play" aria-label="播放">${PLAY_SVG}</button>
       <div class="rvr-pmain" data-act="play"><div class="rvr-ptitle">${escHtml(p.name)}${p.artist ? `<span> · ${escHtml(p.artist)}</span>` : ''}</div>
@@ -2539,12 +2548,12 @@ function rvRenderRoom() {
     const b = e.target.closest('[data-act], .rvr-playall, .rvr-pl-del, [data-pl], [data-tone]'); if (!b) return
     if (b.dataset.tone) {
       const key = rvRoom.toneFor || '', i = Number(key.slice(1))
-      const t = key[0] === 's' ? rvRoom.results[i] : (() => { const l = rvRoom.tab === 'hers' ? rvRoom.hers : rvRoom.tab === 'all' ? rvRoom.picks : rvRoom.songs; return l[i] && pickToTrack(l[i]) })()
+      const t = key[0] === 's' ? rvRoom.results[i] : (() => { const l = rvList(); return l[i] && pickToTrack(l[i]) })()
       rvRoom.toneFor = null; rvRenderRoom()
       if (t) rvMakeTone(t, b.dataset.tone)
       return
     }
-    if (b.classList.contains('rvr-playall')) { rvSetQueue(rvRoom.songs.map(pickToTrack), 0); room.hidden = true; return }
+    if (b.classList.contains('rvr-playall')) { rvSetQueue(rvList().map(pickToTrack), 0); room.hidden = true; return }
     if (b.classList.contains('rvr-pl-del')) {
       const pl = rvRoom.playlists.find(x => x.id === rvRoom.tab)
       if (!pl || !confirm(`删掉歌单「${pl.name}」？里面的歌还留在「涟言点的歌」里。`)) return
@@ -2566,17 +2575,17 @@ function rvRenderRoom() {
       else if (act === 'share') { room.hidden = true; insertAtCursor(`[music:${t.name.replace(/[\[\]|]/g, ' ')}|${t.artist.replace(/[\[\]|]/g, ' ')}]`) }
       return
     }
-    const list = rvRoom.tab === 'hers' ? rvRoom.hers : rvRoom.tab === 'all' ? rvRoom.picks : rvRoom.songs
+    const list = rvList()
     const p = list[i]; if (!p) return
     if (act === 'play') { rvSetQueue(list.map(pickToTrack), i); room.hidden = true }
     else if (act === 'tone') { rvRoom.toneFor = rvRoom.toneFor === 'p' + i ? null : 'p' + i; rvRenderRoom() }
     else if (act === 'addto') { rvRoom.addingTo = rvRoom.addingTo === p.id ? null : p.id; rvRenderRoom() }
     else if (act === 'like') {
-      try { await mApi(`/picks/${p.id}/like`, { method: 'PATCH', body: { liked: p.liked ? 0 : 1 } }); p.liked = p.liked ? 0 : 1 } catch { rvToast('没点上') }
+      try { await mApi(`/picks/${p.id}/like`, { method: 'PATCH', body: { liked: p.liked ? 0 : 1 } }); const v = p.liked ? 0 : 1; for (const x of [...rvRoom.picks, ...rvRoom.hers, ...rvRoom.songs]) if (x.id === p.id) x.liked = v } catch { rvToast('没点上') }
       rvRenderRoom()
     } else if (act === 'del') {
       if (!confirm(`把《${p.name}》从点歌记录里删掉？`)) return
-      try { await mApi(`/picks/${p.id}`, { method: 'DELETE' }); list.splice(i, 1) } catch { rvToast('没删成') }
+      try { await mApi(`/picks/${p.id}`, { method: 'DELETE' }); rvRoom.picks = rvRoom.picks.filter(x => x.id !== p.id); rvRoom.hers = rvRoom.hers.filter(x => x.id !== p.id) } catch { rvToast('没删成') }
       rvRenderRoom()
     } else if (act === 'unlist') {
       try { await mApi(`/playlists/${rvRoom.tab}/songs/${p.id}`, { method: 'DELETE' }); rvRoom.songs.splice(i, 1); const pl = rvRoom.playlists.find(x => x.id === rvRoom.tab); if (pl) pl.song_count = Math.max(0, (pl.song_count || 1) - 1) } catch { rvToast('没拿掉') }
