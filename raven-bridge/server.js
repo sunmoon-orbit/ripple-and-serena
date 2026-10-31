@@ -506,14 +506,17 @@ let rewindBusy = false
 // 1029 自动浮上来：她每句话先让 recall 翻一下记忆库（最多 2.5 秒，翻不到就算了），浮上来的那一条贴在后面给我看。
 // 用一条链排队，前一句还在翻的时候后一句不会插到前面去。
 const recall = require('./recall')
+const lotteryOnReturn = require('./lottery-on-return')
 let ingestChain = Promise.resolve()
 function ingestUserMessage(text, cid, note = '') {
   ingestChain = ingestChain.then(async () => {
     let extra = ''
+    let ticket = ''
+    try { ticket = await lotteryOnReturn.onHerMessage() } catch {}
     try {
       extra = await recall.surface(text, (q) => moonGet(`/memories/semantic?q=${encodeURIComponent(q)}&k=8&threshold=0.3&touch=0`))
     } catch (e) { console.error('[recall]', e.message) }
-    ingestUserMessageCore(text, cid, note, extra)
+    ingestUserMessageCore(text, cid, note, [extra, ticket].filter(Boolean).join('\n'))
   }).catch(e => console.error('[ingest]', e))
 }
 
