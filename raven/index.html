@@ -140,6 +140,12 @@
     #app { max-width: 900px; box-shadow: none; }
     #app #chat-messages { padding: 16px 24px; }
     #app .msg { max-width: 72%; }
+    /* 两边的留白：有壁纸就铺一层糊过的同一张图，没有就照旧底色 */
+    html.has-wall body { background: transparent; }
+    html.has-wall body::before {
+      content: ''; position: fixed; inset: -40px; z-index: -1; pointer-events: none;
+      background: var(--wall) center / cover no-repeat; filter: blur(28px) saturate(1.1); opacity: .7;
+    }
   }
 
   /* --- 1003 液态玻璃：顶栏、标签栏、输入栏原来都是平的色块贴在背景上，她说「缺点啥」。
@@ -5834,8 +5840,12 @@ function applyBg(dataUrl) {
     // Size against the visible scroll container, never the full chat history.
     el.style.backgroundAttachment = 'scroll'
     el.style.backgroundRepeat = 'no-repeat'
+    // 1031：宽屏整页居中以后两边是空的底色（她横屏看着发白），把同一张图糊一层铺到两边
+    document.documentElement.style.setProperty('--wall', `url(${JSON.stringify(dataUrl)})`)
+    document.documentElement.classList.add('has-wall')
   } else {
     el.style.backgroundImage = ''
+    document.documentElement.classList.remove('has-wall')
   }
 }
 
