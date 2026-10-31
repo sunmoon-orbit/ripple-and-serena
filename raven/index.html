@@ -1634,6 +1634,9 @@
           <line x1="12" y1="12.5" x2="12" y2="21"/>
         </svg>
       </button><span>搬家</span></div>
+      <div class="tool"><button id="pull-btn" type="button" title="从服务器拉最近三天的聊天" aria-label="拉记录">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><polyline points="7 10 12 15 17 10"/><path d="M5 19h14"/></svg>
+      </button><span>拉记录</span></div>
     </div>
     <div id="sticker-picker"></div>
     <div id="note-rec" hidden><span class="note-dot"></span><span id="note-time">0:00</span><span id="note-hint">松开发送 · 上滑取消</span><button id="note-x" type="button" aria-label="取消">✕</button></div>
@@ -6006,6 +6009,39 @@ function moveImport(file) {
   }
   reader.readAsText(file)
 }
+
+// 拉记录（1031 她换平板：「新设备登录是没有消息记录的？要不要加个拉取近期消息记录功能？」）
+// 从 L0 的 raven 存档里拿最近三天，和本机已有的按「谁说的＋原文＋前后五分钟」去重，合好了刷新重画。
+document.getElementById('pull-btn').addEventListener('click', async () => {
+  const auth = { headers: { Authorization: 'Bearer ' + (localStorage.getItem('raven-token') || '') } }
+  const btn = document.getElementById('pull-btn'); btn.disabled = true
+  try {
+    const r = await fetch('/raven/archive/days', auth)
+    if (!r.ok) throw new Error(r.status === 401 ? '没登录或钥匙不对' : 'HTTP ' + r.status)
+    const { days = [] } = await r.json()
+    const recent = days.sort((a, b) => a.date < b.date ? -1 : 1).slice(-3)
+    const got = []
+    for (const d of recent) {
+      const rr = await fetch('/raven/archive/day?id=' + d.id, auth)
+      if (!rr.ok) continue
+      const { messages = [] } = await rr.json()
+      for (const m of messages) {
+        const ts = Date.parse(/Z|[+-]\d\d:?\d\d$/.test(m.created_at) ? m.created_at : m.created_at.replace(' ', 'T') + 'Z')
+        if (!m.content || isNaN(ts)) continue
+        got.push({ role: m.role, text: m.content, ts })
+      }
+    }
+    const same = (a, b) => a.role === b.role && String(a.text).trim() === String(b.text).trim() && Math.abs((a.ts || 0) - b.ts) < 5 * 60e3
+    const add = got.filter(g => !chatHistory.some(h => same(h, g)))
+    if (!add.length) { alert('本机已经是最新的了，没有要补的'); return }
+    const merged = [...chatHistory, ...add].sort((a, b) => (a.ts || 0) - (b.ts || 0))
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(merged.slice(-MAX_STORED))) } catch {}
+    alert(`补回来 ${add.length} 条（最近三天，最多留 ${MAX_STORED} 条）`)
+    location.reload()
+  } catch (e) {
+    alert('没拉到：' + (e.message || e))
+  } finally { btn.disabled = false }
+})
 
 document.getElementById('move-btn').addEventListener('click', () => {
   moveStatus('')
