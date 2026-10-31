@@ -310,7 +310,8 @@ export default function DrawStudio({ onClose, onSendToChat }) {
                 <button className="draw-ref-add" onClick={() => refInput.current?.click()}>传图</button>
               </>}
             </div>
-            <input ref={refInput} type="file" accept="image/*" multiple hidden onChange={e => { addRefFiles(e.target.files); e.target.value = '' }} />
+            {/* 1031 不带 multiple：言叽壳多选时图放在 ClipData 里，旧壳只读 data.data，选了也收不到（她 10-24、10-31 两次）。一次一张，最多四张 */}
+            <input ref={refInput} type="file" accept="image/*" hidden onChange={e => { addRefFiles(e.target.files); e.target.value = '' }} />
           </div>
           {sketching && <SketchPad onCancel={() => setSketching(false)} onDone={(u) => { setRefs(r => [...r, { id: Date.now(), dataUrl: u, sketch: true }].slice(0, MAX_REFS)); setSketching(false) }} />}
           <div className="draw-opts">

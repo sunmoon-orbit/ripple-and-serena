@@ -643,9 +643,12 @@ class MainActivity : AppCompatActivity() {
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
         if (requestCode == FILE_CHOOSER_CODE) {
+            // 多选（<input multiple>）时系统把图放在 ClipData 里，parseResult 只读 data.data 会拿到 null（1031 画图窗口参考图选了不显示；归巢壳 1015 同一个坑）
+            val clip = data?.clipData
             fileCallback?.onReceiveValue(
-                if (resultCode == RESULT_OK) WebChromeClient.FileChooserParams.parseResult(resultCode, data)
-                else null
+                if (resultCode != RESULT_OK) null
+                else if (clip != null && clip.itemCount > 0) Array(clip.itemCount) { clip.getItemAt(it).uri }
+                else WebChromeClient.FileChooserParams.parseResult(resultCode, data)
             )
             fileCallback = null
         }
