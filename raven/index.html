@@ -2457,6 +2457,7 @@ async function rvMakeTone(t, use) {
     const N = window.RoostNative
     if (N && typeof N.setCallTone === 'function') {
       N.setCallTone(location.origin + '/raven/tone?f=' + encodeURIComponent(j.f) + '&token=' + encodeURIComponent(localStorage.getItem('raven-token') || ''))
+      try { localStorage.setItem('raven-call-tone', j.f) } catch {}
       rvToast('设好了，下次阿言打来就响这首')
     } else rvToast('存进铃声库了；要装 30 号以后的归巢才能当来电铃声')
   } else rvToast('存进铃声库了，去首页「闹钟」里就能挑')
@@ -4405,7 +4406,27 @@ function ringHide(id) {
   if (ringStop) { ringStop(); ringStop = null }
 }
 // 嘟——嘟——的两声一组，配震动；不用文件，WebAudio 现做
+// 1031：她设了歌做来电铃声，人在聊天页时也放那首（之前只有壳在后台响时才放，前台一直是嘟嘟）
 function ringTone() {
+  let song = ''; try { song = localStorage.getItem('raven-call-tone') || '' } catch {}
+  if (song) {
+    const a = new Audio('/raven/tone?f=' + encodeURIComponent(song) + '&token=' + encodeURIComponent(localStorage.getItem('raven-token') || ''))
+    a.loop = true
+    let vt = setInterval(() => { try { navigator.vibrate?.([500, 300, 500]) } catch {} }, 2600)
+    let fallback = null
+    a.play().catch(() => { clearInterval(vt); vt = null; fallback = ringBeep() })
+    return () => { a.pause(); a.src = ''; if (vt) clearInterval(vt); if (fallback) fallback(); try { navigator.vibrate?.(0) } catch {} }
+  }
+  return ringBeep()
+}
+// 30 号包时设的来电铃声没记在网页这边：壳说有，就认铃声库里最新的那首歌
+try {
+  const N = window.RoostNative
+  if (!localStorage.getItem('raven-call-tone') && N && typeof N.hasCallTone === 'function' && N.hasCallTone())
+    fetch('/raven/tones', { headers: { Authorization: 'Bearer ' + (localStorage.getItem('raven-token') || '') }, cache: 'no-store' })
+      .then(r => r.ok ? r.json() : []).then(l => { const t = l.find(x => x.kind === 'song'); if (t) localStorage.setItem('raven-call-tone', t.f) }).catch(() => {})
+} catch {}
+function ringBeep() {
   const ctx = getSharedAudioContext(); let alive = true, t
   if (ctx?.state === 'suspended') ctx.resume().catch(() => {})
   const beep = () => {
