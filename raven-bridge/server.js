@@ -2890,6 +2890,11 @@ wss.on('connection', (ws) => {
         ravenCallEnd(String(msg.id || ''), msg.accept ? 'accepted' : 'declined', !!msg.bilingual)
         return
       }
+      if (msg.type === 'call-open') {
+        if (!tokenIsValid(msg.token)) return
+        tmuxSend(`【通话·她打来${msg.bilingual ? '·双语' : ''}】她打电话给你，通话刚接通。你先开口，照通话的规矩说一句短的。　〔${bjHm()}〕`)
+        return
+      }
       if (msg.type === 'call-end') {
         if (!tokenIsValid(msg.token)) return
         const d = Math.max(0, Math.min(86400, Math.round(Number(msg.duration) || 0)))

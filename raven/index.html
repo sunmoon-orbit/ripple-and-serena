@@ -4887,7 +4887,11 @@ renderBilingualToggle()
 callBilingualBtn.addEventListener('click', toggleBilingual)
 renderAutoToggle()
 document.getElementById('call-auto').addEventListener('click', () => { callAuto = !callAuto; localStorage.setItem(CALL_AUTO_KEY, callAuto ? '1' : '0'); renderAutoToggle() })
-callBtn.addEventListener('click', openCall)
+// 1031 她：「我打电话过去，你先开口」——她自己点开通话时告诉桥，桥叫我先说一句
+callBtn.addEventListener('click', () => {
+  openCall()
+  try { if (ws && ws.readyState === 1) ws.send(JSON.stringify({ type: 'call-open', bilingual: voiceBilingual, token: localStorage.getItem('raven-token') || '' })) } catch {}
+})
 document.getElementById('call-hangup').addEventListener('click', closeCall)
 document.getElementById('call-text-send').addEventListener('click', sendCallText)
 document.getElementById('call-text-input').addEventListener('keydown', event => {
