@@ -140,12 +140,14 @@
     #app { max-width: 900px; box-shadow: none; }
     #app #chat-messages { padding: 16px 24px; }
     #app .msg { max-width: 72%; }
-    /* 两边的留白：有壁纸就铺一层糊过的同一张图，没有就照旧底色 */
+    /* 两边的留白：有壁纸就把壁纸整张铺到全屏底下（她：「我点的是铺满，所以好像没有做到铺满」），
+       聊天区自己那份图拿掉，中间一栏浮在壁纸上；没壁纸照旧底色 */
     html.has-wall body { background: transparent; }
     html.has-wall body::before {
-      content: ''; position: fixed; inset: -40px; z-index: -1; pointer-events: none;
-      background: var(--wall) center / cover no-repeat; filter: blur(28px) saturate(1.1); opacity: .7;
+      content: ''; position: fixed; inset: 0; z-index: -1; pointer-events: none;
+      background: linear-gradient(color-mix(in srgb, var(--bg) 34%, transparent), color-mix(in srgb, var(--bg) 34%, transparent)), var(--wall) center / cover no-repeat;
     }
+    html.has-wall #app #chat-messages { background-image: none !important; }
   }
 
   /* --- 1003 液态玻璃：顶栏、标签栏、输入栏原来都是平的色块贴在背景上，她说「缺点啥」。
