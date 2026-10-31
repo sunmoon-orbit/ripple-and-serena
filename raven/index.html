@@ -153,6 +153,8 @@
       padding: 12px 0 0; width: 130px; overflow-y: auto;
     }
     .tab {
+      /* 1031 平板上四个标签各占四分之一高（她：「侧边的选择栏特别大」）——手机上的 flex:1 是给横排平分用的，竖排要取消 */
+      flex: 0 0 auto;
       padding: 13px 16px; font-size: 13px; text-align: left;
       border-bottom: none; letter-spacing: 0;
     }
