@@ -64,7 +64,8 @@ class ThemedDialog(private val act: Activity, palette: IntArray? = null) {
         title: String? = null, body: String? = null, icon: String? = null, sub: String? = null,
         content: View? = null, foot: String? = null,
         positive: String = "好", negative: String? = null,
-        onDismiss: (Boolean) -> Unit = {},
+        onNegative: (() -> Unit)? = null,   // 1101：只在点了「否」那个按钮时来（点外面、返回键不算），要分清「选了不要」和「没选」的用它
+        onDismiss: (Boolean) -> Unit = {},  // 必须留在最后：别处都用尾随 lambda 传它
     ): AlertDialog {
         val card = LinearLayout(act).apply {
             orientation = LinearLayout.VERTICAL
@@ -89,7 +90,7 @@ class ThemedDialog(private val act: Activity, palette: IntArray? = null) {
             setTextColor(if (primary) paper else brass)
             background = if (primary) round(brass, 999) else round(Color.TRANSPARENT, 999, ColorUtils.setAlphaComponent(brass, 0x88))
             setPadding(0, px(11), 0, px(11))
-            setOnClickListener { ok = isOk; dialog.dismiss() }
+            setOnClickListener { ok = isOk; if (!isOk) onNegative?.invoke(); dialog.dismiss() }
         }
         val row = LinearLayout(act).apply { orientation = LinearLayout.HORIZONTAL; setPadding(0, px(18), 0, 0) }
         if (negative != null) row.addView(button(negative, false, false), LinearLayout.LayoutParams(0, -2, 1f).apply { marginEnd = px(10) })

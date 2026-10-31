@@ -460,22 +460,23 @@ return [h(paper),h(tx),h(dm.length>=3?dm:tx),h(ac)].join(',')}catch(e){return nu
         withPalette { pal -> crowSettingsDialog(crow, pal) }
     }
 
+    // 1101 她要的：加号里点「小乌鸦」直接二选一——留在桌面，还是先收起来（「加一个选择小乌鸦留桌面或者是暂时关掉的按钮」）。
+    // 点外面、返回键＝什么都不改。原来的勾选框和「状态栏歌词胶囊」都拿掉了（她的原子岛从没显示过胶囊）
     private fun crowSettingsDialog(crow: CrowOverlay, pal: IntArray?) {
+        mediaHelper.chipEnabled = false   // 恒为 false，顺手收掉旧包留下的胶囊通知
         val d = ThemedDialog(this, pal)
-        val c1 = d.check("离开归巢时，屏幕边上蹲一只小乌鸦（放歌时带歌词）", crow.enabled)
-        // 1101：状态栏歌词胶囊她的 vivo 原子岛从来没显示过（「肯定是没出现在那个原子岛里，然后就变成一个桌面的小乌鸦了」），开关拿掉；chipEnabled 现在恒为 false，这里顺手把旧胶囊通知收掉
-        mediaHelper.chipEnabled = false
-        val box = android.widget.LinearLayout(this).apply {
-            orientation = android.widget.LinearLayout.VERTICAL; addView(c1)
-        }
-        d.show(title = "桌面小乌鸦", content = box, positive = "好", negative = "算了") { ok ->
+        val now = if (crow.enabled) "现在：离开归巢时，它蹲在屏幕边上陪你（放歌时带歌词）" else "现在：收起来了，桌面上没有它"
+        d.show(title = "桌面小乌鸦", icon = "🐦‍⬛", body = now, foot = "长按小乌鸦换衣服，拖着能挪位置，点一下回归巢",
+            positive = "留在桌面", negative = "先收起来",
+            onNegative = { crow.enabled = false; Toast.makeText(this, "小乌鸦收起来了，想它了再来这儿叫", Toast.LENGTH_SHORT).show() },
+            onDismiss = { ok ->
             if (!ok) return@show
-            crow.enabled = c1.isChecked
-            if (c1.isChecked && !crow.canDraw()) {
+            crow.enabled = true
+            if (!crow.canDraw()) {
                 Toast.makeText(this, "要先允许「显示在其他应用上层」", Toast.LENGTH_LONG).show()
                 try { startActivity(Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:$packageName"))) } catch (_: Exception) {}
             }
-        }
+        })
     }
 
     override fun onDestroy() {
