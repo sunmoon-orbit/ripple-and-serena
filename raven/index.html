@@ -149,6 +149,13 @@
     }
     html.has-wall #app #chat-messages { background-image: none !important; }
   }
+  @media (min-width: 1200px) {
+    /* 1031 23:52 她：电脑只有网页版（壳只做了安卓），所以电脑上要铺满。
+       整页撑满屏幕，但消息和输入框的内容仍收在中间 1000px 里，不然一行字拉一米长 */
+    #app { max-width: none; }
+    #app #chat-messages { padding-left: max(24px, calc((100% - 1000px) / 2)); padding-right: max(24px, calc((100% - 1000px) / 2)); }
+    #app #chat-input-row { padding-left: max(16px, calc((100% - 1000px) / 2)); padding-right: max(16px, calc((100% - 1000px) / 2)); }
+  }
 
   /* --- 1003 液态玻璃：顶栏、标签栏、输入栏原来都是平的色块贴在背景上，她说「缺点啥」。
      加上下渐变和内高光，让它们有厚度、浮起来（配方参考 dwell-on-something 第 19 篇）。
