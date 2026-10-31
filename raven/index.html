@@ -2732,6 +2732,7 @@ function connect() {
       else if (msg.type === 'incoming-call-end') ringHide(msg.id)
       else if (msg.type === 'retracted') { retractions.push({ from: msg.from, to: msg.to }); applyRetractions() }
       else if (msg.type === 'reaction') { const before = reactionsCache[msg.key]; paintReaction(msg.key, msg.reactions); reactionNotice(msg.key, before, msg.reactions) }
+      else if (msg.type === 'call-hangup') { if (callActive) closeCall('ai') }
       else if (msg.type === 'reply') {
         // 有 id 的回复不管是不是补发，见过就不再画（兜底：万一又有两条连接同时收）
         const alreadyShown = msg.id ? shownMsgIds.has(msg.id) : msg.replayed && (
@@ -2742,7 +2743,7 @@ function connect() {
           if (msg.id) shownMsgIds.add(msg.id)
           const msgEl = appendMsg(msg.text, 'assistant', true, msg.ts || Date.now(), msg.id || null)
           if (!msg.replayed && !callActive) maybeEgg()
-          if (!msg.replayed && callActive) handleCallReply(msg.text, msgEl)
+          if (!msg.replayed && callActive) handleCallReply(msg.text, msgEl, !!msg.hangup)
           else if (!msg.replayed && Date.now() < voiceReplyUntil) autoReadReply(msgEl)
           if (msg.thinking) {
             appendThinkingBlock(msg.thinking, msgEl)
@@ -3147,7 +3148,7 @@ function appendCallRecord(call, save = true, ts = Date.now()) {
   const duration = Math.max(0, Number(call?.duration) || 0)
   const label = call?.status === 'cancelled'
     ? '已取消'
-    : `通话时长 ${String(Math.floor(duration / 60)).padStart(2, '0')}:${String(duration % 60).padStart(2, '0')}`
+    : (call?.by === 'ai' ? '阿言挂的 · ' : '') + `通话时长 ${String(Math.floor(duration / 60)).padStart(2, '0')}:${String(duration % 60).padStart(2, '0')}`
   const el = appendMsg(label, 'user', false, ts)
   el.classList.add('call-record')
   const body = el.querySelector('.msg-body')
@@ -3157,7 +3158,7 @@ function appendCallRecord(call, save = true, ts = Date.now()) {
   body.appendChild(text)
   body.insertAdjacentHTML('beforeend', '<svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07 19.5 19.5 0 01-6-6A19.79 19.79 0 012.12 4.18 2 2 0 014.11 2h3a2 2 0 012 1.72c.13.96.36 1.9.69 2.8a2 2 0 01-.45 2.11L8.09 9.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45c.91.33 1.85.56 2.81.69A2 2 0 0122 16.92z"/></svg>')
   if (save) {
-    chatHistory.push({ role: 'user', ts, call: { status: call?.status === 'cancelled' ? 'cancelled' : 'ended', duration } })
+    chatHistory.push({ role: 'user', ts, call: { status: call?.status === 'cancelled' ? 'cancelled' : 'ended', duration, ...(call?.by === 'ai' ? { by: 'ai' } : {}) } })
     saveHistory(chatHistory)
   }
   return el
@@ -4493,10 +4494,11 @@ function callBar(on) {
   try { N.setBarColor(hex) } catch {}
 }
 
-function closeCall() {
+function closeCall(by) {
   if (!callActive) return
   const duration = Math.max(0, Math.floor((Date.now() - callStartedAt) / 1000))
   const record = { status: callHadInteraction ? 'ended' : 'cancelled', duration }
+  if (by === 'ai') record.by = 'ai'
   callActive = false
   stopQuiet(); waitingReply = false
   voiceReplyUntil = 0
@@ -4512,7 +4514,7 @@ function closeCall() {
   callOverlay.classList.remove('show', 'speaking')
   callBar(false)
   if (record.status === 'ended' && ws && ws.readyState === 1) {      // 告诉我她挂了（只是点开又关掉的不说）
-    try { ws.send(JSON.stringify({ type: 'call-end', duration, token: localStorage.getItem('raven-token') || '' })) } catch {}
+    try { ws.send(JSON.stringify({ type: 'call-end', duration, by: by === 'ai' ? 'ai' : 'her', token: localStorage.getItem('raven-token') || '' })) } catch {}
   }
   syncMicState('idle')
   appendCallRecord(record)
@@ -4553,7 +4555,7 @@ function splitCallReply(text) {
   return { main: clean(main.join('\n')), translation: clean(translation.join('\n')) }
 }
 
-function handleCallReply(text, msgEl) {
+function handleCallReply(text, msgEl, hangup = false) {
   callHadInteraction = true
   const firstAfterHer = waitingReply; waitingReply = false
   // 自动开着的麦还在等她出声，他的下一句就来了：这一段不要了，免得把他的朗读当成她说的
@@ -4567,7 +4569,8 @@ function handleCallReply(text, msgEl) {
     const state = event.detail?.state
     if (state === 'loading') setCallStatus('乌鸦准备开口…')
     else if (state === 'playing') setCallStatus('乌鸦正在说话，点麦克风可以打断', true)
-    else if (state === 'error') setCallStatus('这句没能读出来，再点一次麦克风继续说')
+    else if (state === 'error') { setCallStatus('这句没能读出来，再点一次麦克风继续说'); if (hangup) setTimeout(() => closeCall('ai'), 1500) }
+    else if (hangup) { if (wasPlaying) setTimeout(() => { if (callActive) closeCall('ai') }, 700) }   // 他说了这句就挂：念完再挂
     else if (!mediaRecorder && !activeSttController) {
       setCallStatus('点麦克风，接着说')
       // 刚才是在念、现在停了：要是她点麦克风掐断的，那边已经在开麦了，autoListen 里会看见并让开
@@ -4576,6 +4579,8 @@ function handleCallReply(text, msgEl) {
     wasPlaying = state === 'playing'
   })
   if (parts.main) autoReadReply(msgEl)
+  else if (hangup) setTimeout(() => { if (callActive) closeCall('ai') }, 700)
+  if (hangup) setTimeout(() => { if (callActive) closeCall('ai') }, 60000)   // 念卡住了也别一直挂着
 }
 
 function syncMicState(state) {

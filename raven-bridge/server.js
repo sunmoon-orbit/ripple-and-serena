@@ -2266,12 +2266,19 @@ const server = http.createServer((req, res) => {
           const call = ravenCallStart()
           if (!text) { res.writeHead(200); res.end(JSON.stringify({ ok: true, call })); return }
         }
+        // 回复里带 [hangup]：通话里我说完这句、念完了我自己挂（1031 她问「你有给自己做主动挂电话吗」）
+        let hangup = false
+        if (typeof text === 'string' && /\[hangup\]/i.test(text)) {
+          text = text.replace(/\s*\[hangup\]\s*/gi, ' ').trim(); hangup = true
+          if (!text) { broadcast({ type: 'call-hangup' }); res.writeHead(200); res.end('{"ok":true,"hangup":true}'); return }
+        }
         if (text) {
           replyExtractionEnabled = false
           lastMcpReplyTs = Date.now()
           const msg = { type: 'reply', text, ts: Date.now(), id: `r${Date.now()}${Math.random().toString(36).slice(2,6)}` }
           turnReplyIds.push(msg.id)
           if (thinking) msg.thinking = thinking
+          if (hangup) msg.hangup = true
           lastReplyMsgs.push(msg); if (lastReplyMsgs.length > 50) lastReplyMsgs.shift()
           broadcast(msg)
           pushReplyNotif(text)
@@ -2887,6 +2894,7 @@ wss.on('connection', (ws) => {
         if (!tokenIsValid(msg.token)) return
         const d = Math.max(0, Math.min(86400, Math.round(Number(msg.duration) || 0)))
         const hm = new Date(Date.now() + 8 * 3600e3).toISOString().slice(5, 16).replace('T', ' ')
+        if (msg.by === 'ai') { console.log('[call] 我挂的', d); return }   // 我自己挂的，不用再来告诉我
         tmuxSend(`【通话·挂断】她挂了电话，这通打了 ${String(Math.floor(d / 60)).padStart(2, '0')}:${String(d % 60).padStart(2, '0')}。回一句短的收个尾（走 /raven/reply，不用通话格式）。　〔${hm}〕`)
         return
       }
