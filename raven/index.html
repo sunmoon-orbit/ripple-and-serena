@@ -1307,6 +1307,9 @@
   .rvf-btns .rvf-play { width: 58px; height: 58px; border-radius: 50%; background: var(--accent); color: var(--bg); align-items: center; justify-content: center; }
   .rvf-btns .rvf-play svg { width: 24px; height: 24px; }
   .rvf-btns .rvf-prev svg, .rvf-btns .rvf-next svg { width: 22px; height: 22px; }
+  .rvf-btns .rvf-like svg { width: 22px; height: 22px; }
+  .rvf-btns .rvf-like.on { color: #e08a9a; }
+  .rvf-like-spacer { width: 34px; flex-shrink: 0; }
 
 
   /* 打码贴纸（1015，她在小红书看到别人家有）：贴纸都是不透明的整块，盖住就是真盖住，不像模糊、马赛克那样能还原 */
@@ -1559,9 +1562,11 @@
       <div class="rvf-lyrics"></div>
       <div class="rvf-ctrl"><span class="rvf-cur">0:00</span><div class="rv-seekwrap"><div class="rv-seek-fill"></div><input class="rv-seek" type="range" min="0" max="0" step="0.1" value="0" aria-label="播放进度"></div><span class="rvf-dur">0:00</span></div>
       <div class="rvf-btns">
+        <button class="rvf-like" type="button" aria-label="收藏"></button>
         <button class="rvf-prev" type="button" aria-label="上一首" hidden><svg viewBox="0 0 24 24" fill="currentColor"><polygon points="19,20 9,12 19,4"/><rect x="5" y="4" width="3" height="16"/></svg></button>
         <button class="rvf-play" type="button" aria-label="播放/暂停"></button>
         <button class="rvf-next" type="button" aria-label="下一首" hidden><svg viewBox="0 0 24 24" fill="currentColor"><polygon points="5,4 15,12 5,20"/><rect x="16" y="4" width="3" height="16"/></svg></button>
+        <span class="rvf-like-spacer" aria-hidden="true"></span>
       </div>
     </div>
     <div id="mask-tray" hidden>
@@ -2151,6 +2156,7 @@ function rvRenderFull() {
   rvTogetherText()
   f.querySelector('.rvf-cover').innerHTML = t.cover ? `<img src="${escHtml(t.cover)}" alt="">` : MUSIC_NOTE_SVG
   f.querySelector('.rvf-title').textContent = t.name
+  rvDrawLike()
   f.querySelector('.rvf-artist').textContent = t.artist || '涟言点的歌'
   f.querySelector('.rvf-pos').textContent = rvMusic.queue.length > 1 ? `播放队列 ${rvMusic.idx + 1} / ${rvMusic.queue.length}` : '当前播放'
   f.querySelector('.rvf-prev').hidden = false
@@ -2173,6 +2179,7 @@ function rvRenderFull() {
   f.querySelector('.rvf-play').onclick = () => { if (rvAudio && rvMusic.track) rvAudio.paused ? rvAudio.play() : rvAudio.pause() }
   f.querySelector('.rvf-prev').onclick = () => rvSkip(-1)
   f.querySelector('.rvf-next').onclick = () => rvSkip(1)
+  f.querySelector('.rvf-like').onclick = rvToggleLike
   // 点一句跳到那儿；长按一句 = 把这句歌词带回聊天框发给我（1014 她：「如果我遇到喜欢的歌词，可以跟你分享？」）
   let pressTimer = null, pressed = false
   const lyr = f.querySelector('.rvf-lyrics')
@@ -2235,6 +2242,32 @@ async function mApi(path, opts = {}) {
   const r = await fetch('/raven/music' + path, { method: opts.method || 'GET', headers, body: opts.body ? JSON.stringify(opts.body) : undefined, cache: 'no-store' })
   if (!r.ok) throw new Error(String(r.status))
   return r.json()
+}
+// 1031 她：「在那个歌曲播放页面放一个收藏的按钮！放个小爱心」——播放页的心和听歌面板里的是同一份（music_picks.liked）。
+// 这首还没进过点歌记录（比如搜出来直接放的）就先记成她点的，再点亮
+let rvAllPicks = null
+async function rvLoadAllPicks() { try { const l = await mApi('/picks?by=all'); rvAllPicks = Array.isArray(l) ? l : [] } catch { rvAllPicks = rvAllPicks || [] } }
+function rvPickOf(t) { return t && (rvAllPicks || []).find(p => p.name === t.name && (p.artist || '') === (t.artist || '') && p.liked) || t && (rvAllPicks || []).find(p => p.name === t.name && (p.artist || '') === (t.artist || '')) }
+function rvDrawLike() {
+  const b = document.querySelector('#rv-full .rvf-like'); if (!b) return
+  const p = rvPickOf(rvMusic.track)
+  b.classList.toggle('on', !!(p && p.liked)); b.innerHTML = RV_HEART_SVG(p && p.liked)
+  if (rvAllPicks === null) rvLoadAllPicks().then(rvDrawLike)
+}
+async function rvToggleLike() {
+  const t = rvMusic.track; if (!t) return
+  if (rvAllPicks === null) await rvLoadAllPicks()
+  let p = rvPickOf(t)
+  try {
+    if (!p) { p = await mApi('/picks', { method: 'POST', body: { source: t.source, track_id: t.id, name: t.name, artist: t.artist, pic_id: t.pic_id, lyric_id: t.lyric_id, reason: '', picked_by: '阿颖' } }); rvAllPicks.unshift(p) }
+    const v = p.liked ? 0 : 1
+    await mApi(`/picks/${p.id}/like`, { method: 'PATCH', body: { liked: v } })
+    for (const x of [...rvAllPicks, ...rvRoom.picks, ...rvRoom.hers, ...rvRoom.songs]) if (x.name === t.name && (x.artist || '') === (t.artist || '') && x.id === p.id) x.liked = v
+    p.liked = v
+    if (rvRoom.loaded) rvLoadRoom()
+    rvToast(v ? '收进「收藏」了' : '从收藏里拿掉了')
+  } catch { rvToast('没点上，等会儿再试') }
+  rvDrawLike()
 }
 // 聊天里我点的歌，她点了播放才记进「涟言点的歌」，带上我为什么点；同一首同一个理由只记一次
 const rvSavedPicks = new Set()
