@@ -134,41 +134,12 @@
   #app { display: flex; flex-direction: column; height: 100vh; max-width: 480px; margin: 0 auto; }
 
   @media (min-width: 768px) {
-    #app {
-      display: grid;
-      grid-template-columns: 130px 1fr;
-      grid-template-rows: auto 1fr;
-      width: 100%;
-      max-width: none;
-      height: 100vh;
-      box-shadow: none;
-    }
-
-    #header { grid-column: 2; grid-row: 1; }
-
-    #tabs {
-      grid-column: 1; grid-row: 1 / 3;
-      flex-direction: column; justify-content: flex-start;
-      border-bottom: none; border-right: 1px solid var(--border);
-      padding: 12px 0 0; width: 130px; overflow-y: auto;
-    }
-    #tabs .tab {
-      /* 1031 平板上四个标签各占四分之一高（她：「侧边的选择栏特别大」）——手机上的 flex:1 是给横排平分用的，竖排要取消。
-         ⚠️ 选择器必须带 #tabs：这段媒体查询写在基础 .tab 规则（下面三百多行）之前，同权重后写的赢，原来这几行一直没生效 */
-      flex: 0 0 auto;
-      padding: 13px 16px; font-size: 13px; text-align: left;
-      border-bottom: none; letter-spacing: 0;
-    }
-    #tabs .tab.active {
-      border-bottom: none; border-right: 2px solid var(--accent);
-      background: rgba(128,100,80,0.07);
-    }
-    [data-theme="pink"] #tabs .tab.active { background: rgba(242,200,202,0.18); }
-
-    .panel { grid-column: 2; grid-row: 2; }
-
-    #chat-messages { max-width: 760px; margin: 0 auto; padding: 16px 24px; }
-    .msg { max-width: 65%; }
+    /* 1031 她在平板上：「好长好长的空条条……占了我们的聊天位置……视觉上感觉很空旷，又很拥挤」。
+       原来宽屏把四个标签竖成左边一条 130px 的侧栏，标签只有四个，底下全空。
+       现在宽屏也用手机那套横排标签，整页居中、最宽 900px，两边留白交给壁纸。 */
+    #app { max-width: 900px; box-shadow: none; }
+    #app #chat-messages { padding: 16px 24px; }
+    #app .msg { max-width: 72%; }
   }
 
   /* --- 1003 液态玻璃：顶栏、标签栏、输入栏原来都是平的色块贴在背景上，她说「缺点啥」。
