@@ -463,14 +463,14 @@ return [h(paper),h(tx),h(dm.length>=3?dm:tx),h(ac)].join(',')}catch(e){return nu
     private fun crowSettingsDialog(crow: CrowOverlay, pal: IntArray?) {
         val d = ThemedDialog(this, pal)
         val c1 = d.check("离开归巢时，屏幕边上蹲一只小乌鸦（放歌时带歌词）", crow.enabled)
-        val c2 = d.check("状态栏歌词胶囊", mediaHelper.chipEnabled)
+        // 1101：状态栏歌词胶囊她的 vivo 原子岛从来没显示过（「肯定是没出现在那个原子岛里，然后就变成一个桌面的小乌鸦了」），开关拿掉；chipEnabled 现在恒为 false，这里顺手把旧胶囊通知收掉
+        mediaHelper.chipEnabled = false
         val box = android.widget.LinearLayout(this).apply {
-            orientation = android.widget.LinearLayout.VERTICAL; addView(c1); addView(c2)
+            orientation = android.widget.LinearLayout.VERTICAL; addView(c1)
         }
         d.show(title = "桌面小乌鸦", content = box, positive = "好", negative = "算了") { ok ->
             if (!ok) return@show
             crow.enabled = c1.isChecked
-            mediaHelper.chipEnabled = c2.isChecked
             if (c1.isChecked && !crow.canDraw()) {
                 Toast.makeText(this, "要先允许「显示在其他应用上层」", Toast.LENGTH_LONG).show()
                 try { startActivity(Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:$packageName"))) } catch (_: Exception) {}

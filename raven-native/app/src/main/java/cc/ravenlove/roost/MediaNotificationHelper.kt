@@ -47,7 +47,7 @@ class MediaNotificationHelper(private val context: Context) {
     private var lastLyric = ""
     private val prefs = context.getSharedPreferences("roost_crow", Context.MODE_PRIVATE)
     var chipEnabled: Boolean
-        get() = prefs.getBoolean("chip", false)
+        get() = false   // 1101 她的原子岛不显示，整个关掉；旧包里勾过的也不再算数
         set(v) { prefs.edit().putBoolean("chip", v).apply(); if (!v) nm.cancel(LYRIC_NOTIFICATION_ID) else showLyricChip() }
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
 
