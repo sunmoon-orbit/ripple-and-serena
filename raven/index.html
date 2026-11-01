@@ -3019,8 +3019,19 @@ function buildVoiceNote(sec, text, heard, path) {
 
 function splitUserSegments(text) {
   if (!text || text.includes('```')) return [text]
+  if (/^(> ?引用[：:][^\n]*\n)?【语音条/.test(text)) return [text]   // 语音条整条认，拆了就画不成语音条
   const segs = text.split(/\n[ \t]*\n/).map(s => s.trim()).filter(Boolean)
-  return segs.length > 1 ? segs : [text]
+  // 1101 她：「图片可不可以分开发？现在一定跟字还有多张图片连着在同一个气泡里」——像微信那样字一个泡、每张图一个泡。
+  // 只拆显示，发给我的还是一整条（我收到时字和图在一起，好对上她说的是哪张）
+  const out = []
+  for (const seg of segs) {
+    const atts = seg.match(/\[附件:\s*[^\]]+\]/g) || []
+    const rest = seg.replace(/\[附件:\s*[^\]]+\]/g, '').trim()
+    if (rest && /^> ?引用[：:][^\n]*$/.test(rest) && atts.length) { out.push(rest + '\n' + atts.shift()) }   // 只引用了一句就发图：引用跟着第一张图走
+    else if (rest) out.push(rest)
+    out.push(...atts)
+  }
+  return out.length > 1 ? out : [text]
 }
 
 // 完成彩蛋（1020 从言叽搬来）：我回话后偶尔右下角冒出一只像素小家伙，一半乌鸦一半 Clawd，点一下或八秒后消失。
