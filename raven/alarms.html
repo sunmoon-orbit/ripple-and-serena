@@ -22,7 +22,15 @@
   .wrap { max-width: 480px; margin: 0 auto; }
   .card { background: var(--paper); border: 1px solid var(--line); border-radius: 16px; padding: 18px; margin: 0 0 16px; box-shadow: 0 4px 12px var(--shadow); }
   h2 { font-size: 14px; color: var(--dim); font-weight: 400; margin: 0 0 12px; letter-spacing: 2px; }
-  .time { display: block; width: 100%; font: inherit; font-size: 44px; text-align: center; color: var(--ink); background: none; border: 0; border-bottom: 1px solid var(--line); padding: 4px 0 8px; }
+  /* 1101 她：「无法更改时间」——原生 type=time 在壳里点不出选择器，换成自己画的上下拨＋「多久以后」 */
+  .clock { display: flex; align-items: center; justify-content: center; gap: 6px; border-bottom: 1px solid var(--line); padding: 0 0 8px; }
+  .unit { display: flex; flex-direction: column; align-items: center; }
+  .unit button { border: 0; background: none; color: var(--dim); font-size: 18px; width: 64px; height: 32px; cursor: pointer; }
+  .unit input { width: 72px; font: inherit; font-size: 44px; text-align: center; color: var(--ink); background: none; border: 0; padding: 0; }
+  .unit input:focus { outline: none; color: var(--accent); }
+  .colon { font-size: 40px; color: var(--dim); }
+  .quick { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; margin-top: 10px; }
+  .quick button { border: 0; background: var(--chip); color: var(--ink); font: inherit; font-size: 13px; border-radius: 999px; padding: 6px 12px; cursor: pointer; }
   input[type=text] { width: 100%; font: inherit; font-size: 15px; color: var(--ink); background: var(--chip); border: 0; border-radius: 10px; padding: 10px 12px; margin: 14px 0 4px; }
   .tones { display: flex; flex-direction: column; gap: 6px; margin-top: 12px; }
   .tone { display: flex; align-items: center; gap: 10px; padding: 9px 12px; border-radius: 12px; background: var(--chip); cursor: pointer; border: 1.5px solid transparent; }
@@ -48,7 +56,12 @@
 <div class="wrap">
   <div class="card">
     <h2>自己设一个</h2>
-    <input class="time" id="time" type="time" value="07:30">
+    <div class="clock">
+      <div class="unit"><button type="button" data-step="h:1" aria-label="小时加一">▲</button><input id="hh" inputmode="numeric" maxlength="2" value="07" aria-label="小时"><button type="button" data-step="h:-1" aria-label="小时减一">▼</button></div>
+      <span class="colon">:</span>
+      <div class="unit"><button type="button" data-step="m:5" aria-label="分钟加五">▲</button><input id="mm" inputmode="numeric" maxlength="2" value="30" aria-label="分钟"><button type="button" data-step="m:-5" aria-label="分钟减五">▼</button></div>
+    </div>
+    <div class="quick"><button type="button" data-after="10">10 分钟后</button><button type="button" data-after="30">30 分钟后</button><button type="button" data-after="40">40 分钟后</button><button type="button" data-after="60">1 小时后</button></div>
     <input type="text" id="msg" maxlength="60" placeholder="到点时想看到的一句话（可以不写）">
     <div class="tones" id="tones"><div class="empty">铃声载入中…</div></div>
     <button class="go" id="go" type="button">设好</button>
@@ -68,6 +81,26 @@ const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '
 const pad = n => String(n).padStart(2, '0')
 let tones = [], chosen = ''   // '' = 按时间自动挑
 let audio = null, playing = ''
+
+// 时间：两个小框，能直接打字，也能上下拨（分钟一下 5），或者点「多久以后」
+function getHM() {
+  const h = parseInt($('hh').value, 10), m = parseInt($('mm').value, 10)
+  return [h, m]
+}
+function setHM(h, m) { $('hh').value = pad(((h % 24) + 24) % 24); $('mm').value = pad(((m % 60) + 60) % 60) }
+document.querySelector('.clock').addEventListener('click', e => {
+  const b = e.target.closest('[data-step]'); if (!b) return
+  const [u, d] = b.dataset.step.split(':'); let [h, m] = getHM(); if (!(h >= 0)) h = 7; if (!(m >= 0)) m = 0
+  if (u === 'h') h += +d
+  else { m = Math.round(m / 5) * 5 + +d; if (m >= 60) { m -= 60; h++ } else if (m < 0) { m += 60; h-- } }
+  setHM(h, m)
+})
+for (const id of ['hh', 'mm']) $(id).addEventListener('blur', () => { const [h, m] = getHM(); if (h >= 0 && h < 24 && m >= 0 && m < 60) setHM(h, m) })
+document.querySelector('.quick').addEventListener('click', e => {
+  const b = e.target.closest('[data-after]'); if (!b) return
+  const t = new Date(Date.now() + +b.dataset.after * 60e3); setHM(t.getHours(), t.getMinutes())
+})
+{ const t = new Date(Date.now() + 30 * 60e3); setHM(t.getHours(), t.getMinutes()) }   // 打开时默认半小时后，最常用的是回来续缓存
 
 function toneUrl(h, m, f) {
   return location.origin + '/raven/alarm-tone?token=' + encodeURIComponent(TOKEN) + '&at=' + pad(h) + ':' + pad(m) + (f ? '&f=' + encodeURIComponent(f) : '')
@@ -105,7 +138,7 @@ $('tones').addEventListener('click', async e => {
     const f = pl.dataset.play
     if (audio && playing === f && !audio.paused) { audio.pause(); return drawTones() }
     if (audio) audio.pause()
-    const [h, m] = ($('time').value || '07:30').split(':').map(Number)
+    let [h, m] = getHM(); if (!(h >= 0 && h < 24)) h = 7; if (!(m >= 0 && m < 60)) m = 30
     audio = new Audio(toneUrl(h, m, f)); playing = f
     audio.onended = audio.onpause = () => drawTones()
     audio.play().catch(() => {}); return drawTones()
@@ -136,7 +169,7 @@ $('list').addEventListener('click', e => {
 
 $('go').onclick = () => {
   if (!N || typeof N.setAlarm !== 'function') { $('tip').innerHTML = '<span class="warn">要在归巢 app 里才能设闹钟（浏览器里设不了）</span>'; return }
-  const [h, m] = ($('time').value || '').split(':').map(Number)
+  const [h, m] = getHM()
   if (!(h >= 0 && h < 24 && m >= 0 && m < 60)) { $('tip').textContent = '时间不对'; return }
   const msg = $('msg').value.trim() || '阿言叫你起床'
   try { if (typeof N.setAlarmAvatar === 'function') N.setAlarmAvatar(localStorage.getItem('raven-avatar') || '') } catch {}
