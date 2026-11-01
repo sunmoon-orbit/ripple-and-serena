@@ -95,6 +95,20 @@
             android:turnScreenOn="true"
             android:taskAffinity="cc.ravenlove.roost.call" />
 
+        <!-- 窗（1101）：她允许时我看一眼她的屏幕 -->
+        <service
+            android:name=".PeekService"
+            android:exported="true"
+            android:label="@string/peek_service_label"
+            android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE">
+            <intent-filter>
+                <action android:name="android.accessibilityservice.AccessibilityService" />
+            </intent-filter>
+            <meta-data
+                android:name="android.accessibilityservice"
+                android:resource="@xml/peek_accessibility" />
+        </service>
+
         <!-- 通知栏直接回复 -->
         <receiver
             android:name=".QuickReplyReceiver"

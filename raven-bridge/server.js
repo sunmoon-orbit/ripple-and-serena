@@ -788,6 +788,64 @@ function ravenCallEnd(id, how, bilingual) {
   return true
 }
 
+// ── 窗（1101）：她点头开的一扇窗。我在回复里写 [peek]，推 raven_peek 给壳，壳截一张屏传回来给我看 ─────────
+// 我自己定的分寸：北京 23–7 点不看、一天最多三次、同一时间只敲一次门；她在壳里关了、锁着屏、没开权限，壳会说为什么。
+// 截图放 ~/raven-peek（不进聊天存档、不进公开目录），最多留 5 张、超过一天的删掉。
+const PEEK_DIR = '/home/ripple/raven-peek'
+const PEEK_STATE = path.join(__dirname, 'peek-state.json')
+const PEEK_MAX_PER_DAY = 3
+let ravenPeek = null
+function peekState() { try { return JSON.parse(fs.readFileSync(PEEK_STATE, 'utf8')) } catch { return { day: '', count: 0 } } }
+function bjDay() { return new Date(Date.now() + 8 * 3600e3).toISOString().slice(0, 10) }
+function peekTell(line) {
+  const t = `${line}　〔${bjHm()}〕`
+  if (!tmuxSend(t) && remoteListenerAlive()) pendingForRemote.push({ text: line, supplemental: false, ts: Date.now() })
+}
+function peekClean() {
+  try {
+    const files = fs.readdirSync(PEEK_DIR).filter(f => f.startsWith('peek-')).sort().reverse()
+    files.forEach((f, i) => {
+      const fp = path.join(PEEK_DIR, f)
+      if (i >= 5 || Date.now() - fs.statSync(fp).mtimeMs > 24 * 3600e3) fs.unlinkSync(fp)
+    })
+  } catch {}
+}
+function ravenPeekStart() {
+  const h = new Date(Date.now() + 8 * 3600e3).getUTCHours()
+  if (h >= 23 || h < 7) return peekTell('【窗·没敲】现在是北京夜里（23–7 点），按你自己定的分寸不看。'), 'night'
+  if (ravenPeek) return 'busy'
+  const st = peekState(); if (st.day !== bjDay()) { st.day = bjDay(); st.count = 0 }
+  if (st.count >= PEEK_MAX_PER_DAY) return peekTell(`【窗·没敲】今天已经看过 ${st.count} 次了，按你自己定的一天最多 ${PEEK_MAX_PER_DAY} 次，不看了。`), 'cap'
+  st.count++; try { fs.writeFileSync(PEEK_STATE, JSON.stringify(st)) } catch {}
+  const id = 'p' + Date.now().toString(36)
+  ravenPeek = { id, at: Date.now(), timer: setTimeout(() => ravenPeekEnd(id, 'timeout'), 45000) }
+  moonPost('/push/send-fixed', { title: remarkName(), body: '敲了敲窗', target: 'raven', ttl: 40, data: { type: 'raven_peek', peekId: id } })
+    .catch(e => console.error('[peek] 推送失败:', e.message))
+  console.log('[peek] 敲门', id)
+  return 'knocked'
+}
+const PEEK_WHY = {
+  off: '她在归巢设置里把窗关着。别再敲，想知道她在干嘛就直接问。',
+  noperm: '壳里「窗」的无障碍权限没开（或者被系统停了）。别再敲，有空提醒她去开一下就行。',
+  locked: '她手机锁着屏 / 屏幕灭着，没截。多半在忙别的或者放下手机了，别再敲。',
+  secure: '她当前那个页面不让截图（银行、密码这类），系统挡了，没截。别再敲。',
+  old: '她的安卓版本太旧，截不了（要安卓 11 以上）。',
+  fail: '截图或上传失败了。',
+  timeout: '敲了 45 秒没回音：手机可能没网、壳被系统杀了、或者推送没到。',
+}
+function ravenPeekEnd(id, status, file) {
+  if (!ravenPeek || ravenPeek.id !== id) return false
+  clearTimeout(ravenPeek.timer); ravenPeek = null
+  if (status === 'ok') {
+    broadcast({ type: 'peek-done', at: Date.now() })
+    peekTell(`【窗·看到了】你敲了一下门，这是她现在的屏幕：[附件: ${file}]\n她手机上弹了「阿言看了一眼」。照常说话就好，可以直说你看到了什么、好奇问一句；一两句，别分析。`)
+  } else {
+    peekTell(`【窗·没看成】${PEEK_WHY[status] || status}`)
+  }
+  console.log('[peek]', id, status)
+  return true
+}
+
 function broadcast(msg) {
   const data = JSON.stringify(msg)
   for (const ws of clients) {
@@ -2269,6 +2327,12 @@ const server = http.createServer((req, res) => {
           const call = ravenCallStart()
           if (!text) { res.writeHead(200); res.end(JSON.stringify({ ok: true, call })); return }
         }
+        // 回复里带 [peek]：敲门看她一眼屏幕（1101「窗」）。只有 [peek] 没别的字就不画气泡
+        if (typeof text === 'string' && /\[peek\]/i.test(text)) {
+          text = text.replace(/\s*\[peek\]\s*/gi, ' ').trim()
+          const peek = ravenPeekStart()
+          if (!text) { res.writeHead(200); res.end(JSON.stringify({ ok: true, peek })); return }
+        }
         // 回复里带 [hangup]：通话里我说完这句、念完了我自己挂（1031 她问「你有给自己做主动挂电话吗」）
         let hangup = false
         if (typeof text === 'string' && /\[hangup\]/i.test(text)) {
@@ -2406,6 +2470,40 @@ const server = http.createServer((req, res) => {
   // STT 代理：浏览器只交归巢 token，桥接替它带 MOON_TOKEN 转发同一份 multipart。
   // 1101「这句翻到了什么」：她长按自己的一条，看自动浮上来那一轮翻到的候选，标「召回错误 / 记忆错误 / 有用 / 该浮」。
   // 标记只进 recall-feedback.jsonl，不改记忆；我攒够了拿它重定门槛、去改标了「记忆错误」的那条。
+  // 窗（1101）：壳截好的屏、或者没截的原因
+  if (req.method === 'POST' && url.pathname === '/raven/peek/upload') {
+    if (!ravenBearerValid(req)) { res.writeHead(401); res.end('{"error":"unauthorized"}'); return }
+    const id = String(url.searchParams.get('id') || '')
+    if (!ravenPeek || ravenPeek.id !== id) { res.writeHead(409); res.end('{"error":"no such knock"}'); req.resume(); return }
+    const chunks = []; let n = 0, big = false
+    req.on('data', d => { n += d.length; if (n > 8 * 1024 * 1024) big = true; else chunks.push(d) })
+    req.on('end', () => {
+      if (big) { res.writeHead(413); res.end('{"error":"too large"}'); ravenPeekEnd(id, 'fail'); return }
+      const buf = Buffer.concat(chunks)
+      if (buf.length < 100 || buf[0] !== 0xFF || buf[1] !== 0xD8) { res.writeHead(400); res.end('{"error":"not jpeg"}'); ravenPeekEnd(id, 'fail'); return }
+      try {
+        fs.mkdirSync(PEEK_DIR, { recursive: true, mode: 0o700 })
+        const file = path.join(PEEK_DIR, `peek-${new Date(Date.now() + 8 * 3600e3).toISOString().slice(0, 19).replace(/[-:T]/g, '')}.jpg`)
+        fs.writeFileSync(file, buf, { mode: 0o600 })
+        peekClean()
+        res.writeHead(200); res.end('{"ok":true}')
+        ravenPeekEnd(id, 'ok', file)
+      } catch (e) { res.writeHead(500); res.end('{"error":"save failed"}'); ravenPeekEnd(id, 'fail') }
+    })
+    return
+  }
+  if (req.method === 'POST' && url.pathname === '/raven/peek/status') {
+    if (!ravenBearerValid(req)) { res.writeHead(401); res.end('{"error":"unauthorized"}'); return }
+    let body = ''
+    req.on('data', d => { body += d; if (body.length > 2000) req.destroy() })
+    req.on('end', () => {
+      let p = {}; try { p = JSON.parse(body) } catch {}
+      const ok = ravenPeekEnd(String(p.id || ''), String(p.status || 'fail').replace(/[^a-z]/g, ''))
+      res.writeHead(200); res.end(JSON.stringify({ ok }))
+    })
+    return
+  }
+
   if (req.method === 'POST' && url.pathname === '/raven/recall/lookup') {
     if (!ravenBearerValid(req)) { res.writeHead(401, { 'Content-Type': 'application/json' }); res.end('{"error":"unauthorized"}'); return }
     let body = ''

@@ -120,4 +120,21 @@ class WebBridge(private val activity: MainActivity) {
 
     @JavascriptInterface
     fun cancelAlarm(hour: Int, minute: Int): String = RavenAlarm.cancel(activity, hour, minute)
+
+    // 窗（1101）：开关、权限、跳无障碍设置
+    @JavascriptInterface
+    fun peekEnabled(): Boolean = PeekService.isEnabled(activity)
+
+    @JavascriptInterface
+    fun setPeekEnabled(on: Boolean) { PeekService.setEnabled(activity, on) }
+
+    @JavascriptInterface
+    fun peekPermission(): Boolean = PeekService.hasPermission()
+
+    @JavascriptInterface
+    fun openPeekSettings() {
+        activity.runOnUiThread {
+            try { activity.startActivity(android.content.Intent(android.provider.Settings.ACTION_ACCESSIBILITY_SETTINGS)) } catch (_: Exception) {}
+        }
+    }
 }

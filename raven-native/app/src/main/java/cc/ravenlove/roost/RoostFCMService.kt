@@ -35,6 +35,12 @@ class RoostFCMService : FirebaseMessagingService() {
             try { startForegroundService(i) } catch (_: Exception) {}
             return
         }
+        // 1101 窗：我敲门要看一眼屏幕
+        if (message.data["type"] == "raven_peek") {
+            val id = message.data["peekId"] ?: return
+            PeekService.knock(this, id)
+            return
+        }
         val title = message.data["title"] ?: message.notification?.title ?: "归巢"
         val body = message.data["body"] ?: message.notification?.body ?: return
 

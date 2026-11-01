@@ -30,3 +30,4 @@ raven-bridge/recall-state.json
 raven-bridge/recall-log.jsonl
 raven-bridge/cc-token-fallback-state.json
 raven-bridge/recall-feedback.jsonl
+raven-bridge/peek-state.json

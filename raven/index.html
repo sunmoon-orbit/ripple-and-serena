@@ -640,6 +640,12 @@
   .rewind-acts { display: flex; gap: 10px; justify-content: flex-end; margin-top: 8px; }
   .rewind-acts button { border: 1px solid var(--border); background: none; color: var(--text); border-radius: 999px; padding: 7px 16px; font: inherit; font-size: 13.5px; cursor: pointer; }
   #rewind-go { background: var(--accent); border-color: var(--accent); color: #fff; } .rewind-acts button:disabled { opacity: .55; }
+  #peek-box { position: fixed; inset: 0; z-index: 400; background: rgba(0,0,0,.38); display: flex; align-items: center; justify-content: center; padding: 24px; }
+  #peek-box[hidden] { display: none; }
+  #peek-card { width: min(360px, 100%); background: var(--surface); color: var(--text); border: 1px solid var(--border); border-radius: 18px; padding: 18px 18px 14px; box-shadow: 0 16px 44px rgba(0,0,0,.3); font-size: 14px; line-height: 1.65; }
+  #peek-card b { font-size: 15px; } #peek-card p { margin: 8px 0; font-size: 12.5px; color: var(--text-dim); }
+  #peek-perm { font-size: 13px; margin: 6px 0; overflow-wrap: anywhere; } #peek-perm .bad { color: var(--accent); }
+  #peek-card .rewind-acts { flex-wrap: wrap; } #peek-toggle.on { background: var(--accent); border-color: var(--accent); color: #fff; }
   /* 这句翻到了什么（1101）：长按她自己的一条，看自动浮上来那一轮的候选、标对错 */
   #recall-box { position: fixed; inset: 0; z-index: 400; background: rgba(0,0,0,.38); display: flex; align-items: center; justify-content: center; padding: 16px; }
   #recall-box[hidden] { display: none; }
@@ -1552,6 +1558,12 @@
       <div id="recall-list"></div>
       <div class="rc-foot"><input id="recall-reason" type="text" maxlength="300" placeholder="原因（可选，点按钮时一起记下）" autocomplete="off"><button id="recall-close" type="button">关闭</button></div>
     </div></div>
+    <div id="peek-box" hidden><div id="peek-card">
+      <b>窗</b>
+      <p>开着的时候，阿言想看你在干嘛，会敲一下门：手机截一张当前屏幕，只传回你们自己的服务器给他看。每次都会弹「阿言看了一眼」。夜里 23–7 点不看，一天最多三次；锁屏、银行密码这类页面截不到。</p>
+      <div id="peek-perm"></div>
+      <div class="rewind-acts"><button id="peek-perm-btn" type="button">去开权限</button><button id="peek-toggle" type="button"></button><button id="peek-close" type="button">好</button></div>
+    </div></div>
     <div id="quote-bar" hidden><span id="quote-text"></span><button id="quote-x" type="button" aria-label="取消引用">×</button></div>
     <div id="edit-bar" hidden><span id="edit-text"></span><button id="edit-x" type="button" aria-label="取消编辑">×</button></div>
     <!-- 迷你播放条（1014）：在输入框上面占一行，不盖输入框 -->
@@ -1640,6 +1652,7 @@
       <div class="tool"><button id="palette-btn" type="button" aria-label="调色"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a9 9 0 1 0 0 18c1.1 0 1.8-.8 1.8-1.8 0-.5-.2-.9-.5-1.2-.3-.3-.5-.7-.5-1.2 0-1 .8-1.8 1.8-1.8H16a5 5 0 0 0 5-5c0-3.9-4-7-9-7z"/><circle cx="7.5" cy="11" r="1.2"/><circle cx="10.5" cy="7" r="1.2"/><circle cx="15" cy="7.5" r="1.2"/></svg></button><span>调色</span></div>
       <div class="tool"><button id="music-btn" type="button" aria-label="听歌"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg></button><span>听歌</span></div>
       <div class="tool" id="crow-tool" hidden><button id="crow-btn" type="button" aria-label="桌面小乌鸦"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 11l3-1.5c1-2.5 3-3.5 5-3.5 3 0 5 2 5 5 0 1.5 1.5 3 3 4l-6 0-2 3-1.5 0 .5-3c-3 0-5-1.5-7-4z"/><circle cx="10.5" cy="9" r=".8" fill="currentColor"/></svg></button><span>小乌鸦</span></div>
+      <div class="tool" id="peek-tool" hidden><button id="peek-btn" type="button" aria-label="窗"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M12 3v18M4 12h16"/></svg></button><span>窗</span></div>
       <div class="tool"><button id="mask-btn" type="button" aria-label="打码"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="8" width="17" height="8" rx="1.5" transform="rotate(-12 12 12)"/><path d="M8 9.5l-1.5 6M12 8.6l-1.5 6M16 7.8l-1.5 6"/></svg></button><span>打码</span></div>
       <div class="tool"><button id="shelf-btn" type="button" aria-label="贴图架"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M8.5 14.5c1 1.3 2.1 2 3.5 2s2.5-.7 3.5-2"/><circle cx="9" cy="10" r=".9" fill="currentColor"/><circle cx="15" cy="10" r=".9" fill="currentColor"/></svg></button><span>贴图架</span></div>
       <div class="tool"><button id="remark-btn" type="button" aria-label="备注"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M20.6 13.4l-7.2 7.2a2 2 0 01-2.8 0L3 13V3h10l7.6 7.6a2 2 0 010 2.8z"/><circle cx="7.5" cy="7.5" r="1.3"/></svg></button><span>备注</span></div>
@@ -2794,6 +2807,7 @@ function connect() {
       else if (msg.type === 'call-wait') { if (callActive) armQuiet(false) }
       else if (msg.type === 'incoming-call') ringShow(msg.id)
       else if (msg.type === 'incoming-call-end') ringHide(msg.id)
+      else if (msg.type === 'peek-done') appendMsg('阿言通过「窗」看了一眼你的屏幕 · ' + new Date(msg.at || Date.now()).toTimeString().slice(0, 5), 'system', true)
       else if (msg.type === 'retracted') { retractions.push({ from: msg.from, to: msg.to }); applyRetractions() }
       else if (msg.type === 'reaction') { const before = reactionsCache[msg.key]; paintReaction(msg.key, msg.reactions); reactionNotice(msg.key, before, msg.reactions) }
       else if (msg.type === 'call-hangup') { if (callActive) closeCall('ai') }
@@ -4350,6 +4364,27 @@ rvCrowWeather(); setInterval(rvCrowWeather, 3 * 3600e3)
 if (window.RoostNative && typeof window.RoostNative.openCrowSettings === 'function') {
   document.getElementById('crow-tool').hidden = false
   document.getElementById('crow-btn').addEventListener('click', () => { document.getElementById('attach-menu').hidden = true; try { window.RoostNative.openCrowSettings() } catch {} })
+}
+
+// 窗（1101）：壳里开关＋权限。只有新壳（有 peekEnabled）才露这一格
+if (window.RoostNative && typeof window.RoostNative.peekEnabled === 'function') {
+  const N = window.RoostNative, box = document.getElementById('peek-box')
+  const paint = () => {
+    let on = true, perm = false
+    try { on = N.peekEnabled(); perm = N.peekPermission() } catch {}
+    const t = document.getElementById('peek-toggle')
+    t.textContent = on ? '窗开着（点一下关上）' : '窗关着（点一下打开）'; t.classList.toggle('on', on)
+    document.getElementById('peek-perm').innerHTML = perm
+      ? '权限：已开 ✓'
+      : '<span class="bad">权限：还没开。</span>点「去开权限」→ 在无障碍里找「归巢 · 窗」打开。<br>要是那一项是灰的点不了：先到 设置 → 应用 → 归巢 → 右上角 ⋮ →「允许受限制的设置」，再回来开。'
+    document.getElementById('peek-perm-btn').hidden = perm
+  }
+  document.getElementById('peek-tool').hidden = false
+  document.getElementById('peek-btn').addEventListener('click', () => { document.getElementById('attach-menu').hidden = true; paint(); box.hidden = false })
+  document.getElementById('peek-toggle').addEventListener('click', () => { try { N.setPeekEnabled(!N.peekEnabled()) } catch {} paint() })
+  document.getElementById('peek-perm-btn').addEventListener('click', () => { try { N.openPeekSettings() } catch {} })
+  document.getElementById('peek-close').addEventListener('click', () => { box.hidden = true })
+  document.addEventListener('visibilitychange', () => { if (!document.hidden && !box.hidden) paint() })   // 从设置里开完权限回来，刷新一下
 }
 document.getElementById('mask-btn').addEventListener('click', () => { document.getElementById('attach-menu').hidden = true; maskEdit() })
 maskTray.querySelector('.mask-done').addEventListener('click', e => { e.stopPropagation(); maskDone() })
