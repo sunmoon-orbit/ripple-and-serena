@@ -404,6 +404,12 @@
   .msg.sticker-msg { background: none; border: none; padding: 2px 0; box-shadow: none; backdrop-filter: none; -webkit-backdrop-filter: none; }
   .msg.sticker-msg .msg-body img { margin: 0 !important; }
   .msg.img-msg .msg-body img { border-radius: 12px; }
+  /* 照片叠成一摞（1101 晚） */
+  .pstack { position: relative; width: min(62vw, 240px); height: min(80vw, 310px); touch-action: pan-y; user-select: none; -webkit-user-select: none; margin: 4px 18px 4px 0; }
+  .pstack-card { position: absolute; inset: 0; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 14px rgba(0,0,0,.22); background: var(--surface); will-change: transform; }
+  .pstack-card img { width: 100%; height: 100%; object-fit: cover; display: block; margin: 0 !important; -webkit-user-drag: none; pointer-events: auto; }
+  .pstack-n { position: absolute; right: 8px; top: 8px; z-index: 200; font-size: 11px; color: #fff; background: rgba(0,0,0,.45); border-radius: 999px; padding: 1px 8px; pointer-events: none; }
+
   /* 1023：她画的竖长条表情包撑得太高（她：「画的稍微有点大」）。所有贴图都限高，竖的就窄一点，跟方的看着一样大 */
   .msg-body img[src*="/raven/stickers/"] { max-height: 170px; width: auto; object-fit: contain; }
   .msg-body audio.voice-attach { display: block; width: 240px; max-width: 100%; height: 40px; margin: 4px 0; }
@@ -2920,6 +2926,54 @@ function attachStickerFallback(root) {
   })
 }
 
+
+// ── 照片叠成一摞（1101 晚）────────────────────────────────────────────────
+// 她发来 Wren036/PhotoStack（照微信新版的叠图卡），许可证不让搬代码，照样子自己写的：
+// 一条里两张以上的图叠起来，后面几张错开一点露出边；左右拖着翻，甩一下也翻；点一下还是看大图。
+function makePhotoStack(body) {
+  const imgs = [...body.querySelectorAll('img')]
+  if (imgs.length < 2) return
+  const stack = document.createElement('div'); stack.className = 'pstack'
+  const badge = document.createElement('span'); badge.className = 'pstack-n'
+  imgs.forEach(img => { const c = document.createElement('div'); c.className = 'pstack-card'; c.appendChild(img); stack.appendChild(c) })
+  body.innerHTML = ''; body.appendChild(stack); stack.appendChild(badge)
+  const cards = [...stack.querySelectorAll('.pstack-card')]
+  let cur = 0, drag = null, moved = false
+  const place = (dx = 0, anim = true) => {
+    cards.forEach((c, k) => {
+      const d = k - cur
+      c.style.transition = anim ? 'transform .28s cubic-bezier(.2,.8,.2,1), opacity .28s' : 'none'
+      c.style.zIndex = String(100 - Math.abs(d))
+      let t, o = 1
+      if (d === 0) t = `translateX(${dx}px) rotate(${dx / 18}deg)`
+      else if (d > 0 && d <= 2) { const f = Math.min(1, Math.abs(dx) / 120); t = `translateX(${(d - f) * 12}px) rotate(${(d - f) * 4}deg) scale(${1 - (d - f) * .05})` }
+      else if (d < 0 && d >= -2) { const f = dx > 0 ? Math.min(1, dx / 120) : 0; t = `translateX(${(d + f) * 12}px) rotate(${(d + f) * 4}deg) scale(${1 + (d + f) * .05})`; o = d === -1 ? .9 : .6 }
+      else { t = `translateX(${d * 12}px) scale(.85)`; o = 0 }
+      c.style.transform = t; c.style.opacity = o
+    })
+    badge.textContent = `${cur + 1}/${cards.length}`
+  }
+  place(0, false)
+  stack.addEventListener('pointerdown', e => { drag = { x: e.clientX, y: e.clientY, t: Date.now(), id: e.pointerId }; moved = false })
+  stack.addEventListener('pointermove', e => {
+    if (!drag) return
+    const dx = e.clientX - drag.x, dy = e.clientY - drag.y
+    if (!moved && Math.abs(dx) > 8 && Math.abs(dx) > Math.abs(dy)) { moved = true; try { stack.setPointerCapture(drag.id) } catch {} }
+    if (moved) { let d = dx; if ((cur === 0 && d > 0) || (cur === cards.length - 1 && d < 0)) d /= 3; place(d, false) }
+  })
+  const end = e => {
+    if (!drag) return
+    const dx = e.clientX - drag.x, v = dx / Math.max(1, Date.now() - drag.t)
+    if (moved) {
+      if ((dx < -60 || v < -.5) && cur < cards.length - 1) cur++
+      else if ((dx > 60 || v > .5) && cur > 0) cur--
+    }
+    drag = null; place(0, true)
+  }
+  stack.addEventListener('pointerup', end); stack.addEventListener('pointercancel', end)
+  // 拖过就不算点：别让底下的看大图接到这一下
+  stack.addEventListener('click', e => { if (moved) { e.stopPropagation(); e.preventDefault(); moved = false } }, true)
+}
 const imageViewer = document.getElementById('image-viewer')
 const imageViewerStage = document.getElementById('image-viewer-stage')
 const imageViewerImg = document.getElementById('image-viewer-img')
@@ -3040,8 +3094,11 @@ function splitUserSegments(text) {
   // 只拆显示，发给我的还是一整条（我收到时字和图在一起，好对上她说的是哪张）
   const out = []
   for (const seg of segs) {
-    const atts = seg.match(/\[附件:\s*[^\]]+\]/g) || []
+    let atts = seg.match(/\[附件:\s*[^\]]+\]/g) || []
     const rest = seg.replace(/\[附件:\s*[^\]]+\]/g, '').trim()
+    // 1101 晚：一次好几张图叠成一摞（她发来 PhotoStack 仓库，照微信那样；没抄代码，自己写的）
+    const imgs = atts.filter(a => /\.(?:png|jpe?g|gif|webp)\s*\]$/i.test(a))
+    if (imgs.length > 1) atts = [imgs.join(' '), ...atts.filter(a => !imgs.includes(a))]
     if (rest && /^> ?引用[：:][^\n]*$/.test(rest) && atts.length) { out.push(rest + '\n' + atts.shift()) }   // 只引用了一句就发图：引用跟着第一张图走
     else if (rest) out.push(rest)
     out.push(...atts)
@@ -3117,6 +3174,10 @@ function appendMsg(text, role, save = true, ts = Date.now(), msgId = null, suppl
       fillAlarmCards(body, String(msgId || ts), role === 'assistant' && save && Date.now() - ts < 10 * 60 * 1000)
       attachStickerFallback(body)
       enhanceCodeBlocks(body)
+      // 我一条里只发了两张以上的图，也叠成一摞（1101 晚）
+      if (!aq && /^(?:\s*(?:!\[[^\]]*\]\([^)\s]+\)|\[附件:\s*[^\]]+\.(?:png|jpe?g|gif|webp)\s*\]))+\s*$/i.test(withImgs) && body.querySelectorAll('img').length > 1) {
+        el.classList.add('sticker-msg', 'img-msg', 'stack-msg'); makePhotoStack(body)
+      }
       if (aq) { const q = document.createElement('div'); q.className = 'quote-ref'; q.textContent = aq[1]; body.prepend(q) }
     } else {
       // 1003 引用回复：第一行「> 引用：…」画成一小块引用，正文照常
@@ -3130,6 +3191,8 @@ function appendMsg(text, role, save = true, ts = Date.now(), msgId = null, suppl
         if (STICKER_ONLY_RE.test(utext)) el.classList.add('sticker-msg')
         // 1101 她：「不能只发图片吗，还要包个气泡，感觉有点多此一举」——单独一张图（没带引用）就不包气泡，跟贴图一样
         if (!qm && /^\[附件:\s*[^\]]+\.(?:png|jpe?g|gif|webp)\s*\]$/i.test(utext.trim())) el.classList.add('sticker-msg', 'img-msg')
+        const isStack = !qm && /^(?:\[附件:\s*[^\]]+\.(?:png|jpe?g|gif|webp)\s*\]\s*){2,}$/i.test(utext.trim())
+        if (isStack) el.classList.add('sticker-msg', 'img-msg', 'stack-msg')
         body.innerHTML = utext
           .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
           .replace(/\[sticker:([^\]]+)\]/g, (_, name) =>
@@ -3139,6 +3202,7 @@ function appendMsg(text, role, save = true, ts = Date.now(), msgId = null, suppl
         body.innerHTML = DOMPurify.sanitize(renderMusicCards(body.innerHTML, true), PURIFY_OPTS)
         fillMusicIcons(body)
         attachStickerFallback(body)
+        if (isStack) makePhotoStack(body)
       } else {
         body.textContent = utext
       }
