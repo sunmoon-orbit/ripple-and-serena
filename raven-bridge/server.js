@@ -2534,6 +2534,8 @@ const server = http.createServer((req, res) => {
       const verdict = String(p.verdict || '')
       if (!['wrong_recall', 'wrong_memory', 'useful', 'should_surface', 'clear'].includes(verdict) || !p.entry || !p.mem) { res.writeHead(400); res.end('{"error":"bad feedback"}'); return }
       try { recall.addFeedback({ entry: String(p.entry), mem: Number(p.mem), verdict, reason: String(p.reason || '').slice(0, 300), q: String(p.q || '').slice(0, 80) }) } catch { res.writeHead(500); res.end('{"error":"write failed"}'); return }
+      // 她确认「想起得对」的那条记一次激活（1101 借 Latent「用进，不废退」；自动浮现本身不算，人点过的才算）
+      if (verdict === 'useful' || verdict === 'should_surface') moonPost(`/memories/${Number(p.mem)}/touch`, {}).catch(() => {})
       res.writeHead(200, { 'Content-Type': 'application/json' }); res.end('{"ok":true}')
     })
     return
