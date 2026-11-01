@@ -100,4 +100,42 @@ async function surface(text, search, now = Date.now()) {
   return `〔想起来 #${pick.id}·${fmtDate(pick.created_at)}（自动浮上来的，她看不见，用不用你定）：${clip(pick.content, 180)}〕`
 }
 
-module.exports = { surface, queryOf, worthLooking, MIN_SIM }
+// 1101 她要的「这句翻到了什么」：长按她自己的一条，从日志里找回那一轮翻到的东西给她看，她可以标对错。
+// 用她那条的发出时间＋洗过的文字去对日志：时间差 3 分钟内、文字开头对得上的那一行。
+const FEEDBACK_FILE = path.join(__dirname, 'recall-feedback.jsonl')
+function findEntry(raw, ts) {
+  const q = clip(queryOf(raw), 60)
+  if (!worthLooking(queryOf(raw))) return { skipped: 'short' }
+  let lines = []
+  try { lines = fs.readFileSync(LOG_FILE, 'utf8').trim().split('\n').slice(-3000) } catch { return null }
+  let best = null, bestGap = 3 * 60e3
+  for (const l of lines) {
+    let d; try { d = JSON.parse(l) } catch { continue }
+    if (d.q !== q) continue
+    const gap = Math.abs(new Date(d.at).getTime() - ts)
+    if (gap <= bestGap) { best = d; bestGap = gap }
+  }
+  return best
+}
+// 每个候选为什么没浮：跟 surface 里的闸门同一套判法（冷却和新鲜是当时的状态，日志里没细记，归到「其他」）
+function whyNot(c, entry) {
+  if (entry.pick === c.id) return 'picked'
+  if (SKIP_TYPES.has(c.type)) return 'type'
+  if ((c.sim || 0) < MIN_SIM) return 'low'
+  return 'other'
+}
+function addFeedback(fb) {
+  fs.appendFileSync(FEEDBACK_FILE, JSON.stringify({ at: new Date().toISOString(), ...fb }) + '\n')
+}
+function feedbackFor(entryAt) {
+  const out = {}
+  try {
+    for (const l of fs.readFileSync(FEEDBACK_FILE, 'utf8').trim().split('\n')) {
+      let d; try { d = JSON.parse(l) } catch { continue }
+      if (d.entry === entryAt) out[d.mem] = d.verdict   // 后标的盖前标的
+    }
+  } catch {}
+  return out
+}
+
+module.exports = { surface, queryOf, worthLooking, MIN_SIM, findEntry, whyNot, addFeedback, feedbackFor, SKIP_TYPES }

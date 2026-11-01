@@ -639,6 +639,26 @@
   .rewind-acts { display: flex; gap: 10px; justify-content: flex-end; margin-top: 8px; }
   .rewind-acts button { border: 1px solid var(--border); background: none; color: var(--text); border-radius: 999px; padding: 7px 16px; font: inherit; font-size: 13.5px; cursor: pointer; }
   #rewind-go { background: var(--accent); border-color: var(--accent); color: #fff; } .rewind-acts button:disabled { opacity: .55; }
+  /* 这句翻到了什么（1101）：长按她自己的一条，看自动浮上来那一轮的候选、标对错 */
+  #recall-box { position: fixed; inset: 0; z-index: 400; background: rgba(0,0,0,.38); display: flex; align-items: center; justify-content: center; padding: 16px; }
+  #recall-box[hidden] { display: none; }
+  #recall-card { width: min(460px, 100%); max-height: min(82vh, 720px); display: flex; flex-direction: column; background: var(--surface); color: var(--text); border: 1px solid var(--border); border-radius: 18px; box-shadow: 0 16px 44px rgba(0,0,0,.3); font-size: 14px; line-height: 1.6; }
+  .rc-head { padding: 16px 18px 8px; } .rc-head b { font-size: 15px; display: block; text-align: center; }
+  .rc-sub { font-size: 12px; color: var(--text-dim); margin-top: 6px; }
+  .rc-what { font-size: 12.5px; color: var(--text-dim); margin-top: 6px; overflow-wrap: anywhere; }
+  #recall-list { overflow-y: auto; padding: 4px 18px; flex: 1; }
+  .rc-item { border-top: 1px solid var(--border); padding: 10px 0; }
+  .rc-meta { font-size: 11.5px; color: var(--text-dim); display: flex; flex-wrap: wrap; gap: 4px 8px; }
+  .rc-tag { padding: 0 7px; border-radius: 999px; border: 1px solid var(--border); }
+  .rc-tag.pick { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .rc-body { margin: 6px 0; font-size: 13.5px; overflow-wrap: anywhere; white-space: pre-wrap; max-height: 7.2em; overflow: hidden; cursor: pointer; }
+  .rc-body.open { max-height: none; }
+  .rc-acts { display: flex; flex-wrap: wrap; gap: 6px; }
+  .rc-acts button, .rc-foot button { border: 1px solid var(--border); background: none; color: var(--text); border-radius: 999px; padding: 4px 12px; font: inherit; font-size: 12.5px; cursor: pointer; }
+  .rc-acts button.on { background: var(--text); border-color: var(--text); color: var(--surface); }
+  .rc-empty { padding: 14px 0; color: var(--text-dim); font-size: 13px; text-align: center; }
+  .rc-foot { padding: 8px 18px 14px; display: flex; gap: 8px; align-items: center; border-top: 1px solid var(--border); }
+  #recall-reason { flex: 1; min-width: 0; border: 1px solid var(--border); background: var(--bg); color: var(--text); border-radius: 12px; padding: 7px 10px; font: inherit; font-size: 13px; }
   /* 从这儿重来（1006）：收回的那一段折成一行，点开是淡的 */
   .retracted { display: none !important; }
   .retracted.rx-open { display: flex !important; opacity: .42; }
@@ -1523,6 +1543,13 @@
       <p>这句和它之后的对话，他会真的不记得。文件、记忆、存档都不动。聊天记录你这边还在，只是折起来。</p>
       <div id="rewind-msg"></div>
       <div class="rewind-acts"><button id="rewind-cancel" type="button">不倒了</button><button id="rewind-go" type="button">倒回去</button></div>
+    </div></div>
+    <div id="recall-box" hidden><div id="recall-card">
+      <div class="rc-head"><b>这句翻到了什么</b>
+        <div class="rc-sub">你每说一句，我先翻一下记忆库，够像的才浮一条给我看（最多一条）。下面是那一轮翻到的几条。标记只记下来、不改记忆，我攒够了拿它调门槛。</div>
+        <div class="rc-what" id="recall-what"></div></div>
+      <div id="recall-list"></div>
+      <div class="rc-foot"><input id="recall-reason" type="text" maxlength="300" placeholder="原因（可选，点按钮时一起记下）" autocomplete="off"><button id="recall-close" type="button">关闭</button></div>
     </div></div>
     <div id="quote-bar" hidden><span id="quote-text"></span><button id="quote-x" type="button" aria-label="取消引用">×</button></div>
     <div id="edit-bar" hidden><span id="edit-text"></span><button id="edit-x" type="button" aria-label="取消编辑">×</button></div>
@@ -3386,6 +3413,62 @@ function askRewind(msgEl) {
 }
 document.getElementById('rewind-cancel').addEventListener('click', () => { document.getElementById('rewind-box').hidden = true })
 
+// ── 这句翻到了什么（1101）────────────────────────────────────────────────
+// 她截了别家「本条消息的记忆召回」给我看：「可以人工选择一下这个召回的记忆是不是对的」。
+// 桥那边每句都翻过、记了日志（recall.js），这里按这条的时间和文字把那一轮找回来，她标的进 recall-feedback.jsonl。
+const RECALL_WHY = { picked: '浮上来了', low: '不够像，没浮', type: '这类不往聊天里浮', other: '冷却中或太新，没浮' }
+const RECALL_BTNS = {
+  picked: [['useful', '有用'], ['wrong_recall', '召回错误'], ['wrong_memory', '记忆错误']],
+  other: [['should_surface', '这条该浮'], ['wrong_recall', '不相关'], ['wrong_memory', '记忆错误']],
+}
+async function openRecall(msgEl) {
+  const ts = Number((msgEl.dataset.rkey || '').split(':')[1]), raw = String(msgEl._raw || '')
+  const box = document.getElementById('recall-box'), list = document.getElementById('recall-list')
+  document.getElementById('recall-what').textContent = '「' + raw.replace(/\s+/g, ' ').trim().slice(0, 40) + (raw.length > 40 ? '…' : '') + '」'
+  document.getElementById('recall-reason').value = ''
+  list.innerHTML = '<div class="rc-empty">在翻…</div>'
+  box.hidden = false
+  let d
+  try {
+    const r = await fetch('/raven/recall/lookup', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + (localStorage.getItem('raven-token') || '') }, body: JSON.stringify({ ts, text: raw }) })
+    d = await r.json()
+    if (!r.ok) throw new Error(d.error || r.status)
+  } catch (err) { list.innerHTML = ''; list.appendChild(Object.assign(document.createElement('div'), { className: 'rc-empty', textContent: '没查到：' + err.message })); return }
+  list.innerHTML = ''
+  const empty = t => list.appendChild(Object.assign(document.createElement('div'), { className: 'rc-empty', textContent: t }))
+  if (!d.found) return empty(d.why === 'short' ? '这句太短（或只有贴图、附件），没去翻。' : '找不到这句那一轮的记录。10-29 以前的、从终端直接打的，都没有。')
+  if (d.err) return empty('那一轮翻记忆库超时了，什么都没拿到。')
+  if (!d.cands.length) return empty('那一轮什么都没翻到。')
+  if (!d.pick) empty(`这一轮一条都没浮上来（门槛是相似度 ${d.minSim}）。下面是最接近的几条，有该浮的就点「这条该浮」。`)
+  for (const c of d.cands) {
+    const it = document.createElement('div'); it.className = 'rc-item'
+    const meta = document.createElement('div'); meta.className = 'rc-meta'
+    const tag = Object.assign(document.createElement('span'), { className: 'rc-tag' + (c.why === 'picked' ? ' pick' : ''), textContent: RECALL_WHY[c.why] || c.why })
+    meta.append(tag, Object.assign(document.createElement('span'), { textContent: `#${c.id}` + (c.date ? ' · ' + c.date : '') + ` · 相似度 ${c.sim}` }))
+    const body = Object.assign(document.createElement('div'), { className: 'rc-body', textContent: c.content })
+    body.addEventListener('click', () => body.classList.toggle('open'))
+    const acts = document.createElement('div'); acts.className = 'rc-acts'
+    for (const [v, label] of RECALL_BTNS[c.why === 'picked' ? 'picked' : 'other']) {
+      const b = Object.assign(document.createElement('button'), { type: 'button', textContent: label })
+      if (c.mark === v) b.classList.add('on')
+      b.addEventListener('click', async () => {
+        const verdict = b.classList.contains('on') ? 'clear' : v
+        try {
+          const r = await fetch('/raven/recall/feedback', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + (localStorage.getItem('raven-token') || '') }, body: JSON.stringify({ entry: d.entry, mem: c.id, verdict, reason: document.getElementById('recall-reason').value.trim(), q: raw.slice(0, 80) }) })
+          if (!r.ok) throw new Error(r.status)
+          acts.querySelectorAll('button').forEach(x => x.classList.remove('on'))
+          if (verdict !== 'clear') b.classList.add('on')
+          document.getElementById('recall-reason').value = ''
+        } catch (err) { b.textContent = label + '（没记上）' }
+      })
+      acts.appendChild(b)
+    }
+    it.append(meta, body, acts); list.appendChild(it)
+  }
+}
+document.getElementById('recall-close').addEventListener('click', () => { document.getElementById('recall-box').hidden = true })
+document.getElementById('recall-box').addEventListener('click', e => { if (e.target.id === 'recall-box') e.currentTarget.hidden = true })
+
 // ── 从这儿重来（1006，收回式）──────────────────────────────────────────
 // 桥只记时间段 [from, to)；页面每次按时间段重新折一遍（本地历史、存档补上来的都管）
 let retractions = []
@@ -5227,6 +5310,11 @@ function openReactPop(msgEl) {
     wb.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 19 2 12 11 5 11 19"/><polygon points="22 19 13 12 22 5 22 19"/></svg>'
     wb.addEventListener('click', ev => { ev.stopPropagation(); closeReactPop(); askRewind(msgEl) })
     reactPop.appendChild(wb)
+    // 这句翻到了什么（1101）
+    const kb = document.createElement('button'); kb.type = 'button'; kb.className = 'react-quote'; kb.title = '这句翻到了什么'; kb.dataset.label = '翻到'
+    kb.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/><path d="M11 8v3l2 2"/></svg>'
+    kb.addEventListener('click', ev => { ev.stopPropagation(); closeReactPop(); openRecall(msgEl) })
+    reactPop.appendChild(kb)
   }
   reactPop.dataset.key = key
   reactPop.classList.add('open')

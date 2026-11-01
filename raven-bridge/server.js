@@ -2404,6 +2404,43 @@ const server = http.createServer((req, res) => {
   }
 
   // STT 代理：浏览器只交归巢 token，桥接替它带 MOON_TOKEN 转发同一份 multipart。
+  // 1101「这句翻到了什么」：她长按自己的一条，看自动浮上来那一轮翻到的候选，标「召回错误 / 记忆错误 / 有用 / 该浮」。
+  // 标记只进 recall-feedback.jsonl，不改记忆；我攒够了拿它重定门槛、去改标了「记忆错误」的那条。
+  if (req.method === 'POST' && url.pathname === '/raven/recall/lookup') {
+    if (!ravenBearerValid(req)) { res.writeHead(401, { 'Content-Type': 'application/json' }); res.end('{"error":"unauthorized"}'); return }
+    let body = ''
+    req.on('data', d => { body += d; if (body.length > 20000) req.destroy() })
+    req.on('end', async () => {
+      let p; try { p = JSON.parse(body) } catch { res.writeHead(400); res.end('{"error":"bad json"}'); return }
+      const entry = recall.findEntry(String(p.text || ''), Number(p.ts) || Date.now())
+      if (!entry || entry.skipped) { res.writeHead(200, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ found: false, why: entry ? entry.skipped : 'nolog' })); return }
+      const marks = recall.feedbackFor(entry.at)
+      const cands = []
+      for (const c of (entry.top || []).slice(0, 5)) {
+        let m = null
+        try { m = await moonGet(`/memories/${c.id}`) } catch {}
+        cands.push({ id: c.id, type: c.type, sim: c.sim, why: recall.whyNot(c, entry), mark: marks[c.id] || null,
+          date: m && m.created_at ? String(m.created_at).slice(0, 10) : '', content: m && !m.error ? String(m.content || '').slice(0, 600) : '（这条记忆找不到了）' })
+      }
+      res.writeHead(200, { 'Content-Type': 'application/json' })
+      res.end(JSON.stringify({ found: true, entry: entry.at, pick: entry.pick || null, err: entry.err || null, minSim: recall.MIN_SIM, cands }))
+    })
+    return
+  }
+  if (req.method === 'POST' && url.pathname === '/raven/recall/feedback') {
+    if (!ravenBearerValid(req)) { res.writeHead(401, { 'Content-Type': 'application/json' }); res.end('{"error":"unauthorized"}'); return }
+    let body = ''
+    req.on('data', d => { body += d; if (body.length > 20000) req.destroy() })
+    req.on('end', () => {
+      let p; try { p = JSON.parse(body) } catch { res.writeHead(400); res.end('{"error":"bad json"}'); return }
+      const verdict = String(p.verdict || '')
+      if (!['wrong_recall', 'wrong_memory', 'useful', 'should_surface', 'clear'].includes(verdict) || !p.entry || !p.mem) { res.writeHead(400); res.end('{"error":"bad feedback"}'); return }
+      try { recall.addFeedback({ entry: String(p.entry), mem: Number(p.mem), verdict, reason: String(p.reason || '').slice(0, 300), q: String(p.q || '').slice(0, 80) }) } catch { res.writeHead(500); res.end('{"error":"write failed"}'); return }
+      res.writeHead(200, { 'Content-Type': 'application/json' }); res.end('{"ok":true}')
+    })
+    return
+  }
+
   if (req.method === 'POST' && url.pathname === '/raven/stt') {
     if (!ravenBearerValid(req)) {
       res.writeHead(401, { 'Content-Type': 'application/json' })
