@@ -32,3 +32,5 @@ raven-bridge/cc-token-fallback-state.json
 raven-bridge/recall-feedback.jsonl
 raven-bridge/peek-state.json
 raven-bridge/wake-state.json
+raven-bridge/rare-echo-state.json
+raven-bridge/rare-echo-log.jsonl

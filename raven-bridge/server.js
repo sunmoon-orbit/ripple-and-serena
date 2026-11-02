@@ -507,6 +507,7 @@ let rewindBusy = false
 // 用一条链排队，前一句还在翻的时候后一句不会插到前面去。
 const recall = require('./recall')
 const lotteryOnReturn = require('./lottery-on-return')
+const rareEcho = require('./rare-echo')
 let ingestChain = Promise.resolve()
 function ingestUserMessage(text, cid, note = '') {
   ingestChain = ingestChain.then(async () => {
@@ -516,7 +517,10 @@ function ingestUserMessage(text, cid, note = '') {
     try {
       extra = await recall.surface(text, (q) => moonGet(`/memories/semantic?q=${encodeURIComponent(q)}&k=8&threshold=0.3&touch=0`))
     } catch (e) { console.error('[recall]', e.message) }
-    ingestUserMessageCore(text, cid, note, [extra, ticket].filter(Boolean).join('\n'))
+    // 1102：记忆库翻不到的，再去聊天原文里找稀有的四字段（「鲁国的纸」那种），见 rare-echo.js
+    let echoLine = ''
+    try { echoLine = await rareEcho.echo(text, (p) => moonGet(p)) } catch (e) { console.error('[rare-echo]', e.message) }
+    ingestUserMessageCore(text, cid, note, [extra, echoLine, ticket].filter(Boolean).join('\n'))
   }).catch(e => console.error('[ingest]', e))
 }
 
