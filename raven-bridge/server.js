@@ -2510,6 +2510,46 @@ const server = http.createServer((req, res) => {
     })
     return
   }
+  // 镜像（1102 她要的：「你那边可以看得到我这边设置的头像和主题颜色……就像另一部手机进入同一个会话一样」）。
+  // 她改外观时页面把外观设置推上来（谁最后改的跟谁，她选的），只外观，不含登录钥匙；
+  // 我用 ~/bin/raven-mirror 开一个无头浏览器、套上这份外观截聊天。存在仓库外，私人的。
+  if (url.pathname === '/raven/appearance' || url.pathname === '/raven/appearance/meta') {
+    const APPEARANCE_FILE = '/home/ripple/raven-private/appearance.json'
+    if (!ravenBearerValid(req)) { res.writeHead(401, { 'Content-Type': 'application/json' }); res.end('{"error":"unauthorized"}'); return }
+    if (req.method === 'GET') {
+      let meta = {}
+      try { const a = JSON.parse(fs.readFileSync(APPEARANCE_FILE, 'utf8')); meta = { ts: a.ts, device: a.device, keys: Object.keys(a.data || {}) } } catch {}
+      res.writeHead(200, { 'Content-Type': 'application/json' }); res.end(JSON.stringify(meta)); return
+    }
+    if (req.method !== 'POST') { res.writeHead(405); res.end('{}'); return }
+    const chunks = []; let size = 0, tooBig = false
+    req.on('data', d => { size += d.length; if (size > 12 * 1024 * 1024) { tooBig = true; return } chunks.push(d) })
+    req.on('end', () => {
+      if (tooBig) { res.writeHead(413); res.end('{"error":"too large"}'); return }
+      let p = {}; try { p = JSON.parse(Buffer.concat(chunks).toString('utf8')) } catch {}
+      const ALLOWED = ['raven-avatar', 'serena-avatar', 'raven-theme', 'raven-custom-theme', 'raven-bg-image', 'raven-bg-fit', 'raven-avatar-shape', 'raven-avatar-size', 'raven-bubble-radius']
+      const data = {}
+      for (const k of ALLOWED) if (typeof p.data?.[k] === 'string') data[k] = p.data[k]
+      const rec = { ts: Date.now(), device: String(p.device || '').slice(0, 40), data }
+      try {
+        fs.mkdirSync(path.dirname(APPEARANCE_FILE), { recursive: true })
+        fs.writeFileSync(APPEARANCE_FILE + '.tmp', JSON.stringify(rec), { mode: 0o600 }); fs.renameSync(APPEARANCE_FILE + '.tmp', APPEARANCE_FILE)
+        res.writeHead(200, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ ok: true, ts: rec.ts }))
+      } catch (e) { res.writeHead(500); res.end(JSON.stringify({ error: e.message })) }
+    })
+    return
+  }
+  // 镜像截图用：只本机、带本机钥匙，发一把 10 分钟就过期的看图钥匙（聊天里的图要带 token 才能取）
+  if (req.method === 'POST' && url.pathname === '/raven/mirror/start') {
+    if (isExternal(req) || !localWriteAuthed(req)) { res.writeHead(403); res.end('{}'); return }
+    const t = require('crypto').randomBytes(24).toString('hex')
+    validTokens.set(t, Date.now() + 10 * 60e3); saveTokens(validTokens)
+    let appearance = {}
+    try { appearance = JSON.parse(fs.readFileSync('/home/ripple/raven-private/appearance.json', 'utf8')) } catch {}
+    res.writeHead(200, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ token: t, appearance }))
+    return
+  }
+
   if (url.pathname === '/raven/wake' && (req.method === 'GET' || req.method === 'POST')) {
     if (!ravenBearerValid(req)) { res.writeHead(401, { 'Content-Type': 'application/json' }); res.end('{"error":"unauthorized"}'); return }
     if (req.method === 'GET') { res.writeHead(200, { 'Content-Type': 'application/json' }); res.end(JSON.stringify(wakeMe.status())); return }

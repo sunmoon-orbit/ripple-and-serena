@@ -4472,6 +4472,26 @@ if (window.RoostNative && typeof window.RoostNative.peekEnabled === 'function') 
   document.getElementById('peek-close').addEventListener('click', () => { box.hidden = true })
   document.addEventListener('visibilitychange', () => { if (!document.hidden && !box.hidden) paint() })   // 从设置里开完权限回来，刷新一下
 }
+// 镜像（1102）：外观一改就推一份到桥上，「谁最后改的跟谁」（她选的）。只推外观，不碰登录钥匙和聊天
+{
+  const KEYS = ['raven-avatar', 'serena-avatar', 'raven-theme', 'raven-custom-theme', 'raven-bg-image', 'raven-bg-fit', 'raven-avatar-shape', 'raven-avatar-size', 'raven-bubble-radius']
+  const device = Math.min(screen.width, screen.height) < 600 ? '手机' : '平板'
+  let timer = 0
+  const push = () => {
+    const data = {}
+    for (const k of KEYS) { try { const v = localStorage.getItem(k); if (v != null) data[k] = v } catch {} }
+    fetch('/raven/appearance', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + (localStorage.getItem('raven-token') || '') }, body: JSON.stringify({ device, data }) }).catch(() => {})
+  }
+  const later = () => { if (window.__rvMirror) return; clearTimeout(timer); timer = setTimeout(push, 2000) }
+  try {
+    const set = Storage.prototype.setItem, del = Storage.prototype.removeItem
+    Storage.prototype.setItem = function (k, v) { set.call(this, k, v); if (this === localStorage && KEYS.includes(k)) later() }
+    Storage.prototype.removeItem = function (k) { del.call(this, k); if (this === localStorage && KEYS.includes(k)) later() }
+  } catch {}
+  // 桥上还一份都没有：先把这台的推上去，免得镜像是空的
+  if (!window.__rvMirror) fetch('/raven/appearance/meta', { headers: { Authorization: 'Bearer ' + (localStorage.getItem('raven-token') || '') } })
+    .then(r => r.ok ? r.json() : null).then(m => { if (m && !m.ts) push() }).catch(() => {})
+}
 // 叫醒我（1102）：她开着，阿言就会在她安静一阵后被叫醒、自己决定要不要来找她。开关存在桥上
 {
   const box = document.getElementById('wake-box'), t = document.getElementById('wake-toggle'), now = document.getElementById('wake-now')
