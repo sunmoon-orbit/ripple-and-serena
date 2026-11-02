@@ -2341,20 +2341,20 @@ const server = http.createServer((req, res) => {
         if (typeof text === 'string' && text.trim()) lastMineTs = Date.now()   // 叫醒我（1102）算「安静了多久」用
         // 回复里带 [call]：给她打电话（1022）。只有 [call] 没别的字就不画气泡
         if (typeof text === 'string' && /\[call\]/i.test(text)) {
-          text = text.replace(/\s*\[call\]\s*/gi, ' ').trim()
+          text = text.replace(/[ \t]*\[call\][ \t]*/gi, ' ').replace(/ +\n/g, '\n').replace(/\n +/g, '\n').trim()
           const call = ravenCallStart()
           if (!text) { res.writeHead(200); res.end(JSON.stringify({ ok: true, call })); return }
         }
         // 回复里带 [peek]：敲门看她一眼屏幕（1101「窗」）。只有 [peek] 没别的字就不画气泡
         if (typeof text === 'string' && /\[peek\]/i.test(text)) {
-          text = text.replace(/\s*\[peek\]\s*/gi, ' ').trim()
+          text = text.replace(/[ \t]*\[peek\][ \t]*/gi, ' ').replace(/ +\n/g, '\n').replace(/\n +/g, '\n').trim()
           const peek = ravenPeekStart()
           if (!text) { res.writeHead(200); res.end(JSON.stringify({ ok: true, peek })); return }
         }
         // 回复里带 [hangup]：通话里我说完这句、念完了我自己挂（1031 她问「你有给自己做主动挂电话吗」）
         let hangup = false
         if (typeof text === 'string' && /\[hangup\]/i.test(text)) {
-          text = text.replace(/\s*\[hangup\]\s*/gi, ' ').trim(); hangup = true
+          text = text.replace(/[ \t]*\[hangup\][ \t]*/gi, ' ').replace(/ +\n/g, '\n').replace(/\n +/g, '\n').trim(); hangup = true
           if (!text) { broadcast({ type: 'call-hangup' }); res.writeHead(200); res.end('{"ok":true,"hangup":true}'); return }
         }
         if (text) {
