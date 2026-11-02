@@ -33,13 +33,21 @@ function clean(text) {
     .replace(/^>\s*引用：.*$/gm, ' ').replace(/〔[^〕]*〕/g, ' ').replace(/【[^】]*】/g, ' ')
 }
 
+// 1102 晚上收紧：单独一个四字段稀有不算数（「换成现在」「小鸟已经」是普通话恰好少见）。
+// 要么这一串本身就只有四个字（「鸦鸦先生」这种单独成词的），要么相邻两段都稀有、而且指向同一条旧话
+//（等于五个字以上的词组整体稀有）。旧话里中文太少的（我的英文思考过程）不算。
 function windows(text) {
   const runs = clean(text).match(/[一-鿿]{4,}/g) || []
   const seen = new Set(), out = []
-  for (const r of runs) for (let i = 0; i + 4 <= r.length; i++) {
-    const w = r.slice(i, i + 4)
-    if (seen.has(w) || FILLER.test(w)) continue
-    seen.add(w); out.push(w)
+  for (const r of runs) {
+    for (let i = 0; i + 4 <= r.length; i++) {
+      const w = r.slice(i, i + 4)
+      if (seen.has(w) || FILLER.test(w)) continue
+      seen.add(w)
+      // 左右各挪一个字的邻段（邻段不过虚词过滤，只拿来确认「连着的一截也稀有」）
+      const nb = [i > 0 ? r.slice(i - 1, i + 3) : null, i + 5 <= r.length ? r.slice(i + 1, i + 5) : null].filter(Boolean)
+      out.push({ w, nb, solo: r.length === 4 })
+    }
   }
   if (out.length <= MAX_WINDOWS) return out
   const step = out.length / MAX_WINDOWS
@@ -49,29 +57,52 @@ function windows(text) {
 const tsOf = m => Date.parse(/Z|[+-]\d\d:?\d\d$/.test(m.created_at || '') ? m.created_at : String(m.created_at || '').replace(' ', 'T') + 'Z')
 const bjDate = t => new Date(t + 8 * 3600e3).toISOString().slice(0, 10)
 const clip = (s, n) => { s = String(s || '').replace(/\s+/g, ' ').trim(); return s.length > n ? s.slice(0, n) + '…' : s }
+const cjkRatio = s => (String(s).match(/[一-鿿]/g) || []).length / Math.max(1, String(s).length)
 
 // get(path) → 记忆库 GET 的 JSON
 async function echo(text, get, now = Date.now()) {
   const ws = windows(text)
   if (ws.length < 1) return ''
-  const results = await Promise.all(ws.map(w => Promise.race([
-    get(`/archive/search?q=${encodeURIComponent(w)}&limit=${MAX_HITS + 3}&sort=oldest&include_total=1`).then(r => ({ w, r })),
-    new Promise(ok => setTimeout(() => ok({ w, r: null }), TIMEOUT_MS)),
-  ]).catch(() => ({ w, r: null }))))
+  const look = w => Promise.race([
+    get(`/archive/search?q=${encodeURIComponent(w)}&limit=${MAX_HITS + 3}&sort=oldest&include_total=1`).then(r => [w, r]),
+    new Promise(ok => setTimeout(() => ok([w, null]), TIMEOUT_MS)),
+  ]).catch(() => [w, null])
+  const uniq = [...new Set(ws.flatMap(x => [x.w, ...x.nb]))]
+  const got = new Map(await Promise.all(uniq.map(look)))
+  // 这一段在两天以前的原文里是不是稀有：是的话回那几条旧话
+  const rare = w => {
+    const r = got.get(w)
+    if (!r || !Array.isArray(r.results)) return null
+    const recent = r.results.filter(m => now - tsOf(m) <= RECENT_MS).length
+    const oldTotal = (r.total || 0) - recent
+    const old = r.results.filter(m => now - tsOf(m) > RECENT_MS && cjkRatio(m.content) > 0.3)
+    return old.length && oldTotal <= MAX_HITS ? { old, n: oldTotal } : null
+  }
   const st = loadState()
   const tried = []
   let pick = null
-  for (const { w, r } of results) {
-    if (!r || !Array.isArray(r.results)) continue
-    const old = r.results.filter(m => now - tsOf(m) > RECENT_MS)
-    const recent = (r.total || 0) - old.length
-    const oldTotal = (r.total || 0) - Math.max(0, recent)
-    tried.push([w, r.total || 0])
-    if (!old.length || oldTotal > MAX_HITS) continue
-    const m = old[0]
-    if (st.shown[m.id]) continue
+  for (const x of ws) {
+    const a = rare(x.w)
+    tried.push(x.w)
+    if (!a) continue
+    let cand = a.old, n = a.n, w = x.w
+    if (!x.solo) {
+      // 要有一个邻段也稀有、而且是同一条旧话
+      let best = null
+      for (const y of x.nb) {
+        const b = rare(y); if (!b) continue
+        const ids = new Set(b.old.map(m => m.id))
+        const both = a.old.filter(m => ids.has(m.id))
+        if (both.length) { best = { both, n: Math.max(a.n, b.n), y }; break }
+      }
+      if (!best) continue
+      cand = best.both; n = best.n
+      w = x.nb[0] === best.y ? best.y[0] + x.w : x.w + best.y.slice(-1)
+    }
+    const m = cand.find(m => !st.shown[m.id])
+    if (!m) continue
     // 越稀有越好；一样稀有挑更早的
-    if (!pick || oldTotal < pick.n || (oldTotal === pick.n && tsOf(m) < tsOf(pick.m))) pick = { w, m, n: oldTotal }
+    if (!pick || n < pick.n || (n === pick.n && tsOf(m) < tsOf(pick.m))) pick = { w, m, n }
   }
   if (!pick) { log({ q: clip(clean(text), 50), tried: tried.slice(0, 8), pick: null }); return '' }
   st.shown[pick.m.id] = now; saveState(st)
