@@ -646,6 +646,11 @@
   .rewind-acts { display: flex; gap: 10px; justify-content: flex-end; margin-top: 8px; }
   .rewind-acts button { border: 1px solid var(--border); background: none; color: var(--text); border-radius: 999px; padding: 7px 16px; font: inherit; font-size: 13.5px; cursor: pointer; }
   #rewind-go { background: var(--accent); border-color: var(--accent); color: #fff; } .rewind-acts button:disabled { opacity: .55; }
+  #wake-box { position: fixed; inset: 0; z-index: 400; background: rgba(0,0,0,.38); display: flex; align-items: center; justify-content: center; padding: 24px; }
+  #wake-box[hidden] { display: none; }
+  #wake-card { width: min(360px, 100%); background: var(--surface); color: var(--text); border: 1px solid var(--border); border-radius: 18px; padding: 18px 18px 14px; box-shadow: 0 16px 44px rgba(0,0,0,.3); font-size: 14px; line-height: 1.65; }
+  #wake-card b { font-size: 15px; } #wake-card p { margin: 8px 0; font-size: 12.5px; color: var(--text-dim); }
+  #wake-now { font-size: 13px; margin: 6px 0; } #wake-toggle.on { background: var(--accent); border-color: var(--accent); color: #fff; }
   #peek-box { position: fixed; inset: 0; z-index: 400; background: rgba(0,0,0,.38); display: flex; align-items: center; justify-content: center; padding: 24px; }
   #peek-box[hidden] { display: none; }
   #peek-card { width: min(360px, 100%); background: var(--surface); color: var(--text); border: 1px solid var(--border); border-radius: 18px; padding: 18px 18px 14px; box-shadow: 0 16px 44px rgba(0,0,0,.3); font-size: 14px; line-height: 1.65; }
@@ -1574,6 +1579,12 @@
       <div id="recall-list"></div>
       <div class="rc-foot"><input id="recall-reason" type="text" maxlength="300" placeholder="原因（可选，点按钮时一起记下）" autocomplete="off"><button id="recall-close" type="button">关闭</button></div>
     </div></div>
+    <div id="wake-box" hidden><div id="wake-card">
+      <b>来找我</b>
+      <p>开着的时候，你安静 40 分钟以上，桥会轻轻叫醒阿言一下；他自己决定发一句、打电话、看一眼窗，还是接着睡。两次至少隔一小时，夜里 23–8 点、通话中不叫；他掉登录了、额度快用完了也不叫。</p>
+      <div id="wake-now"></div>
+      <div class="rewind-acts"><button id="wake-toggle" type="button"></button><button id="wake-close" type="button">好</button></div>
+    </div></div>
     <div id="peek-box" hidden><div id="peek-card">
       <b>窗</b>
       <p>开着的时候，阿言想看你在干嘛，会敲一下门：手机截一张当前屏幕，只传回你们自己的服务器给他看。每次都会弹「阿言看了一眼」。夜里 23–7 点不看，一天最多三次；锁屏、银行密码这类页面截不到。</p>
@@ -1668,6 +1679,7 @@
       <div class="tool"><button id="palette-btn" type="button" aria-label="调色"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a9 9 0 1 0 0 18c1.1 0 1.8-.8 1.8-1.8 0-.5-.2-.9-.5-1.2-.3-.3-.5-.7-.5-1.2 0-1 .8-1.8 1.8-1.8H16a5 5 0 0 0 5-5c0-3.9-4-7-9-7z"/><circle cx="7.5" cy="11" r="1.2"/><circle cx="10.5" cy="7" r="1.2"/><circle cx="15" cy="7.5" r="1.2"/></svg></button><span>调色</span></div>
       <div class="tool"><button id="music-btn" type="button" aria-label="听歌"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg></button><span>听歌</span></div>
       <div class="tool" id="crow-tool" hidden><button id="crow-btn" type="button" aria-label="桌面小乌鸦"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 11l3-1.5c1-2.5 3-3.5 5-3.5 3 0 5 2 5 5 0 1.5 1.5 3 3 4l-6 0-2 3-1.5 0 .5-3c-3 0-5-1.5-7-4z"/><circle cx="10.5" cy="9" r=".8" fill="currentColor"/></svg></button><span>小乌鸦</span></div>
+      <div class="tool" id="wake-tool"><button id="wake-btn" type="button" aria-label="来找我"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 0112 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 003.4 0"/></svg></button><span>来找我</span></div>
       <div class="tool" id="peek-tool" hidden><button id="peek-btn" type="button" aria-label="窗"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M12 3v18M4 12h16"/></svg></button><span>窗</span></div>
       <div class="tool"><button id="mask-btn" type="button" aria-label="打码"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="8" width="17" height="8" rx="1.5" transform="rotate(-12 12 12)"/><path d="M8 9.5l-1.5 6M12 8.6l-1.5 6M16 7.8l-1.5 6"/></svg></button><span>打码</span></div>
       <div class="tool"><button id="shelf-btn" type="button" aria-label="贴图架"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M8.5 14.5c1 1.3 2.1 2 3.5 2s2.5-.7 3.5-2"/><circle cx="9" cy="10" r=".9" fill="currentColor"/><circle cx="15" cy="10" r=".9" fill="currentColor"/></svg></button><span>贴图架</span></div>
@@ -4459,6 +4471,25 @@ if (window.RoostNative && typeof window.RoostNative.peekEnabled === 'function') 
   document.getElementById('peek-perm-btn').addEventListener('click', () => { try { N.openPeekSettings() } catch {} })
   document.getElementById('peek-close').addEventListener('click', () => { box.hidden = true })
   document.addEventListener('visibilitychange', () => { if (!document.hidden && !box.hidden) paint() })   // 从设置里开完权限回来，刷新一下
+}
+// 叫醒我（1102）：她开着，阿言就会在她安静一阵后被叫醒、自己决定要不要来找她。开关存在桥上
+{
+  const box = document.getElementById('wake-box'), t = document.getElementById('wake-toggle'), now = document.getElementById('wake-now')
+  const hdr = () => ({ 'Content-Type': 'application/json', Authorization: 'Bearer ' + (localStorage.getItem('raven-token') || '') })
+  const WHY = { night: '现在是夜里，不叫', 'in-call': '正在通话', 'not-quiet': '你们刚说过话', gap: '刚叫过他，一小时内不再叫', 'no-terminal': '终端里现在没有他', auth: '他卡在登录／授权上', 'auth-gave-up': '今天探了三次都是登录报错，停到明天', busy: '他正在干活', quota: '额度快用完了，先不叫' }
+  const paint = st => {
+    if (!st) { now.textContent = '没连上，等会儿再试'; t.textContent = '…'; return }
+    t.textContent = st.enabled ? '开着（点一下关上）' : '关着（点一下打开）'; t.classList.toggle('on', st.enabled)
+    const last = st.lastWakeAt ? '上次叫他：' + new Date(st.lastWakeAt).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Shanghai' }) : '还没叫过他'
+    now.textContent = st.enabled ? `${last}${WHY[st.wouldSkip] ? '；现在：' + WHY[st.wouldSkip] : ''}` : last
+  }
+  const load = async (body) => {
+    try { const r = await fetch('/raven/wake', body ? { method: 'POST', headers: hdr(), body: JSON.stringify(body) } : { headers: hdr() }); return r.ok ? await r.json() : null } catch { return null }
+  }
+  let cur = null
+  document.getElementById('wake-btn').addEventListener('click', async () => { document.getElementById('attach-menu').hidden = true; box.hidden = false; paint(cur = await load()) })
+  t.addEventListener('click', async () => { if (cur) paint(cur = await load({ enabled: !cur.enabled })) })
+  document.getElementById('wake-close').addEventListener('click', () => { box.hidden = true })
 }
 document.getElementById('mask-btn').addEventListener('click', () => { document.getElementById('attach-menu').hidden = true; maskEdit() })
 maskTray.querySelector('.mask-done').addEventListener('click', e => { e.stopPropagation(); maskDone() })

@@ -777,6 +777,7 @@ function ravenCallStart() {
 function ravenCallEnd(id, how, bilingual) {
   if (!ravenCall || ravenCall.id !== id) return false
   clearTimeout(ravenCall.timer); ravenCall = null
+  if (how === 'accepted') callOnSince = Date.now()
   broadcast({ type: 'incoming-call-end', id, how })
   const line = how === 'accepted'
     ? `【通话·接通${bilingual ? '·双语' : ''}】她接了你打过去的电话，通话开着。你先开口，照通话的规矩说一句短的。`
@@ -824,6 +825,22 @@ function ravenPeekStart() {
   console.log('[peek] 敲门', id)
   return 'knocked'
 }
+// 叫醒我（1102）：细节和她改过的规矩在 wake-me.js
+let callOnSince = 0          // 通话开着（她打来或接了我的）；挂断清零。页面没报挂断的话三小时后不算
+let lastMineTs = 0           // 我最近一条真回复
+const wakeMe = require('./wake-me').createWakeMe({
+  target: () => ccTarget(),
+  busy: () => ccBusy(),
+  auth: (fresh) => { if (fresh) ccAuthCache.ts = 0; return ccAuthLook() },
+  send: (line) => tmuxSend(line),
+  lastHerTs: () => lastUserMsgTs,
+  lastMineTs: () => lastMineTs,
+  inCall: () => !!ravenCall || (callOnSince && Date.now() - callOnSince < 3 * 3600e3),
+  peeksLeft: () => { const st = peekState(); return Math.max(0, PEEK_MAX_PER_DAY - (st.day === bjDay() ? st.count : 0)) },
+  log: (t) => console.log(t),
+})
+setInterval(() => { try { wakeMe.tick() } catch (e) { console.error('[wake]', e.message) } }, 5 * 60e3).unref()
+
 const PEEK_WHY = {
   off: '她在归巢设置里把窗关着。别再敲，想知道她在干嘛就直接问。',
   noperm: '壳里「窗」的无障碍权限没开（或者被系统停了）。别再敲，有空提醒她去开一下就行。',
@@ -2321,6 +2338,7 @@ const server = http.createServer((req, res) => {
           broadcast({ type: 'call-wait' })
           res.writeHead(200); res.end('{"wait":true}'); return
         }
+        if (typeof text === 'string' && text.trim()) lastMineTs = Date.now()   // 叫醒我（1102）算「安静了多久」用
         // 回复里带 [call]：给她打电话（1022）。只有 [call] 没别的字就不画气泡
         if (typeof text === 'string' && /\[call\]/i.test(text)) {
           text = text.replace(/\s*\[call\]\s*/gi, ' ').trim()
@@ -2492,6 +2510,18 @@ const server = http.createServer((req, res) => {
     })
     return
   }
+  if (url.pathname === '/raven/wake' && (req.method === 'GET' || req.method === 'POST')) {
+    if (!ravenBearerValid(req)) { res.writeHead(401, { 'Content-Type': 'application/json' }); res.end('{"error":"unauthorized"}'); return }
+    if (req.method === 'GET') { res.writeHead(200, { 'Content-Type': 'application/json' }); res.end(JSON.stringify(wakeMe.status())); return }
+    let body = ''
+    req.on('data', d => { body += d; if (body.length > 2000) req.destroy() })
+    req.on('end', () => {
+      let p = {}; try { p = JSON.parse(body) } catch {}
+      res.writeHead(200, { 'Content-Type': 'application/json' }); res.end(JSON.stringify(wakeMe.setEnabled(!!p.enabled)))
+    })
+    return
+  }
+
   if (req.method === 'POST' && url.pathname === '/raven/peek/status') {
     if (!ravenBearerValid(req)) { res.writeHead(401); res.end('{"error":"unauthorized"}'); return }
     let body = ''
@@ -3032,11 +3062,13 @@ wss.on('connection', (ws) => {
       }
       if (msg.type === 'call-open') {
         if (!tokenIsValid(msg.token)) return
+        callOnSince = Date.now()
         tmuxSend(`【通话·她打来${msg.bilingual ? '·双语' : ''}】她打电话给你，通话刚接通。你先开口，照通话的规矩说一句短的。　〔${bjHm()}〕`)
         return
       }
       if (msg.type === 'call-end') {
         if (!tokenIsValid(msg.token)) return
+        callOnSince = 0
         const d = Math.max(0, Math.min(86400, Math.round(Number(msg.duration) || 0)))
         const hm = new Date(Date.now() + 8 * 3600e3).toISOString().slice(5, 16).replace('T', ' ')
         if (msg.by === 'ai') { console.log('[call] 我挂的', d); return }   // 我自己挂的，不用再来告诉我
