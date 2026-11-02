@@ -17,7 +17,7 @@ const COOLDOWN_MS = 6 * 3600e3
 const MAX_WINDOWS = 14
 const TIMEOUT_MS = 2000
 // 太常见的字开头/结尾的段，基本都是虚词拼起来的，不查
-const FILLER = /^[的了是我你他她它们在有就也都还和跟吗呢吧啊呀哦嗯这那个一不没要会能想说到去来看好]|[的了吗呢吧啊呀哦嗯]$/
+const FILLER = /^[的了是我你他她它们在有就也都还和跟吗呢吧啊呀哦嗯这那个一不没要会能想说到去来看好]|[的了吗呢吧啊呀哦嗯]$|[的了]|之类|一下|什么|这个|那个|就是|然后|但是|因为|所以|可以|觉得|感觉/
 
 function loadState() { try { return JSON.parse(fs.readFileSync(STATE_FILE, 'utf8')) } catch { return { shown: {} } } }
 function saveState(st) {
