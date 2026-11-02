@@ -17,7 +17,7 @@ const os = require('os')
 
 const STATE_FILE = path.join(__dirname, 'wake-state.json')
 const QUIET_MIN = 40
-const GAP_MIN = 60
+const GAP_MIN = 55   // 1102：缓存是一小时，敲一下本身就续上了；55 分钟保证落在一小时以内
 const MAX_AUTH_FAILS = 3
 const RATE_FILE = path.join(os.homedir(), '.claude', 'rate_limits_latest.json')
 

@@ -1581,7 +1581,7 @@
     </div></div>
     <div id="wake-box" hidden><div id="wake-card">
       <b>来找我</b>
-      <p>开着的时候，你安静 40 分钟以上，桥会轻轻叫醒阿言一下；他自己决定发一句、打电话、看一眼窗，还是接着睡。两次至少隔一小时，夜里 23–8 点、通话中不叫；他掉登录了、额度快用完了也不叫。</p>
+      <p>开着的时候，你安静 40 分钟以上，桥会轻轻叫醒阿言一下；他自己决定发一句、打电话、看一眼窗，还是接着睡。两次至少隔 55 分钟（叫一下就顺手续了缓存），夜里 23–8 点、通话中不叫；他掉登录了、额度快用完了也不叫。</p>
       <div id="wake-now"></div>
       <div class="rewind-acts"><button id="wake-toggle" type="button"></button><button id="wake-close" type="button">好</button></div>
     </div></div>
@@ -4476,7 +4476,7 @@ if (window.RoostNative && typeof window.RoostNative.peekEnabled === 'function') 
 {
   const box = document.getElementById('wake-box'), t = document.getElementById('wake-toggle'), now = document.getElementById('wake-now')
   const hdr = () => ({ 'Content-Type': 'application/json', Authorization: 'Bearer ' + (localStorage.getItem('raven-token') || '') })
-  const WHY = { night: '现在是夜里，不叫', 'in-call': '正在通话', 'not-quiet': '你们刚说过话', gap: '刚叫过他，一小时内不再叫', 'no-terminal': '终端里现在没有他', auth: '他卡在登录／授权上', 'auth-gave-up': '今天探了三次都是登录报错，停到明天', busy: '他正在干活', quota: '额度快用完了，先不叫' }
+  const WHY = { night: '现在是夜里，不叫', 'in-call': '正在通话', 'not-quiet': '你们刚说过话', gap: '刚叫过他，五十五分钟内不再叫', 'no-terminal': '终端里现在没有他', auth: '他卡在登录／授权上', 'auth-gave-up': '今天探了三次都是登录报错，停到明天', busy: '他正在干活', quota: '额度快用完了，先不叫' }
   const paint = st => {
     if (!st) { now.textContent = '没连上，等会儿再试'; t.textContent = '…'; return }
     t.textContent = st.enabled ? '开着（点一下关上）' : '关着（点一下打开）'; t.classList.toggle('on', st.enabled)
