@@ -86,6 +86,10 @@ class WebBridge(private val activity: MainActivity) {
     @JavascriptInterface
     fun setBarColor(color: String) { activity.runOnUiThread { activity.setBarColor(color) } }
 
+    // 1102 她要的：通话时切走，缩成画中画小窗（「微信的话就有个小方框」）
+    @JavascriptInterface
+    fun setInCall(on: Boolean) { activity.runOnUiThread { activity.setInCall(on) } }
+
     @JavascriptInterface
     fun openCrowSettings() { activity.runOnUiThread { activity.openCrowSettings() } }
 

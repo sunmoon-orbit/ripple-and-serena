@@ -1102,6 +1102,14 @@
   #call-overlay.speaking #call-pulse { animation: callPulse 1.45s ease-out infinite; }
   @keyframes callPulse { 0% { opacity: .55; transform: scale(.92); } 100% { opacity: 0; transform: scale(1.22); } }
   #call-status { margin-top: 15px; font-size: 13px; color: var(--text-dim); min-height: 20px; }
+  /* 1102 画中画：小窗里只留头像、计时和状态 */
+  body.pip #call-overlay { padding: 6px !important; justify-content: center; }
+  body.pip #call-title, body.pip #call-top-pad, body.pip #call-log, body.pip #call-mode-row,
+  body.pip #call-text-row, body.pip #call-controls { display: none !important; }
+  body.pip #call-top { min-height: 0; justify-content: center; }
+  body.pip #call-stage { padding: 4px 0 0; }
+  body.pip #call-avatar-wrap, body.pip #call-avatar { width: 56px; height: 56px; }
+  body.pip #call-status { margin-top: 6px; font-size: 11px; text-align: center; }
   #call-log {
     flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 9px;
     width: min(100%, 560px); margin: 0 auto; padding: 8px 2px 14px;
@@ -4708,6 +4716,7 @@ function openCall() {
   document.getElementById('call-log').innerHTML = ''
   callOverlay.classList.add('show')
   callBar(true)
+  pipCall(true)
   setCallStatus('点麦克风，跟乌鸦说话')
   updateCallTimer()
   clearInterval(callTimerId)
@@ -4725,6 +4734,13 @@ function callBar(on) {
   }
   try { N.setBarColor(hex) } catch {}
 }
+
+// 1102：通话开着时告诉壳，切走就缩成画中画小窗；壳进出小窗时回调 rvPip（旧壳没有这个口子就算了）
+function pipCall(on) {
+  const N = window.RoostNative
+  if (N && typeof N.setInCall === 'function') try { N.setInCall(on) } catch {}
+}
+window.rvPip = on => document.body.classList.toggle('pip', !!on)
 
 function closeCall(by) {
   if (!callActive) return
@@ -4745,6 +4761,7 @@ function closeCall(by) {
   if (stopActiveTts) stopActiveTts()
   callOverlay.classList.remove('show', 'speaking')
   callBar(false)
+  pipCall(false)
   if (record.status === 'ended' && ws && ws.readyState === 1) {      // 告诉我她挂了（只是点开又关掉的不说）
     try { ws.send(JSON.stringify({ type: 'call-end', duration, by: by === 'ai' ? 'ai' : 'her', token: localStorage.getItem('raven-token') || '' })) } catch {}
   }

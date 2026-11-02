@@ -263,6 +263,32 @@ class MainActivity : AppCompatActivity() {
     override fun onResume() { super.onResume(); resumed = true; updateChatFlag(); CallRingService.stop(this); refreshPalette() }
     override fun onPause() { super.onPause(); resumed = false; updateChatFlag() }
 
+    // 通话画中画（1102）：通话开着时切到后台或别的 app，归巢缩成一个小窗，点一下回来。
+    // 小窗也算看得见，麦克风不会被系统掐掉。安卓 12+ 用 autoEnter（手势上划也能进），旧的在 onUserLeaveHint 里手动进。
+    private var inCall = false
+    private fun pipParams(): android.app.PictureInPictureParams? {
+        if (Build.VERSION.SDK_INT < 26) return null
+        val b = android.app.PictureInPictureParams.Builder().setAspectRatio(android.util.Rational(3, 4))
+        if (Build.VERSION.SDK_INT >= 31) b.setAutoEnterEnabled(inCall).setSeamlessResizeEnabled(false)
+        return b.build()
+    }
+    private fun canPip() = Build.VERSION.SDK_INT >= 26 &&
+        packageManager.hasSystemFeature(PackageManager.FEATURE_PICTURE_IN_PICTURE)
+    fun setInCall(on: Boolean) {
+        inCall = on
+        if (canPip()) try { setPictureInPictureParams(pipParams()!!) } catch (_: Exception) {}
+        // 小窗里挂了电话：通话页已经收了，小窗也别留着
+        if (!on && Build.VERSION.SDK_INT >= 26 && isInPictureInPictureMode) moveTaskToBack(false)
+    }
+    override fun onUserLeaveHint() {
+        super.onUserLeaveHint()
+        if (inCall && canPip() && Build.VERSION.SDK_INT < 31) try { enterPictureInPictureMode(pipParams()!!) } catch (_: Exception) {}
+    }
+    override fun onPictureInPictureModeChanged(isInPip: Boolean, newConfig: android.content.res.Configuration) {
+        super.onPictureInPictureModeChanged(isInPip, newConfig)
+        webView.evaluateJavascript("window.rvPip && rvPip($isInPip)", null)
+    }
+
     // 来电页点了接听：开着聊天页就直接接，不然带着 ?answer= 打开聊天页
     private fun handleAnswerIntent(intent: Intent?) {
         val id = intent?.getStringExtra("answerCall") ?: return
