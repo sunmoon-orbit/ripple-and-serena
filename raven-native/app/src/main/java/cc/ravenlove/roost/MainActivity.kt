@@ -268,7 +268,7 @@ class MainActivity : AppCompatActivity() {
     private var inCall = false
     private fun pipParams(): android.app.PictureInPictureParams? {
         if (Build.VERSION.SDK_INT < 26) return null
-        val b = android.app.PictureInPictureParams.Builder().setAspectRatio(android.util.Rational(3, 4))
+        val b = android.app.PictureInPictureParams.Builder().setAspectRatio(android.util.Rational(1, 1))
         if (Build.VERSION.SDK_INT >= 31) b.setAutoEnterEnabled(inCall).setSeamlessResizeEnabled(false)
         return b.build()
     }
