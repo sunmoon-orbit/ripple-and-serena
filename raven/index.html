@@ -4524,7 +4524,7 @@ const savedBilingual = localStorage.getItem(BILINGUAL_KEY)
 let voiceBilingual = savedBilingual == null ? true : savedBilingual === '1'
 let mediaRecorder = null
 let recordedChunks = []
-let voiceStarting = false
+let voiceStarting = false, voiceStartingAt = 0, sttStartedAt = 0, sttTimedOut = false
 let recordingForCall = false
 let discardRecording = false
 let activeSttController = null
@@ -4884,6 +4884,8 @@ async function transcribeAndSend(blob, forCall, wasAuto = false) {
   form.append('audio', blob, 'audio.webm')
   const controller = new AbortController()
   activeSttController = controller
+  sttStartedAt = Date.now()
+  const sttTimer = setTimeout(() => { sttTimedOut = true; controller.abort() }, 30000)   // 1102：转写卡住别一直占着麦
   try {
     const response = await fetch('/raven/stt', {
       method: 'POST',
@@ -4916,7 +4918,9 @@ async function transcribeAndSend(blob, forCall, wasAuto = false) {
     sendMsg((voiceBilingual ? '【语音·双语】' : '【语音】') + text)
   } catch (error) {
     if (error.name !== 'AbortError') showVoiceError(error.message || '语音转写失败，请再试一次')
+    else if (sttTimedOut) showVoiceError('这句没转出字（转写服务没回应），再说一次，或者打字')
   } finally {
+    clearTimeout(sttTimer); sttTimedOut = false
     if (activeSttController === controller) activeSttController = null
     syncMicState('idle')
     if (resumeAfter && callActive && callAuto) setTimeout(() => autoListen(), 300)
@@ -4937,7 +4941,7 @@ async function startRecording(forCall = false, auto = false) {
   const audioCtx = getSharedAudioContext()
   if (audioCtx?.state === 'suspended') audioCtx.resume().catch(() => {})
   if (stopActiveTts) stopActiveTts()
-  voiceStarting = true
+  voiceStarting = true; voiceStartingAt = Date.now()
   recordingForCall = forCall
   recordingAuto = auto
   if (forCall) setCallStatus('正在打开麦克风…')
@@ -5013,6 +5017,10 @@ async function startRecording(forCall = false, auto = false) {
 function toggleRecording(forCall = false) {
   const audioCtx = getSharedAudioContext()
   if (audioCtx?.state === 'suspended') audioCtx.resume().catch(() => {})
+  // 1102 她：「我已经听完你讲话了，但是一直没轮到我讲话，我手动点击也没有」。
+  // 转写或开麦卡住超过 8 秒，她再点就把卡住的那一下放掉，重新开麦，别让按钮一直没反应
+  if (activeSttController && Date.now() - sttStartedAt > 8000) { activeSttController.abort(); activeSttController = null; syncMicState('idle') }
+  if (voiceStarting && Date.now() - voiceStartingAt > 8000) voiceStarting = false
   if (activeSttController || voiceStarting) return
   if (mediaRecorder?.state === 'recording') {
     mediaRecorder.stop()
