@@ -67,6 +67,13 @@ const tsOf = m => Date.parse(/Z|[+-]\d\d:?\d\d$/.test(m.created_at || '') ? m.cr
 const bjDate = t => new Date(t + 8 * 3600e3).toISOString().slice(0, 10)
 const clip = (s, n) => { s = String(s || '').replace(/\s+/g, ' ').trim(); return s.length > n ? s.slice(0, n) + '…' : s }
 const cjkRatio = s => (String(s).match(/[一-鿿]/g) || []).length / Math.max(1, String(s).length)
+// 我以前的思考笔记（「阿颖又熬夜了……我应该：」）混在原文里，是我写给自己的，不是说给她的话。
+// 认法：我说的、开头一截里提到她用的是「阿颖／她」而不是「你」，或者带「我应该：」这类打草稿的字样
+const isMyNote = m => {
+  if (m.role === 'human') return false
+  const c = String(m.content || ''), head = c.slice(0, 60)
+  return /我应该[：:]|让我(想想|讲|来|看看)|^\s*(阿颖|她)/.test(c.slice(0, 200)) || (/阿颖|她/.test(head) && !/你/.test(head))
+}
 
 // get(path) → 记忆库 GET 的 JSON
 async function echo(text, get, now = Date.now()) {
@@ -84,7 +91,7 @@ async function echo(text, get, now = Date.now()) {
     if (!r || !Array.isArray(r.results)) return null
     const recent = r.results.filter(m => now - tsOf(m) <= RECENT_MS).length
     const oldTotal = (r.total || 0) - recent
-    const old = r.results.filter(m => now - tsOf(m) > RECENT_MS && cjkRatio(m.content) > 0.3)
+    const old = r.results.filter(m => now - tsOf(m) > RECENT_MS && cjkRatio(m.content) > 0.3 && !isMyNote(m))
     return old.length && oldTotal <= MAX_HITS ? { old, n: oldTotal } : null
   }
   const st = loadState()
