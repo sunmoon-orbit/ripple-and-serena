@@ -19,7 +19,13 @@ const TIMEOUT_MS = 2000
 // 太常见的字开头/结尾的段，基本都是虚词拼起来的，不查
 const FILLER = /^[的了是我你他她它们在有就也都还和跟吗呢吧啊呀哦嗯这那个一不没要会能想说到去来看好]|[的了吗呢吧啊呀哦嗯]$|[的了]|之类|一下|什么|这个|那个|就是|然后|但是|因为|所以|可以|觉得|感觉/
 
-function loadState() { try { return JSON.parse(fs.readFileSync(STATE_FILE, 'utf8')) } catch { return { shown: {} } } }
+function loadState() {
+  let st; try { st = JSON.parse(fs.readFileSync(STATE_FILE, 'utf8')) } catch { st = { shown: {} } }
+  // 过了冷却的读的时候就丢掉（以前只在存的时候清，没新命中就一直挡着）
+  const now = Date.now()
+  for (const [k, t] of Object.entries(st.shown || {})) if (now - t > COOLDOWN_MS) delete st.shown[k]
+  return st
+}
 function saveState(st) {
   const now = Date.now()
   for (const [k, t] of Object.entries(st.shown)) if (now - t > COOLDOWN_MS) delete st.shown[k]
@@ -33,25 +39,28 @@ function clean(text) {
     .replace(/^>\s*引用：.*$/gm, ' ').replace(/〔[^〕]*〕/g, ' ').replace(/【[^】]*】/g, ' ')
 }
 
-// 1102 晚上收紧：单独一个四字段稀有不算数（「换成现在」「小鸟已经」是普通话恰好少见）。
-// 要么这一串本身就只有四个字（「鸦鸦先生」这种单独成词的），要么相邻两段都稀有、而且指向同一条旧话
-//（等于五个字以上的词组整体稀有）。旧话里中文太少的（我的英文思考过程）不算。
+// 1102 晚上收紧、1103 再收紧：单独一个四字段稀有不算数。1103 上午三条全是噪音（「我现在该去」「现在去找一」
+//「晚点见亲爱」，五个字的普通话恰好少见），所以现在要连着三段（六个字以上）都稀有、而且指向同一条旧话；
+// 例外：原文里只出现过一次的，连着两段（五个字，「你床头发现」）就够；这一串本身只有四五个字、整串都稀有
+//（「鸦鸦先生」这种单独成词的）也算。
+// 旧话里中文太少的（我的英文思考过程）不算。
+const MIN_STREAK = 3
 function windows(text) {
   const runs = clean(text).match(/[一-鿿]{4,}/g) || []
-  const seen = new Set(), out = []
+  const out = []
   for (const r of runs) {
-    for (let i = 0; i + 4 <= r.length; i++) {
-      const w = r.slice(i, i + 4)
-      if (seen.has(w) || FILLER.test(w)) continue
-      seen.add(w)
-      // 左右各挪一个字的邻段（邻段不过虚词过滤，只拿来确认「连着的一截也稀有」）
-      const nb = [i > 0 ? r.slice(i - 1, i + 3) : null, i + 5 <= r.length ? r.slice(i + 1, i + 5) : null].filter(Boolean)
-      out.push({ w, nb, solo: r.length === 4 })
-    }
+    const ws = []
+    for (let i = 0; i + 4 <= r.length; i++) ws.push(r.slice(i, i + 4))
+    // 虚词段不当起点，但在一串中间时照样查（不然「鲁国的纸」中间的「的」会把串打断）
+    if (ws.some(w => !FILLER.test(w))) out.push({ run: r, ws })
   }
-  if (out.length <= MAX_WINDOWS) return out
-  const step = out.length / MAX_WINDOWS
-  return Array.from({ length: MAX_WINDOWS }, (_, i) => out[Math.floor(i * step)])
+  // 查询总数封顶：从每串里平均截
+  let total = out.reduce((n, x) => n + x.ws.length, 0)
+  while (total > MAX_WINDOWS * 2 && out.length) {
+    const big = out.reduce((m, x) => x.ws.length > m.ws.length ? x : m)
+    big.ws.pop(); big.run = big.run.slice(0, big.ws.length + 3); total--
+  }
+  return out
 }
 
 const tsOf = m => Date.parse(/Z|[+-]\d\d:?\d\d$/.test(m.created_at || '') ? m.created_at : String(m.created_at || '').replace(' ', 'T') + 'Z')
@@ -61,13 +70,13 @@ const cjkRatio = s => (String(s).match(/[一-鿿]/g) || []).length / Math.max(1,
 
 // get(path) → 记忆库 GET 的 JSON
 async function echo(text, get, now = Date.now()) {
-  const ws = windows(text)
-  if (ws.length < 1) return ''
+  const runs = windows(text)
+  if (!runs.length) return ''
   const look = w => Promise.race([
     get(`/archive/search?q=${encodeURIComponent(w)}&limit=${MAX_HITS + 3}&sort=oldest&include_total=1`).then(r => [w, r]),
     new Promise(ok => setTimeout(() => ok([w, null]), TIMEOUT_MS)),
   ]).catch(() => [w, null])
-  const uniq = [...new Set(ws.flatMap(x => [x.w, ...x.nb]))]
+  const uniq = [...new Set(runs.flatMap(x => x.ws))]
   const got = new Map(await Promise.all(uniq.map(look)))
   // 这一段在两天以前的原文里是不是稀有：是的话回那几条旧话
   const rare = w => {
@@ -81,28 +90,31 @@ async function echo(text, get, now = Date.now()) {
   const st = loadState()
   const tried = []
   let pick = null
-  for (const x of ws) {
-    const a = rare(x.w)
-    tried.push(x.w)
-    if (!a) continue
-    let cand = a.old, n = a.n, w = x.w
-    if (!x.solo) {
-      // 要有一个邻段也稀有、而且是同一条旧话
-      let best = null
-      for (const y of x.nb) {
-        const b = rare(y); if (!b) continue
-        const ids = new Set(b.old.map(m => m.id))
-        const both = a.old.filter(m => ids.has(m.id))
-        if (both.length) { best = { both, n: Math.max(a.n, b.n), y }; break }
-      }
-      if (!best) continue
-      cand = best.both; n = best.n
-      w = x.nb[0] === best.y ? best.y[0] + x.w : x.w + best.y.slice(-1)
-    }
+  const offer = (w, cand, n) => {
     const m = cand.find(m => !st.shown[m.id])
-    if (!m) continue
-    // 越稀有越好；一样稀有挑更早的
-    if (!pick || n < pick.n || (n === pick.n && tsOf(m) < tsOf(pick.m))) pick = { w, m, n }
+    if (!m) return
+    // 越稀有越好；一样稀有挑更长的，再挑更早的
+    if (!pick || n < pick.n || (n === pick.n && (w.length > pick.w.length || (w.length === pick.w.length && tsOf(m) < tsOf(pick.m))))) pick = { w, m, n }
+  }
+  for (const { run, ws } of runs) {
+    tried.push(...ws.slice(0, 3))
+    const info = ws.map(rare)
+    const whole = ws.length <= 2 && info.every(Boolean)   // 整串只有四五个字、都稀有
+    // 找连着的稀有段，并且它们共有同一条旧话
+    for (let i = 0; i < ws.length; i++) {
+      if (!info[i]) continue
+      let ids = new Set(info[i].old.map(m => m.id)), n = info[i].n, j = i
+      while (j + 1 < ws.length && info[j + 1]) {
+        const nx = new Set(info[j + 1].old.filter(m => ids.has(m.id)).map(m => m.id))
+        if (!nx.size) break
+        ids = nx; n = Math.max(n, info[j + 1].n); j++
+      }
+      const len = j - i + 1
+      if (len >= MIN_STREAK || (len >= 2 && n <= 1) || (whole && len === ws.length)) {
+        offer(run.slice(i, j + 4), info[i].old.filter(m => ids.has(m.id)), n)
+      }
+      i = j
+    }
   }
   if (!pick) { log({ q: clip(clean(text), 50), tried: tried.slice(0, 8), pick: null }); return '' }
   st.shown[pick.m.id] = now; saveState(st)
