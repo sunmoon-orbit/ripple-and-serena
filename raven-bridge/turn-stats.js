@@ -73,7 +73,7 @@ function recallNear(startMs) {
 }
 
 // atMs：我这条回复发出的时间。找它所在的那一轮，汇总这一轮的花费、工具和浮上来的记忆
-function turnStats(atMs, lines = readTail(1500)) {
+function turnStats(atMs, lines = readTail(1500), text = '') {
   let start = -1
   for (let i = 0; i < lines.length; i++) {
     if (isRealUser(lines[i]) && ts(lines[i]) <= atMs + 1000) start = i
@@ -91,6 +91,20 @@ function turnStats(atMs, lines = readTail(1500)) {
     }
     if (d.type === 'user' && Array.isArray(m?.content)) {
       for (const b of m.content) if (b.type === 'tool_result') results.set(b.tool_use_id, { text: cut(flat(b.content), 700), error: !!b.is_error })
+    }
+  }
+  // 1103 她要「单独这条的输入和输出＋缓存命中」：我一条一条发，每条是一次 curl。找命令里带着这条原文的那次调用
+  let one = null
+  const probe = String(text || '').replace(/\[(?:voice|call|peek|hangup)[^\]]*\]/gi, '').replace(/\s+/g, ' ').trim().slice(0, 24)
+  if (probe.length >= 2) {
+    for (let i = start + 1; i < end && !one; i++) {
+      const d = lines[i], m = d.message
+      if (d.type !== 'assistant' || !m?.usage || !Array.isArray(m.content)) continue
+      for (const b of m.content) {
+        if (b.type !== 'tool_use') continue
+        const cmd = JSON.stringify(b.input).replace(/\\n/g, ' ').replace(/\s+/g, ' ')
+        if (cmd.includes(probe) || cmd.includes(JSON.stringify(probe).slice(1, -1))) { one = m.usage; break }
+      }
     }
   }
   const sum = { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, cost: 0, calls: seen.size }
@@ -112,6 +126,8 @@ function turnStats(atMs, lines = readTail(1500)) {
     startedAt: lines[start].timestamp,
     said: cut(flat(lines[start].message.content).replace(/〔想起来[\s\S]*?〕/g, '').replace(/^【[^】]*】/, '').replace(/　〔\d\d-\d\d \d\d:\d\d〕\s*$/, '').trim(), 120),
     usage: sum,
+    one: one ? (() => { const w = one.cache_creation_input_tokens || 0, r = one.cache_read_input_tokens || 0, i = one.input_tokens || 0
+      return { input: i, output: one.output_tokens || 0, cacheRead: r, cacheWrite: w, hitRate: (i + r + w) ? r / (i + r + w) : 0, cost: Math.round(costOf(one) * 10000) / 10000 } })() : null,
     context: { used: lastCtx, window: windowOf(lastCtx) },
     tools: tools.map(t => ({ ...t, result: results.get(t.id) || null })),
     recall: rc ? { pick: rc.pick || null, sim: rc.sim ?? null, snippet: rc.snippet || '', why: rc.why || (rc.err ? 'error' : null), top: rc.top || [] } : null,

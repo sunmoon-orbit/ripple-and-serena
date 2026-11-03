@@ -3279,7 +3279,7 @@ function appendMsg(text, role, save = true, ts = Date.now(), msgId = null, suppl
       const billBtn = document.createElement('button')
       billBtn.className = 'copy-btn bill-btn'
       billBtn.textContent = '账单'
-      billBtn.addEventListener('click', (e) => { e.stopPropagation(); openTurnSheet(ts) })
+      billBtn.addEventListener('click', (e) => { e.stopPropagation(); openTurnSheet(ts, text) })
       meta.appendChild(billBtn)
     }
 
@@ -5352,15 +5352,26 @@ const fmtK = n => n >= 1e6 ? (n / 1e6).toFixed(2) + 'M' : n >= 1e3 ? (n / 1e3).t
 const escH = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c])
 const statAuth = () => ({ Authorization: 'Bearer ' + (localStorage.getItem('raven-token') || '') })
 const WHY = { low: '没有够像的旧记忆，宁可不给', type: '最像的是技术记录／规矩这类，不往聊天里浮', fresh: '最像的是这两天刚写的，我脑子里还有', cooldown: '最像的那条刚浮过，冷却中', none: '没翻到', error: '翻的时候出错了' }
-async function openTurnSheet(at) {
+async function openTurnSheet(at, text = '') {
   statBody.innerHTML = '<div class="st-note">翻账本中……</div>'; statSheet.hidden = false
   try {
-    const r = await fetch('/raven/turn-stats?at=' + Number(at), { headers: statAuth() })
+    const r = await fetch('/raven/turn-stats?at=' + Number(at) + '&text=' + encodeURIComponent(String(text).slice(0, 120)), { headers: statAuth() })
     const d = await r.json()
     if (!d) { statBody.innerHTML = '<div class="st-note">这一轮太早了，会话记录里找不到（只看最近一千多行）</div>'; return }
     const u = d.usage
-    let h = `<div class="st-kicker">this turn</div><div class="st-title">这一轮的账单</div>`
+    let h = `<div class="st-kicker">this message</div><div class="st-title">这一条的账单</div>`
     if (d.said) h += `<div class="st-said">你说：${escH(d.said)}</div>`
+    // 1103 她要的「单独这条的输入和输出＋缓存命中」：我一条一条发，每条是一次调用（一口气发好几条的会共用一次）
+    if (d.one) {
+      const o = d.one
+      h += `<div class="st-grid">
+        <div class="st-cell"><b>${fmtK(o.input + o.cacheRead + o.cacheWrite)}</b><span>输入</span></div>
+        <div class="st-cell"><b>${fmtK(o.output)}</b><span>输出（含思考）</span></div>
+        <div class="st-cell"><b>${(o.hitRate * 100).toFixed(1)}%</b><span>缓存命中</span></div>
+      </div>
+      <div class="st-note">输入里读缓存 ${fmtK(o.cacheRead)}、写缓存 ${fmtK(o.cacheWrite)}、新的 ${fmtK(o.input)}；按 API 价约 <b>$${o.cost.toFixed(4)}</b>。我一口气连发的几条算同一次。</div>`
+    } else h += `<div class="st-note">这一条单独的对不上（多半是终端里直接说的，或者太早了），下面是整轮的。</div>`
+    h += `<div class="st-sec">这一轮合计（你说一句到下一句之间）</div>`
     h += `<div class="st-grid">
       <div class="st-cell"><b>${fmtK(u.cacheRead)}</b><span>读缓存</span></div>
       <div class="st-cell"><b>${fmtK(u.cacheWrite)}</b><span>写缓存</span></div>

@@ -2079,7 +2079,7 @@ const server = http.createServer((req, res) => {
     try {
       const ts = require('./turn-stats')
       let r
-      if (url.pathname === '/raven/turn-stats') r = ts.turnStats(Number(url.searchParams.get('at')) || Date.now())
+      if (url.pathname === '/raven/turn-stats') r = ts.turnStats(Number(url.searchParams.get('at')) || Date.now(), undefined, String(url.searchParams.get('text') || '').slice(0, 200))
       else {
         if (!global.__ctxCache || Date.now() - global.__ctxCache.t > 20000) global.__ctxCache = { t: Date.now(), v: ts.contextStats() }
         r = global.__ctxCache.v
