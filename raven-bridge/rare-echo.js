@@ -76,7 +76,7 @@ const isMyNote = m => {
 }
 
 // get(path) → 记忆库 GET 的 JSON
-async function echo(text, get, now = Date.now()) {
+async function echo(text, get, now = Date.now(), out = null) {
   const runs = windows(text)
   if (!runs.length) return ''
   const look = w => Promise.race([
@@ -126,8 +126,10 @@ async function echo(text, get, now = Date.now()) {
   if (!pick) { log({ q: clip(clean(text), 50), tried: tried.slice(0, 8), pick: null }); return '' }
   st.shown[pick.m.id] = now; saveState(st)
   const who = pick.m.role === 'human' ? '她' : '我'
-  log({ q: clip(clean(text), 50), pick: pick.m.id, w: pick.w, n: pick.n })
-  return `〔以前说过「${pick.w}」·${bjDate(tsOf(pick.m))}，${who}说的（翻聊天原文翻到的，她看不见，用不用你定）：${clip(pick.m.content.replace(/^【[^】]*】/, ''), 160)}〕`
+  const at = new Date().toISOString()
+  log({ at, q: clip(clean(text), 50), pick: pick.m.id, w: pick.w, n: pick.n })
+  if (out) out.echo = { kind: 'echo', id: pick.m.id, phrase: pick.w, date: bjDate(tsOf(pick.m)), who, text: clip(pick.m.content.replace(/^【[^】]*】/, ''), 600), entry: at }
+  return `〔以前说过「${pick.w}」·${bjDate(tsOf(pick.m))}，${who}说的（翻聊天原文翻到的，会挂在你这条回复底下给她看、打分，用不用你定）：${clip(pick.m.content.replace(/^【[^】]*】/, ''), 160)}〕`
 }
 
 module.exports = { echo, windows }

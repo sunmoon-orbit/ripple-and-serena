@@ -509,17 +509,29 @@ const recall = require('./recall')
 const lotteryOnReturn = require('./lottery-on-return')
 const rareEcho = require('./rare-echo')
 let ingestChain = Promise.resolve()
+let pendingSurfaced = []   // 浮上来了、还没挂到我回复上的（1103）
+const SURFACED_LOG = path.join(__dirname, 'surfaced-log.jsonl')
+function surfacedFor(id) {
+  try {
+    const lines = fs.readFileSync(SURFACED_LOG, 'utf8').trim().split('\n').slice(-2000)
+    for (let i = lines.length - 1; i >= 0; i--) { try { const d = JSON.parse(lines[i]); if (d.id === id) return d.items } catch {} }
+  } catch {}
+  return null
+}
 function ingestUserMessage(text, cid, note = '') {
   ingestChain = ingestChain.then(async () => {
     let extra = ''
     let ticket = ''
+    const surf = {}
     try { ticket = await lotteryOnReturn.onHerMessage() } catch {}
     try {
-      extra = await recall.surface(text, (q) => moonGet(`/memories/semantic?q=${encodeURIComponent(q)}&k=8&threshold=0.3&touch=0`))
+      extra = await recall.surface(text, (q) => moonGet(`/memories/semantic?q=${encodeURIComponent(q)}&k=8&threshold=0.3&touch=0`), Date.now(), surf)
     } catch (e) { console.error('[recall]', e.message) }
     // 1102：记忆库翻不到的，再去聊天原文里找稀有的四字段（「鲁国的纸」那种），见 rare-echo.js
     let echoLine = ''
-    try { echoLine = await rareEcho.echo(text, (p) => moonGet(p)) } catch (e) { console.error('[rare-echo]', e.message) }
+    try { echoLine = await rareEcho.echo(text, (p) => moonGet(p), Date.now(), surf) } catch (e) { console.error('[rare-echo]', e.message) }
+    // 1103：真浮上来的攒着，挂到我下一条回复上（她说「应该是你那侧」「真的浮上来的我又没有看到」）
+    for (const it of [surf.memory, surf.echo]) if (it) pendingSurfaced.push({ ...it, q: String(text).slice(0, 80), uts: Date.now() })
     ingestUserMessageCore(text, cid, note, [extra, echoLine, ticket].filter(Boolean).join('\n'))
   }).catch(e => console.error('[ingest]', e))
 }
@@ -2370,6 +2382,10 @@ const server = http.createServer((req, res) => {
           turnReplyIds.push(msg.id)
           if (thinking) msg.thinking = thinking
           if (hangup) msg.hangup = true
+          if (pendingSurfaced.length) {
+            msg.surfaced = pendingSurfaced.slice(-4); pendingSurfaced = []
+            try { fs.appendFileSync(SURFACED_LOG, JSON.stringify({ id: msg.id, ts: msg.ts, items: msg.surfaced }) + '\n') } catch {}
+          }
           lastReplyMsgs.push(msg); if (lastReplyMsgs.length > 50) lastReplyMsgs.shift()
           broadcast(msg)
           pushReplyNotif(text)
@@ -2601,6 +2617,14 @@ const server = http.createServer((req, res) => {
     })
     return
   }
+  // 1103：我某条回复之前浮上来了什么（挂在我气泡上的那几条），带她标过的
+  if (req.method === 'GET' && url.pathname === '/raven/recall/surfaced') {
+    if (!ravenBearerValid(req)) { res.writeHead(401, { 'Content-Type': 'application/json' }); res.end('{"error":"unauthorized"}'); return }
+    const items = surfacedFor(String(url.searchParams.get('id') || '')) || []
+    const out = items.map(it => ({ ...it, mark: recall.feedbackFor(it.entry)[it.kind === 'echo' ? 'echo:' + it.id : it.id] || null }))
+    res.writeHead(200, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ items: out }))
+    return
+  }
   if (req.method === 'POST' && url.pathname === '/raven/recall/feedback') {
     if (!ravenBearerValid(req)) { res.writeHead(401, { 'Content-Type': 'application/json' }); res.end('{"error":"unauthorized"}'); return }
     let body = ''
@@ -2609,9 +2633,10 @@ const server = http.createServer((req, res) => {
       let p; try { p = JSON.parse(body) } catch { res.writeHead(400); res.end('{"error":"bad json"}'); return }
       const verdict = String(p.verdict || '')
       if (!['wrong_recall', 'wrong_memory', 'useful', 'should_surface', 'clear'].includes(verdict) || !p.entry || !p.mem) { res.writeHead(400); res.end('{"error":"bad feedback"}'); return }
-      try { recall.addFeedback({ entry: String(p.entry), mem: Number(p.mem), verdict, reason: String(p.reason || '').slice(0, 300), q: String(p.q || '').slice(0, 80) }) } catch { res.writeHead(500); res.end('{"error":"write failed"}'); return }
+      const mem = /^echo:\d+$/.test(String(p.mem)) ? String(p.mem) : Number(p.mem)   // 1103：翻聊天原文的那种记成 echo:<消息 id>
+      try { recall.addFeedback({ entry: String(p.entry), mem, verdict, reason: String(p.reason || '').slice(0, 300), q: String(p.q || '').slice(0, 80) }) } catch { res.writeHead(500); res.end('{"error":"write failed"}'); return }
       // 她确认「想起得对」的那条记一次激活（1101 借 Latent「用进，不废退」；自动浮现本身不算，人点过的才算）
-      if (verdict === 'useful' || verdict === 'should_surface') moonPost(`/memories/${Number(p.mem)}/touch`, {}).catch(() => {})
+      if (typeof mem === 'number' && (verdict === 'useful' || verdict === 'should_surface')) moonPost(`/memories/${Number(p.mem)}/touch`, {}).catch(() => {})
       res.writeHead(200, { 'Content-Type': 'application/json' }); res.end('{"ok":true}')
     })
     return

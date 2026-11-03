@@ -66,7 +66,7 @@ function clip(s, n) {
 }
 
 // 返回要贴在她那句话后面的一行（没有就返回 ''）。search(q) 要给出 moon 语义搜索的结果数组。
-async function surface(text, search, now = Date.now()) {
+async function surface(text, search, now = Date.now(), out = null) {
   const q = queryOf(text)
   if (!worthLooking(q)) return ''
   let rows
@@ -96,8 +96,11 @@ async function surface(text, search, now = Date.now()) {
   if (!pick) { log({ q: clip(q, 60), top, why }); return '' }
   st.surfaced[pick.id] = now
   saveState(st)
-  log({ q: clip(q, 60), top, pick: pick.id, sim: Math.round(pick._sim * 1000) / 1000, snippet: clip(pick.content, 90) })
-  return `〔想起来 #${pick.id}·${fmtDate(pick.created_at)}（自动浮上来的，她看不见，用不用你定）：${clip(pick.content, 180)}〕`
+  const at = new Date().toISOString()
+  log({ at, q: clip(q, 60), top, pick: pick.id, sim: Math.round(pick._sim * 1000) / 1000, snippet: clip(pick.content, 90) })
+  // 1103：真浮上来的挂到我下一条回复上给她看、给她打分（out 由桥传进来）
+  if (out) out.memory = { kind: 'memory', id: pick.id, sim: Math.round(pick._sim * 1000) / 1000, date: fmtDate(pick.created_at), text: clip(pick.content, 600), entry: at }
+  return `〔想起来 #${pick.id}·${fmtDate(pick.created_at)}（自动浮上来的，会挂在你这条回复底下给她看、打分，用不用你定）：${clip(pick.content, 180)}〕`
 }
 
 // 1101 她要的「这句翻到了什么」：长按她自己的一条，从日志里找回那一轮翻到的东西给她看，她可以标对错。

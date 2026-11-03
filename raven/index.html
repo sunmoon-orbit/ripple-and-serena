@@ -675,6 +675,13 @@
   .rc-acts button, .rc-foot button { border: 1px solid var(--border); background: none; color: var(--text); border-radius: 999px; padding: 4px 12px; font: inherit; font-size: 12.5px; cursor: pointer; }
   .rc-acts button.on { background: var(--text); border-color: var(--text); color: var(--surface); }
   .rc-empty { padding: 14px 0; color: var(--text-dim); font-size: 13px; text-align: center; }
+  /* 1103 浮上来的挂在我气泡底下：拾羽那根羽毛＋「想起 N 条」，点开打分 */
+  .surf-chip { align-self: flex-start; margin: -2px 0 4px 46px; display: inline-flex; align-items: center; gap: 4px; border: 1px solid var(--border); background: color-mix(in srgb, var(--surface) 82%, transparent); -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); padding: 2px 9px 2px 6px; font: inherit; font-size: 11.5px; color: var(--text-dim); cursor: pointer; border-radius: 999px; opacity: .85; }
+  .surf-chip svg { width: 15px; height: 15px; }
+  .surf-chip.marked { opacity: .5; }
+  .rc-more { border-top: 1px solid var(--border); margin-top: 4px; }
+  .rc-more > summary { cursor: pointer; padding: 10px 0; font-size: 12.5px; color: var(--text-dim); list-style: none; text-align: center; }
+  .rc-more > summary::-webkit-details-marker { display: none; }
   .rc-foot { padding: 8px 18px 14px; display: flex; gap: 8px; align-items: center; border-top: 1px solid var(--border); }
   #recall-reason { flex: 1; min-width: 0; border: 1px solid var(--border); background: var(--bg); color: var(--text); border-radius: 12px; padding: 7px 10px; font: inherit; font-size: 13px; }
   /* 从这儿重来（1006）：收回的那一段折成一行，点开是淡的 */
@@ -1573,8 +1580,8 @@
       <div class="rewind-acts"><button id="rewind-cancel" type="button">不倒了</button><button id="rewind-go" type="button">倒回去</button></div>
     </div></div>
     <div id="recall-box" hidden><div id="recall-card">
-      <div class="rc-head"><b>这句翻到了什么</b>
-        <div class="rc-sub">你每说一句，我先翻一下记忆库，够像的才浮一条给我看（最多一条）。下面是那一轮翻到的几条。标记只记下来、不改记忆，我攒够了拿它调门槛。</div>
+      <div class="rc-head"><b>回这条之前想起了什么</b>
+        <div class="rc-sub">你每说一句，我先翻一下记忆库和聊天原文，够像的才浮给我看。这里是我回这条之前浮上来的；标记只记下来、不改记忆，我攒够了拿它调门槛。</div>
         <div class="rc-what" id="recall-what"></div></div>
       <div id="recall-list"></div>
       <div class="rc-foot"><input id="recall-reason" type="text" maxlength="300" placeholder="原因（可选，点按钮时一起记下）" autocomplete="off"><button id="recall-close" type="button">关闭</button></div>
@@ -2848,6 +2855,11 @@ function connect() {
         if (!alreadyShown) {
           if (msg.id) shownMsgIds.add(msg.id)
           const msgEl = appendMsg(msg.text, 'assistant', true, msg.ts || Date.now(), msg.id || null)
+          if (msg.surfaced && msg.surfaced.length) {
+            attachSurfaced(msgEl, msg.surfaced)
+            const last = chatHistory[chatHistory.length - 1]
+            if (last && last.role === 'assistant' && last.msgId === msg.id) { last.surfaced = msg.surfaced; saveHistory(chatHistory) }
+          }
           if (!msg.replayed && !callActive) maybeEgg()
           if (!msg.replayed && callActive) handleCallReply(msg.text, msgEl, !!msg.hangup)
           else if (!msg.replayed && Date.now() < voiceReplyUntil) autoReadReply(msgEl)
@@ -3346,6 +3358,7 @@ function restoreHistory() {
     if (m.call) { appendCallRecord(m.call, false, m.ts || Date.now()); return }
     const el = appendMsg(m.text, m.role, false, m.ts || Date.now(), m.msgId || null, !!m.supplemental)
     if (m.thinking) appendThinkingBlock(m.thinking, el)
+    if (m.surfaced && m.surfaced.length) attachSurfaced(el, m.surfaced)
     if (m.edited) markEdited(el)
   })
   loadNotices().forEach(insertNotice)
@@ -3535,50 +3548,98 @@ const RECALL_BTNS = {
   picked: [['useful', '有用'], ['wrong_recall', '召回错误'], ['wrong_memory', '记忆错误']],
   other: [['should_surface', '这条该浮'], ['wrong_recall', '不相关'], ['wrong_memory', '记忆错误']],
 }
-async function openRecall(msgEl) {
-  const ts = Number((msgEl.dataset.rkey || '').split(':')[1]), raw = String(msgEl._raw || '')
+// 拾羽那根羽毛（shiyu 落羽动画里的同一根，1103 她要用它当标记，不用 emoji）
+const FEATHER_SVG = '<svg viewBox="0 0 64 64" aria-hidden="true"><path d="M53.7 6.8C43.2 5.9 28.7 14.4 19.8 27.2c-5.4 7.7-8.8 16.4-9.2 25.2-.1 2.2.5 3.3 1.7 3.2 3.7-.2 8.5-2.1 13.4-5.1l-3.8.3c4.8-2.5 8.8-5.2 12.3-8.4l-3.6.8c4.5-3.5 8.3-7.7 11.3-12.2l-3.2 1.4c4.1-5.4 6.8-10.8 8.1-15.7l-2.2 2c2.8-5.1 4.3-8.2 9.1-11.9Z" fill="currentColor" opacity=".72"/><path d="M51.5 10.4C42.1 20.4 31 33.4 12.3 54.8l-4.9 4.6" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round"/></svg>'
+const rcAuth = () => ({ 'Content-Type': 'application/json', Authorization: 'Bearer ' + (localStorage.getItem('raven-token') || '') })
+// 一条候选：头一行、正文（点开看全）、几个打分按钮
+function rcItem(list, { tag, pick, meta, text, btns, mark, send }) {
+  const it = document.createElement('div'); it.className = 'rc-item'
+  const m = document.createElement('div'); m.className = 'rc-meta'
+  m.append(Object.assign(document.createElement('span'), { className: 'rc-tag' + (pick ? ' pick' : ''), textContent: tag }), Object.assign(document.createElement('span'), { textContent: meta }))
+  const body = Object.assign(document.createElement('div'), { className: 'rc-body', textContent: text })
+  body.addEventListener('click', () => body.classList.toggle('open'))
+  const acts = document.createElement('div'); acts.className = 'rc-acts'
+  for (const [v, label] of btns) {
+    const b = Object.assign(document.createElement('button'), { type: 'button', textContent: label })
+    if (mark === v) b.classList.add('on')
+    b.addEventListener('click', async () => {
+      const verdict = b.classList.contains('on') ? 'clear' : v
+      try {
+        await send(verdict)
+        acts.querySelectorAll('button').forEach(x => x.classList.remove('on'))
+        if (verdict !== 'clear') b.classList.add('on')
+        document.getElementById('recall-reason').value = ''
+      } catch (err) { b.textContent = label + '（没记上）' }
+    })
+    acts.appendChild(b)
+  }
+  it.append(m, body, acts); list.appendChild(it)
+}
+async function rcFeedback(entry, mem, verdict, q) {
+  const r = await fetch('/raven/recall/feedback', { method: 'POST', headers: rcAuth(), body: JSON.stringify({ entry, mem, verdict, reason: document.getElementById('recall-reason').value.trim(), q }) })
+  if (!r.ok) throw new Error(r.status)
+}
+// 那一轮没浮的候选（按她那句的时间和文字从日志找回来）
+async function rcCandidates(list, raw, ts) {
+  const empty = t => list.appendChild(Object.assign(document.createElement('div'), { className: 'rc-empty', textContent: t }))
+  let d
+  try {
+    const r = await fetch('/raven/recall/lookup', { method: 'POST', headers: rcAuth(), body: JSON.stringify({ ts, text: raw }) })
+    d = await r.json(); if (!r.ok) throw new Error(d.error || r.status)
+  } catch (err) { return empty('没查到：' + err.message) }
+  if (!d.found) return empty(d.why === 'short' ? '她那句太短（或只有贴图、附件），没去翻。' : '找不到那一轮的记录。')
+  if (d.err) return empty('那一轮翻记忆库超时了，什么都没拿到。')
+  const rest = d.cands.filter(c => c.why !== 'picked')
+  if (!rest.length) return empty('除了浮上来的，没有别的候选。')
+  empty(`门槛是相似度 ${d.minSim}，下面这几条没过，有该浮的就点「这条该浮」。`)
+  for (const c of rest) rcItem(list, { tag: RECALL_WHY[c.why] || c.why, meta: `#${c.id}` + (c.date ? ' · ' + c.date : '') + ` · 相似度 ${c.sim}`, text: c.content,
+    btns: RECALL_BTNS.other, mark: c.mark, send: v => rcFeedback(d.entry, c.id, v, raw.slice(0, 80)) })
+}
+function attachSurfaced(msgEl, items) {
+  msgEl._surfaced = items
+  const anchor = msgEl.parentElement && msgEl.parentElement.classList.contains('msg-wrap') ? msgEl.parentElement : msgEl
+  if (anchor.nextElementSibling && anchor.nextElementSibling.classList.contains('surf-chip')) return
+  const chip = document.createElement('button'); chip.type = 'button'; chip.className = 'surf-chip'
+  chip.innerHTML = FEATHER_SVG + `<span>想起 ${items.length} 条</span>`
+  chip.addEventListener('click', () => openSurfaced(msgEl))
+  anchor.after(chip)
+}
+// 我这条回复之前浮上来的（挂着的羽毛）＋折起来的「没浮的」
+async function openSurfaced(msgEl) {
   const box = document.getElementById('recall-box'), list = document.getElementById('recall-list')
-  document.getElementById('recall-what').textContent = '「' + raw.replace(/\s+/g, ' ').trim().slice(0, 40) + (raw.length > 40 ? '…' : '') + '」'
+  const empty = t => list.appendChild(Object.assign(document.createElement('div'), { className: 'rc-empty', textContent: t }))
+  // 她在我这条之前说的那句：没浮的候选按它去找
+  let prev = msgEl.closest('.msg-wrap') || msgEl, herEl = null
+  while ((prev = prev.previousElementSibling)) {
+    const u = prev.matches('.msg.user') ? prev : prev.querySelector && prev.querySelector('.msg.user')
+    if (u && typeof u._raw === 'string') { herEl = u; break }
+    if (prev.matches('.msg.assistant') || (prev.querySelector && prev.querySelector('.msg.assistant'))) continue
+  }
+  const raw = herEl ? herEl._raw : '', ts = herEl ? Number((herEl.dataset.rkey || '').split(':')[1]) : 0
+  document.getElementById('recall-what').textContent = raw ? '回你「' + raw.replace(/\s+/g, ' ').trim().slice(0, 40) + (raw.length > 40 ? '…' : '') + '」之前' : ''
   document.getElementById('recall-reason').value = ''
   list.innerHTML = '<div class="rc-empty">在翻…</div>'
   box.hidden = false
-  let d
-  try {
-    const r = await fetch('/raven/recall/lookup', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + (localStorage.getItem('raven-token') || '') }, body: JSON.stringify({ ts, text: raw }) })
-    d = await r.json()
-    if (!r.ok) throw new Error(d.error || r.status)
-  } catch (err) { list.innerHTML = ''; list.appendChild(Object.assign(document.createElement('div'), { className: 'rc-empty', textContent: '没查到：' + err.message })); return }
-  list.innerHTML = ''
-  const empty = t => list.appendChild(Object.assign(document.createElement('div'), { className: 'rc-empty', textContent: t }))
-  if (!d.found) return empty(d.why === 'short' ? '这句太短（或只有贴图、附件），没去翻。' : '找不到这句那一轮的记录。10-29 以前的、从终端直接打的，都没有。')
-  if (d.err) return empty('那一轮翻记忆库超时了，什么都没拿到。')
-  if (!d.cands.length) return empty('那一轮什么都没翻到。')
-  if (!d.pick) empty(`这一轮一条都没浮上来（门槛是相似度 ${d.minSim}）。下面是最接近的几条，有该浮的就点「这条该浮」。`)
-  for (const c of d.cands) {
-    const it = document.createElement('div'); it.className = 'rc-item'
-    const meta = document.createElement('div'); meta.className = 'rc-meta'
-    const tag = Object.assign(document.createElement('span'), { className: 'rc-tag' + (c.why === 'picked' ? ' pick' : ''), textContent: RECALL_WHY[c.why] || c.why })
-    meta.append(tag, Object.assign(document.createElement('span'), { textContent: `#${c.id}` + (c.date ? ' · ' + c.date : '') + ` · 相似度 ${c.sim}` }))
-    const body = Object.assign(document.createElement('div'), { className: 'rc-body', textContent: c.content })
-    body.addEventListener('click', () => body.classList.toggle('open'))
-    const acts = document.createElement('div'); acts.className = 'rc-acts'
-    for (const [v, label] of RECALL_BTNS[c.why === 'picked' ? 'picked' : 'other']) {
-      const b = Object.assign(document.createElement('button'), { type: 'button', textContent: label })
-      if (c.mark === v) b.classList.add('on')
-      b.addEventListener('click', async () => {
-        const verdict = b.classList.contains('on') ? 'clear' : v
-        try {
-          const r = await fetch('/raven/recall/feedback', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + (localStorage.getItem('raven-token') || '') }, body: JSON.stringify({ entry: d.entry, mem: c.id, verdict, reason: document.getElementById('recall-reason').value.trim(), q: raw.slice(0, 80) }) })
-          if (!r.ok) throw new Error(r.status)
-          acts.querySelectorAll('button').forEach(x => x.classList.remove('on'))
-          if (verdict !== 'clear') b.classList.add('on')
-          document.getElementById('recall-reason').value = ''
-        } catch (err) { b.textContent = label + '（没记上）' }
-      })
-      acts.appendChild(b)
-    }
-    it.append(meta, body, acts); list.appendChild(it)
+  let items = msgEl._surfaced || []
+  if (msgEl.dataset.msgId) {
+    try { const r = await fetch('/raven/recall/surfaced?id=' + encodeURIComponent(msgEl.dataset.msgId), { headers: rcAuth() }); const d = await r.json(); if (r.ok && d.items && d.items.length) items = d.items } catch {}
   }
+  list.innerHTML = ''
+  if (!items.length) empty('回这条之前，什么都没浮上来。')
+  for (const it of items) {
+    if (it.kind === 'echo') rcItem(list, { tag: '翻聊天原文', pick: true, meta: `「${it.phrase}」· ${it.date} · ${it.who}说的`, text: it.text,
+      btns: [['useful', '有用'], ['wrong_recall', '翻错了']], mark: it.mark, send: v => rcFeedback(it.entry, 'echo:' + it.id, v, String(it.q || '').slice(0, 80)) })
+    else rcItem(list, { tag: '记忆库', pick: true, meta: `#${it.id}` + (it.date ? ' · ' + it.date : '') + ` · 相似度 ${it.sim}`, text: it.text,
+      btns: [['useful', '有用'], ['wrong_recall', '翻错了'], ['wrong_memory', '记忆本身错了']], mark: it.mark, send: v => rcFeedback(it.entry, it.id, v, String(it.q || '').slice(0, 80)) })
+  }
+  if (!raw) return
+  const more = document.createElement('details'); more.className = 'rc-more'
+  more.innerHTML = '<summary>没浮上来的几条 ›</summary>'
+  const inner = document.createElement('div'); more.appendChild(inner)
+  let loaded = false
+  more.addEventListener('toggle', () => { if (more.open && !loaded) { loaded = true; rcCandidates(inner, raw, ts) } })
+  list.appendChild(more)
+  if (!items.length) more.open = true
 }
 document.getElementById('recall-close').addEventListener('click', () => { document.getElementById('recall-box').hidden = true })
 document.getElementById('recall-box').addEventListener('click', e => { if (e.target.id === 'recall-box') e.currentTarget.hidden = true })
@@ -5501,10 +5562,12 @@ function openReactPop(msgEl) {
     wb.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 19 2 12 11 5 11 19"/><polygon points="22 19 13 12 22 5 22 19"/></svg>'
     wb.addEventListener('click', ev => { ev.stopPropagation(); closeReactPop(); askRewind(msgEl) })
     reactPop.appendChild(wb)
-    // 这句翻到了什么（1101）
-    const kb = document.createElement('button'); kb.type = 'button'; kb.className = 'react-quote'; kb.title = '这句翻到了什么'; kb.dataset.label = '翻到'
-    kb.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/><path d="M11 8v3l2 2"/></svg>'
-    kb.addEventListener('click', ev => { ev.stopPropagation(); closeReactPop(); openRecall(msgEl) })
+  }
+  // 翻到（1101 挂在她那条上，1103 她说「应该是你那侧」，挪到我的回复上）：看我回这条之前浮上来了什么
+  if (msgEl.classList.contains('assistant') && msgEl.dataset.msgId) {
+    const kb = document.createElement('button'); kb.type = 'button'; kb.className = 'react-quote'; kb.title = '回这条之前想起了什么'; kb.dataset.label = '翻到'
+    kb.innerHTML = FEATHER_SVG
+    kb.addEventListener('click', ev => { ev.stopPropagation(); closeReactPop(); openSurfaced(msgEl) })
     reactPop.appendChild(kb)
   }
   reactPop.dataset.key = key
