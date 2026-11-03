@@ -1071,6 +1071,10 @@
     font-size: 15px; font-weight: 600; user-select: none;
   }
   .msg.call-record .msg-body svg { flex: 0 0 auto; opacity: .86; }
+  /* 1103 我打过去没接通：画在我这一侧，图标在前；没接的字带一点红 */
+  .msg.assistant.call-record .msg-body { flex-direction: row-reverse; justify-content: flex-end; }
+  .msg.call-record .msg-meta, .msg.call-record .voice-bar { display: none !important; }
+  .msg.call-record.missed .msg-body span { color: #ff9b94; }
 
   /* 归巢通话：独立界面，底层仍是按下说话 → STT → CC → TTS */
   #call-overlay {
@@ -2842,6 +2846,9 @@ function connect() {
       else if (msg.type === 'call-wait') { if (callActive) armQuiet(false) }
       else if (msg.type === 'incoming-call') ringShow(msg.id)
       else if (msg.type === 'incoming-call-end') ringHide(msg.id)
+      else if (msg.type === 'call-record') {
+        if (!shownMsgIds.has(msg.id) && !chatHistory.some(m => m.call && m.call.id === msg.id)) { shownMsgIds.add(msg.id); appendCallRecord({ from: 'ai', how: msg.how, id: msg.id }, true, msg.ts || Date.now()) }
+      }
       else if (msg.type === 'peek-done') appendMsg('阿言通过「窗」看了一眼你的屏幕 · ' + new Date(msg.at || Date.now()).toTimeString().slice(0, 5), 'system', true)
       else if (msg.type === 'retracted') { retractions.push({ from: msg.from, to: msg.to }); applyRetractions() }
       else if (msg.type === 'reaction') { const before = reactionsCache[msg.key]; paintReaction(msg.key, msg.reactions); reactionNotice(msg.key, before, msg.reactions) }
@@ -3335,18 +3342,25 @@ function appendMsg(text, role, save = true, ts = Date.now(), msgId = null, suppl
 
 function appendCallRecord(call, save = true, ts = Date.now()) {
   const duration = Math.max(0, Number(call?.duration) || 0)
-  const label = call?.status === 'cancelled'
+  // 1103 我打过去没接通的：画在我这一侧，像微信的「未接来电」
+  const fromAi = call?.from === 'ai'
+  const label = fromAi ? (call.how === 'declined' ? '已拒绝' : '未接来电')
+    : call?.status === 'cancelled'
     ? '已取消'
     : (call?.by === 'ai' ? '阿言挂的 · ' : '') + `通话时长 ${String(Math.floor(duration / 60)).padStart(2, '0')}:${String(duration % 60).padStart(2, '0')}`
-  const el = appendMsg(label, 'user', false, ts)
+  const el = appendMsg(label, fromAi ? 'assistant' : 'user', false, ts)
   el.classList.add('call-record')
+  if (fromAi && call.how !== 'declined') el.classList.add('missed')
   const body = el.querySelector('.msg-body')
   body.textContent = ''
   const text = document.createElement('span')
   text.textContent = label
   body.appendChild(text)
   body.insertAdjacentHTML('beforeend', '<svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07 19.5 19.5 0 01-6-6A19.79 19.79 0 012.12 4.18 2 2 0 014.11 2h3a2 2 0 012 1.72c.13.96.36 1.9.69 2.8a2 2 0 01-.45 2.11L8.09 9.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45c.91.33 1.85.56 2.81.69A2 2 0 0122 16.92z"/></svg>')
-  if (save) {
+  if (save && fromAi) {
+    chatHistory.push({ role: 'assistant', ts, call: { from: 'ai', how: call.how, id: call.id } })
+    saveHistory(chatHistory)
+  } else if (save) {
     chatHistory.push({ role: 'user', ts, call: { status: call?.status === 'cancelled' ? 'cancelled' : 'ended', duration, ...(call?.by === 'ai' ? { by: 'ai' } : {}) } })
     saveHistory(chatHistory)
   }

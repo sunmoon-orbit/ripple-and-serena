@@ -795,6 +795,13 @@ function ravenCallEnd(id, how, bilingual) {
   clearTimeout(ravenCall.timer); ravenCall = null
   if (how === 'accepted') callOnSince = Date.now()
   broadcast({ type: 'incoming-call-end', id, how })
+  // 1103：没接、按掉的，聊天里留一条「未接来电」（她 18:11：「你给我打电话也没有显示哦？」），重连补发也带上
+  if (how !== 'accepted') {
+    const rec = { type: 'call-record', id: 'cr' + id, how, ts: Date.now() }
+    lastReplyMsgs.push(rec); if (lastReplyMsgs.length > 50) lastReplyMsgs.shift()
+    broadcast(rec)
+    if (how === 'missed') moonPost('/push/send-fixed', { title: remarkName(), body: '未接来电', target: 'raven', ttl: 3600, data: { type: 'raven_missed_call' } }).catch(() => {})
+  }
   const line = how === 'accepted'
     ? `【通话·接通${bilingual ? '·双语' : ''}】她接了你打过去的电话，通话开着。你先开口，照通话的规矩说一句短的。`
     : how === 'declined'
