@@ -314,6 +314,14 @@ export async function saveBookCover(config, bookId, image) {
   })
 }
 
+// 改书名／作者／简介（1103）
+export async function saveBookMeta(config, bookId, meta) {
+  const { baseUrl, apiToken } = config
+  return request(baseUrl, `/books/${bookId}/meta`, {
+    method: 'PUT', headers: headers(apiToken), body: JSON.stringify(meta),
+  })
+}
+
 // 读讫章：读完一本盖一枚，阿颖和涟言各一枚分开盖
 export async function stampBook(config, bookId, reader) {
   const { baseUrl, apiToken } = config

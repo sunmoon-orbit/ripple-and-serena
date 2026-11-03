@@ -4316,6 +4316,10 @@ textarea.form-input { display: block; margin: 8px 16px 12px; }
 .bookread-cover-wait { justify-content: center; animation: cover-wait 1.4s ease-in-out infinite alternate; }
 @keyframes cover-wait { from { opacity: .55 } to { opacity: .9 } }
 .bookread-cover-actions { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; }
+/* 1103 改书名／作者／简介 */
+.bookread-meta-edit { width: min(320px, 86vw); display: flex; flex-direction: column; gap: 8px; padding: 12px; border-radius: 14px; background: color-mix(in srgb, var(--card) 92%, transparent); }
+.bookread-meta-edit label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--text-secondary, var(--text)); }
+.bookread-meta-edit input, .bookread-meta-edit textarea { font: inherit; font-size: 14px; color: var(--text); background: var(--bg, transparent); border: 1px solid var(--border); border-radius: 8px; padding: 6px 8px; resize: vertical; }
 .bookread-cover-actions .roost-btn { min-width: 76px; }
 .bookread-cover-actions .roost-btn.ghost { background: color-mix(in srgb, var(--card) 85%, transparent); color: var(--text); }
 .bookread-spine-title {

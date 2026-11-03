@@ -5,7 +5,7 @@ import {
   fetchBooks, fetchBook, fetchBookChapter, createBook, appendBookChapters,
   deleteBook, createBookAnnotation, deleteBookAnnotation, saveBookBookmark, fetchBookEchoes, markBookEchoesSeen, starBookAnnotation, fetchStarredAnnotations,
   sendReadingHeartbeat, fetchBookChat, createBookChatMessage, stampBook, unstampBook,
-  fetchReadingActivity, fetchBookCover, saveBookCover, saveBookChapterAlt,
+  fetchReadingActivity, fetchBookCover, saveBookCover, saveBookMeta, saveBookChapterAlt,
 } from '../../api/moonMemory'
 import { readBookFile, splitChapters, pairBooks, guessOffset, paragraphEnds, previewPairs } from '../../utils/bookImport'
 import { savePdfBlob, deletePdfBlob, openPdf } from '../../utils/pdfBooks'
@@ -389,6 +389,20 @@ export default function BookRead({ onClose }) {
       setBooks((list) => (list || []).map((b) => b.id === id ? { ...b, has_cover: 1 } : b))
       showToast('封面换好了')
     } catch (err) { showToast('封面没换上：' + (err.message || err)) }
+  }
+
+  // 1103 她：「直接加一个可编辑的呢，以后填错了我也能自己改」
+  async function saveMeta() {
+    if (!coverBook?.edit) return
+    const id = coverBook.book.id, { title, author, intro } = coverBook.edit
+    if (!String(title || '').trim()) { showToast('书名不能空着'); return }
+    try {
+      const r = await saveBookMeta(cfg, id, { title, author, intro })
+      const patch = { title: r.title, author: r.author, intro: r.intro }
+      setBooks((list) => (list || []).map((b) => b.id === id ? { ...b, ...patch } : b))
+      setCoverBook((cur) => cur && cur.book.id === id ? { ...cur, book: { ...cur.book, ...patch }, edit: null } : cur)
+      showToast('改好了')
+    } catch (err) { showToast('没改上：' + (err.message || err)) }
   }
 
   async function dropCover() {
@@ -1232,11 +1246,27 @@ export default function BookRead({ onClose }) {
                         </div>
                       )}
                   </div>
+                  {coverBook.edit ? (
+                    <div className="bookread-meta-edit">
+                      <label>书名<input value={coverBook.edit.title} maxLength={200}
+                        onChange={(e) => setCoverBook((cur) => ({ ...cur, edit: { ...cur.edit, title: e.target.value } }))} /></label>
+                      <label>作者<input value={coverBook.edit.author} maxLength={200}
+                        onChange={(e) => setCoverBook((cur) => ({ ...cur, edit: { ...cur.edit, author: e.target.value } }))} /></label>
+                      <label>简介<textarea rows={3} value={coverBook.edit.intro} maxLength={2000}
+                        onChange={(e) => setCoverBook((cur) => ({ ...cur, edit: { ...cur.edit, intro: e.target.value } }))} /></label>
+                      <div className="bookread-cover-actions">
+                        <button className="roost-btn" onClick={saveMeta}>保存</button>
+                        <button className="roost-btn ghost" onClick={() => setCoverBook((cur) => ({ ...cur, edit: null }))}>算了</button>
+                      </div>
+                    </div>
+                  ) : (
                   <div className="bookread-cover-actions">
                     <button className="roost-btn" onClick={() => { const bk = b; setCoverBook(null); openBook(bk) }}>翻开</button>
                     <button className="roost-btn ghost" onClick={() => coverFileRef.current?.click()}>{coverBook.image ? '换一张' : '换封面'}</button>
                     {coverBook.image && <button className="roost-btn ghost" onClick={dropCover}>换回画的</button>}
+                    <button className="roost-btn ghost" onClick={() => setCoverBook((cur) => ({ ...cur, edit: { title: b.title || '', author: b.author || '', intro: b.intro || '' } }))}>改信息</button>
                   </div>
+                  )}
                   <input ref={coverFileRef} type="file" accept="image/*" hidden onChange={pickCover} />
                 </div>
               </div>
