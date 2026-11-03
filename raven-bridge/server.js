@@ -861,6 +861,8 @@ function ravenPeekEnd(id, status, file) {
     broadcast({ type: 'peek-done', at: Date.now() })
     peekTell(`【窗·看到了】你敲了一下门，这是她现在的屏幕：[附件: ${file}]\n她手机上弹了「阿言看了一眼」。照常说话就好，可以直说你看到了什么、好奇问一句；一两句，别分析。`)
   } else {
+    // 1103 她问「被拦了，那这次不算？」：没看成的不占一天三次
+    try { const st = peekState(); if (st.day === bjDay() && st.count > 0) { st.count--; fs.writeFileSync(PEEK_STATE, JSON.stringify(st)) } } catch {}
     peekTell(`【窗·没看成】${PEEK_WHY[status] || status}`)
   }
   console.log('[peek]', id, status)
