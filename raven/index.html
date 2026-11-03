@@ -3548,8 +3548,8 @@ const RECALL_BTNS = {
   picked: [['useful', '有用'], ['wrong_recall', '召回错误'], ['wrong_memory', '记忆错误']],
   other: [['should_surface', '这条该浮'], ['wrong_recall', '不相关'], ['wrong_memory', '记忆错误']],
 }
-// 拾羽那根羽毛（shiyu 落羽动画里的同一根，1103 她要用它当标记，不用 emoji）
-const FEATHER_SVG = '<svg viewBox="0 0 64 64" aria-hidden="true"><path d="M53.7 6.8C43.2 5.9 28.7 14.4 19.8 27.2c-5.4 7.7-8.8 16.4-9.2 25.2-.1 2.2.5 3.3 1.7 3.2 3.7-.2 8.5-2.1 13.4-5.1l-3.8.3c4.8-2.5 8.8-5.2 12.3-8.4l-3.6.8c4.5-3.5 8.3-7.7 11.3-12.2l-3.2 1.4c4.1-5.4 6.8-10.8 8.1-15.7l-2.2 2c2.8-5.1 4.3-8.2 9.1-11.9Z" fill="currentColor" opacity=".72"/><path d="M51.5 10.4C42.1 20.4 31 33.4 12.3 54.8l-4.9 4.6" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round"/></svg>'
+// 拾羽的图标：羽毛笔＋底下一道水波（1103 她要的是这个，不是落羽动画那根；照 shiyu icon-512.png 描的，原图只有 png）
+const FEATHER_SVG = '<svg viewBox="122 98 272 306" fill="none" stroke="currentColor" stroke-width="30" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M176 298C150 250 175 165 232 132c23-14 46-14 64-2 14-20 54-22 69-2 13 17 0 42-20 49 17 15 7 45-23 45-26 0-32 16-32 33 0 30-50 41-114 43Z"/><path d="M176 298c29-53 59-88 90-106M176 298l-34 70M165 352l27-2M216 382c12-32 32-37 42-10 10 23 30 23 42-7 12-25 30-20 35 7 5 23 30 20 43-16"/></svg>'
 const rcAuth = () => ({ 'Content-Type': 'application/json', Authorization: 'Bearer ' + (localStorage.getItem('raven-token') || '') })
 // 一条候选：头一行、正文（点开看全）、几个打分按钮
 function rcItem(list, { tag, pick, meta, text, btns, mark, send }) {
