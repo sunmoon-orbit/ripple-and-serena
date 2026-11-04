@@ -5283,7 +5283,7 @@ body.mp-active .scroll-bottom-btn { bottom: 139px; }
   display: grid; grid-template-columns: 1fr 1fr;
   gap: 12px 10px;
   align-items: start;
-  padding: 6px 2px 4px;
+  padding: 6px 8px 4px;
 }
 .board-col { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
 .board-empty {

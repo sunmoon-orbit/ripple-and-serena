@@ -97,11 +97,22 @@ export default function BoardWall({ onClose }) {
     return cols
   }
 
+  // 1104 她：「便签条条太长了，然后边边就会挡住一些字」——长条转同样的角度，底下那头会甩出去好几十像素，
+  // 被墙的边裁掉。按估算的高度把角度压小：甩出去的距离（半高 × 角度）不超过约 6 像素
+  const tiltOf = (n) => {
+    const t = String(n.text || '')
+    const lines = t.split('\n').reduce((s, l) => s + Math.max(1, Math.ceil(l.length / 11)), 0)
+    const half = (70 + lines * 24) / 2
+    const base = TILTS[n.id % TILTS.length]
+    const cap = Math.atan(6 / half) * 180 / Math.PI
+    return Math.sign(base) * Math.min(Math.abs(base), cap)
+  }
+
   const renderNote = (n, i) => (
     <div
       key={n.id}
       className={'board-note' + (n.author === '涟言' ? ' from-crow' : '')}
-      style={{ '--tilt': `${TILTS[n.id % TILTS.length]}deg`, animationDelay: `${Math.min(i * 40, 400)}ms` }}
+      style={{ '--tilt': `${tiltOf(n).toFixed(2)}deg`, animationDelay: `${Math.min(i * 40, 400)}ms` }}
     >
       <span className="board-note-tape" />
       <button className="board-note-del" onClick={() => remove(n.id)} aria-label="撕下">✕</button>
