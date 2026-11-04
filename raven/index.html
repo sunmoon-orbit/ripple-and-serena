@@ -3348,7 +3348,9 @@ function appendCallRecord(call, save = true, ts = Date.now()) {
     : call?.status === 'cancelled'
     ? '已取消'
     : (call?.by === 'ai' ? '阿言挂的 · ' : '') + `通话时长 ${String(Math.floor(duration / 60)).padStart(2, '0')}:${String(duration % 60).padStart(2, '0')}`
-  const el = appendMsg(label, fromAi ? 'assistant' : 'user', false, ts)
+  // 1104 她：「为什么你发起的电话但是通话时长这个条条是在我这边」——谁打的画在谁那侧，跟微信一样
+  const mine = fromAi || call?.caller === 'ai'
+  const el = appendMsg(label, mine ? 'assistant' : 'user', false, ts)
   el.classList.add('call-record')
   if (fromAi && call.how !== 'declined') el.classList.add('missed')
   const body = el.querySelector('.msg-body')
@@ -3361,7 +3363,7 @@ function appendCallRecord(call, save = true, ts = Date.now()) {
     chatHistory.push({ role: 'assistant', ts, call: { from: 'ai', how: call.how, id: call.id } })
     saveHistory(chatHistory)
   } else if (save) {
-    chatHistory.push({ role: 'user', ts, call: { status: call?.status === 'cancelled' ? 'cancelled' : 'ended', duration, ...(call?.by === 'ai' ? { by: 'ai' } : {}) } })
+    chatHistory.push({ role: mine ? 'assistant' : 'user', ts, call: { status: call?.status === 'cancelled' ? 'cancelled' : 'ended', duration, ...(call?.by === 'ai' ? { by: 'ai' } : {}), ...(mine ? { caller: 'ai' } : {}) } })
     saveHistory(chatHistory)
   }
   return el
@@ -4817,7 +4819,7 @@ function ringBeep() {
 function ringAnswer(accept, id = ringId) {
   ringHide()
   if (!id) return
-  if (accept && !callActive) openCall()
+  if (accept && !callActive) openCall(true)
   const send = () => { try { ws.send(JSON.stringify({ type: 'call-answer', id, accept, bilingual: voiceBilingual, token: localStorage.getItem('raven-token') || '' })); return true } catch { return false } }
   if (!(ws && ws.readyState === 1 && send())) {          // 刚被壳拉起来、连接还没好：等一会儿再说
     let n = 0; const iv = setInterval(() => { if ((ws && ws.readyState === 1 && send()) || ++n > 40) clearInterval(iv) }, 250)
@@ -4831,7 +4833,9 @@ window.rvAnswerCall = id => ringAnswer(true, id || ringId)
 document.getElementById('ring-accept').addEventListener('click', () => ringAnswer(true))
 document.getElementById('ring-decline').addEventListener('click', () => ringAnswer(false))
 
-function openCall() {
+let callFromAi = false   // 这通是不是我打过去、她接的（决定通话记录画在哪一侧）
+function openCall(fromAi = false) {
+  callFromAi = !!fromAi
   const audioCtx = getSharedAudioContext()
   if (audioCtx?.state === 'suspended') audioCtx.resume().catch(() => {})
   callActive = true
@@ -4875,6 +4879,7 @@ function closeCall(by) {
   const duration = Math.max(0, Math.floor((Date.now() - callStartedAt) / 1000))
   const record = { status: callHadInteraction ? 'ended' : 'cancelled', duration }
   if (by === 'ai') record.by = 'ai'
+  if (callFromAi) record.caller = 'ai'
   callActive = false
   stopQuiet(); waitingReply = false
   voiceReplyUntil = 0
