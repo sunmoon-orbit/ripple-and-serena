@@ -2542,6 +2542,52 @@ const server = http.createServer((req, res) => {
   // 镜像（1102 她要的：「你那边可以看得到我这边设置的头像和主题颜色……就像另一部手机进入同一个会话一样」）。
   // 她改外观时页面把外观设置推上来（谁最后改的跟谁，她选的），只外观，不含登录钥匙；
   // 我用 ~/bin/raven-mirror 开一个无头浏览器、套上这份外观截聊天。存在仓库外，私人的。
+  // 装修方案（1105 她要的「保存主题装修」）：把这一套外观（主题、调色、壁纸、头像、气泡圆角）存个名字，
+  // 以后点一下换回来。存在桥上不存手机：壁纸是整张图，localStorage 装不下好几套；换设备也带得走。
+  if (url.pathname === '/raven/looks') {
+    const LOOKS_DIR = '/home/ripple/raven-private/looks'
+    if (!ravenBearerValid(req)) { res.writeHead(401, { 'Content-Type': 'application/json' }); res.end('{"error":"unauthorized"}'); return }
+    const LOOK_KEYS = ['raven-avatar', 'serena-avatar', 'raven-theme', 'raven-custom-theme', 'raven-bg-image', 'raven-bg-fit', 'raven-avatar-shape', 'raven-avatar-size', 'raven-bubble-radius']
+    const send = (code, obj) => { res.writeHead(code, { 'Content-Type': 'application/json' }); res.end(JSON.stringify(obj)) }
+    const safeId = v => String(v || '').replace(/[^a-z0-9]/gi, '').slice(0, 24)
+    const readLook = id => { try { return JSON.parse(fs.readFileSync(path.join(LOOKS_DIR, id + '.json'), 'utf8')) } catch { return null } }
+    const list = () => { try { return fs.readdirSync(LOOKS_DIR).filter(f => f.endsWith('.json')).map(f => readLook(f.slice(0, -5))).filter(Boolean).sort((a, b) => a.ts - b.ts) } catch { return [] } }
+    const write = rec => { fs.mkdirSync(LOOKS_DIR, { recursive: true, mode: 0o700 }); const f = path.join(LOOKS_DIR, rec.id + '.json'); fs.writeFileSync(f + '.tmp', JSON.stringify(rec), { mode: 0o600 }); fs.renameSync(f + '.tmp', f) }
+    if (req.method === 'GET') {
+      const id = safeId(url.searchParams.get('id'))
+      if (id) { const r = readLook(id); return r ? send(200, r) : send(404, { error: 'not found' }) }
+      return send(200, { looks: list().map(({ id, name, ts, thumb, data }) => ({ id, name, ts, thumb, theme: data?.['raven-theme'] || 'dark', palette: data?.['raven-custom-theme'] || null })) })
+    }
+    if (req.method === 'DELETE') {
+      const id = safeId(url.searchParams.get('id'))
+      try { fs.unlinkSync(path.join(LOOKS_DIR, id + '.json')); send(200, { ok: true }) } catch { send(404, { error: 'not found' }) }
+      return
+    }
+    if (req.method !== 'POST') return send(405, {})
+    const chunks = []; let size = 0, tooBig = false
+    req.on('data', d => { size += d.length; if (size > 12 * 1024 * 1024) { tooBig = true; return } chunks.push(d) })
+    req.on('end', () => {
+      if (tooBig) return send(413, { error: 'too large' })
+      let p = {}; try { p = JSON.parse(Buffer.concat(chunks).toString('utf8')) } catch {}
+      const name = String(p.name || '').trim().slice(0, 30)
+      try {
+        // 只改名：{id, name}
+        if (p.id && !p.data) {
+          const r = readLook(safeId(p.id)); if (!r) return send(404, { error: 'not found' })
+          if (name) r.name = name
+          write(r); return send(200, { ok: true })
+        }
+        if (list().length >= 20 && !p.id) return send(400, { error: '最多存 20 套，先删一套' })
+        const data = {}
+        for (const k of LOOK_KEYS) if (typeof p.data?.[k] === 'string') data[k] = p.data[k]
+        const old = p.id ? readLook(safeId(p.id)) : null
+        const rec = { id: old?.id || Date.now().toString(36) + Math.random().toString(36).slice(2, 6), name: name || old?.name || '未命名',
+          ts: old?.ts || Date.now(), updated: Date.now(), thumb: typeof p.thumb === 'string' && p.thumb.length < 60000 ? p.thumb : '', data }
+        write(rec); send(200, { ok: true, id: rec.id })
+      } catch (e) { send(500, { error: e.message }) }
+    })
+    return
+  }
   if (url.pathname === '/raven/appearance' || url.pathname === '/raven/appearance/meta') {
     const APPEARANCE_FILE = '/home/ripple/raven-private/appearance.json'
     if (!ravenBearerValid(req)) { res.writeHead(401, { 'Content-Type': 'application/json' }); res.end('{"error":"unauthorized"}'); return }

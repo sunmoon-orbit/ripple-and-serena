@@ -651,6 +651,20 @@
   #wake-card { width: min(360px, 100%); background: var(--surface); color: var(--text); border: 1px solid var(--border); border-radius: 18px; padding: 18px 18px 14px; box-shadow: 0 16px 44px rgba(0,0,0,.3); font-size: 14px; line-height: 1.65; }
   #wake-card b { font-size: 15px; } #wake-card p { margin: 8px 0; font-size: 12.5px; color: var(--text-dim); }
   #wake-now { font-size: 13px; margin: 6px 0; } #wake-toggle.on { background: var(--accent); border-color: var(--accent); color: #fff; }
+  /* 装修方案（1105） */
+  #looks-box { position: fixed; inset: 0; z-index: 400; background: rgba(0,0,0,.38); display: flex; align-items: center; justify-content: center; padding: 16px; }
+  #looks-box[hidden] { display: none; }
+  #looks-card { width: min(380px, 100%); max-height: 86vh; overflow-y: auto; background: var(--surface); color: var(--text); border: 1px solid var(--border); border-radius: 18px; padding: 18px 16px 14px; box-shadow: 0 16px 44px rgba(0,0,0,.3); font-size: 14px; line-height: 1.6; }
+  #looks-card b { font-size: 15px; } #looks-card p { margin: 6px 0 10px; font-size: 12.5px; color: var(--text-dim); }
+  .looks-new { display: flex; gap: 8px; margin-bottom: 12px; }
+  .looks-new input { flex: 1; min-width: 0; border: 1px solid var(--border); background: var(--bg); color: var(--text); border-radius: 999px; padding: 7px 12px; font: inherit; font-size: 13.5px; }
+  .looks-new button, .look-acts button { border: 1px solid var(--border); background: none; color: var(--text); border-radius: 999px; padding: 6px 12px; font: inherit; font-size: 12.5px; cursor: pointer; white-space: nowrap; }
+  .looks-new button { background: var(--accent); border-color: var(--accent); color: #fff; font-size: 13.5px; }
+  .look { display: flex; gap: 10px; align-items: center; padding: 8px 0; border-top: 1px solid var(--border); }
+  .look img, .look .look-sw { width: 45px; height: 80px; border-radius: 8px; object-fit: cover; flex: none; border: 1px solid var(--border); }
+  .look-main { flex: 1; min-width: 0; } .look-name { font-weight: 600; overflow-wrap: anywhere; } .look-sub { font-size: 12px; color: var(--text-dim); }
+  .look-acts { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 5px; } .look-acts .look-use { background: var(--accent); border-color: var(--accent); color: #fff; }
+  #looks-msg { min-height: 1.3em; font-size: 12.5px; color: var(--accent); }
   #peek-box { position: fixed; inset: 0; z-index: 400; background: rgba(0,0,0,.38); display: flex; align-items: center; justify-content: center; padding: 24px; }
   #peek-box[hidden] { display: none; }
   #peek-card { width: min(360px, 100%); background: var(--surface); color: var(--text); border: 1px solid var(--border); border-radius: 18px; padding: 18px 18px 14px; box-shadow: 0 16px 44px rgba(0,0,0,.3); font-size: 14px; line-height: 1.65; }
@@ -1596,6 +1610,14 @@
       <div id="wake-now"></div>
       <div class="rewind-acts"><button id="wake-toggle" type="button"></button><button id="wake-close" type="button">好</button></div>
     </div></div>
+    <div id="looks-box" hidden><div id="looks-card">
+      <b>装修方案</b>
+      <p>把现在这一套（主题、调色、壁纸、头像、气泡圆角）存个名字，以后点「换上」就回来。存在服务器上，换手机也在。</p>
+      <div class="looks-new"><input id="looks-name" maxlength="30" placeholder="给现在这套起个名字"><button id="looks-save" type="button">存下来</button></div>
+      <div id="looks-msg"></div>
+      <div id="looks-list"></div>
+      <div class="rewind-acts"><button id="looks-close" type="button">好</button></div>
+    </div></div>
     <div id="peek-box" hidden><div id="peek-card">
       <b>窗</b>
       <p>开着的时候，阿言想看你在干嘛，会敲一下门：手机截一张当前屏幕，只传回你们自己的服务器给他看。每次都会弹「阿言看了一眼」。夜里 23–7 点不看，一天最多三次；锁屏、银行密码这类页面截不到。</p>
@@ -1688,6 +1710,7 @@
       </button><span>背景</span></div>
       <div class="tool"><button id="theme-btn" title="切换主题" aria-label="切换主题"></button><span>主题</span></div>
       <div class="tool"><button id="palette-btn" type="button" aria-label="调色"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a9 9 0 1 0 0 18c1.1 0 1.8-.8 1.8-1.8 0-.5-.2-.9-.5-1.2-.3-.3-.5-.7-.5-1.2 0-1 .8-1.8 1.8-1.8H16a5 5 0 0 0 5-5c0-3.9-4-7-9-7z"/><circle cx="7.5" cy="11" r="1.2"/><circle cx="10.5" cy="7" r="1.2"/><circle cx="15" cy="7.5" r="1.2"/></svg></button><span>调色</span></div>
+      <div class="tool"><button id="looks-btn" type="button" aria-label="装修方案"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 11l8-7 8 7"/><path d="M6 9.5V20h12V9.5"/><path d="M10 20v-5h4v5"/></svg></button><span>装修</span></div>
       <div class="tool"><button id="music-btn" type="button" aria-label="听歌"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg></button><span>听歌</span></div>
       <div class="tool" id="crow-tool" hidden><button id="crow-btn" type="button" aria-label="桌面小乌鸦"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 11l3-1.5c1-2.5 3-3.5 5-3.5 3 0 5 2 5 5 0 1.5 1.5 3 3 4l-6 0-2 3-1.5 0 .5-3c-3 0-5-1.5-7-4z"/><circle cx="10.5" cy="9" r=".8" fill="currentColor"/></svg></button><span>小乌鸦</span></div>
       <div class="tool" id="wake-tool"><button id="wake-btn" type="button" aria-label="来找我"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 0112 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 003.4 0"/></svg></button><span>来找我</span></div>
@@ -4574,6 +4597,89 @@ if (window.RoostNative && typeof window.RoostNative.peekEnabled === 'function') 
   // 桥上还一份都没有：先把这台的推上去，免得镜像是空的
   if (!window.__rvMirror) fetch('/raven/appearance/meta', { headers: { Authorization: 'Bearer ' + (localStorage.getItem('raven-token') || '') } })
     .then(r => r.ok ? r.json() : null).then(m => { if (m && !m.ts) push() }).catch(() => {})
+}
+// 装修方案（1105 她要的）：外观存一套起个名字，点一下换回来。存在桥上（/raven/looks），壁纸太大手机里放不下几套
+{
+  const KEYS = ['raven-avatar', 'serena-avatar', 'raven-theme', 'raven-custom-theme', 'raven-bg-image', 'raven-bg-fit', 'raven-avatar-shape', 'raven-avatar-size', 'raven-bubble-radius']
+  const box = document.getElementById('looks-box'), listEl = document.getElementById('looks-list'), msg = document.getElementById('looks-msg')
+  const hdr = () => ({ 'Content-Type': 'application/json', Authorization: 'Bearer ' + (localStorage.getItem('raven-token') || '') })
+  const esc = v => String(v).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]))
+  const say = t => { msg.textContent = t || '' }
+  const snapshot = () => { const d = {}; for (const k of KEYS) { try { const v = localStorage.getItem(k); if (v != null) d[k] = v } catch {} } return d }
+  // 小缩略图：底色＋壁纸＋两个气泡的颜色，一眼认得出是哪套
+  const thumb = () => new Promise(done => {
+    try {
+      const c = document.createElement('canvas'); c.width = 90; c.height = 160
+      const g = c.getContext('2d'), cs = getComputedStyle(document.documentElement)
+      g.fillStyle = cs.getPropertyValue('--bg').trim() || '#1a1a1f'; g.fillRect(0, 0, 90, 160)
+      const bubbles = () => {
+        const pick = v => ((v || '').match(/#[0-9a-f]{3,8}|rgba?\([^)]*\)/i) || ['#888'])[0]
+        g.fillStyle = pick(cs.getPropertyValue('--bubble-assistant-bg')); g.beginPath(); g.roundRect?.(8, 52, 50, 18, 7) ?? g.rect(8, 52, 50, 18); g.fill()
+        g.fillStyle = pick(cs.getPropertyValue('--bubble-user-bg')); g.beginPath(); g.roundRect?.(36, 84, 46, 18, 7) ?? g.rect(36, 84, 46, 18); g.fill()
+        g.fillStyle = cs.getPropertyValue('--accent').trim() || '#b39c78'; g.fillRect(0, 150, 90, 10)
+        try { done(c.toDataURL('image/jpeg', 0.7)) } catch { done('') }
+      }
+      const src = localStorage.getItem('raven-bg-image')
+      if (!src) return bubbles()
+      const im = new Image()
+      im.onload = () => {
+        const fit = localStorage.getItem('raven-bg-fit') === 'cover' ? Math.max : Math.min
+        const k = fit(90 / im.width, 160 / im.height), w = im.width * k, h = im.height * k
+        g.drawImage(im, (90 - w) / 2, (160 - h) / 2, w, h)
+        g.fillStyle = 'color-mix(in srgb, ' + (cs.getPropertyValue('--bg').trim() || '#1a1a1f') + ' 34%, transparent)'; g.fillRect(0, 0, 90, 160)
+        bubbles()
+      }
+      im.onerror = bubbles; im.src = src
+    } catch { done('') }
+  })
+  const paint = async () => {
+    listEl.innerHTML = '<div class="look-sub">翻一下……</div>'
+    let looks = null
+    try { const r = await fetch('/raven/looks', { headers: hdr() }); if (r.ok) looks = (await r.json()).looks } catch {}
+    if (!looks) { listEl.innerHTML = '<div class="look-sub">没连上服务器，等会儿再试</div>'; return }
+    if (!looks.length) { listEl.innerHTML = '<div class="look-sub">还一套都没存。</div>'; return }
+    listEl.innerHTML = looks.slice().reverse().map(l => `<div class="look" data-id="${esc(l.id)}">
+      ${l.thumb ? `<img src="${esc(l.thumb)}" alt="">` : `<span class="look-sw" style="background:${esc(themeColor(l.theme) || '#888')}"></span>`}
+      <div class="look-main"><div class="look-name">${esc(l.name)}</div>
+        <div class="look-sub">${esc(THEME_NAMES[l.theme] || l.theme)} · ${new Date(l.ts).toLocaleDateString('zh-CN', { month: 'numeric', day: 'numeric', timeZone: 'Asia/Shanghai' })}</div>
+        <div class="look-acts"><button class="look-use" data-a="use">换上</button><button data-a="over">用现在的盖掉</button><button data-a="ren">改名</button><button data-a="del">删</button></div></div></div>`).join('')
+  }
+  listEl.addEventListener('click', async e => {
+    const b = e.target.closest('button[data-a]'); if (!b) return
+    const row = b.closest('.look'), id = row.dataset.id, name = row.querySelector('.look-name').textContent
+    try {
+      if (b.dataset.a === 'use') {
+        say('换上「' + name + '」……')
+        const r = await fetch('/raven/looks?id=' + encodeURIComponent(id), { headers: hdr() }); if (!r.ok) throw 0
+        const { data = {} } = await r.json()
+        for (const k of KEYS) { try { if (typeof data[k] === 'string') localStorage.setItem(k, data[k]); else localStorage.removeItem(k) } catch { say('这套的壁纸太大，这台手机存不下'); return } }
+        setTimeout(() => location.reload(), 2300)   // 等上面那段把新外观推给镜像（2 秒防抖）再刷新
+      } else if (b.dataset.a === 'over') {
+        if (!confirm('用现在的外观盖掉「' + name + '」？')) return
+        const r = await fetch('/raven/looks', { method: 'POST', headers: hdr(), body: JSON.stringify({ id, data: snapshot(), thumb: await thumb() }) })
+        say(r.ok ? '盖好了' : '没存上'); paint()
+      } else if (b.dataset.a === 'ren') {
+        const n = (prompt('新名字', name) || '').trim(); if (!n || n === name) return
+        await fetch('/raven/looks', { method: 'POST', headers: hdr(), body: JSON.stringify({ id, name: n }) }); paint()
+      } else if (b.dataset.a === 'del') {
+        if (!confirm('删掉「' + name + '」？')) return
+        await fetch('/raven/looks?id=' + encodeURIComponent(id), { method: 'DELETE', headers: hdr() }); say('删了'); paint()
+      }
+    } catch { say('没连上服务器') }
+  })
+  document.getElementById('looks-save').addEventListener('click', async () => {
+    const inp = document.getElementById('looks-name'), n = inp.value.trim() || (THEME_NAMES[currentTheme] || '一套') + ' · ' + new Date().toLocaleDateString('zh-CN', { month: 'numeric', day: 'numeric', timeZone: 'Asia/Shanghai' })
+    say('存着……')
+    try {
+      const r = await fetch('/raven/looks', { method: 'POST', headers: hdr(), body: JSON.stringify({ name: n, data: snapshot(), thumb: await thumb() }) })
+      const j = await r.json().catch(() => ({}))
+      say(r.ok ? '存好了：' + n : (j.error || '没存上')); if (r.ok) inp.value = ''
+    } catch { say('没连上服务器') }
+    paint()
+  })
+  document.getElementById('looks-btn').addEventListener('click', () => { document.getElementById('attach-menu').hidden = true; say(''); box.hidden = false; paint() })
+  document.getElementById('looks-close').addEventListener('click', () => { box.hidden = true })
+  box.addEventListener('click', e => { if (e.target === box) box.hidden = true })
 }
 // 叫醒我（1102）：她开着，阿言就会在她安静一阵后被叫醒、自己决定要不要来找她。开关存在桥上
 {
