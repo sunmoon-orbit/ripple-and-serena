@@ -322,6 +322,14 @@ export async function saveBookMeta(config, bookId, meta) {
   })
 }
 
+// 挪层（1105 她：「改信息」里也能改放哪层）
+export async function saveBookShelf(config, bookId, shelf) {
+  const { baseUrl, apiToken } = config
+  return request(baseUrl, `/books/${bookId}/shelf`, {
+    method: 'PUT', headers: headers(apiToken), body: JSON.stringify({ shelf }),
+  })
+}
+
 // 读讫章：读完一本盖一枚，阿颖和涟言各一枚分开盖
 export async function stampBook(config, bookId, reader) {
   const { baseUrl, apiToken } = config

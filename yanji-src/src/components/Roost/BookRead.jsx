@@ -5,7 +5,7 @@ import {
   fetchBooks, fetchBook, fetchBookChapter, createBook, appendBookChapters,
   deleteBook, createBookAnnotation, deleteBookAnnotation, saveBookBookmark, fetchBookEchoes, markBookEchoesSeen, starBookAnnotation, fetchStarredAnnotations,
   sendReadingHeartbeat, fetchBookChat, createBookChatMessage, stampBook, unstampBook,
-  fetchReadingActivity, fetchBookCover, saveBookCover, saveBookMeta, saveBookChapterAlt,
+  fetchReadingActivity, fetchBookCover, saveBookCover, saveBookMeta, saveBookShelf, saveBookChapterAlt,
 } from '../../api/moonMemory'
 import { readBookFile, splitChapters, pairBooks, guessOffset, paragraphEnds, previewPairs } from '../../utils/bookImport'
 import { savePdfBlob, deletePdfBlob, openPdf } from '../../utils/pdfBooks'
@@ -394,11 +394,13 @@ export default function BookRead({ onClose }) {
   // 1103 她：「直接加一个可编辑的呢，以后填错了我也能自己改」
   async function saveMeta() {
     if (!coverBook?.edit) return
-    const id = coverBook.book.id, { title, author, intro } = coverBook.edit
+    const id = coverBook.book.id, { title, author, intro, shelf } = coverBook.edit
     if (!String(title || '').trim()) { showToast('书名不能空着'); return }
     try {
       const r = await saveBookMeta(cfg, id, { title, author, intro })
       const patch = { title: r.title, author: r.author, intro: r.intro }
+      // 1105：放哪层也在这里改（她发现《人生海海》放错在正经层）
+      if (shelf != null && shelf !== (coverBook.book.shelf || '')) { await saveBookShelf(cfg, id, shelf); patch.shelf = shelf }
       setBooks((list) => (list || []).map((b) => b.id === id ? { ...b, ...patch } : b))
       setCoverBook((cur) => cur && cur.book.id === id ? { ...cur, book: { ...cur.book, ...patch }, edit: null } : cur)
       showToast('改好了')
@@ -1254,6 +1256,15 @@ export default function BookRead({ onClose }) {
                         onChange={(e) => setCoverBook((cur) => ({ ...cur, edit: { ...cur.edit, author: e.target.value } }))} /></label>
                       <label>简介<textarea rows={3} value={coverBook.edit.intro} maxLength={2000}
                         onChange={(e) => setCoverBook((cur) => ({ ...cur, edit: { ...cur.edit, intro: e.target.value } }))} /></label>
+                      <div className="bookread-spine-row">
+                        <span className="bookread-foot-hint">放哪层</span>
+                        <div className="bookread-author-toggle">
+                          {SHELF_ORDER.map((s) => (
+                            <button key={s} type="button" className={(coverBook.edit.shelf || '') === s ? 'active' : ''}
+                              onClick={() => setCoverBook((cur) => ({ ...cur, edit: { ...cur.edit, shelf: s } }))}>{s}</button>
+                          ))}
+                        </div>
+                      </div>
                       <div className="bookread-cover-actions">
                         <button className="roost-btn" onClick={saveMeta}>保存</button>
                         <button className="roost-btn ghost" onClick={() => setCoverBook((cur) => ({ ...cur, edit: null }))}>算了</button>
@@ -1264,7 +1275,7 @@ export default function BookRead({ onClose }) {
                     <button className="roost-btn" onClick={() => { const bk = b; setCoverBook(null); openBook(bk) }}>翻开</button>
                     <button className="roost-btn ghost" onClick={() => coverFileRef.current?.click()}>{coverBook.image ? '换一张' : '换封面'}</button>
                     {coverBook.image && <button className="roost-btn ghost" onClick={dropCover}>换回画的</button>}
-                    <button className="roost-btn ghost" onClick={() => setCoverBook((cur) => ({ ...cur, edit: { title: b.title || '', author: b.author || '', intro: b.intro || '' } }))}>改信息</button>
+                    <button className="roost-btn ghost" onClick={() => setCoverBook((cur) => ({ ...cur, edit: { title: b.title || '', author: b.author || '', intro: b.intro || '', shelf: b.shelf || '' } }))}>改信息</button>
                   </div>
                   )}
                   <input ref={coverFileRef} type="file" accept="image/*" hidden onChange={pickCover} />
