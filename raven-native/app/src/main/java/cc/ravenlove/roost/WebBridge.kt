@@ -135,6 +135,10 @@ class WebBridge(private val activity: MainActivity) {
     @JavascriptInterface
     fun peekPermission(): Boolean = PeekService.hasPermission()
 
+    // 1105：给过 adb 那条授权的话，窗被系统停了壳会自己重开
+    @JavascriptInterface
+    fun peekCanSelfHeal(): Boolean = PeekService.canSelfHeal(activity)
+
     @JavascriptInterface
     fun openPeekSettings() {
         activity.runOnUiThread {

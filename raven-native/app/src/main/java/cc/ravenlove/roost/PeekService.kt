@@ -33,12 +33,38 @@ class PeekService : AccessibilityService() {
         fun setEnabled(ctx: Context, on: Boolean) = ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putBoolean(KEY_ON, on).apply()
         fun hasPermission() = instance != null
 
+        // 1105：vivo 一天停了两回无障碍（11-04 17:53、22:03），电量健康、没关机。多半是后台清理把壳强行停止了，
+        // 安卓对被强停的 app 会把它的无障碍从「已开启」名单里摘掉。她在电脑上用 adb 给过一次 WRITE_SECURE_SETTINGS 的话，
+        // 壳就能自己把名字写回去，不用她每次去设置里点。没给过就什么也不做，照旧报 noperm。
+        fun canSelfHeal(ctx: Context) =
+            ctx.checkSelfPermission("android.permission.WRITE_SECURE_SETTINGS") == android.content.pm.PackageManager.PERMISSION_GRANTED
+
+        fun selfHeal(ctx: Context): Boolean {
+            if (instance != null || !isEnabled(ctx) || !canSelfHeal(ctx)) return false
+            return try {
+                val me = android.content.ComponentName(ctx, PeekService::class.java).flattenToString()
+                val cr = ctx.contentResolver
+                val cur = android.provider.Settings.Secure.getString(cr, android.provider.Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES) ?: ""
+                val list = cur.split(':').filter { it.isNotBlank() }
+                if (list.none { it.equals(me, true) }) {
+                    android.provider.Settings.Secure.putString(cr, android.provider.Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES, (list + me).joinToString(":"))
+                }
+                android.provider.Settings.Secure.putInt(cr, android.provider.Settings.Secure.ACCESSIBILITY_ENABLED, 1)
+                true
+            } catch (_: Exception) { false }
+        }
+
         // FCM 收到敲门时调。不管成没成，都回桥一声
         fun knock(ctx: Context, id: String) {
             val app = ctx.applicationContext
             when {
                 !isEnabled(app) -> report(app, id, "off")
                 Build.VERSION.SDK_INT < Build.VERSION_CODES.R -> report(app, id, "old")
+                instance == null && selfHeal(app) -> Thread {
+                    // 写回去以后系统要一会儿才绑上服务，等它最多三秒
+                    for (i in 0 until 30) { if (instance != null) break; Thread.sleep(100) }
+                    if (instance == null) report(app, id, "noperm") else knock(app, id)
+                }.start()
                 instance == null -> report(app, id, "noperm")
                 !(app.getSystemService(PowerManager::class.java).isInteractive) ||
                     app.getSystemService(KeyguardManager::class.java).isKeyguardLocked -> report(app, id, "locked")

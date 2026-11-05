@@ -4541,6 +4541,12 @@ if (window.RoostNative && typeof window.RoostNative.peekEnabled === 'function') 
       ? '权限：已开 ✓'
       : '<span class="bad">权限：还没开。</span>点「去开权限」→ 在无障碍里找「归巢 · 窗」打开。<br>要是那一项是灰的点不了：先到 设置 → 应用 → 归巢 → 右上角 ⋮ →「允许受限制的设置」，再回来开。'
     document.getElementById('peek-perm-btn').hidden = perm
+    // 1105：给过 adb 授权的壳，被系统停了会自己重开
+    let heal = null
+    try { if (typeof N.peekCanSelfHeal === 'function') heal = N.peekCanSelfHeal() } catch {}
+    if (heal !== null) document.getElementById('peek-perm').insertAdjacentHTML('beforeend', heal
+      ? '<br>被系统停了会自己重开 ✓'
+      : '<br><span class="bad">被系统停了还不会自己重开</span>（要在电脑上给一次 adb 授权，问阿言）')
   }
   document.getElementById('peek-tool').hidden = false
   document.getElementById('peek-btn').addEventListener('click', () => { document.getElementById('attach-menu').hidden = true; paint(); box.hidden = false })
