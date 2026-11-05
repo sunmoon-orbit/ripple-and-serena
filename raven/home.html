@@ -1260,7 +1260,15 @@ async function loadUsage() {
     else if (x.stale) notes.push('曜 · Codex 的数字是旧的，快照任务可能停了')
 
     // 1022 她：「额度那一块就砍得只剩你的……点击展开」——平时只露我的 5 小时和 7 天，其余收进「更多」
-    const mainN = (c.available ? (c.five_hour ? 1 : 0) + (c.seven_day ? 1 : 0) : 0)
+    let mainN = (c.available ? (c.five_hour ? 1 : 0) + (c.seven_day ? 1 : 0) : 0)
+    // 1105 她要的：语音（ElevenLabs）这个月剩多少字，跟我的两条一起露在外面
+    const el = d.eleven
+    if (el?.available && el.limit) {
+      const left = Math.max(0, el.limit - el.used)
+      rows.splice(mainN, 0, ugBar('语音 · ElevenLabs', el.used / el.limit * 100, el.reset_at ? (el.reset_at - Date.now()) / 1000 : null,
+        `<span class="ug-reset"> 剩 ${left.toLocaleString()} 字${el.stale ? '（旧数字）' : ''}</span>`))
+      mainN++
+    } else if (el?.error) notes.push('语音额度读不到：' + el.error)
     const more = rows.slice(mainN).join('') + (notes.length ? `<div class="ug-note">${notes.join('；')}</div>` : '')
     let open = false; try { open = localStorage.getItem('raven-home-usage-open') === '1' } catch {}
     bEl.innerHTML = (rows.slice(0, mainN).join('') || '<div class="ug-note">暂时没有可显示的额度</div>')

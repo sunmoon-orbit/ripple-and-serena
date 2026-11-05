@@ -168,6 +168,24 @@ function refreshDeepseekBalance() {
     .catch(e => { deepseekBalance = { ...deepseekBalance, stale: true, error: String(e.message || e).slice(0, 80) } })
 }
 refreshDeepseekBalance()
+// 1105 她要的：首页看语音（ElevenLabs）这个月还剩多少字。钥匙 1105 她给勾了 User→Read
+let elevenQuota = { available: false }
+let elevenCheckedAt = 0
+function refreshElevenQuota() {
+  if (Date.now() - elevenCheckedAt < 60 * 1000) return Promise.resolve()
+  elevenCheckedAt = Date.now()
+  let key = ''
+  try { key = (fs.readFileSync('/home/ripple/moon-memory/.env', 'utf8').match(/^ELEVENLABS_API_KEY=(.*)$/m) || [])[1]?.trim() || '' } catch {}
+  if (!key) { elevenQuota = { available: false, error: '没配密钥' }; return Promise.resolve() }
+  return fetch('https://api.elevenlabs.io/v1/user/subscription', { headers: { 'xi-api-key': key }, signal: AbortSignal.timeout(10000) })
+    .then(r => r.ok ? r.json() : Promise.reject(new Error('HTTP ' + r.status)))
+    .then(d => {
+      elevenQuota = { available: true, tier: d.tier || '', used: Number(d.character_count || 0), limit: Number(d.character_limit || 0),
+        reset_at: d.next_character_count_reset_unix ? d.next_character_count_reset_unix * 1000 : null, status: d.status || '', checked_at: new Date().toISOString() }
+    })
+    .catch(e => { elevenQuota = { ...elevenQuota, stale: true, error: String(e.message || e).slice(0, 80) } })
+}
+refreshElevenQuota()
 
 const THINK_ZH_FILE = path.join(__dirname, '.thinking-zh-cache.json')
 let thinkZhCache = null
@@ -1323,9 +1341,9 @@ const server = http.createServer((req, res) => {
   // 涟言和曜 · Codex 还剩多少额度（详见 usage.js：只读快照文件，不碰任何凭证）
   if (req.method === 'GET' && url.pathname === '/raven/usage') {
     // 等余额查回来再答，最多等 3.5 秒；查不回来就给上一次的
-    Promise.race([refreshDeepseekBalance(), new Promise(r => setTimeout(r, 3500))]).catch(() => {}).then(() => {
+    Promise.race([Promise.all([refreshDeepseekBalance(), refreshElevenQuota()]), new Promise(r => setTimeout(r, 3500))]).catch(() => {}).then(() => {
       res.writeHead(200, { 'Content-Type': 'application/json' })
-      res.end(JSON.stringify({ ...getUsage(), deepseek: deepseekBalance }))
+      res.end(JSON.stringify({ ...getUsage(), deepseek: deepseekBalance, eleven: elevenQuota }))
     })
     return
   }
