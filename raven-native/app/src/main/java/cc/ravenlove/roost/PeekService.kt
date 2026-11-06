@@ -39,16 +39,23 @@ class PeekService : AccessibilityService() {
         fun canSelfHeal(ctx: Context) =
             ctx.checkSelfPermission("android.permission.WRITE_SECURE_SETTINGS") == android.content.pm.PackageManager.PERMISSION_GRANTED
 
-        fun selfHeal(ctx: Context): Boolean {
+        // 1106 第一次真被停，自愈没救回来（14:26 报 noperm）。猜是名字还留在名单里、只是没绑上：
+        // 那样只写一遍名单等于没改，系统不会重新绑。所以 toggle=true 时，名单里已有就先摘掉再写回去，逼它重绑。
+        // toggle 会 sleep，只在后台线程用（敲门那条路）；onResume 那条在主线程，照旧不 toggle。
+        fun selfHeal(ctx: Context, toggle: Boolean = false): Boolean {
             if (instance != null || !isEnabled(ctx) || !canSelfHeal(ctx)) return false
             return try {
                 val me = android.content.ComponentName(ctx, PeekService::class.java).flattenToString()
                 val cr = ctx.contentResolver
-                val cur = android.provider.Settings.Secure.getString(cr, android.provider.Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES) ?: ""
-                val list = cur.split(':').filter { it.isNotBlank() }
-                if (list.none { it.equals(me, true) }) {
-                    android.provider.Settings.Secure.putString(cr, android.provider.Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES, (list + me).joinToString(":"))
+                val key = android.provider.Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES
+                val cur = android.provider.Settings.Secure.getString(cr, key) ?: ""
+                val others = cur.split(':').filter { it.isNotBlank() && !it.equals(me, true) }
+                val listed = others.size != cur.split(':').count { it.isNotBlank() }
+                if (listed && toggle) {
+                    android.provider.Settings.Secure.putString(cr, key, others.joinToString(":"))
+                    Thread.sleep(500)
                 }
+                if (!listed || toggle) android.provider.Settings.Secure.putString(cr, key, (others + me).joinToString(":"))
                 android.provider.Settings.Secure.putInt(cr, android.provider.Settings.Secure.ACCESSIBILITY_ENABLED, 1)
                 true
             } catch (_: Exception) { false }
@@ -60,10 +67,11 @@ class PeekService : AccessibilityService() {
             when {
                 !isEnabled(app) -> report(app, id, "off")
                 Build.VERSION.SDK_INT < Build.VERSION_CODES.R -> report(app, id, "old")
-                instance == null && selfHeal(app) -> Thread {
-                    // 写回去以后系统要一会儿才绑上服务，等它最多三秒
-                    for (i in 0 until 30) { if (instance != null) break; Thread.sleep(100) }
-                    if (instance == null) report(app, id, "noperm") else knock(app, id)
+                instance == null && canSelfHeal(app) -> Thread {
+                    // 写回去以后系统要一会儿才绑上服务，等它最多六秒；还不行就报 healfail，跟「根本没给过权限」分开
+                    val tried = selfHeal(app, toggle = true)
+                    for (i in 0 until 60) { if (instance != null) break; Thread.sleep(100) }
+                    if (instance != null) knock(app, id) else report(app, id, if (tried) "healfail" else "noperm")
                 }.start()
                 instance == null -> report(app, id, "noperm")
                 !(app.getSystemService(PowerManager::class.java).isInteractive) ||
