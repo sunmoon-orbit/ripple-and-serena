@@ -249,7 +249,7 @@
   #remark-his { margin-top: 10px; font-size: 12.5px; color: var(--text-dim); }
   #remark-save { background: var(--accent); border-color: var(--accent); color: #fff; }
   /* 聊天里的一行小字：「你将对方的备注从「…」改为「…」」 */
-  .chat-notice { align-self: center; max-width: 82%; margin: 8px auto; font-size: 11.5px; line-height: 1.5; text-align: center; color: var(--text-dim); opacity: .85; overflow-wrap: anywhere; text-shadow: 0 0 6px var(--bg); }   /* 1007 她：不要圈起来，只留字更干净。字底下一圈同底色的晕，压在壁纸上也看得清 */
+  .chat-notice { align-self: center; max-width: 82%; margin: 8px auto; font-size: 11.5px; line-height: 1.5; text-align: center; color: var(--notice-text, var(--text-dim)); opacity: .9; overflow-wrap: anywhere; text-shadow: 0 0 3px var(--bg), 0 0 7px var(--bg), 0 0 12px var(--bg); }   /* 1106 她换了深棕底＋深咖啡正文，提醒字糊在壁纸上：颜色改走 --notice-text（自调色时按底色深浅自动挑），晕加厚两层 */   /* 1007 她：不要圈起来，只留字更干净。字底下一圈同底色的晕，压在壁纸上也看得清 */
   #header-title .crow-icon { font-size: 20px; line-height: 1; }
   #home-btn { display: flex; align-items: center; color: var(--text); opacity: .7; padding: 6px 4px; margin-left: -4px; -webkit-tap-highlight-color: transparent; }
   #home-btn:active { opacity: 1; }
@@ -413,7 +413,7 @@
   /* 1023：她画的竖长条表情包撑得太高（她：「画的稍微有点大」）。所有贴图都限高，竖的就窄一点，跟方的看着一样大 */
   .msg-body img[src*="/raven/stickers/"] { max-height: 170px; width: auto; object-fit: contain; }
   .msg-body audio.voice-attach { display: block; width: 240px; max-width: 100%; height: 40px; margin: 4px 0; }
-  .msg.system { align-self: center; font-size: 12px; color: var(--text-dim); background: none; padding: 2px 0; }
+  .msg.system { align-self: center; font-size: 12px; color: var(--notice-text, var(--text-dim)); background: none; padding: 2px 0; text-shadow: 0 0 3px var(--bg), 0 0 8px var(--bg); }
 
   @keyframes msgIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
 
@@ -6185,7 +6185,7 @@ try { const r = localStorage.getItem('raven-bubble-radius'); if (r !== null) doc
 const PAL_FIELDS = [
   ['background', '页面底色'], ['accent', '强调色'], ['userBubble', '我的气泡'], ['assistantBubble', '他的气泡'], ['text', '正文文字'],
 ]
-const PAL_VARS = ['--bg', '--surface', '--border', '--text', '--text-dim', '--accent', '--terminal-bg', '--terminal-text',
+const PAL_VARS = ['--bg', '--surface', '--border', '--text', '--text-dim', '--notice-text', '--accent', '--terminal-bg', '--terminal-text',
   '--bubble-user-bg', '--bubble-user-text', '--bubble-user-border', '--bubble-user-shadow', '--bubble-user-link', '--bubble-user-code', '--bubble-user-selection',
   '--bubble-assistant-bg', '--bubble-assistant-text', '--bubble-assistant-border', '--bubble-assistant-shadow', '--bubble-assistant-link', '--bubble-assistant-code', '--bubble-assistant-selection']
 const palHex = v => /^#[0-9a-f]{6}$/i.test(v || '') ? v.toLowerCase() : null
@@ -6194,6 +6194,7 @@ const palToHex = c => '#' + c.map(x => Math.round(Math.max(0, Math.min(255, x)))
 const palMix = (a, b, t) => a.map((x, i) => x + (b[i] - x) * t)
 const palLum = c => { const [r, g, b] = c.map(x => { x /= 255; return x <= 0.03928 ? x / 12.92 : ((x + 0.055) / 1.055) ** 2.4 }); return 0.2126 * r + 0.7152 * g + 0.0722 * b }
 const palReadable = c => palLum(c) > 0.42 ? '#2c2830' : '#f6f2ee'
+const palContrast = (a, b) => { const [x, y] = [palLum(a), palLum(b)].sort((m, n) => n - m); return (x + 0.05) / (y + 0.05) }
 // 第一次打开时，从眼下这套主题里取色当起点，不从一套陌生的颜色开始
 function palFromCurrent() {
   const cs = getComputedStyle(document.documentElement)
@@ -6224,6 +6225,8 @@ function palApply(cfg) {
   const v = {
     '--bg': palToHex(bg), '--surface': palToHex(palMix(bg, tx, dark ? 0.07 : 0.05)), '--border': `rgba(${t},.14)`,
     '--text': palToHex(tx), '--text-dim': palToHex(palMix(tx, bg, 0.45)), '--accent': palToHex(ac),
+    // 系统提醒压在壁纸上，正文色跟底色太近（1106 她那套深棕底＋深咖啡字只有 2:1）就不跟正文走，换跟底色反着的浅/深色
+    '--notice-text': palContrast(tx, bg) >= 4.5 ? palToHex(palMix(tx, bg, 0.45)) : palToHex(palMix(palRgb(palReadable(bg)), bg, 0.15)),
     '--terminal-bg': palToHex(palMix(bg, tx, 0.05)), '--terminal-text': palToHex(tx),
     '--bubble-user-bg': `linear-gradient(140deg, ${palToHex(us)}, ${palToHex(palMix(us, ac, 0.22))})`,
     '--bubble-user-text': palReadable(us), '--bubble-user-border': palToHex(palMix(us, tx, 0.1)),
