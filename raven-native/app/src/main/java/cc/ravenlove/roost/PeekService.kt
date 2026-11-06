@@ -61,6 +61,14 @@ class PeekService : AccessibilityService() {
             } catch (_: Exception) { false }
         }
 
+        // 1106 晚上又掉了一回，她打开 app 也没好：onResume 那条不 toggle，名单在、服务没绑的情况救不回来。
+        // 改成凡是醒着的入口（打开 app、收到任何推送、开机）都在后台线程 toggle 一次；已经绑着就什么都不做。
+        fun healAsync(ctx: Context) {
+            val app = ctx.applicationContext
+            if (instance != null || !isEnabled(app) || !canSelfHeal(app)) return
+            Thread { selfHeal(app, toggle = true) }.start()
+        }
+
         // FCM 收到敲门时调。不管成没成，都回桥一声
         fun knock(ctx: Context, id: String) {
             val app = ctx.applicationContext
