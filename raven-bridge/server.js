@@ -854,7 +854,7 @@ function peekClean() {
 }
 function ravenPeekStart() {
   const h = new Date(Date.now() + 8 * 3600e3).getUTCHours()
-  if (h >= 23 || h < 7) return peekTell('【窗·没敲】现在是北京夜里（23–7 点），按你自己定的分寸不看。'), 'night'
+  if (h >= 23 || h < 7) return peekTell('【窗·没敲】现在是东八区夜里（23–7 点），按你自己定的分寸不看。'), 'night'
   if (ravenPeek) return 'busy'
   const st = peekState(); if (st.day !== bjDay()) { st.day = bjDay(); st.count = 0 }
   if (st.count >= PEEK_MAX_PER_DAY) return peekTell(`【窗·没敲】今天已经看过 ${st.count} 次了，按你自己定的一天最多 ${PEEK_MAX_PER_DAY} 次，不看了。`), 'cap'

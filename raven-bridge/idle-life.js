@@ -35,7 +35,7 @@ function realSleepTimes(snapshot) {
     minute: '2-digit',
     hourCycle: 'h23',
   }).format(date)
-  return `、入睡${fmt(start)}、醒来${fmt(end)}（北京时间）`
+  return `、入睡${fmt(start)}、醒来${fmt(end)}（东八区）`
 }
 
 // 随机 0-40 分钟，别每次整点醒，像自然睡醒
