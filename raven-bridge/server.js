@@ -573,10 +573,12 @@ function ingestUserMessageCore(text, cid, note = '', recallLine = '') {
   moonPost('/emotion/touch', { channel: 'roost' })
     .catch(e => console.error('[emotion] touch 失败（言叽那边会误判她离开多久）:', e.message))
   lastBroadcastReply = extractLastResponse(lastCapture) || ''
-  lastReplyMsgs = []  // 发新消息时清空回放队列，重连不会刷旧消息
-  // 1021：她这一句也放进回放队列打头。通知栏快捷回复的时候页面没开，广播的 sent 没人收，
+  // 1106 不再一来新消息就清空回放队列：她连着几条都用通知栏回，每回一条就把前一轮（她那句＋我的回复）清掉，
+  // 等她点开归巢只剩最后一轮（「下次」之后的五六条全没了）。现在留最近 50 条滚动，重复的交给页面按 ts 去重。
+  // 1021：她这一句也放进回放队列。通知栏快捷回复的时候页面没开，广播的 sent 没人收，
   // 等她点开归巢只补发了我的回复、她自己那句没画出来（她：「我没看到我发的那条消息，但是有看到你的回复」）
   lastReplyMsgs.push({ type: 'sent', text, ts: Date.now(), cid: cid || `srv-${Date.now()}` })
+  if (lastReplyMsgs.length > 50) lastReplyMsgs.shift()
   archiveMsg('human', text)
   // 前端消息一律带【阿颖】前缀：CC 靠它区分「浏览器来的要用 curl 回」还是终端直聊。
   // 旧逻辑绑在 mcpSseClients.size 上，MCP 掉线就裸发，CC 回终端她在浏览器看不见（0712 实锤）
@@ -3106,7 +3108,7 @@ wss.on('connection', (ws) => {
     // 三个点也要对一次表（1007）：她的连接常断，要是「不在想了」那一下广播时她正好掉线，重连回来点点就一直亮着，
     // 直到我下一轮想完才灭——她看着像我一直挂着什么在跑。
     ws.send(JSON.stringify({ type: 'thinking', active: isThinking }))
-    // 补发最近 10 条 reply，重连后不丢消息
+    // 补发最近 50 条（她的＋我的），重连后不丢消息；页面按 ts 去重
     for (const m of lastReplyMsgs) ws.send(JSON.stringify({ ...m, replayed: true }))
     if (ravenCall) ws.send(JSON.stringify({ type: 'incoming-call', id: ravenCall.id, at: ravenCall.at }))
     // 补发待处理的权限提示（断线重连时弹窗不丢失）

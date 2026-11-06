@@ -2878,9 +2878,9 @@ function connect() {
       else if (msg.type === 'call-hangup') { if (callActive) closeCall('ai') }
       else if (msg.type === 'reply') {
         // 有 id 的回复不管是不是补发，见过就不再画（兜底：万一又有两条连接同时收）
-        const alreadyShown = msg.id ? shownMsgIds.has(msg.id) : msg.replayed && (
-          chatHistory.length && chatHistory[chatHistory.length - 1].text === msg.text && chatHistory[chatHistory.length - 1].role === 'assistant'
-        )
+        // 1106 回放队列不再清空，补发的可能是好几轮以前的：在最近的历史里按原时间戳（或同文同十分钟内）找，画过就跳过
+        const alreadyShown = (msg.id && shownMsgIds.has(msg.id)) || (msg.replayed && chatHistory.slice(-150).some(h => h.role === 'assistant' &&
+          ((msg.ts && h.ts === msg.ts) || (h.text === msg.text && (!msg.ts || !h.ts || Math.abs(h.ts - msg.ts) < 600000)))))
         if (msg.id && !msg.replayed) shownMsgIds.add(msg.id)
         if (!alreadyShown) {
           if (msg.id) shownMsgIds.add(msg.id)
