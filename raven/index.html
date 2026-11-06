@@ -763,13 +763,28 @@
   #note-btn { background: none; border: none; cursor: pointer; padding: 6px 4px; color: var(--text-dim); flex-shrink: 0; align-self: flex-end; line-height: 0; touch-action: none; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
   #note-btn.rec { color: var(--accent); transform: scale(1.15); }
   #note-btn.busy { opacity: .45; }
-  #note-rec { position: fixed; left: 50%; bottom: 96px; transform: translateX(-50%); z-index: 60; display: flex; align-items: center; gap: 10px; padding: 10px 18px; border-radius: 99px; background: var(--card, #222); color: var(--text); box-shadow: 0 6px 24px rgba(0,0,0,.25); font-size: 14px; pointer-events: none; white-space: nowrap; }
+  /* 1106 她：「还是一个系统黑色的椭圆长框」——原来读的 --card 哪套主题都没定义，回落成 #222。改跟主题走：半透明面板＋毛玻璃＋强调色的实时音量条 */
+  #note-rec { position: fixed; left: 50%; bottom: 96px; transform: translateX(-50%); z-index: 60; display: flex; align-items: center; gap: 12px; padding: 10px 16px 10px 14px; border-radius: 99px;
+    background: color-mix(in srgb, var(--surface, #2a2a30) 92%, transparent); -webkit-backdrop-filter: blur(16px) saturate(1.2); backdrop-filter: blur(16px) saturate(1.2);
+    border: 1px solid color-mix(in srgb, var(--accent) 35%, var(--border, transparent)); color: var(--text);
+    box-shadow: 0 10px 30px rgba(0,0,0,.22), 0 0 0 4px color-mix(in srgb, var(--accent) 10%, transparent); font-size: 14px; pointer-events: none; white-space: nowrap; animation: noteIn .18s ease-out; }
+  @keyframes noteIn { from { opacity: 0; transform: translate(-50%, 8px) scale(.96) } to { opacity: 1; transform: translateX(-50%) } }
+  #note-rec .note-lvl { display: inline-flex; align-items: center; gap: 3px; height: 22px; }
+  #note-rec .note-lvl i { display: block; width: 3px; height: 22px; border-radius: 3px; background: var(--accent); transform: scaleY(.18); transform-origin: center; transition: transform .08s linear; }
+  #note-rec #note-hint { opacity: .7; font-size: 12.5px; }
+  #note-rec.sending .note-dot, #note-rec.sending #note-time { display: none; }
+  #note-rec.sending .note-lvl i { animation: noteWait 1s ease-in-out infinite; }
+  #note-rec.sending .note-lvl i:nth-child(2) { animation-delay: .1s } #note-rec.sending .note-lvl i:nth-child(3) { animation-delay: .2s }
+  #note-rec.sending .note-lvl i:nth-child(4) { animation-delay: .3s } #note-rec.sending .note-lvl i:nth-child(5) { animation-delay: .4s }
+  #note-rec.sending .note-lvl i:nth-child(6) { animation-delay: .5s } #note-rec.sending .note-lvl i:nth-child(7) { animation-delay: .6s }
+  @keyframes noteWait { 0%, 100% { transform: scaleY(.2) } 50% { transform: scaleY(.75) } }
   #note-rec[hidden] { display: none; }
   #note-rec #note-x { display: none; border: 0; background: color-mix(in srgb, currentColor 15%, transparent); color: inherit; width: 26px; height: 26px; border-radius: 50%; font-size: 12px; cursor: pointer; }
   #note-rec.tap { pointer-events: auto; }
   #note-rec.tap #note-x { display: inline-grid; place-items: center; }
-  #note-rec .note-dot { width: 9px; height: 9px; border-radius: 50%; background: #e0524a; animation: noteBlink 1s infinite; }
-  #note-rec.cancel { background: #b9483f; color: #fff; }
+  #note-rec .note-dot { width: 8px; height: 8px; border-radius: 50%; background: #e0524a; box-shadow: 0 0 0 3px rgba(224,82,74,.18); animation: noteBlink 1s infinite; }
+  #note-rec.cancel { background: color-mix(in srgb, #b9483f 88%, transparent); border-color: #b9483f; color: #fff; }
+  #note-rec.cancel .note-lvl i { background: #fff; }
   #note-rec #note-time { font-variant-numeric: tabular-nums; font-weight: 600; }
   @keyframes noteBlink { 50% { opacity: .25; } }
   .vnote-bar { display: flex; align-items: center; gap: 8px; border: 0; background: none; color: inherit; font: inherit; padding: 2px 0; cursor: pointer; min-width: 90px; }
@@ -1731,7 +1746,7 @@
       </button><span>搬家</span></div>
     </div>
     <div id="sticker-picker"></div>
-    <div id="note-rec" hidden><span class="note-dot"></span><span id="note-time">0:00</span><span id="note-hint">松开发送 · 上滑取消</span><button id="note-x" type="button" aria-label="取消">✕</button></div>
+    <div id="note-rec" hidden><span class="note-dot"></span><span class="note-lvl"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span><span id="note-time">0:00</span><span id="note-hint">松开发送 · 上滑取消</span><button id="note-x" type="button" aria-label="取消">✕</button></div>
     <div id="note-prev" hidden></div>
     <div id="chat-input-row">
       <button id="attach-btn" aria-label="更多">
@@ -5265,9 +5280,30 @@ async function noteStart(y) {
   n.rec.ondataavailable = e => { if (e.data && e.data.size) n.chunks.push(e.data) }
   n.rec.onstop = () => noteFinish(n)
   n.rec.start(); n.t0 = Date.now()
-  noteRec.hidden = false; noteRec.classList.remove('cancel')
+  noteRec.hidden = false; noteRec.classList.remove('cancel', 'sending')
+  noteLevels(n)
   if (!n.tap) { noteRec.classList.remove('tap'); document.getElementById('note-hint').textContent = '松开发送 · 上滑取消' }
   noteTick(n); n.timer = setInterval(() => noteTick(n), 250)
+}
+// 1106：音量条跟着她的声音跳（读麦克风的实时音量），不是假动画
+function noteLevels(n) {
+  try {
+    const ac = new (window.AudioContext || window.webkitAudioContext)()
+    const an = ac.createAnalyser(); an.fftSize = 256
+    ac.createMediaStreamSource(n.stream).connect(an)
+    n.ac = ac
+    const buf = new Uint8Array(an.fftSize), bars = [...noteRec.querySelectorAll('.note-lvl i')]
+    const loop = () => {
+      if (note !== n) return
+      an.getByteTimeDomainData(buf)
+      let sum = 0; for (const v of buf) { const d = (v - 128) / 128; sum += d * d }
+      const lvl = Math.min(1, Math.sqrt(sum / buf.length) * 5)
+      const t = Date.now() / 140
+      bars.forEach((b, i) => { const w = .4 + .6 * Math.sin(t + i * 1.3) ** 2; b.style.transform = `scaleY(${(.18 + lvl * w * .82).toFixed(3)})` })
+      n.raf = requestAnimationFrame(loop)
+    }
+    loop()
+  } catch {}
 }
 function noteTick(n) {
   const s = Math.floor((Date.now() - n.t0) / 1000)
@@ -5281,6 +5317,9 @@ function noteStop(cancel) {
 }
 async function noteFinish(n) {
   clearInterval(n.timer)
+  if (n.raf) cancelAnimationFrame(n.raf)
+  try { n.ac && n.ac.close() } catch {}
+  noteRec.querySelectorAll('.note-lvl i').forEach(b => b.style.transform = '')
   n.stream.getTracks().forEach(t => t.stop())
   noteRec.hidden = true; noteRec.classList.remove('tap'); noteBtn.classList.remove('rec')
   if (note === n) note = null
@@ -5303,6 +5342,9 @@ function noteAuth() { return { Authorization: 'Bearer ' + (localStorage.getItem(
 async function noteSend(blob, ext, sec, stt) {
   const up = new FormData(); up.append('file', blob, `voice.${ext}`)
   noteBtn.classList.add('busy')
+  // 1106：松手以后上传＋转写那几秒也给她看着（原来只有按钮暗一下，她以为卡了）
+  noteRec.classList.add('sending'); noteRec.classList.remove('tap', 'cancel'); noteRec.hidden = false
+  document.getElementById('note-hint').textContent = '正在转成文字…'
   try {
     const [u, t] = await Promise.all([fetch(UPLOAD_URL, { method: 'POST', headers: noteAuth(), body: up }).then(r => r.json()), stt])
     if (!u || !u.path) throw new Error('录音没传上去')
@@ -5315,7 +5357,7 @@ async function noteSend(blob, ext, sec, stt) {
     sendMsg(q + `【语音条·${sec}秒】${words}` + (heard.length ? `\n〔机器听到：${heard.join('、')}〕` : '') + `\n[附件: ${u.path}]`)
   } catch (e) {
     showVoiceError('语音条没发出去：' + (e.message || '再试一次'))
-  } finally { noteBtn.classList.remove('busy') }
+  } finally { noteBtn.classList.remove('busy'); if (!note) { noteRec.hidden = true; noteRec.classList.remove('sending') } }
 }
 // 预览：能回放、看转出来的字，再决定发还是扔
 function notePreview(blob, ext, sec, stt) {
