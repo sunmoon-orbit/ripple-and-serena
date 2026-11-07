@@ -843,7 +843,8 @@ function MessageBubble({ msg, onEdit, onQuote, onDelete, isLast, presentationCon
               )}
             </button>
           )}
-          {!isUser && (!isStreaming || presentationConfig?.crossing) && (presentationConfig?.enabled ?? moonMemory?.enabled) && (
+          {/* 1107：语音条模式下 vb-play 已经管播放，这里再放一个就重复了 */}
+          {!isUser && !voiceMode && (!isStreaming || presentationConfig?.crossing) && (presentationConfig?.enabled ?? moonMemory?.enabled) && (
             <div className={presentationConfig?.crossing ? 'crossing-speech' : undefined}>
               <SpeechButton status={ttsState} onClick={playTts} disabled={presentationConfig?.crossing ? !speech.available : false} error={speech.error} />
             </div>

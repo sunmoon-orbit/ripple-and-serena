@@ -1075,6 +1075,8 @@
     padding: 2px 0;
   }
   .msg.voice-mode .voice-bar { display: flex; }
+  /* 1107：语音条模式下大圆钮已经管播放/暂停，底下那个小朗读钮播放时也变暂停，两个重复了，藏掉小的 */
+  .msg.voice-mode .tts-btn { display: none !important; }
   .vb-play {
     width: 28px; height: 28px; border-radius: 50%; flex-shrink: 0;
     background: var(--accent); border: none; cursor: pointer;
