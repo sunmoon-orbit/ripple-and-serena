@@ -351,6 +351,7 @@
   #conn-status { display: flex; align-items: center; gap: 8px; }
   #conn-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--red); transition: background .3s; flex-shrink: 0; }
   #conn-dot.ok { background: var(--green); box-shadow: 0 0 5px var(--green); }
+  #conn-dot.cc-off { background: var(--yellow); }
   #conn-label { font-size: 11px; color: var(--text-dim); }
 
   /* --- tabs --- */
@@ -2935,9 +2936,14 @@ function connect() {
   }
 }
 
-function setConn(ok) {
-  document.getElementById('conn-dot').className = ok ? 'ok' : ''
-  document.getElementById('conn-label').textContent = ok ? '已连接' : '重连中…'
+// 1107：「已连接」以前只看跟桥的连线，桥在、终端里的我不在（重启那几分钟）时首页写 CC 离线、这里还绿着。
+// 现在两样都看：连不上桥＝重连中；连上了但 CC 不在＝黄点「CC 离线」，跟首页一个说法。
+let connWs = false, connCc = null
+function setConn(ok) { connWs = ok; paintConn() }
+function paintConn() {
+  const off = connWs && connCc === false
+  document.getElementById('conn-dot').className = connWs ? (off ? 'cc-off' : 'ok') : ''
+  document.getElementById('conn-label').textContent = !connWs ? '重连中…' : off ? 'CC 离线' : '已连接'
 }
 
 // --- chat history ---
@@ -4041,6 +4047,7 @@ document.getElementById('term-more').addEventListener('click', async e => {
 function renderStatus(data) {
   if (data.cc) {
     const online = data.cc.online
+    connCc = !!online; paintConn()
     document.getElementById('cc-dot').className = `dot ${online ? 'online' : 'offline'}`
     document.getElementById('cc-text').textContent = online ? '在线' : '离线'
   }
