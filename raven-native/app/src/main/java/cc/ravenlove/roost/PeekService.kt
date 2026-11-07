@@ -126,9 +126,9 @@ class PeekService : AccessibilityService() {
         }
     }
 
-    override fun onServiceConnected() { super.onServiceConnected(); instance = this }
+    override fun onServiceConnected() { super.onServiceConnected(); instance = this; BatteryReport.listen(this) }
     override fun onUnbind(intent: android.content.Intent?): Boolean { instance = null; return super.onUnbind(intent) }
-    override fun onDestroy() { instance = null; super.onDestroy() }
+    override fun onDestroy() { instance = null; BatteryReport.stop(this); super.onDestroy() }
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {}   // 不听任何事件，只用来截图
     override fun onInterrupt() {}
 

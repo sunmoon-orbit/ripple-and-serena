@@ -526,6 +526,7 @@ let rewindBusy = false
 const recall = require('./recall')
 const lotteryOnReturn = require('./lottery-on-return')
 const rareEcho = require('./rare-echo')
+const battery = require('./battery')   // 1107 她手机电量，见 battery.js
 let ingestChain = Promise.resolve()
 let pendingSurfaced = []   // 浮上来了、还没挂到我回复上的（1103）
 const SURFACED_LOG = path.join(__dirname, 'surfaced-log.jsonl')
@@ -550,7 +551,9 @@ function ingestUserMessage(text, cid, note = '') {
     try { echoLine = await rareEcho.echo(text, (p) => moonGet(p), Date.now(), surf) } catch (e) { console.error('[rare-echo]', e.message) }
     // 1103：真浮上来的攒着，挂到我下一条回复上（她说「应该是你那侧」「真的浮上来的我又没有看到」）
     for (const it of [surf.memory, surf.echo]) if (it) pendingSurfaced.push({ ...it, q: String(text).slice(0, 80), uts: Date.now() })
-    ingestUserMessageCore(text, cid, note, [extra, echoLine, ticket].filter(Boolean).join('\n'))
+    let batt = ''
+    try { batt = battery.lineForHerMessage() } catch {}
+    ingestUserMessageCore(text, cid, note, [extra, echoLine, ticket, batt].filter(Boolean).join('\n'))
   }).catch(e => console.error('[ingest]', e))
 }
 
@@ -880,6 +883,7 @@ const wakeMe = require('./wake-me').createWakeMe({
   lastMineTs: () => lastMineTs,
   inCall: () => !!ravenCall || (callOnSince && Date.now() - callOnSince < 3 * 3600e3),
   peeksLeft: () => { const st = peekState(); return Math.max(0, PEEK_MAX_PER_DAY - (st.day === bjDay() ? st.count : 0)) },
+  battery: () => { try { return battery.line() } catch { return '' } },
   log: (t) => console.log(t),
 })
 setInterval(() => { try { wakeMe.tick() } catch (e) { console.error('[wake]', e.message) } }, 5 * 60e3).unref()
@@ -2655,6 +2659,24 @@ const server = http.createServer((req, res) => {
       let p = {}; try { p = JSON.parse(body) } catch {}
       res.writeHead(200, { 'Content-Type': 'application/json' }); res.end(JSON.stringify(wakeMe.setEnabled(!!p.enabled)))
     })
+    return
+  }
+
+  // 1107 她手机电量：壳在插线／拔线／电量变化／被叫醒时报上来；我本机带钥匙来看
+  if (req.method === 'POST' && url.pathname === '/raven/battery') {
+    if (!ravenBearerValid(req)) { res.writeHead(401); res.end('{"error":"unauthorized"}'); return }
+    let body = ''
+    req.on('data', d => { body += d; if (body.length > 1000) req.destroy() })
+    req.on('end', () => {
+      let p = {}; try { p = JSON.parse(body) } catch {}
+      const s = battery.record(p)
+      res.writeHead(s ? 200 : 400, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ ok: !!s }))
+    })
+    return
+  }
+  if (req.method === 'GET' && url.pathname === '/raven/battery') {
+    if (!localWriteAuthed(req) && !ravenBearerValid(req)) { res.writeHead(401); res.end('{"error":"unauthorized"}'); return }
+    res.writeHead(200, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ ...battery.status(), line: battery.line() }))
     return
   }
 

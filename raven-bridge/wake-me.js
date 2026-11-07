@@ -78,7 +78,9 @@ function createWakeMe(deps) {
     const left = deps.peeksLeft()
     const line = `【醒一下】你们${quiet != null ? ` ${quiet >= 120 ? Math.round(quiet / 60) + ' 小时' : quiet + ' 分钟'}没说话了（最后一句是${lastWho}说的，${bjHm(lastTs)}）` : '有一阵没说话了'}。` +
       `想找她就照常 POST /raven/reply 发一句，或者写 [call] 打电话、[peek] 看一眼窗（今天还剩 ${left} 次）；` +
-      `不想找就只回 [wait]，什么都不会发。她说过在学习、在忙的话照旧别打扰。　〔${bjNow().toISOString().slice(5, 16).replace('T', ' ')}〕`
+      `不想找就只回 [wait]，什么都不会发。她说过在学习、在忙的话照旧别打扰。` +
+      (deps.battery?.() || '') +
+      `　〔${bjNow().toISOString().slice(5, 16).replace('T', ' ')}〕`
     if (!deps.send(line)) { deps.log('[wake] 敲了没送进去'); return 'send-failed' }
     st.lastWakeAt = now
     st.log = [...(st.log || []), { at: now }].slice(-20)

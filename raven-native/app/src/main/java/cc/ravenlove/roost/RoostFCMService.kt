@@ -30,6 +30,7 @@ class RoostFCMService : FirebaseMessagingService() {
         // 1106：每来一条推送（我的回复、闹钟、敲门……）壳都会被叫醒一下，顺手看窗还绑没绑着，没绑就重绑
         // 敲门那条自己会 toggle，这里不重复，免得两边同时摘名单打架
         if (message.data["type"] != "raven_peek") PeekService.healAsync(this)
+        BatteryReport.report(this, "push")   // 1107：被叫醒顺手报一下电量
         // 1022：我打给她。归巢正开在聊天页（网页自己会弹来电）就不响；否则前台服务响铃＋全屏来电
         if (message.data["type"] == "raven_call") {
             val id = message.data["callId"] ?: return
