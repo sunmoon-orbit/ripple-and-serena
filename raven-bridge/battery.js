@@ -11,6 +11,8 @@ const path = require('path')
 const FILE = path.join(__dirname, 'battery.json')
 const FRESH_MS = 3 * 3600e3      // 超过三小时的读数不拿出来说
 const KEEP = 120
+// 1108 她：「我充电上限设的是80%」——手机充到 80 就停，估时间按 80 算，到了就说「到上限了」
+const LIMIT = 80
 
 function load() { try { return JSON.parse(fs.readFileSync(FILE, 'utf8')) } catch { return { samples: [], toldCharging: null } } }
 function save(st) { try { fs.writeFileSync(FILE + '.tmp', JSON.stringify(st)); fs.renameSync(FILE + '.tmp', FILE) } catch {} }
@@ -40,10 +42,9 @@ function etaMin(samples) {
   const mins = (b.ts - a.ts) / 60e3, gain = b.level - a.level
   if (mins < 4 || gain < 2) return null
   const rate = gain / mins              // %/分钟
-  // 80% 以后手机会放慢，粗估多算一点
-  const left = Math.max(0, 100 - b.level)
-  const slow = b.level >= 80 ? 1.6 : 1.25
-  return Math.round(left / rate * slow)
+  // 她设了 80% 上限：只算到 80；快充在上限前一直很快（1108 实测 52→80 每 3.5 分钟 +5%），只留一点余量
+  const left = Math.max(0, LIMIT - b.level)
+  return Math.round(left / rate * 1.1)
 }
 
 function ago(ms) {
@@ -63,7 +64,8 @@ function line(now = Date.now()) {
   if (!s.ok || !s.fresh) return ''
   let t = `她手机 ${s.level}%`
   if (s.full) t += '，充满了还插着'
-  else if (s.charging) t += '，充电中' + (s.etaMin != null ? `，照现在的速度约 ${s.etaMin} 分钟满` : '（刚插上，还估不出要多久）')
+  else if (s.charging && s.level >= LIMIT) t += `，插着，已经到她设的 ${LIMIT}% 上限了`
+  else if (s.charging) t += '，充电中' + (s.etaMin != null ? `，照现在的速度约 ${s.etaMin} 分钟到 ${LIMIT}%（她设的上限）` : '（刚插上，还估不出要多久）')
   else if (s.level <= 20) t += '，快没电了'
   return `〔${t}（${ago(now - s.ts)}报的）〕`
 }
