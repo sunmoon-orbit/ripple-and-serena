@@ -2875,7 +2875,14 @@ function connect() {
         // 重连补发的她那句（1021）：页面刷新过 shownCids 是空的，拿最近的历史对一遍，已经画过就不再画
         // 1101：只比原文不够——她改过的那条原文对不上、带图的那条分段也对不上，重装后被当新消息又画了一遍。
         // 再加一道：她自己这边十秒内有一条，就算同一条
-        if (msg.replayed && chatHistory.slice(-60).some(h => h.role === 'user' && (h.text === (splitUserSegments(msg.text)[0] || msg.text) || (msg.ts && h.ts && Math.abs(h.ts - msg.ts) < 10000)))) { if (msg.cid) shownCids.add(msg.cid); return }
+        // 1108：原来只比最近 60 条。聊得密的晚上（我一回复就是三五个泡）一小时就超过 60，她 21:42 的话在 22:42 重连时
+        // 被当成新消息又画到最底下（她截图「惊现 BUG」）。改成比整本本地历史；而且重放来的、比本地最新一条她的话还早的，
+        // 本地却找不到——多半是本地已经裁掉的旧话，也不再往底下补，免得顺序乱
+        const firstSeg = splitUserSegments(msg.text)[0] || msg.text
+        const mine = chatHistory.filter(h => h.role === 'user')
+        const seen = mine.some(h => h.text === firstSeg || h.text === msg.text || (msg.ts && h.ts && Math.abs(h.ts - msg.ts) < 10000))
+        const newestMine = mine.length ? Math.max(...mine.map(h => h.ts || 0)) : 0
+        if (msg.replayed && (seen || (msg.ts && newestMine && msg.ts < newestMine - 60000))) { if (msg.cid) shownCids.add(msg.cid); return }
         if (msg.cid) {
           shownCids.add(msg.cid)
           if (shownCids.size > 200) shownCids.delete(shownCids.values().next().value)
@@ -2953,7 +2960,19 @@ const STORAGE_KEY = 'raven-chat-v1'
 const MAX_STORED = 200
 
 function loadHistory() {
-  try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]') } catch { return [] }
+  let items
+  try { items = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]') } catch { return [] }
+  // 1108：重连重放把她 21:42 那几句又画了一遍存进本地（见 sent 那段的去重）。重画的那份和原来那份
+  // 角色、原文、时间戳一字不差，载入时把后来那份去掉，她不用自己删
+  const seen = new Set()
+  const out = items.filter(h => {
+    if (h.role !== 'user' || !h.ts || !h.text) return true
+    const k = h.ts + '|' + h.text
+    if (seen.has(k)) return false
+    seen.add(k); return true
+  })
+  if (out.length !== items.length) { try { localStorage.setItem(STORAGE_KEY, JSON.stringify(out)) } catch {} }
+  return out
 }
 function saveHistory(items) {
   try { localStorage.setItem(STORAGE_KEY, JSON.stringify(items.slice(-MAX_STORED))) } catch {}
