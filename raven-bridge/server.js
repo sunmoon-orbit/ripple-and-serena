@@ -1996,6 +1996,23 @@ const server = http.createServer((req, res) => {
     res.end(JSON.stringify({ count: loadDrawer().filter(x => !x.seen_at).length }))
     return
   }
+  // 1109：本机脚本叫醒我用的（先是 vps-deal-watch）。只送一行【…】进终端，不进聊天、不推送。
+  // 她说：「你这个购买链接发一个通知，我从哪里点进去呢……到时候要真的有好的机子得先问你？」——推送只喊一声，我自己却收不到
+  if (url.pathname === '/raven/notice' && req.method === 'POST') {
+    if (isExternal(req) || !localWriteAuthed(req)) { res.writeHead(401); res.end('{}'); return }
+    let body = ''
+    req.on('data', d => { body += d; if (body.length > 20000) req.destroy() })
+    req.on('end', () => {
+      let ok = false
+      try {
+        const t = String(JSON.parse(body || '{}').text || '').trim()
+        if (t.startsWith('【')) ok = tmuxSend(t + `　〔${new Date(Date.now() + 8 * 3600e3).toISOString().slice(5, 16).replace('T', ' ')}〕`)
+      } catch {}
+      res.writeHead(200, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ ok }))
+    })
+    return
+  }
+
   if ((url.pathname === '/raven/drawer' || url.pathname === '/raven/drawer/seen') && req.method === 'POST') {
     const seen = url.pathname.endsWith('/seen')
     // 标已读是她的页面做的；往里放东西只有我能做
