@@ -32,8 +32,8 @@ test('crossing 40 upward queues one hint, delivered once, no repeat while still 
   emo.applyEmotionDelta({ g: -5 })   // 38：还没回落到 30 以下
   emo.applyEmotionDelta({ g: 6 })    // 44：再次越过 40，但没重新布防
   assert.equal(emo.peekEmotionHints().length, 0)
-  emo.applyEmotionDelta({ g: -20 })  // 24：回落重新布防
-  emo.applyEmotionDelta({ g: 20 })   // 44：再越过 → 再提醒一次
+  emo.applyEmotionDelta({ g: -8 }); emo.applyEmotionDelta({ g: -8 }); emo.applyEmotionDelta({ g: -8 })  // 每轮最多降 8 → 14，回落重新布防
+  emo.applyEmotionDelta({ g: 30 })   // 44：再越过 → 再提醒一次
   assert.equal(emo.peekEmotionHints().length, 1)
 })
 
@@ -64,4 +64,34 @@ test('undelivered hints survive until marked; time-away keeps hint state', () =>
   const r = emo.applyTimeAway(0)
   assert.ok(r.added > 0)
   assert.deepEqual(emo.peekEmotionHints().map(h => h.id), before.map(h => h.id))
+})
+
+test('negative drops are capped at 8 per turn; positive slots are not', () => {
+  reset({ anger: 60, joy: 60 })
+  const st = emo.applyEmotionDelta({ a: -30, j: -30 })
+  assert.equal(Math.round(st.slots.anger), 52)
+  assert.equal(Math.round(st.slots.joy), 30)
+})
+
+test('release halves a negative slot once per 6 hours, second try becomes a note', () => {
+  reset({ grievance: 60 })
+  let st = emo.applyEmotionDelta({ r: 'g' })
+  assert.equal(Math.round(st.slots.grievance), 30)
+  st = emo.applyEmotionDelta({ r: ['g'] })
+  assert.equal(Math.round(st.slots.grievance), 30)
+  assert.match(emo.buildEmotionPrompt(emo.peekEmotionHints()), /上次没生效：委屈6 小时内已经释放过一次/)
+})
+
+test('unknown keys and broken tags are reported next turn instead of dropped silently', () => {
+  reset()
+  emo.applyEmotionDelta({ zz: 5 })
+  const bad = emo.extractEmotionUpdate('嗯<es>{"a":+5,}</es>')
+  assert.equal(bad.clean, '嗯')
+  assert.ok(bad.error)
+  emo.noteEmotionError(bad.error)
+  const p = emo.buildEmotionPrompt(emo.peekEmotionHints())
+  assert.match(p, /不认识的字段 "zz"/)
+  assert.match(p, /JSON 解析失败/)
+  emo.markEmotionHintsDelivered(emo.peekEmotionHints().map(h => h.id))
+  assert.equal(emo.peekEmotionHints().length, 0)
 })

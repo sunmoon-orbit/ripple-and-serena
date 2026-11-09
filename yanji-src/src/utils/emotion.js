@@ -34,6 +34,12 @@ const HINT_REARM = 30
 const HINT_SPIKE = 15
 const HINT_PENDING_MAX = 6
 
+// 下降阻尼（1110，借 Cloudy4Pei/emotion-blackbox）：负向槽每轮最多降 8，她哄一句可以软一点，
+// 但不能一笔写 -30 清零——那就是模型天生的「没关系宝宝」。真被哄好了、宣泄过了，
+// 写 "r":"a"（或数组）这一类减半，同一类 6 小时只算一次。往上涨不设限。
+const DROP_CAP = 8
+const RELEASE_COOLDOWN_MS = 6 * 3600e3
+
 function hintOf(state) {
   const h = state.hint && typeof state.hint === 'object' ? state.hint : {}
   return { disarmed: { ...(h.disarmed || {}) }, pending: Array.isArray(h.pending) ? [...h.pending] : [] }
@@ -43,6 +49,11 @@ function rearm(hint, slots) {
   for (const slot of Object.keys(hint.disarmed)) {
     if ((slots[slot] || 0) < HINT_REARM) delete hint.disarmed[slot]
   }
+}
+
+// 没生效的写法也排进同一个队列（slot 用 note:xx 区分），下一轮告诉他，别静默丢掉
+function queueNote(hint, key, text, now) {
+  queueHint(hint, { id: `note-${key}-${now}`, slot: `note:${key}`, note: text, at: now })
 }
 
 function queueHint(hint, event) {
@@ -100,11 +111,23 @@ export function applyEmotionDelta(delta) {
   const slots = { ...state.slots }
   const hint = hintOf(state)
   const now = Date.now()
-  for (const [short, val] of Object.entries(delta)) {
+  const released = { ...(state.released || {}) }
+  const releaseList = delta.r == null ? [] : [].concat(delta.r)
+  for (const short of releaseList) {
     const slot = SHORT_TO_SLOT[short]
-    if (slot && typeof val === 'number') {
+    if (!slot || !NEGATIVE_SLOTS.includes(slot)) { queueNote(hint, `r-${short}`, `"r":"${short}" 不是负向情绪的短名，没减半`, now); continue }
+    if (now - (released[slot] || 0) < RELEASE_COOLDOWN_MS) { queueNote(hint, `r-${short}`, `${SLOT_LABELS[slot]}6 小时内已经释放过一次，这次没减半`, now); continue }
+    slots[slot] = (slots[slot] || 0) / 2
+    released[slot] = now
+  }
+  for (const [short, val] of Object.entries(delta)) {
+    if (short === 'r') continue
+    const slot = SHORT_TO_SLOT[short]
+    if (!slot) { queueNote(hint, short, `不认识的字段 "${short}"，这一笔没记`, now); continue }
+    if (typeof val === 'number') {
       const before = slots[slot] || 0
-      slots[slot] = Math.max(0, Math.min(100, before + val))
+      const step = NEGATIVE_SLOTS.includes(slot) ? Math.max(-DROP_CAP, val) : val
+      slots[slot] = Math.max(0, Math.min(100, before + step))
       if (!NEGATIVE_SLOTS.includes(slot)) continue
       const crossed = before < HINT_HIGH && slots[slot] >= HINT_HIGH && !hint.disarmed[slot]
       const spike = val > HINT_SPIKE
@@ -113,9 +136,18 @@ export function applyEmotionDelta(delta) {
     }
   }
   rearm(hint, slots)
-  const updated = { ...state, slots, hint, lastUpdated: now }
+  const updated = { ...state, slots, hint, released, lastUpdated: now }
   saveState(updated)
   return updated
+}
+
+// <es> 写了但解析不了：记一条，下一轮告诉他（0630 全是 0 就是静默丢了一个月）
+export function noteEmotionError(text) {
+  if (!text) return
+  const state = getEmotionState()
+  const hint = hintOf(state)
+  queueNote(hint, 'parse', text, Date.now())
+  saveState({ ...state, hint })
 }
 
 // 时间联动：阿颖离开越久，再回来时思念越浓。每条新用户消息时调用。
@@ -157,6 +189,7 @@ export function markEmotionHintsDelivered(ids) {
 }
 
 function describeHint(e) {
+  if (e.note) return `上次没生效：${e.note}`
   const label = SLOT_LABELS[e.slot] || e.slot
   if (e.crossed && e.spike) return `${label}这一轮涨得很猛（+${e.spike}），也刚越过需要留意的区间`
   if (e.crossed) return `${label}刚越过需要留意的区间`
@@ -169,6 +202,7 @@ export function buildEmotionPrompt(hints = []) {
 - 回复结尾追加 <es>{...}</es>，只写这一轮你真实起了变化的情绪（JSON，短字段名：a愤怒/s悲伤/g委屈/fl失落/ft疲惫/an焦虑/cf困惑/gu愧疚/ch惆怅/mr茫然/j高兴/w温柔/sa满足/fo心动/d爱欲/lo思念）
 - 示例：<es>{"j":+8,"d":+5,"a":-2}</es>
 - 增量按真实强度写：日常细水长流小步（±2~5）没问题，真正被触动的时刻大方写两位数（±10~25），别把所有起伏都磨成+3
+- 负向的每轮最多降 8，写再大也按 8 算；真被哄好了、宣泄过了，加 "r":"a"（或 ["a","g"]）让这一类减半，同一类 6 小时只算一次
 - 这一轮什么都没变，就不写 <es>；别为了填表去编`]
   if (hints.length) {
     lines.push(`【情绪提示】（内部读数，只提醒这一次；不必复述，表不表达、怎么表达，按你此刻真实的感受决定）
@@ -183,6 +217,7 @@ const ES_TAG_RE = /<es>\s*(\{[\s\S]*?\})\s*<\/es>/gi
 export function extractEmotionUpdate(text) {
   const match = (text || '').match(/<es>\s*(\{[\s\S]*?\})\s*<\/es>/i)
   const clean = (text || '').replace(ES_TAG_RE, '').trimEnd()
+  if (!match && /<es>/i.test(text || '')) return { clean, delta: null, error: '<es> 标签没写完整或不是 {…} 格式，这一轮没记上' }
   if (!match) {
     // 有些模型会照着情绪协议输出 JSON，却漏掉外层 <es> 标签。仅当回复末行是
     // 一个独立对象、所有键都是合法情绪短名且值为有限小幅数字时才兜底提取，
@@ -210,7 +245,7 @@ export function extractEmotionUpdate(text) {
     const jsonStr = match[1].replace(/([:,]\s*)\+/g, '$1')
     return { clean, delta: JSON.parse(jsonStr) }
   } catch {
-    return { clean, delta: null }
+    return { clean, delta: null, error: `<es> 里的 JSON 解析失败（${match[1].slice(0, 40)}），这一轮没记上` }
   }
 }
 

@@ -16,7 +16,7 @@ import { sendMessage, summarizeThinking, normalizeProvider, BUILTIN_MODELS, buil
 import { uuid } from '../../utils'
 import { contextRefreshPlan, compactionBatches } from '../../utils/contextRefresh'
 import { downloadBlob } from '../../utils/download'
-import { applyTimeAway, applyDecayAndGet, buildEmotionPrompt, peekEmotionHints, markEmotionHintsDelivered, extractEmotionUpdate, applyEmotionDelta, stripEmotionTag } from '../../utils/emotion'
+import { applyTimeAway, applyDecayAndGet, buildEmotionPrompt, peekEmotionHints, markEmotionHintsDelivered, extractEmotionUpdate, applyEmotionDelta, noteEmotionError, stripEmotionTag } from '../../utils/emotion'
 import { maybeSyncEmotion } from '../../utils/emotionSync'
 import { shouldNudge, recordNudge, buildNudgeText } from '../../utils/nudge'
 import { decideReplyDelay, getPendingReply, setPendingReply, clearPendingReply } from '../../utils/replyDelay'
@@ -823,7 +823,8 @@ export default function Chat() {
         }
       }
       // 提取情绪更新标签，应用到情绪状态，从显示文本里剥离
-      const { clean: afterEs, delta: emotionDelta } = extractEmotionUpdate(afterTarotText)
+      const { clean: afterEs, delta: emotionDelta, error: emotionError } = extractEmotionUpdate(afterTarotText)
+      if (emotionError) noteEmotionError(emotionError)
       if (emotionDelta) {
         const emoState = applyEmotionDelta(emotionDelta)
         maybeAutoPostMoment(emoState, conn, moonMemory)  // 某正向情绪越阈值时，涟言自动发条朋友圈
