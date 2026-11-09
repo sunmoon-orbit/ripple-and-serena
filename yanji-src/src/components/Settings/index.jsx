@@ -463,6 +463,17 @@ function ConnectionCard({ conn, onSave, onDelete, onActivate, isActive }) {
             <label className="form-label"></label>
             <p className="card-hint" style={{ margin: 0 }}>留空使用推荐值：按次 40 轮／3 万 token，按 Token 24 轮／2 万 token。达到任一阈值后固定翻一页，保留最近 12 轮和接续笔记；完整聊天不会删除。</p>
           </div>
+          <div className="form-row">
+            <label className="form-label">写笔记用</label>
+            <PickerSelect className="filter-select" value={form.compactWith || 'light'} onChange={(e) => setForm({ ...form, compactWith: e.target.value })}>
+              <option value="light">轻任务模型</option>
+              <option value="main">跟聊天同一个模型</option>
+            </PickerSelect>
+          </div>
+          <div className="form-row">
+            <label className="form-label"></label>
+            <p className="card-hint" style={{ margin: 0 }}>按次计费时，写一次笔记不管多长都只算一次，用聊天同一个模型更划算、笔记也写得更好；按 Token 计费建议留在轻任务模型。</p>
+          </div>
           {/* 轻任务模型：自动发圈/朋友圈评论/思考总结等一次性小任务用便宜模型省钱；
               留空则跟默认模型走。带图的识图评论仍走默认模型（便宜模型多半没 vision） */}
           <div className="form-row">

@@ -1968,6 +1968,8 @@ const COMPACTION_PROMPT = `你正在为一段持续的对话维护一份私密�
 - 关系和情感上下文（亲密、争执、玩笑、心情变化）
 - 重要的时间线节点
 
+日期一律写绝对日期（如「11月9日下午」），照每条消息前面的时间戳写；**不许写「今天」「昨天」「刚才」**——笔记以后某一天才被读到，那时这些词都指错了日子。
+
 不要保留：逐字对话、重复的寒暄、纯技术调试的中间过程。
 涉及亲密内容时用克制中性的语言概括事实即可——这是私人对话的内部笔记，不要拒绝、不要说教。
 
@@ -1979,10 +1981,15 @@ const COMPACTION_PROMPT = `你正在为一段持续的对话维护一份私密�
 
 export async function compactMessages(messages, connection, model, prevSummary = '') {
   if (!messages.length) return ''
+  // 1109 借 rolling-summary-tutorial：带上北京时间，笔记才写得出绝对日期
+  const stamp = (at) => {
+    const d = new Date(Number(at) + 8 * 3600e3)
+    return Number.isFinite(d.getTime()) ? ` ${d.getUTCMonth() + 1}月${d.getUTCDate()}日 ${String(d.getUTCHours()).padStart(2, '0')}:${String(d.getUTCMinutes()).padStart(2, '0')}` : ''
+  }
   const rendered = messages.map((m, i) => {
     const role = m.role === 'user' ? '阿颖' : '涟言'
     const text = m.content || ''
-    return `[${i + 1}] ${role}: ${text}`
+    return `[${i + 1}${m.at ? stamp(m.at) : ''}] ${role}: ${text}`
   }).join('\n\n')
   const input = [
     COMPACTION_PROMPT,
@@ -1992,6 +1999,9 @@ export async function compactMessages(messages, connection, model, prevSummary =
     '',
     '【新增源消息】',
     rendered,
+    '',
+    // 三明治：对话一长，轻模型读到结尾就忘了要干什么，末尾再说一次
+    '——源消息到此结束。现在按开头的规则输出合并后的完整笔记（实体/称呼、事件/事实、情感/关系、未了结），用绝对日期，不超过 700 字，只输出笔记本身。',
   ].join('\n')
   const result = await sendMessage({
     connection,

@@ -20,6 +20,7 @@ export default function ConversationList({ onClose, onOpenCrossing, onStartCall,
   // 只能靠症状反推，而且笔记存在浏览器本地，手机上的那份在电脑上根本查不到（0726）。
   const summariesByChatId = useStore((s) => s.summariesByChatId)
   const setSummary = useStore((s) => s.setSummary)
+  const summaryHistoryByChatId = useStore((s) => s.summaryHistoryByChatId)
 
   const [search, setSearch] = useState('')
   const [renamingId, setRenamingId] = useState(null)
@@ -457,6 +458,17 @@ export default function ConversationList({ onClose, onOpenCrossing, onStartCall,
               这段对话太长时，早期消息会被压缩成这份笔记，每轮都发给涟言当背景。
               可以直接改——比如「未了结」里挂着早就做完的事，删掉那一行就行。
             </div>
+            {(summaryHistoryByChatId?.[noteChatId] || []).length > 0 && (
+              // 1109：新笔记写坏了能退回去。点一份旧的只是放进编辑框，按「保存」才算换回
+              <div className="note-history">
+                <span className="note-history-label">旧版本</span>
+                {summaryHistoryByChatId[noteChatId].map((h, i) => (
+                  <button key={h.at + '-' + i} className="note-history-chip" onClick={() => setNoteText(h.text)} title="放进编辑框，保存后生效">
+                    {new Date(h.at).toLocaleString('zh-CN', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                  </button>
+                ))}
+              </div>
+            )}
             <textarea
               className="note-modal-text"
               value={noteText}

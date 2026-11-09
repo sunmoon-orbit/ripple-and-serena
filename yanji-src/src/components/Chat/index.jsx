@@ -566,8 +566,8 @@ export default function Chat() {
           const cutMsgs = prepared.slice(start, cutCount).flatMap((p, k) => {
             const src = allMsgs[start + k]
             if (src?.hidden && p.role === 'user') return []
-            if (src?.proactive && p.role === 'assistant') return [{ ...p, content: `（这条是涟言自己主动开口发的）${p.content || ''}` }]
-            return [p]
+            if (src?.proactive && p.role === 'assistant') return [{ ...p, at: src.createdAt, content: `（这条是涟言自己主动开口发的）${p.content || ''}` }]
+            return [{ ...p, at: src?.createdAt }]
           })
 
           if (cutMsgs.length && boundaryId) {
@@ -575,8 +575,9 @@ export default function Chat() {
             if (!job) {
               job = (async () => {
                 try {
-                  // 上下文压缩用轻连接：lightModel 已折入 lc.defaultModel，conn 本身不变
-                  const lc = getLightConn(conn)
+                  // 上下文压缩默认用轻连接：lightModel 已折入 lc.defaultModel，conn 本身不变。
+                  // 1109 她要的：按次计费时一次请求不管多长都是一个价，写笔记用主模型更划算也写得更好，所以让她自己选
+                  const lc = conn.compactWith === 'main' ? { ...conn, defaultModel: chat.model || conn.defaultModel } : getLightConn(conn)
                   const lightModel = lc.defaultModel || 'deepseek-v4-flash'
                   let newSummary = prev || ''
                   const batches = compactionBatches(cutMsgs)

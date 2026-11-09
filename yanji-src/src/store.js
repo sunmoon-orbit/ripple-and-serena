@@ -19,7 +19,7 @@ export const DEFAULT_CUSTOM_THEME = Object.freeze({
 })
 // 聊天记录和摘要不再进 localStorage（约 5MB 配额，撑满之后**所有**写入一起失败，
 // 连换个头像都存不下——2026-08-02 就是这么丢了两段对话），改存 IndexedDB。见 utils/bigStore.js
-const BIG_KEYS = ['messagesByChatId', 'summariesByChatId']
+const BIG_KEYS = ['messagesByChatId', 'summariesByChatId', 'summaryHistoryByChatId']
 
 const DEFAULT_STATE = {
   connections: [],
@@ -29,6 +29,8 @@ const DEFAULT_STATE = {
   messagesByChatId: {},
   globalInstruction: '',
   summariesByChatId: {},
+  // 1109 借 rolling-summary-tutorial：被替换掉的旧笔记留最近 5 份，写坏了能退回去
+  summaryHistoryByChatId: {},
   // 每个窗口各存一份未发送文字。组件切去设置页会卸载，草稿不能跟着局部 state 一起消失。
   draftsByChatId: {},
   generationConfig: { temperature: 0.7, maxTokens: 4096 },
@@ -239,6 +241,14 @@ function flushBig() {
   })
 }
 
+// 笔记被换掉时把旧的那份压进历史（同样内容不重复存），最多 5 份
+function withSummaryHistory(s, chatId, next) {
+  const old = s.summariesByChatId?.[chatId]
+  if (!old?.trim() || old === next) return s.summaryHistoryByChatId || {}
+  const list = [{ text: old, at: Date.now() }, ...((s.summaryHistoryByChatId || {})[chatId] || []).filter((h) => h.text !== old)].slice(0, 5)
+  return { ...(s.summaryHistoryByChatId || {}), [chatId]: list }
+}
+
 function savePersistedState(state) {
   const { activePanel, bigReady, ...rest } = state
   const big = {}
@@ -253,7 +263,7 @@ function savePersistedState(state) {
 
 const persistedKeys = [
   'connections', 'activeConnectionId', 'chats', 'activeChatId',
-  'messagesByChatId', 'globalInstruction', 'summariesByChatId', 'draftsByChatId',
+  'messagesByChatId', 'globalInstruction', 'summariesByChatId', 'summaryHistoryByChatId', 'draftsByChatId',
   'generationConfig', 'memoryItems', 'tokenStats', 'contextLimit',
   'searchConfig', 'avatarConfig', 'autoTools', 'imageDescriptions', 'moonMemory', 'mcpServers', 'theme', 'customTheme', 'glassOpacity',
   'customKeyboardEnabled', 'widgetBackgroundStyle',
@@ -468,10 +478,12 @@ export const useStore = create((set, get) => ({
       delete messagesByChatId[id]
       const summariesByChatId = { ...s.summariesByChatId }
       delete summariesByChatId[id]
+      const summaryHistoryByChatId = { ...(s.summaryHistoryByChatId || {}) }
+      delete summaryHistoryByChatId[id]
       const draftsByChatId = removeChatDraft(s.draftsByChatId, id)
       const activeChatId = s.activeChatId === id ? (chats[0]?.id ?? null) : s.activeChatId
-      savePersistedState({ ...s, chats, messagesByChatId, summariesByChatId, draftsByChatId, activeChatId })
-      return { chats, messagesByChatId, summariesByChatId, draftsByChatId, activeChatId }
+      savePersistedState({ ...s, chats, messagesByChatId, summariesByChatId, summaryHistoryByChatId, draftsByChatId, activeChatId })
+      return { chats, messagesByChatId, summariesByChatId, summaryHistoryByChatId, draftsByChatId, activeChatId }
     })
   },
   updateChatModel: (chatId, model) => {
@@ -592,13 +604,14 @@ export const useStore = create((set, get) => ({
   getSummary: (chatId) => get().summariesByChatId[chatId] || null,
   setSummary: (chatId, summary) => {
     set((s) => {
+      const summaryHistoryByChatId = withSummaryHistory(s, chatId, summary)
       const summariesByChatId = { ...s.summariesByChatId, [chatId]: summary }
       // 手动清空后下次从头重建，与界面上的提示保持一致。
       const chats = summary ? s.chats : s.chats.map((c) => c.id === chatId
         ? { ...c, compactedThrough: null, compactionVersion: (c.compactionVersion || 0) + 1 }
         : c)
-      savePersistedState({ ...s, summariesByChatId, chats })
-      return { summariesByChatId, chats }
+      savePersistedState({ ...s, summariesByChatId, summaryHistoryByChatId, chats })
+      return { summariesByChatId, summaryHistoryByChatId, chats }
     })
   },
   // 笔记和游标同一次进 store；失败路径不调这个 action，游标也不会前移。
@@ -607,10 +620,11 @@ export const useStore = create((set, get) => ({
       const chat = s.chats.find((c) => c.id === chatId)
       // 压缩等模型时历史可能被编辑；版本变了就丢弃旧结果，不让它把 dirty 状态覆盖回去。
       if (!chat || (chat.compactionVersion || 0) !== expectedVersion) return {}
+      const summaryHistoryByChatId = withSummaryHistory(s, chatId, summary)
       const summariesByChatId = { ...s.summariesByChatId, [chatId]: summary }
       const chats = s.chats.map((c) => c.id === chatId ? { ...c, compactedThrough } : c)
-      savePersistedState({ ...s, summariesByChatId, chats })
-      return { summariesByChatId, chats }
+      savePersistedState({ ...s, summariesByChatId, summaryHistoryByChatId, chats })
+      return { summariesByChatId, summaryHistoryByChatId, chats }
     })
   },
 
@@ -782,16 +796,18 @@ if (hasLegacyBig) {
     })
 } else {
   Promise.all(BIG_KEYS.map((k) => bigGet(k)))
-    .then(([messages, summaries]) => {
+    .then(([messages, summaries, sumHistory]) => {
       const loadedMsgs = sweepStaleStreaming(messages && typeof messages === 'object' ? messages : {})
       const loadedSums = summaries && typeof summaries === 'object' ? summaries : {}
+      const loadedHist = sumHistory && typeof sumHistory === 'object' ? sumHistory : {}
       const cur = useStore.getState()
       bigHydrated = true
       // 读回来之前删掉的对话，从库里那份旧数据上再扣一次——不然「只增不减」的合并会让它复活
-      for (const id of deletedBeforeHydrate) { delete loadedMsgs[id]; delete loadedSums[id] }
+      for (const id of deletedBeforeHydrate) { delete loadedMsgs[id]; delete loadedSums[id]; delete loadedHist[id] }
       useStore.setState({
         messagesByChatId: mergeMessages(loadedMsgs, cur.messagesByChatId),
         summariesByChatId: { ...loadedSums, ...cur.summariesByChatId },
+        summaryHistoryByChatId: { ...loadedHist, ...(cur.summaryHistoryByChatId || {}) },
         bigReady: true,
       })
       // 读回来之前发生的写入都被挡掉了（那时状态是空的，回写会盖掉真数据）。

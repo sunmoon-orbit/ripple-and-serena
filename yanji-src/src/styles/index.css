@@ -5679,6 +5679,15 @@ body.mp-active .scroll-bottom-btn { bottom: 139px; }
   padding: 0 14px 10px; font-size: 12px; line-height: 1.6;
   color: var(--text-faint);
 }
+.note-history {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 6px;
+  padding: 0 14px 10px;
+}
+.note-history-label { font-size: 11px; color: var(--text-faint); }
+.note-history-chip {
+  padding: 3px 9px; border-radius: 999px; font-size: 11px; cursor: pointer;
+  border: 1px solid var(--border); background: transparent; color: var(--text-muted);
+}
 .note-modal-text {
   flex: 1; min-height: 200px; margin: 0 14px;
   padding: 10px; border: 1px solid var(--border); border-radius: 10px;
