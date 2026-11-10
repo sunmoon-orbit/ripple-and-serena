@@ -44,6 +44,7 @@ function qs(params = {}) {
 
 export const api = {
   list: (params = {}) => req('/memories/filter' + qs(params)),
+  cover: () => req('/memories/cover'),
   heatmap: (params = {}) => req('/memories/heatmap' + qs(params)),
   trash: () => req('/memories/trash?limit=300'),
   create: (body) => req('/memories', { method: 'POST', body: JSON.stringify(body) }),

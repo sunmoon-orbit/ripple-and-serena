@@ -1,8 +1,10 @@
 import { useState, useEffect, useCallback } from 'react'
 import { api } from '../api'
+import { useStore } from '../store'
+import Cover from './Cover'
 import { APP, IS_ZHAOHUA } from '../config'
 import { showToast } from './Toast'
-import { Plus, RefreshCw, Search, Clock, Pencil, Trash2, Share2, Sparkles, ArrowUpDown } from 'lucide-react'
+import { ChevronLeft, Plus, RefreshCw, Search, Clock, Pencil, Trash2, Share2, Sparkles, ArrowUpDown } from 'lucide-react'
 
 export const SCOPES = { shared: '共享', private_阿颖: '阿颖私密', private_阿言: IS_ZHAOHUA ? '昭华私密' : '阿言私密' }
 export const LAYERS = { core: '核心', long: '长期', short: '短期', consciousness: '意识' }
@@ -357,6 +359,16 @@ export default function MemoryPanel() {
   const [semanticLoading, setSemanticLoading] = useState(false)
   const [heatType, setHeatType] = useState('count') // count | emotion
   const [heatPage, setHeatPage] = useState(0) // 0=最近12周, 1=再往前12周...
+  // 封面 / 列表（1110）：进门先是封面，点格子、点热力图某一天、点「翻全部记忆」才到列表
+  const [view, setView] = useState('cover')
+  const [preset, setPreset] = useState('') // 从封面哪一格进来的，列表顶上写一句
+  const setPanel = useStore((s) => s.setPanel)
+  const openList = ({ label, layer: l, type: t }) => {
+    setPreset(label); setLayer(l); setMemType(t); setScope(''); setResolvedOnly(false); setSelectedDate(null); setQ('')
+    setTabIdx(t === 'tech' ? 2 : 0); setView('list'); window.scrollTo(0, 0)
+  }
+  const backToCover = () => { setView('cover'); setPreset(''); setSelectedDate(null); window.scrollTo(0, 0) }
+  const pickDate = (d) => { setSelectedDate(d); if (d) { setPreset(''); setLayer(''); setMemType(''); setTabIdx(0); setView('list') } }
 
   // 在一起多少天
   useEffect(() => {
@@ -412,6 +424,39 @@ export default function MemoryPanel() {
     catch (e) { showToast(e.message, 'error') }
   }
 
+  const heatBlock = (
+    <>
+      {/* 热力图切换 + 翻页 */}
+      <div className="heatmap-nav">
+        <div className="heatmap-switch">
+          <button className={'heatmap-switch-btn' + (heatType === 'count' ? ' active' : '')} onClick={() => setHeatType('count')}>记忆数</button>
+          <button className={'heatmap-switch-btn' + (heatType === 'emotion' ? ' active' : '')} onClick={() => setHeatType('emotion')}>情绪</button>
+        </div>
+        <div className="heatmap-pager">
+          <button className="heatmap-pager-btn" onClick={() => setHeatPage(p => p + 1)} title="往前">←</button>
+          <span className="heatmap-pager-label">{heatPage === 0 ? '最近 12 周' : `第 ${heatPage + 1} 期`}</span>
+          <button className="heatmap-pager-btn" onClick={() => setHeatPage(p => Math.max(0, p - 1))} disabled={heatPage === 0} title="往后">→</button>
+        </div>
+      </div>
+      {heatType === 'count' ? (
+        <>
+          <Heatmap data={heat} selectedDate={selectedDate} onSelectDate={pickDate} offset={heatPage * 84} />
+          <div className="heatmap-legend">
+            {selectedDate
+              ? <><span style={{ color: 'var(--olive-active)', fontWeight: 600 }}>{selectedDate}</span> · {mems.length} 条 <button className="card-more" style={{ display: 'inline', marginLeft: 6 }} onClick={() => setSelectedDate(null)}>取消筛选</button></>
+              : <>过去 12 周 · {mems.length} 条记忆</>
+            }
+          </div>
+        </>
+      ) : (
+        <>
+          <EmotionHeatmap data={emotionHeat} selectedDate={selectedDate} onSelectDate={pickDate} offset={heatPage * 84} />
+          <div className="heatmap-legend">情绪分布 · 暖色积极 冷色消极 深色强烈</div>
+        </>
+      )}
+    </>
+  )
+
   return (
     <div className="panel">
       {/* 顶栏 */}
@@ -433,34 +478,13 @@ export default function MemoryPanel() {
         </div>
       </div>
 
-      {/* 热力图切换 + 翻页 */}
-      <div className="heatmap-nav">
-        <div className="heatmap-switch">
-          <button className={'heatmap-switch-btn' + (heatType === 'count' ? ' active' : '')} onClick={() => setHeatType('count')}>记忆数</button>
-          <button className={'heatmap-switch-btn' + (heatType === 'emotion' ? ' active' : '')} onClick={() => setHeatType('emotion')}>情绪</button>
-        </div>
-        <div className="heatmap-pager">
-          <button className="heatmap-pager-btn" onClick={() => setHeatPage(p => p + 1)} title="往前">←</button>
-          <span className="heatmap-pager-label">{heatPage === 0 ? '最近 12 周' : `第 ${heatPage + 1} 期`}</span>
-          <button className="heatmap-pager-btn" onClick={() => setHeatPage(p => Math.max(0, p - 1))} disabled={heatPage === 0} title="往后">→</button>
-        </div>
+      {view === 'cover' ? (
+        <Cover colors={LAYER_COLORS} onOpen={openList} onPanel={setPanel}>{heatBlock}</Cover>
+      ) : (<>
+      <div className="list-back">
+        <button className="list-back-btn" onClick={backToCover}><ChevronLeft size={15} />封面</button>
+        {(preset || selectedDate) && <span className="list-back-label">{preset || selectedDate} · {mems.length} 条</span>}
       </div>
-      {heatType === 'count' ? (
-        <>
-          <Heatmap data={heat} selectedDate={selectedDate} onSelectDate={setSelectedDate} offset={heatPage * 84} />
-          <div className="heatmap-legend">
-            {selectedDate
-              ? <><span style={{ color: 'var(--olive-active)', fontWeight: 600 }}>{selectedDate}</span> · {mems.length} 条 <button className="card-more" style={{ display: 'inline', marginLeft: 6 }} onClick={() => setSelectedDate(null)}>取消筛选</button></>
-              : <>过去 12 周 · {mems.length} 条记忆</>
-            }
-          </div>
-        </>
-      ) : (
-        <>
-          <EmotionHeatmap data={emotionHeat} selectedDate={selectedDate} onSelectDate={setSelectedDate} offset={heatPage * 84} />
-          <div className="heatmap-legend">情绪分布 · 暖色积极 冷色消极 深色强烈</div>
-        </>
-      )}
 
       {/* 搜索框 */}
       <div className="search-wrap">
@@ -492,7 +516,7 @@ export default function MemoryPanel() {
         {TABS.map((t, i) => (
           <button key={i}
             className={'scope-tab' + (tabIdx === i ? ' active' : '')}
-            onClick={() => { setTabIdx(i); setScope(t.scope); setMemType(t.type); setResolvedOnly(!!t.resolved) }}>
+            onClick={() => { setTabIdx(i); setScope(t.scope); setMemType(t.type); setResolvedOnly(!!t.resolved); setPreset('') }}>
             {t.l}
           </button>
         ))}
@@ -500,9 +524,9 @@ export default function MemoryPanel() {
 
       {/* Layer 彩色圆点胶囊 */}
       <div className="layer-pills">
-        <button className={'layer-pill' + (layer === '' ? ' active' : '')} onClick={() => setLayer('')}>全部层</button>
+        <button className={'layer-pill' + (layer === '' ? ' active' : '')} onClick={() => { setLayer(''); setPreset('') }}>全部层</button>
         {Object.entries(LAYERS).map(([v, l]) => (
-          <button key={v} className={'layer-pill' + (layer === v ? ' active' : '')} onClick={() => setLayer(v)}>
+          <button key={v} className={'layer-pill' + (layer === v ? ' active' : '')} onClick={() => { setLayer(v); setPreset('') }}>
             <span className="layer-dot" style={{ background: LAYER_COLORS[v] }} />
             {l}
           </button>
@@ -515,6 +539,7 @@ export default function MemoryPanel() {
       <div className="mem-list">
         {sortedMems.map((m) => <Card key={m.id} m={m} onEdit={setEditor} onTrash={trash} onChanged={load} />)}
       </div>
+      </>)}
 
       {/* 悬浮新建按钮 */}
       <button className="fab" onClick={() => setEditor({ _new: true })}>

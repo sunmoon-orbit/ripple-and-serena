@@ -4,9 +4,6 @@ import Splash from './components/Splash'
 import PasswordGate from './components/PasswordGate'
 import { ToastHost } from './components/Toast'
 import MemoryPanel from './components/MemoryPanel'
-import StarMapPanel from './components/StarMapPanel'
-import MemoryVeinPanel from './components/MemoryVeinPanel'
-import MemoryTreePanel from './components/MemoryTreePanel'
 import TrashPanel from './components/TrashPanel'
 import StatsPanel from './components/StatsPanel'
 import SettingsPanel from './components/SettingsPanel'
@@ -25,7 +22,6 @@ const NAV = [
 export default function App() {
   const theme = useStore((s) => s.theme)
   const panel = useStore((s) => s.panel)
-  const memoryView = useStore((s) => s.memoryView)
   const setPanel = useStore((s) => s.setPanel)
   const [splashGone, setSplashGone] = useState(false) // 开屏完全卸载
   const [gateVisible, setGateVisible] = useState(false) // 开屏开始晕开时，门在底下浮现
@@ -56,7 +52,7 @@ export default function App() {
 
   return (
     <div className="app">
-      {panel === 'memory' && (memoryView === 'starmap' ? <StarMapPanel /> : memoryView === 'veins' ? <MemoryVeinPanel /> : memoryView === 'tree' ? <MemoryTreePanel /> : <MemoryPanel />)}
+      {panel === 'memory' && <MemoryPanel />}
       {panel === 'stats' && <StatsPanel />}
       {panel === 'events' && <EventsPanel />}
       {panel === 'trash' && <TrashPanel />}

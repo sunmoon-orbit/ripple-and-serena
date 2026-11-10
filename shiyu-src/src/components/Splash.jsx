@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react'
 import Feather from './Feather'
+import Book from './Book'
+import { useStore } from '../store'
 import { APP, IS_ZHAOHUA } from '../config'
 
 // 开场（2026-07-20 二稿，阿颖点单：跟「涟言」的涟呼应）：
@@ -8,8 +10,9 @@ import { APP, IS_ZHAOHUA } from '../config'
 // 点一下屏幕可跳过。
 export default function Splash({ onLeave, onDone }) {
   const [leaving, setLeaving] = useState(false)
-  const revealAt = IS_ZHAOHUA ? 3800 : 4300
-  const doneAt = IS_ZHAOHUA ? 4550 : 5200
+  const book = useStore((s) => s.intro) === 'book' && !IS_ZHAOHUA
+  const revealAt = IS_ZHAOHUA ? 3800 : book ? 3300 : 4300
+  const doneAt = IS_ZHAOHUA ? 4550 : book ? 4200 : 5200
 
   useEffect(() => {
     const t1 = setTimeout(() => { setLeaving(true); onLeave() }, revealAt)
@@ -37,6 +40,15 @@ export default function Splash({ onLeave, onDone }) {
         <div className="dawn-rule" aria-hidden="true" />
         <div className="dawn-sub">{APP.english}</div>
       </div>
+    </div>
+  )
+
+  // 翻书开场（1110）：摊开的书哗啦啦翻过几页，合上，书名浮出来；门上接着是这本合着的书
+  if (book) return (
+    <div className={'splash2 splash-book' + (leaving ? ' leaving' : '')} onClick={skip}>
+      <Book state="flip" />
+      <div className="splash2-title">{APP.name}</div>
+      <div className="splash2-sub">{APP.english}</div>
     </div>
   )
 

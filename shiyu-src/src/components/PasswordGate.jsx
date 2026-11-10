@@ -1,7 +1,8 @@
 import { useState, useRef } from 'react'
-import { useStore, hashPassword } from '../store'
+import { useStore, hashPassword, DEFAULT_PW_HASH } from '../store'
 import { loginZhaohua } from '../api'
 import Feather from './Feather'
+import Book from './Book'
 import { APP, IS_ZHAOHUA } from '../config'
 
 // 密码门（2026-07-20 随新开场翻新）：
@@ -11,12 +12,16 @@ export default function PasswordGate({ onUnlock }) {
   const passwordHash = useStore((s) => s.passwordHash)
   const setPassword  = useStore((s) => s.setPassword)
   const setConn = useStore((s) => s.setConn)
-  const isSetup = !passwordHash && !IS_ZHAOHUA
+  const intro = useStore((s) => s.intro)
+  const bookIntro = intro === 'book' && !IS_ZHAOHUA
+  // 1110 起有默认密码（纪念日），不再有「第一次设置」那一步
+  const isSetup = false
 
   const [pw,  setPw]  = useState('')
   const [pw2, setPw2] = useState('')
   const [err, setErr] = useState('')
   const [out, setOut] = useState(false) // 解锁淡出中
+  const [opening, setOpening] = useState(false) // 翻书开场：密码对了，封面先掀开
   const typedAt = useRef(0)
   // 兜底（1016）：刚打完字、又不是她自己点别处，焦点却丢了——立刻拿回来，输入法就不会缩回去
   const keepFocus = (e) => {
@@ -26,12 +31,18 @@ export default function PasswordGate({ onUnlock }) {
   }
 
   function pass() {
+    if (bookIntro) {
+      setOpening(true)
+      setTimeout(() => setOut(true), 620)
+      setTimeout(onUnlock, 620 + 420)
+      return
+    }
     setOut(true)
     setTimeout(onUnlock, 420)
   }
 
   async function submit() {
-    if (out) return
+    if (out || opening) return
     if (IS_ZHAOHUA) {
       try {
         const token = await loginZhaohua(pw)
@@ -48,7 +59,7 @@ export default function PasswordGate({ onUnlock }) {
       if (pw !== pw2)    return setErr('两次输入不一致')
       setPassword(pw); pass()
     } else {
-      if (hashPassword(pw) === passwordHash) pass()
+      if (hashPassword(pw) === (passwordHash || DEFAULT_PW_HASH)) pass()
       else { setErr('密码不对'); setPw('') }
     }
   }
@@ -56,7 +67,7 @@ export default function PasswordGate({ onUnlock }) {
   return (
     <div className={'gate-minimal gate-ink' + (out ? ' gate-out' : '')}>
       {/* 开屏落下的那根羽毛，落地后微微歪着 */}
-      {IS_ZHAOHUA ? <span className="gate-feather2 zhaohua-light gate-light" /> : <Feather className="gate-feather2" />}
+      {IS_ZHAOHUA ? <span className="gate-feather2 zhaohua-light gate-light" /> : bookIntro ? <div className="gate-book"><Book state={opening ? 'open' : 'closed'} /></div> : <Feather className="gate-feather2" />}
 
       {/* 标题 */}
       <div className="gate-brand">

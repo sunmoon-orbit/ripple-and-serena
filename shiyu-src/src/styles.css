@@ -1163,3 +1163,136 @@ input, textarea, select { font-family: inherit; font-size: 15px; color: var(--in
 /* 1021：密码框改成普通文本框（避开 vivo 安全键盘重载），字用圆点遮住 */
 .ink-masked { -webkit-text-security: disc; text-security: disc; }
 .badge-btn { border: 0; cursor: pointer; font: inherit; }
+
+/* ── 封面（1110）：大数字 + 每周走势 + 分段格子，替掉星图／脉络／树 ── */
+.cover { padding-bottom: 8px; }
+.cover-big {
+  font-family: Georgia, 'Noto Serif SC', 'Songti SC', serif;
+  font-size: 52px; font-weight: 500; line-height: 1; letter-spacing: -1px;
+  color: var(--ink); margin-top: 6px; font-variant-numeric: tabular-nums;
+}
+.cover-cap { font-size: 12.5px; color: var(--ink-faint); margin: 7px 0 14px; }
+.cover-card, .cover-tile {
+  background: var(--surface); border-radius: 18px; box-shadow: var(--shadow);
+}
+.cover-weeks { padding: 12px 14px; margin-bottom: 14px; }
+.cover-weeks svg { display: block; width: 100%; margin: 8px 0 5px; }
+.cover-weeks-head { display: flex; justify-content: space-between; font-size: 11px; color: var(--ink-faint); }
+.cover-sec {
+  display: flex; align-items: center; gap: 10px;
+  font-size: 12px; color: var(--ink-soft); margin: 22px 4px 9px;
+}
+.cover-sec::after { content: ''; flex: 1; height: 1px; background: var(--line); }
+.cover-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.cover-tile {
+  position: relative; height: 98px; padding: 12px 14px; text-align: left; line-height: 1.25;
+  display: flex; flex-direction: column; align-items: flex-start; justify-content: flex-start; width: 100%; color: var(--ink);
+  transition: transform 0.15s ease, box-shadow 0.2s ease;
+}
+.cover-tile.wide { grid-column: 1 / 3; height: 102px; }
+.cover-tile.tappable:active { transform: scale(0.975); }
+.cover-tile.warm { background: linear-gradient(140deg, var(--surface) 40%, color-mix(in srgb, var(--accent) 16%, var(--surface))); }
+.cover-tile-name { font-size: 15px; font-weight: 600; display: flex; align-items: center; gap: 6px; }
+.cover-tile-en { font-family: Georgia, serif; font-style: italic; font-size: 11px; color: var(--ink-faint); margin-top: 1px; }
+.cover-tile-num {
+  position: absolute; left: 14px; bottom: 10px;
+  font-family: Georgia, 'Noto Serif SC', serif; font-size: 26px; font-weight: 500; font-variant-numeric: tabular-nums;
+}
+.cover-tile .cover-spark { position: absolute; right: 14px; bottom: 14px; }
+.cover-rows { padding: 3px 14px; }
+.cover-row {
+  display: flex; justify-content: space-between; align-items: center; width: 100%;
+  padding: 12px 2px; font-size: 14px; color: var(--ink); border-bottom: 1px solid var(--line); text-align: left;
+}
+.cover-row:last-child { border-bottom: 0; }
+.cover-row i { font-family: Georgia, serif; font-size: 11px; color: var(--ink-faint); margin-left: 8px; }
+.cover-row-num { font-family: Georgia, serif; color: var(--ink-soft); display: inline-flex; align-items: center; gap: 2px; }
+.cover-all {
+  display: flex; align-items: center; justify-content: center; gap: 4px;
+  width: 100%; margin: 18px 0 6px; padding: 13px; border-radius: 999px;
+  border: 1px solid var(--line); color: var(--ink-soft); font-size: 14px; letter-spacing: 2px;
+}
+.cover-all:active { background: var(--bg-soft); }
+.list-back { display: flex; align-items: center; gap: 10px; margin: 2px 0 10px; }
+.list-back-btn {
+  display: inline-flex; align-items: center; gap: 2px; padding: 6px 12px 6px 7px;
+  border-radius: 999px; border: 1px solid var(--line); color: var(--ink-soft); font-size: 13px;
+}
+.list-back-label { font-size: 13px; color: var(--ink-faint); }
+
+/* ── 小书（1110 翻书开场）── */
+.book { --bw: 74px; --bh: 100px; position: relative; width: calc(var(--bw) * 2); height: var(--bh); perspective: 900px; }
+.book-inner { position: absolute; inset: 0; transform-style: preserve-3d; transform: rotateX(16deg); }
+.book-base, .book-leaf, .book-cover {
+  position: absolute; left: 50%; top: 0; width: var(--bw); height: var(--bh);
+  transform-origin: left center;
+}
+.book-base {
+  border-radius: 2px 7px 7px 2px;
+  background: color-mix(in srgb, var(--olive-active) 78%, #000);
+  box-shadow: 0 10px 22px color-mix(in srgb, var(--ink) 22%, transparent);
+}
+.book-leaf {
+  top: 3px; width: calc(var(--bw) - 4px); height: calc(var(--bh) - 6px);
+  border-radius: 1px 4px 4px 1px;
+  background:
+    repeating-linear-gradient(to bottom, transparent 0 11px, color-mix(in srgb, var(--ink) 9%, transparent) 11px 12px) 10px 16px / calc(100% - 20px) calc(100% - 30px) no-repeat,
+    color-mix(in srgb, var(--surface) 92%, #fff);
+  border: 0.5px solid color-mix(in srgb, var(--ink) 14%, transparent);
+  transform: rotateY(0deg) translateZ(calc((7 - var(--i)) * 0.5px));
+}
+.book-cover { transform-style: preserve-3d; transform: rotateY(0deg) translateZ(4px); }
+.book-face {
+  position: absolute; inset: 0; backface-visibility: hidden;
+  border-radius: 2px 7px 7px 2px;
+  background: linear-gradient(120deg, color-mix(in srgb, var(--olive-active) 82%, #000) 0 9%, var(--olive-active) 9.5%, color-mix(in srgb, var(--olive-active) 86%, #fff) 100%);
+  display: flex; align-items: center; justify-content: center;
+}
+.book-emblem { width: 34px; height: 34px; color: var(--bg); opacity: 0.92; transform: rotate(8deg); }
+.book-inside {
+  transform: rotateY(180deg); border-radius: 7px 2px 2px 7px;
+  background: color-mix(in srgb, var(--surface) 92%, #fff);
+  border: 0.5px solid color-mix(in srgb, var(--ink) 14%, transparent);
+}
+
+/* 合着：整本往左挪半本，居中 */
+.book-closed .book-inner { transform: translateX(calc(var(--bw) / -2)) rotateX(16deg); }
+
+/* 开屏：摊开 → 六页先后翻过去 → 连封面一起合上 */
+.book-flip .book-inner { animation: book-in 0.35s ease both, book-center 0.8s cubic-bezier(.5,0,.3,1) 1.5s forwards; }
+.book-flip .book-cover { transform: rotateY(-180deg) translateZ(4px); animation: book-shut 0.8s cubic-bezier(.5,0,.3,1) 1.5s forwards; }
+.book-flip .book-leaf {
+  animation:
+    leaf-over 0.42s cubic-bezier(.45,.05,.55,.95) calc(0.25s + var(--i) * 0.13s) forwards,
+    leaf-back 0.8s cubic-bezier(.5,0,.3,1) calc(1.5s + (7 - var(--i)) * 0.012s) forwards;
+}
+@keyframes book-in { from { opacity: 0; transform: translateY(8px) rotateX(16deg); } to { opacity: 1; transform: rotateX(16deg); } }
+@keyframes book-center { to { transform: translateX(calc(var(--bw) / -2)) rotateX(16deg); } }
+@keyframes book-shut { from { transform: rotateY(-180deg) translateZ(4px); } to { transform: rotateY(0deg) translateZ(4px); } }
+@keyframes leaf-over {
+  from { transform: rotateY(0deg) translateZ(calc((7 - var(--i)) * 0.5px)); }
+  to   { transform: rotateY(-180deg) translateZ(calc((7 - var(--i)) * 0.5px)); }
+}
+@keyframes leaf-back {
+  from { transform: rotateY(-180deg) translateZ(calc((7 - var(--i)) * 0.5px)); }
+  to   { transform: rotateY(0deg) translateZ(calc((7 - var(--i)) * 0.5px)); }
+}
+/* 最底下那页不翻，摊开时右边始终有纸 */
+.book-flip .book-leaf:nth-child(7) { animation: none; }
+.splash-book .splash2-title { animation-delay: 2.1s; }
+.splash-book .splash2-sub { animation-delay: 2.45s; }
+
+/* 密码门上那本合着的书；密码对了：封面掀开，书迎面放大化开 */
+.gate-book { margin-bottom: 22px; }
+.gate-ink .gate-book { opacity: 0; filter: blur(8px); animation: ink-in 0.9s ease 0.05s forwards; }
+.book-open .book-inner { animation: book-enter 0.75s cubic-bezier(.4,0,.2,1) forwards; }
+.book-open .book-cover { animation: book-lift 0.62s cubic-bezier(.4,0,.2,1) forwards; }
+@keyframes book-lift { from { transform: rotateY(0deg) translateZ(4px); } to { transform: rotateY(-168deg) translateZ(4px); } }
+@keyframes book-enter {
+  0%   { transform: translateX(calc(var(--bw) / -2)) rotateX(16deg) scale(1); opacity: 1; }
+  55%  { transform: translateX(0) rotateX(10deg) scale(1.08); opacity: 1; }
+  100% { transform: translateX(0) rotateX(0deg) scale(1.9); opacity: 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .book-flip .book-inner, .book-flip .book-cover, .book-flip .book-leaf, .book-open .book-inner, .book-open .book-cover { animation-duration: 0.01s; animation-delay: 0s; }
+}

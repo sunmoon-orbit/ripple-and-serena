@@ -1,6 +1,6 @@
 import { useState, useRef } from 'react'
 import { api } from '../api'
-import { useStore, hashPassword } from '../store'
+import { useStore, hashPassword, DEFAULT_PW_HASH } from '../store'
 import { showToast } from './Toast'
 import { IS_ZHAOHUA } from '../config'
 import { Plug, KeyRound, Palette, Activity, RefreshCw, CheckCircle2, AlertTriangle, XCircle, Upload } from 'lucide-react'
@@ -33,7 +33,7 @@ function fmtBackup(report) {
 }
 
 export default function SettingsPanel() {
-  const { baseUrl, apiToken, theme, setTheme, setConn, passwordHash, setPassword, memoryView, setMemoryView } = useStore()
+  const { baseUrl, apiToken, theme, setTheme, setConn, passwordHash, setPassword, intro, setIntro } = useStore()
   const [url, setUrl] = useState(baseUrl || 'https://memory.ravenlove.cc')
   const [token, setToken] = useState(apiToken)
   const [testing, setTesting] = useState(false)
@@ -61,7 +61,7 @@ export default function SettingsPanel() {
   }
 
   function changePw() {
-    if (hashPassword(oldPw) !== passwordHash) return showToast('旧密码不对', 'error')
+    if (hashPassword(oldPw) !== (passwordHash || DEFAULT_PW_HASH)) return showToast('旧密码不对', 'error')
     if (newPw.length < 4) return showToast('新密码至少 4 位', 'error')
     setPassword(newPw); setOldPw(''); setNewPw('')
     showToast('密码已更新', 'success')
@@ -228,25 +228,18 @@ export default function SettingsPanel() {
           ))}
         </div>
 
-        <div className="row" style={{ marginTop: 14 }}><span className="row-label">记忆视图</span></div>
-        <div className="theme-grid">
-          {[
-            { id: 'list', label: '年轮列表', dot: '#8FA3BC' },
-            { id: 'starmap', label: '记忆星图', dot: '#F5D97E' },
-            { id: 'veins', label: '记忆脉络', dot: '#A07850' },
-            { id: 'tree', label: IS_ZHAOHUA ? '记忆木牌树' : '记忆之树', dot: IS_ZHAOHUA ? '#8B7654' : '#6F5B45' },
-          ].map((v) => (
-            <button key={v.id} className={'theme-chip' + (memoryView === v.id ? ' active' : '')} onClick={() => setMemoryView(v.id)}>
-              <span className="theme-chip-dot" style={{ background: v.dot }} />
-              <span className="theme-chip-label">{v.label}</span>
-            </button>
-          ))}
-        </div>
-        <p style={{ fontSize: 12, opacity: 0.5, margin: '8px 2px 0' }}>
-          {IS_ZHAOHUA
-            ? '木牌树让普通记忆成叶、重要记忆成牌；布局打开时算定，不持续模拟，手机更省电。'
-            : '星图把每条记忆画成一颗星；脉络把相近的记忆理成几簇，按叶脉长开，手机更省电。'}
-        </p>
+        {!IS_ZHAOHUA && <>
+          <div className="row" style={{ marginTop: 14 }}><span className="row-label">开场</span></div>
+          <div className="theme-grid">
+            {[{ id: 'feather', label: '羽毛飘落', dot: '#8FA3BC' }, { id: 'book', label: '翻书', dot: '#A07850' }].map((v) => (
+              <button key={v.id} className={'theme-chip' + (intro === v.id ? ' active' : '')} onClick={() => setIntro(v.id)}>
+                <span className="theme-chip-dot" style={{ background: v.dot }} />
+                <span className="theme-chip-label">{v.label}</span>
+              </button>
+            ))}
+          </div>
+          <p style={{ fontSize: 12, opacity: 0.5, margin: '8px 2px 0' }}>下次打开拾羽时生效。进门密码默认是纪念日，上面可以改。</p>
+        </>}
       </div>
     </div>
   )
