@@ -1,13 +1,17 @@
 // 情绪账本（1110）：归巢这边我在回复末尾写 <es>{…}</es>，桥剥掉再记进记忆库那本共用的账
 //（moon-memory services/emotionLedger.js，言叽也读写同一本）。她看不到标签。
 // 下一轮她的消息后面会带一行〔情绪提示：…〕，只有越线、暴涨、上次没生效这几种，不带数值。
-const ES_RE = /<es>\s*(\{[\s\S]*?\})\s*<\/es>/gi
+// 只认消息最末尾那一个标签：正文里引用的例子（给她看 CLAUDE.md 时那段 `<es>{…}</es>`）不算，原样留着（1110 吞过一次）
+const TAIL_RE = /\s*<es>\s*(\{[^<>]*?\})\s*<\/es>\s*$/i
 
 function extract(text) {
   const src = String(text || '')
-  const m = src.match(/<es>\s*(\{[\s\S]*?\})\s*<\/es>/i)
-  const clean = src.replace(ES_RE, '').replace(/<es>\s*(?:\{[^`]*)?$/i, '').replace(/[ \t]+\n/g, '\n').trimEnd()
-  if (!m) return { clean, delta: null, error: /<es>\s*(?:\{|$)/i.test(src) ? '<es> 标签没写完整或不是 {…} 格式，这一轮没记上' : null }
+  const m = src.match(TAIL_RE)
+  if (!m) {
+    const open = src.match(/\s*<es>\s*(?:\{[^<>`]*)?$/i)   // 末尾没写完的
+    return open ? { clean: src.slice(0, open.index).trimEnd(), delta: null, error: '<es> 标签没写完整，这一轮没记上' } : { clean: src, delta: null, error: null }
+  }
+  const clean = src.slice(0, m.index).trimEnd()
   try { return { clean, delta: JSON.parse(m[1].replace(/([:,\[]\s*)\+/g, '$1')), error: null } }
   catch { return { clean, delta: null, error: `<es> 里的 JSON 解析失败（${m[1].slice(0, 40)}），这一轮没记上` } }
 }
