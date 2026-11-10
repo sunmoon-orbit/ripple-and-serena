@@ -68,31 +68,90 @@
     const preferred = [selected, data.currentModel, data.model].find(value => value && [...modelSelect.options].some(option => option.value === value))
     modelSelect.value = preferred || modelSelect.options[0].value
     modelApply.disabled = busy || !modelSelect.value
+    if (!keepSelection) showAll = false
     renderModelList(data.currentModel)
+    renderEffort(data)
   }
   // 1004：系统下拉框在手机上是一块白底弹窗，跟归巢不搭（她说「有鸟为了图省事用的系统框」）。
   // 换成页面里自己画的列表，select 藏起来继续当数据源；历史版本单独一组
   const modelList = document.getElementById('cc-model-list')
+  // 1110 她说这页「好长呀」：常用的排成两列，名字缩短；全部版本收成一行，点了才展开
+  let showAll = false
+  const shortLabel = o => o.dataset.source === 'alias'
+    ? (o.dataset.label || '').replace('（Claude Code 推荐）', '').replace('（自动使用最新版本）', ' 最新')
+    : (o.dataset.label || o.textContent)
   function renderModelList(current) {
     if (!modelList) return
     modelList.replaceChildren()
     const isAll = o => o.dataset.source === 'official' || o.dataset.source === 'legacy'
-    const groups = [['常用', o => !isAll(o)], ['全部版本（官方列出的）', isAll]]
-    for (const [title, test] of groups) {
-      const opts = [...modelSelect.options].filter(o => o.value && test(o))
-      if (!opts.length) continue
-      const h = document.createElement('div'); h.className = 'cc-model-group'; h.textContent = title
-      modelList.append(h)
-      for (const o of opts) {
-        const b = document.createElement('button'); b.type = 'button'; b.className = 'cc-model-item'
+    const opts = [...modelSelect.options].filter(o => o.value)
+    const grid = list => {
+      const g = document.createElement('div'); g.className = 'cc-model-grid'
+      for (const o of list) {
+        const b = document.createElement('button'); b.type = 'button'; b.className = 'cc-model-item'; b.title = o.value
         if (o.value === modelSelect.value) b.classList.add('on')
-        const name = document.createElement('span'); name.textContent = o.dataset.label || o.textContent
+        const name = document.createElement('span'); name.textContent = shortLabel(o)
         b.append(name)
         if (o.value === current) { const tag = document.createElement('em'); tag.textContent = '正在用'; b.append(tag) }
         b.onclick = () => { modelSelect.value = o.value; modelSelect.onchange && modelSelect.onchange(); renderModelList(current) }
-        modelList.append(b)
+        g.append(b)
       }
+      return g
     }
+    const common = opts.filter(o => !isAll(o)), rest = opts.filter(isAll)
+    if (common.length) modelList.append(grid(common))
+    if (!rest.length) return
+    const picked = rest.find(o => o.value === modelSelect.value)
+    const more = document.createElement('button'); more.type = 'button'; more.className = 'cc-model-more'
+    more.setAttribute('aria-expanded', String(showAll))
+    const text = document.createElement('span')
+    text.textContent = '全部版本 · ' + rest.length + ' 个' + (picked && !showAll ? '（选了 ' + shortLabel(picked) + '）' : '')
+    const arrow = document.createElement('span'); arrow.textContent = showAll ? '收起 ▴' : '展开 ▾'
+    more.append(text, arrow)
+    more.onclick = () => { showAll = !showAll; renderModelList(current) }
+    modelList.append(more)
+    if (showAll) modelList.append(grid(rest))
+  }
+  // 1110 思考程度：终端里的 /effort。点一下就发，亮着的是状态栏报上来的当前档
+  const effortBlock = document.getElementById('cc-effort-block')
+  const effortList = document.getElementById('cc-effort-list')
+  const effortNow = document.getElementById('cc-current-effort')
+  const EFFORT_NAMES = { auto: '自动', low: '低', medium: '中', high: '高', xhigh: '超高', max: '最大' }
+  let effortTimer = null
+  function renderEffort(data) {
+    if (!effortBlock) return
+    const list = Array.isArray(data.efforts) ? data.efforts : []
+    effortBlock.hidden = !list.length
+    effortNow.textContent = EFFORT_NAMES[data.effort] || '未知'
+    effortList.replaceChildren()
+    for (const level of list) {
+      const b = document.createElement('button'); b.type = 'button'; b.className = 'cc-effort-item'
+      b.textContent = EFFORT_NAMES[level] || level
+      if (level === data.effort) b.classList.add('on')
+      b.disabled = busy
+      b.onclick = () => run(async () => {
+        say('正在切换思考程度…')
+        await api({}, { kind: 'effort-switch', effort: level })
+        say('指令已发送，正在等 Claude Code 确认…')
+        confirmEffort(level)
+      })
+      effortList.append(b)
+    }
+  }
+  function confirmEffort(expected, attempt = 0) {
+    clearTimeout(effortTimer)
+    effortTimer = setTimeout(async () => {
+      try {
+        const data = await api({ kind: 'model' })
+        applyModelData(data, true)
+        const now = EFFORT_NAMES[data.effort] || ''
+        // 「自动」是把档位交回给 CC 自己定，状态栏只会报它定成了哪一档
+        if (expected === 'auto' && attempt >= 1) { say('已交回自动' + (now ? '，现在是「' + now + '」' : '')); return }
+        if (data.effort === expected) { say('思考程度已切到「' + now + '」'); return }
+        if (attempt < 2) { confirmEffort(expected, attempt + 1); return }
+        say(now ? '指令已发送；状态栏报的还是「' + now + '」，这个模型可能不支持那一档，或者等下一条回复后再看。' : '指令已发送；状态栏还没报档位，等下一条回复后再看。')
+      } catch (e) { say(e.message) }
+    }, attempt === 0 ? 1800 : 2500)
   }
   function modelMatchesSelection(actual, selected) {
     if (!actual || !selected) return false

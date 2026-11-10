@@ -4,6 +4,8 @@ const path = require('path')
 const crypto = require('crypto')
 const { modelCatalog, validModel, officialModels } = require('./claude-runtime')
 const MAX_BYTES = 256 * 1024
+// 1110 思考程度：终端里 /effort 认的那几档（claude --help 的 --effort 加上 auto）
+const EFFORTS = ['auto', 'low', 'medium', 'high', 'xhigh', 'max']
 const hash = s => crypto.createHash('sha256').update(s).digest('hex')
 const fail = (status, message) => Object.assign(new Error(message), { status })
 
@@ -67,6 +69,9 @@ function createStore({ project, home, backups, claudeState = path.join(home, '.c
         currentModel: validModel(snapshot?.model) ? snapshot.model : '',
         // 快照是状态栏每次重绘时写的，终端里切了模型、还没出下一条回复前它是旧的
         currentModelAgeSeconds: Number(snapshot?.updated_at) ? Math.max(0, Math.round(Date.now() / 1000 - Number(snapshot.updated_at))) : null,
+        // 状态栏报上来的当前档位；模型不支持 effort 或快照是旧脚本写的就是空
+        effort: EFFORTS.includes(snapshot?.effort) ? snapshot.effort : '',
+        efforts: EFFORTS,
         models: modelCatalog({ stateFile: claudeState, settingsFile: targets.model, usageFile: usageSnapshot, officialList: officialModels(path.join(home, '.claude', '.credentials.json')) }),
         revision: item.revision,
         applies: 'next_session',
@@ -82,7 +87,7 @@ function createStore({ project, home, backups, claudeState = path.join(home, '.c
   }
 }
 
-function createHandler(store, authenticate, { switchModel, canSwitchModel } = {}) {
+function createHandler(store, authenticate, { switchModel, canSwitchModel, switchEffort } = {}) {
   return async function handle(req, res, url) {
     const send = (status, data) => {
       res.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' })
@@ -111,6 +116,11 @@ function createHandler(store, authenticate, { switchModel, canSwitchModel } = {}
         if (typeof canSwitchModel === 'function' && !canSwitchModel()) throw fail(409, '请等当前回复结束后再切换模型')
         if (typeof switchModel !== 'function' || !switchModel(body.model)) throw fail(409, '当前没有可接收切换指令的 Claude Code 会话')
         data = { model: body.model, applied: 'current_session', queued: true }
+      } else if (body.kind === 'effort-switch') {
+        if (!EFFORTS.includes(body.effort)) throw fail(400, '思考程度无效')
+        if (typeof canSwitchModel === 'function' && !canSwitchModel()) throw fail(409, '请等当前回复结束后再切换思考程度')
+        if (typeof switchEffort !== 'function' || !switchEffort(body.effort)) throw fail(409, '当前没有可接收切换指令的 Claude Code 会话')
+        data = { effort: body.effort, applied: 'current_session', queued: true }
       } else {
         data = body.kind === 'model' ? store.saveModel(body.model, body.revision) : store.saveDocument(body.scope, body.content, body.revision)
       }

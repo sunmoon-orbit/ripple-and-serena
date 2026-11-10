@@ -1213,6 +1213,12 @@ const handleCcSettings = ccSettings.createHandler(ccSettings.createStore({
     if (ok) switchQuietUntil = Date.now() + 6000
     return ok
   },
+  // 1110 她要的：终端里能选思考程度，归巢也要有。档位在 cc-settings.js 里验过才到这儿
+  switchEffort: level => {
+    const ok = tmuxSend(`/effort ${level}`)
+    if (ok) switchQuietUntil = Date.now() + 6000
+    return ok
+  },
 })
 
 const server = http.createServer((req, res) => {

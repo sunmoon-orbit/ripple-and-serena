@@ -86,3 +86,27 @@ test('HTTP refuses to type a model command while Claude Code is replying', async
   assert.match(response.body.error, /当前回复结束/)
   assert.deepEqual(switched, [])
 })
+test('effort level comes from the statusline snapshot and only known levels can be typed', async t => {
+  const { store, usageSnapshot } = fixture(t)
+  assert.equal(store.readModel().effort, '')
+  fs.writeFileSync(usageSnapshot, JSON.stringify({ model: 'claude-current', effort: 'xhigh', updated_at: Math.floor(Date.now() / 1000) }))
+  assert.equal(store.readModel().effort, 'xhigh')
+  fs.writeFileSync(usageSnapshot, JSON.stringify({ model: 'claude-current', effort: 'high; rm -rf /' }))
+  assert.equal(store.readModel().effort, '')
+  const typed = []
+  const handler = createHandler(store, token => token === 'fixture-only', { switchEffort: value => { typed.push(value); return true } })
+  const ok = await request(handler, { method: 'POST', token: 'fixture-only', body: JSON.stringify({ kind: 'effort-switch', effort: 'max' }) })
+  assert.equal(ok.status, 200)
+  assert.equal((await request(handler, { method: 'POST', token: 'fixture-only', body: JSON.stringify({ kind: 'effort-switch', effort: 'max\n/model opus' }) })).status, 400)
+  assert.equal((await request(handler, { method: 'POST', token: 'fixture-only', body: JSON.stringify({ kind: 'effort-switch' }) })).status, 400)
+  assert.deepEqual(typed, ['max'])
+})
+test('HTTP refuses to type an effort command while Claude Code is replying', async t => {
+  const { store } = fixture(t)
+  const typed = []
+  const handler = createHandler(store, token => token === 'fixture-only', { canSwitchModel: () => false, switchEffort: value => { typed.push(value); return true } })
+  const response = await request(handler, { method: 'POST', token: 'fixture-only', body: JSON.stringify({ kind: 'effort-switch', effort: 'low' }) })
+  assert.equal(response.status, 409)
+  assert.match(response.body.error, /当前回复结束/)
+  assert.deepEqual(typed, [])
+})

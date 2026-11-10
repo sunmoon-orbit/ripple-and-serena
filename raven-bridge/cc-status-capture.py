@@ -34,6 +34,8 @@ def main():
         "available": True,
         "updated_at": int(time.time()),
         "model": model.get("id") or model.get("display_name") or "",
+        # 1110 思考程度：模型不支持 effort 时 CC 不给这个字段
+        "effort": (source.get("effort") or {}).get("level"),
         "five_hour": window(limits.get("five_hour")),
         "seven_day": window(limits.get("seven_day")),
         "context_used_percent": context.get("used_percentage"),
