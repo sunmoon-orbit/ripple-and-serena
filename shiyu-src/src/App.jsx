@@ -40,6 +40,8 @@ export default function App() {
     const color = bg[theme] || bg.light
     document.documentElement.setAttribute('data-theme', theme)
     document.documentElement.style.background = color
+    // 开机脚本给 body 写过一次内联底色；这里不跟着改，换主题后页面底色就停在开机那套上（1110）
+    document.body.style.background = color
     const meta = document.getElementById('theme-color-meta')
     if (meta) meta.setAttribute('content', color)
   }, [theme])
