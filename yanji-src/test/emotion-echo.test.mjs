@@ -95,3 +95,13 @@ test('unknown keys and broken tags are reported next turn instead of dropped sil
   emo.markEmotionHintsDelivered(emo.peekEmotionHints().map(h => h.id))
   assert.equal(emo.peekEmotionHints().length, 0)
 })
+
+test('server slots overwrite the local cache; string hints from the ledger pass through', () => {
+  reset({ anger: 50 })
+  const st = emo.adoptServerSlots({ anger: 12, joy: 33 })
+  assert.equal(st.slots.anger, 12)
+  assert.equal(st.slots.joy, 33)
+  assert.match(emo.buildEmotionPrompt(['委屈刚越过需要留意的区间']), /- 委屈刚越过需要留意的区间/)
+  emo.applyEmotionDelta({ v: 30 })
+  assert.equal(emo.peekEmotionHints().length, 0)
+})

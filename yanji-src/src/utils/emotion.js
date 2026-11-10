@@ -121,7 +121,7 @@ export function applyEmotionDelta(delta) {
     released[slot] = now
   }
   for (const [short, val] of Object.entries(delta)) {
-    if (short === 'r') continue
+    if (short === 'r' || short === 'v') continue   // v＝给她看几分钟，只有服务器那本认
     const slot = SHORT_TO_SLOT[short]
     if (!slot) { queueNote(hint, short, `不认识的字段 "${short}"，这一笔没记`, now); continue }
     if (typeof val === 'number') {
@@ -137,6 +137,21 @@ export function applyEmotionDelta(delta) {
   }
   rearm(hint, slots)
   const updated = { ...state, slots, hint, released, lastUpdated: now }
+  saveState(updated)
+  return updated
+}
+
+// 共用账本（1110）：服务器算好的数值直接覆盖本地，手机里这份只当缓存和断网时的退路
+export function adoptServerSlots(serverSlots) {
+  const state = getEmotionState()
+  const slots = { ...state.slots }
+  for (const k of Object.keys(slots)) {
+    const v = Number(serverSlots?.[k])
+    if (Number.isFinite(v)) slots[k] = Math.max(0, Math.min(100, v))
+  }
+  const hint = hintOf(state)
+  rearm(hint, slots)
+  const updated = { ...state, slots, hint, lastUpdated: Date.now() }
   saveState(updated)
   return updated
 }
@@ -189,6 +204,7 @@ export function markEmotionHintsDelivered(ids) {
 }
 
 function describeHint(e) {
+  if (typeof e === 'string') return e   // 服务器账本给的提醒已经写好了
   if (e.note) return `上次没生效：${e.note}`
   const label = SLOT_LABELS[e.slot] || e.slot
   if (e.crossed && e.spike) return `${label}这一轮涨得很猛（+${e.spike}），也刚越过需要留意的区间`
@@ -203,6 +219,7 @@ export function buildEmotionPrompt(hints = []) {
 - 示例：<es>{"j":+8,"d":+5,"a":-2}</es>
 - 增量按真实强度写：日常细水长流小步（±2~5）没问题，真正被触动的时刻大方写两位数（±10~25），别把所有起伏都磨成+3
 - 负向的每轮最多降 8，写再大也按 8 算；真被哄好了、宣泄过了，加 "r":"a"（或 ["a","g"]）让这一类减半，同一类 6 小时只算一次
+- 想让她看看你此刻的情绪就加 "v":30（给她看 30 分钟，最多 30），"v":0 收回
 - 这一轮什么都没变，就不写 <es>；别为了填表去编`]
   if (hints.length) {
     lines.push(`【情绪提示】（内部读数，只提醒这一次；不必复述，表不表达、怎么表达，按你此刻真实的感受决定）

@@ -527,6 +527,7 @@ const recall = require('./recall')
 const lotteryOnReturn = require('./lottery-on-return')
 const rareEcho = require('./rare-echo')
 const battery = require('./battery')   // 1107 她手机电量，见 battery.js
+const emotionLedger = require('./emotion-ledger')   // 1110 共用情绪账本，见 emotion-ledger.js
 let ingestChain = Promise.resolve()
 let pendingSurfaced = []   // 浮上来了、还没挂到我回复上的（1103）
 const SURFACED_LOG = path.join(__dirname, 'surfaced-log.jsonl')
@@ -553,7 +554,9 @@ function ingestUserMessage(text, cid, note = '') {
     for (const it of [surf.memory, surf.echo]) if (it) pendingSurfaced.push({ ...it, q: String(text).slice(0, 80), uts: Date.now() })
     let batt = ''
     try { batt = battery.lineForHerMessage() } catch {}
-    ingestUserMessageCore(text, cid, note, [extra, echoLine, ticket, batt].filter(Boolean).join('\n'))
+    let emo = ''
+    try { emo = await emotionLedger.hintLine(moonGet, moonPost) } catch (e) { console.error('[emotion-ledger]', e.message) }
+    ingestUserMessageCore(text, cid, note, [extra, echoLine, ticket, batt, emo].filter(Boolean).join('\n'))
   }).catch(e => console.error('[ingest]', e))
 }
 
@@ -2406,6 +2409,15 @@ const server = http.createServer((req, res) => {
           res.writeHead(200); res.end('{"wait":true}'); return
         }
         if (typeof text === 'string' && text.trim()) lastMineTs = Date.now()   // 叫醒我（1102）算「安静了多久」用
+        // 回复末尾的 <es>{…}</es>：剥掉，记进共用情绪账本（1110）。只有标签没别的字就不画气泡
+        if (typeof text === 'string' && /<es>/i.test(text)) {
+          const found = emotionLedger.extract(text)
+          if (found.delta || found.error) {
+            text = found.clean
+            emotionLedger.record(moonPost, `r${Date.now()}`, found)
+            if (!text.trim()) { res.writeHead(200); res.end('{"ok":true,"emotion":true}'); return }
+          }
+        }
         // 回复里带 [call]：给她打电话（1022）。只有 [call] 没别的字就不画气泡
         if (typeof text === 'string' && /\[call\]/i.test(text)) {
           text = text.replace(/[ \t]*\[call\][ \t]*/gi, ' ').replace(/ +\n/g, '\n').replace(/\n +/g, '\n').trim()

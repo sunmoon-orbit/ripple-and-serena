@@ -16,7 +16,7 @@ import { sendMessage, summarizeThinking, normalizeProvider, BUILTIN_MODELS, buil
 import { uuid } from '../../utils'
 import { contextRefreshPlan, compactionBatches } from '../../utils/contextRefresh'
 import { downloadBlob } from '../../utils/download'
-import { applyTimeAway, applyDecayAndGet, buildEmotionPrompt, peekEmotionHints, markEmotionHintsDelivered, extractEmotionUpdate, applyEmotionDelta, noteEmotionError, stripEmotionTag } from '../../utils/emotion'
+import { applyTimeAway, applyDecayAndGet, buildEmotionPrompt, peekEmotionHints, markEmotionHintsDelivered, extractEmotionUpdate, applyEmotionDelta, noteEmotionError, adoptServerSlots, stripEmotionTag } from '../../utils/emotion'
 import { maybeSyncEmotion } from '../../utils/emotionSync'
 import { shouldNudge, recordNudge, buildNudgeText } from '../../utils/nudge'
 import { decideReplyDelay, getPendingReply, setPendingReply, clearPendingReply } from '../../utils/replyDelay'
@@ -61,7 +61,7 @@ import HeartCardAlbum from './HeartCardAlbum'
 import PhotoAlbum, { AlbumIcon } from './PhotoAlbum'
 import Favorites, { StarIcon } from './Favorites'
 import { surfaceMemory } from '../../utils/autoRecall'
-import { fetchAnniversaryToday, fetchUnseenHeartCards, markHeartCardSeen, formatWeatherLine, fetchContactLastSeen } from '../../api/moonMemory'
+import { fetchAnniversaryToday, fetchUnseenHeartCards, markHeartCardSeen, formatWeatherLine, fetchContactLastSeen, fetchEmotionLedger, fetchEmotionLedgerContext, ackEmotionLedger, applyEmotionLedger, postEmotionAway } from '../../api/moonMemory'
 import CompletionEgg, { pickEgg } from './CompletionEgg'
 import QuestionCard from './QuestionCard'
 import { ThemedConfirmDialog, useThemedConfirm } from '../ThemedConfirmDialog'
@@ -739,9 +739,21 @@ export default function Chat() {
       if (timeAwarenessOn && moonMemory?.apiToken) {
         try { contactFloor = await fetchContactLastSeen({ baseUrl: moonMemory.baseUrl, apiToken: moonMemory.apiToken }) } catch { /* 静默 */ }
       }
+      // 1110 共用情绪账本：服务器那本是准的（归巢也在记），先拿来覆盖本地；连不上就退回手机里那套
+      const ledgerCfg = moonMemory?.apiToken ? { baseUrl: moonMemory.baseUrl, apiToken: moonMemory.apiToken } : null
+      let ledgerCtx = null
+      if (ledgerCfg) {
+        try {
+          adoptServerSlots((await fetchEmotionLedger(ledgerCfg)).slots)
+          ledgerCtx = await fetchEmotionLedgerContext(ledgerCfg)
+        } catch { ledgerCtx = null }
+      }
       const { hoursAway, added: longingAdded } = timeAwarenessOn ? applyTimeAway(contactFloor) : (applyDecayAndGet(), { hoursAway: 0, added: 0 })
+      if (ledgerCtx && longingAdded) {
+        try { adoptServerSlots((await postEmotionAway(ledgerCfg, longingAdded)).slots) } catch { /* 本地已经加过了 */ }
+      }
       // 情绪回声（0929）：不再每轮塞整张数值表，只给记录协议 + 越阈值的一次性提醒
-      const emotionHints = peekEmotionHints()
+      const emotionHints = ledgerCtx ? ledgerCtx.lines : peekEmotionHints()
       dynParts.push(buildEmotionPrompt(emotionHints))
       if (timeAwarenessOn && hoursAway >= 2) {
         const h = Math.round(hoursAway)
@@ -807,7 +819,8 @@ export default function Chat() {
         onAskUser: askUser,
       })
       // 请求真的发出去并回来了，这批一次性情绪提醒才算送到
-      markEmotionHintsDelivered(emotionHints.map(e => e.id))
+      if (ledgerCtx) { if (ledgerCtx.lines.length) ackEmotionLedger(ledgerCfg, ledgerCtx.upto).catch(() => {}) }
+      else markEmotionHintsDelivered(emotionHints.map(e => e.id))
       // 最终落盘会一次写入完整正文；先取消尚未执行的流式刷新，避免它随后把
       // streaming:true 覆盖回来，留下永不结束的光标。
       streamUi.cancel()
@@ -824,11 +837,19 @@ export default function Chat() {
       }
       // 提取情绪更新标签，应用到情绪状态，从显示文本里剥离
       const { clean: afterEs, delta: emotionDelta, error: emotionError } = extractEmotionUpdate(afterTarotText)
-      if (emotionError) noteEmotionError(emotionError)
-      if (emotionDelta) {
-        const emoState = applyEmotionDelta(emotionDelta)
-        maybeAutoPostMoment(emoState, conn, moonMemory)  // 某正向情绪越阈值时，涟言自动发条朋友圈
+      if (emotionDelta || emotionError) {
+        let emoState = null
+        if (ledgerCtx) {
+          try { emoState = adoptServerSlots((await applyEmotionLedger(ledgerCfg, { source: 'yanji', turn: assistantId, delta: emotionDelta || {}, error: emotionError })).slots) } catch { emoState = null }
+        }
+        if (!emoState) {
+          if (emotionError) noteEmotionError(emotionError)
+          if (emotionDelta) emoState = applyEmotionDelta(emotionDelta)
+        }
+        if (emotionDelta && emoState) maybeAutoPostMoment(emoState, conn, moonMemory)  // 某正向情绪越阈值时，涟言自动发条朋友圈
       }
+      // "v":N 是我主动给她看（1110）：侧边栏照 <neg>allow</neg> 那样解锁
+      if (Number(emotionDelta?.v) > 0) window.dispatchEvent(new CustomEvent('neg-view-result', { detail: { allow: true } }))
       // 提取情绪之肤 <mood>，改变整屏氛围，并从显示文本里剥离
       const { clean: afterMood, mood: moodTag } = extractMood(afterEs)
       if (moodTag) applyMood(moodTag)
