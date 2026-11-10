@@ -1987,6 +1987,25 @@ const server = http.createServer((req, res) => {
   // 按「角色:时间戳」给一条消息挂表情，每人每条最多一个，再点同一个就摘掉。
   // 外网来的（她的浏览器/app，要 token）记在阿颖名下；本机带 X-Local-Token 的记在涟言名下。
   // 抽屉：她读（外网要 token），我写（只收本机带钥匙的）
+  // 心情账（1110）：共用情绪账本给她看的那一面。没 grant 时负向槽是 null（遮挡在 moon 那边做）
+  if (url.pathname === '/raven/mood' && req.method === 'GET') {
+    if (!externalAuthed(req, url)) { res.writeHead(401); res.end('{}'); return }
+    moonGet('/emotion/ledger/view')
+      .then(d => { res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' }); res.end(JSON.stringify(d)) })
+      .catch(() => { res.writeHead(503); res.end('{}') })
+    return
+  }
+  if ((url.pathname === '/raven/mood/viewed' || url.pathname === '/raven/mood/close') && req.method === 'POST') {
+    if (!externalAuthed(req, url)) { res.writeHead(401); res.end('{}'); return }
+    const closing = url.pathname.endsWith('/close')
+    moonPost(closing ? '/emotion/ledger/close' : '/emotion/ledger/viewed', {})
+      .then(r => {
+        if (r.data?.ok) emotionLedger.noteHer(closing ? '她把你给她看的心情账提前合上了' : '她打开看了你给她看的心情账')
+        res.writeHead(200, { 'Content-Type': 'application/json' }); res.end(JSON.stringify(r.data || {}))
+      })
+      .catch(() => { res.writeHead(503); res.end('{}') })
+    return
+  }
   if (url.pathname === '/raven/drawer' && req.method === 'GET') {
     if (!externalAuthed(req, url)) { res.writeHead(401); res.end('{}'); return }
     const items = loadDrawer().slice().sort((a, b) => b.id - a.id)

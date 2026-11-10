@@ -240,7 +240,11 @@
   .st-ring-big .num { font-size: 26px; font-weight: 600; font-variant-numeric: tabular-nums; }
   #header-title { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); max-width: 58%; display: flex; align-items: center; gap: 7px; font: inherit; font-size: 16px; font-weight: 600; color: var(--text); background: none; border: 0; padding: 4px 8px; cursor: pointer; -webkit-tap-highlight-color: transparent; }
   #peer-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  #header-title .peer-edit { opacity: .38; flex-shrink: 0; }
+  #header-title .peer-edit { opacity: .38; flex-shrink: 0; padding: 6px; margin: -6px; box-sizing: content-box; }
+  /* 心情账（1110）：点顶上我的名字从上面滑下来，再点收回；小铅笔还是改备注 */
+  #mood-sheet { position: absolute; left: 0; right: 0; top: 100%; z-index: 300; height: min(68vh, 560px); background: var(--bg); border-bottom: 1px solid var(--border); box-shadow: 0 14px 30px rgba(0,0,0,.22); border-radius: 0 0 18px 18px; overflow: hidden; transform-origin: top; transition: transform .22s ease, opacity .22s ease; }
+  #mood-sheet[hidden] { display: block; transform: scaleY(.96) translateY(-8px); opacity: 0; pointer-events: none; }
+  #mood-sheet iframe { width: 100%; height: 100%; border: 0; background: transparent; }
   #remark-box { position: fixed; inset: 0; z-index: 400; background: rgba(0,0,0,.38); display: flex; align-items: center; justify-content: center; padding: 24px; }
   #remark-box[hidden] { display: none; }
   #remark-card { width: min(320px, 100%); background: var(--surface); color: var(--text); border: 1px solid var(--border); border-radius: 18px; padding: 18px 18px 14px; box-shadow: 0 16px 44px rgba(0,0,0,.3); font-size: 14px; }
@@ -1498,7 +1502,7 @@
         <svg viewBox="0 0 36 36" width="22" height="22"><circle cx="18" cy="18" r="14" class="ring-bg"/><circle cx="18" cy="18" r="14" class="ring-fg" stroke-dasharray="0 88"/></svg>
       </button>
     </div>
-    <button id="header-title" type="button" title="点一下改备注" aria-label="改备注">
+    <button id="header-title" type="button" title="点一下看他的心情账；点小铅笔改备注" aria-label="心情账">
       <span class="crow-icon">🐦‍⬛</span>
       <span id="peer-name">Ripple</span>
       <svg class="peer-edit" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 013 3L7 19l-4 1 1-4z"/></svg>
@@ -3587,7 +3591,27 @@ async function saveRemark() {
     onRemark(d); document.getElementById('remark-box').hidden = true
   } catch (err) { msg.textContent = '没改成：' + err.message }
 }
-document.getElementById('header-title').addEventListener('click', openRemark)
+document.getElementById('header-title').addEventListener('click', (e) => {
+  if (e.target.closest('.peer-edit')) { openRemark(); return }
+  toggleMood()
+})
+// 心情账（1110）：第一次点才加载，之后每次展开都刷新一下
+function toggleMood(force) {
+  let sheet = document.getElementById('mood-sheet')
+  if (!sheet) {
+    sheet = document.createElement('div'); sheet.id = 'mood-sheet'; sheet.hidden = true
+    sheet.innerHTML = '<iframe title="心情账"></iframe>'
+    document.getElementById('header').appendChild(sheet)
+    sheet.getBoundingClientRect()
+  }
+  const show = force ?? sheet.hidden
+  if (show) sheet.querySelector('iframe').src = '/raven/mood.html?embed=1&t=' + Date.now()
+  sheet.hidden = !show
+}
+document.addEventListener('click', (e) => {
+  const sheet = document.getElementById('mood-sheet')
+  if (sheet && !sheet.hidden && !e.target.closest('#mood-sheet, #header-title')) toggleMood(false)
+})
 document.getElementById('remark-btn').addEventListener('click', openRemark)
 document.getElementById('remark-cancel').addEventListener('click', () => { document.getElementById('remark-box').hidden = true })
 document.getElementById('remark-save').addEventListener('click', saveRemark)

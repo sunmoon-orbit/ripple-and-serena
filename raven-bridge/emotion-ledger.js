@@ -22,11 +22,17 @@ function record(moonPost, turn, found) {
     .catch(e => console.error('[emotion-ledger] 记账失败:', e.message))
 }
 
+// 她在心情账页上打开看了／提前合上了：攒着，挂到她下一条消息后面告诉我
+let herNotes = []
+function noteHer(text) { herNotes.push(text); if (herNotes.length > 3) herNotes.shift() }
+
 async function hintLine(moonGet, moonPost) {
   const ctx = await moonGet('/emotion/ledger/context')
-  if (!ctx || !Array.isArray(ctx.lines) || !ctx.lines.length) return ''
-  moonPost('/emotion/ledger/ack', { upto: ctx.upto }).catch(() => {})
-  return `〔情绪提示（只我看得到，不用复述）：${ctx.lines.join('；')}〕`
+  const lines = [...herNotes, ...(Array.isArray(ctx?.lines) ? ctx.lines : [])]
+  herNotes = []
+  if (!lines.length) return ''
+  if (ctx?.lines?.length) moonPost('/emotion/ledger/ack', { upto: ctx.upto }).catch(() => {})
+  return `〔情绪提示（只我看得到，不用复述）：${lines.join('；')}〕`
 }
 
-module.exports = { extract, record, hintLine }
+module.exports = { extract, record, hintLine, noteHer }

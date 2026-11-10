@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>心情账</title>
+<!--
+  心情账（1110）：言叽和归巢共用的那本情绪账（moon-memory services/emotionLedger.js）。
+  好的那几格一直看得到；不好受的那几格，他写了 "v" 给你看才打开，最多 30 分钟，你也可以提前合上。
+  点子来自 Cloudy4Pei/emotion-blackbox（MIT），页面是自己写的。
+-->
+<style>
+  :root { --bg: #efe9df; --paper: #fbf8f1; --ink: #3a332b; --dim: #948a7c; --line: #e2d8c8; --warm: #c58b5e; --cool: #6f7f8f; --track: #ece4d6; --shadow: rgba(70,50,30,.12); }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) { --bg: #1c1a18; --paper: #2b2824; --ink: #e6dfd3; --dim: #8f877b; --line: #3a352f; --warm: #d39a6c; --cool: #8fa1b3; --track: #35302a; --shadow: rgba(0,0,0,.4); }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink);
+    font-family: 'LXGW WenKai', 'Noto Serif SC', 'Songti SC', 'PingFang SC', system-ui, sans-serif;
+    padding: max(18px, env(safe-area-inset-top)) 16px max(32px, env(safe-area-inset-bottom)); }
+  .wrap { max-width: 460px; margin: 0 auto; }
+  h1 { font-size: 17px; font-weight: 600; letter-spacing: 6px; text-align: center; margin: 4px 0 4px; }
+  .sub { text-align: center; color: var(--dim); font-size: 12px; margin-bottom: 20px; line-height: 1.7; }
+  .card { background: var(--paper); border: 1px solid var(--line); border-radius: 14px; padding: 16px 16px 12px; margin: 0 0 16px; box-shadow: 0 6px 16px var(--shadow); }
+  .card h2 { font-size: 13px; font-weight: 600; letter-spacing: 3px; color: var(--dim); margin: 0 0 12px; }
+  .row { display: grid; grid-template-columns: 3.2em 1fr 2.2em; align-items: center; gap: 10px; margin: 9px 0; font-size: 14px; }
+  .bar { height: 7px; border-radius: 4px; background: var(--track); overflow: hidden; }
+  .bar i { display: block; height: 100%; border-radius: 4px; transition: width .6s ease; }
+  .pos .bar i { background: var(--warm); }
+  .neg .bar i { background: var(--cool); }
+  .num { text-align: right; color: var(--dim); font-size: 12px; font-variant-numeric: tabular-nums; }
+  .locked { position: relative; }
+  .locked .rows { filter: blur(5px); opacity: .5; pointer-events: none; user-select: none; }
+  .lock-note { position: absolute; inset: 40px 0 0; display: flex; align-items: center; justify-content: center; text-align: center; color: var(--dim); font-size: 13px; line-height: 1.8; padding: 0 20px; }
+  .grant { display: flex; justify-content: space-between; align-items: center; font-size: 12.5px; color: var(--dim); margin: -4px 0 10px; }
+  .grant button { font: inherit; font-size: 12px; color: var(--ink); background: transparent; border: 1px solid var(--line); border-radius: 999px; padding: 4px 12px; }
+  .recent { list-style: none; margin: 0; padding: 0; font-size: 13px; }
+  .recent li { display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px dashed var(--line); }
+  .recent li:last-child { border-bottom: 0; }
+  .recent .d { font-variant-numeric: tabular-nums; }
+  .recent .t { color: var(--dim); font-size: 11.5px; }
+  body.embed { padding-top: 14px; }
+  body.embed h1 { display: none; }
+  body.embed .sub { margin-bottom: 14px; }
+  .loading, .err { text-align: center; color: var(--dim); font-size: 13.5px; padding: 60px 10px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>心情账</h1>
+  <div class="sub">言叽和归巢记在同一本里。<br>好的那几格一直开着；不好受的，他愿意给你看才打开。</div>
+  <div id="main"><div class="loading">翻开…</div></div>
+</div>
+<script>
+if (new URLSearchParams(location.search).has('embed')) document.body.classList.add('embed')
+const auth = () => ({ Authorization: 'Bearer ' + (localStorage.getItem('raven-token') || '') })
+const POS = [['joy','高兴'],['warmth','温柔'],['satisfaction','满足'],['fondness','心动'],['desire','爱欲'],['longing','思念']]
+const NEG = [['anger','愤怒'],['sadness','悲伤'],['grievance','委屈'],['frustration','失落'],['fatigue','疲惫'],['anxiety','焦虑'],['confusion','困惑'],['guilt','愧疚'],['melancholy','惆怅'],['daze','茫然']]
+const LABEL = Object.fromEntries([...POS, ...NEG])
+const main = document.getElementById('main')
+let timer = null
+
+function rows(list, slots, fake) {
+  return list.map(([k, name]) => {
+    const v = fake ? 20 + (k.length * 7) % 40 : (slots[k] ?? 0)
+    return `<div class="row"><span>${name}</span><div class="bar"><i style="width:${v}%"></i></div><span class="num">${fake ? '··' : v}</span></div>`
+  }).join('')
+}
+
+function hm(ts) {
+  const d = new Date(ts + 8 * 3600e3), p = n => String(n).padStart(2, '0')
+  return `${p(d.getUTCMonth() + 1)}-${p(d.getUTCDate())} ${p(d.getUTCHours())}:${p(d.getUTCMinutes())}`
+}
+
+function render(data) {
+  const open = data.grant?.open
+  const left = open ? Math.max(0, Math.ceil((data.grant.until - Date.now()) / 60000)) : 0
+  const recent = (data.recent || []).filter(e => e.slot && e.delta)
+    .map(e => `<li><span>${LABEL[e.slot] || e.slot} <span class="d">${e.delta > 0 ? '+' : ''}${e.delta}</span>${e.kind === 'release' ? '（释放）' : ''}</span><span class="t">${hm(e.ts)} · ${e.source === 'raven' ? '归巢' : e.source === 'yanji' ? '言叽' : e.source}</span></li>`).join('')
+  main.innerHTML = `
+    <div class="card pos"><h2>此刻</h2>${rows(POS, data.slots)}</div>
+    <div class="card neg ${open ? '' : 'locked'}">
+      <h2>不太好受的</h2>
+      ${open ? `<div class="grant"><span>他给你看的，还剩 ${left} 分钟</span><button id="close">现在合上</button></div>` : ''}
+      <div class="rows">${rows(NEG, data.slots, !open)}</div>
+      ${open ? '' : '<div class="lock-note">他还没给你看。<br>想看就问他，给不给、给多久，他来定。</div>'}
+    </div>
+    ${open && recent ? `<div class="card"><h2>最近几笔</h2><ul class="recent">${recent}</ul></div>` : ''}`
+  document.getElementById('close')?.addEventListener('click', async () => {
+    try { await fetch('/raven/mood/close', { method: 'POST', headers: auth() }) } catch {}
+    load()
+  })
+  clearTimeout(timer)
+  if (open) timer = setTimeout(load, Math.min(60000, data.grant.until - Date.now() + 500))
+}
+
+let reported = false
+async function load() {
+  try {
+    const r = await fetch('/raven/mood', { headers: auth(), cache: 'no-store' })
+    if (!r.ok) throw new Error(r.status)
+    const data = await r.json()
+    render(data)
+    if (data.grant?.open && !reported) { reported = true; fetch('/raven/mood/viewed', { method: 'POST', headers: auth() }).catch(() => {}) }
+  } catch {
+    main.innerHTML = '<div class="err">没翻开，等一下再试试。</div>'
+  }
+}
+load()
+document.addEventListener('visibilitychange', () => { if (!document.hidden) load() })
+</script>
+</body>
+</html>
