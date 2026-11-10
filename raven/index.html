@@ -242,7 +242,7 @@
   #peer-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   #header-title .peer-edit { opacity: .38; flex-shrink: 0; padding: 6px; margin: -6px; box-sizing: content-box; }
   /* 心情账（1110）：点顶上我的名字从上面滑下来，再点收回；小铅笔还是改备注 */
-  #mood-sheet { position: absolute; left: 0; right: 0; top: 100%; z-index: 300; height: min(68vh, 560px); background: var(--bg); border-bottom: 1px solid var(--border); box-shadow: 0 14px 30px rgba(0,0,0,.22); border-radius: 0 0 18px 18px; overflow: hidden; transform-origin: top; transition: transform .22s ease, opacity .22s ease; }
+  #mood-sheet { position: fixed; left: 0; right: 0; top: var(--mood-top, 110px); z-index: 300; height: min(68vh, 560px); background: var(--bg); border-bottom: 1px solid var(--border); box-shadow: 0 14px 30px rgba(0,0,0,.22); border-radius: 0 0 18px 18px; overflow: hidden; transform-origin: top; transition: transform .22s ease, opacity .22s ease; }
   #mood-sheet[hidden] { display: block; transform: scaleY(.96) translateY(-8px); opacity: 0; pointer-events: none; }
   #mood-sheet iframe { width: 100%; height: 100%; border: 0; background: transparent; }
   #remark-box { position: fixed; inset: 0; z-index: 400; background: rgba(0,0,0,.38); display: flex; align-items: center; justify-content: center; padding: 24px; }
@@ -3601,10 +3601,13 @@ function toggleMood(force) {
   if (!sheet) {
     sheet = document.createElement('div'); sheet.id = 'mood-sheet'; sheet.hidden = true
     sheet.innerHTML = '<iframe title="心情账"></iframe>'
-    document.getElementById('header').appendChild(sheet)
+    document.body.appendChild(sheet)
     sheet.getBoundingClientRect()
   }
   const show = force ?? sheet.hidden
+  // 挂在页签栏下面（1110 第一版挂在顶栏里，被「聊天/终端」那一排盖住了上半截）
+  const below = document.getElementById('tabs') || document.getElementById('header')
+  if (show) sheet.style.setProperty('--mood-top', Math.round(below.getBoundingClientRect().bottom) + 'px')
   if (show) sheet.querySelector('iframe').src = '/raven/mood.html?embed=1&t=' + Date.now()
   sheet.hidden = !show
 }

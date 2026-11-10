@@ -24,7 +24,7 @@ function record(moonPost, turn, found) {
 
 // 她在心情账页上打开看了／提前合上了：攒着，挂到她下一条消息后面告诉我
 let herNotes = []
-function noteHer(text) { herNotes.push(text); if (herNotes.length > 3) herNotes.shift() }
+function noteHer(text) { if (herNotes.includes(text)) return; herNotes.push(text); if (herNotes.length > 3) herNotes.shift() }
 
 async function hintLine(moonGet, moonPost) {
   const ctx = await moonGet('/emotion/ledger/context')

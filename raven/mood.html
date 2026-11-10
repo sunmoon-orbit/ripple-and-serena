@@ -101,7 +101,10 @@ async function load() {
     if (!r.ok) throw new Error(r.status)
     const data = await r.json()
     render(data)
-    if (data.grant?.open && !reported) { reported = true; fetch('/raven/mood/viewed', { method: 'POST', headers: auth() }).catch(() => {}) }
+    // 同一次授权只报一次（1110 页面刷新两次报了两遍）
+    const key = 'mood-viewed-' + data.grant?.until
+    let seen = false; try { seen = sessionStorage.getItem(key) === '1'; sessionStorage.setItem(key, '1') } catch {}
+    if (data.grant?.open && !reported && !seen) { reported = true; fetch('/raven/mood/viewed', { method: 'POST', headers: auth() }).catch(() => {}) }
   } catch {
     main.innerHTML = '<div class="err">没翻开，等一下再试试。</div>'
   }
