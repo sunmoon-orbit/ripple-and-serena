@@ -1471,9 +1471,14 @@
   .rvr-pl-bar { display: flex; gap: 8px; margin: 2px 0 6px; }
   .rvr-playall { flex: 1; border: 0; background: var(--accent); color: var(--bg); border-radius: 10px; padding: 9px; font-size: 13.5px; cursor: pointer; font-family: inherit; }
   .rvr-pl-del { border: 1px solid var(--border); background: none; color: var(--text-dim); border-radius: 10px; padding: 9px 12px; font-size: 12.5px; cursor: pointer; font-family: inherit; margin-left: auto; }
-  #rv-toast { position: fixed; left: 50%; bottom: calc(140px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); z-index: 1300; background: rgba(0,0,0,.75); color: #fff;
-    font-size: 13px; padding: 7px 14px; border-radius: 999px; opacity: 0; pointer-events: none; transition: opacity .2s; }
-  #rv-toast.show { opacity: 1; }
+  /* 小提示（1111 她：「还是系统的椭圆黑框提示，弄好看点」）：跟主题走的毛玻璃，收藏和听歌共用 */
+  #rv-toast { position: fixed; left: 50%; bottom: calc(118px + env(safe-area-inset-bottom, 0px)); transform: translate(-50%, 8px); z-index: 9999; width: max-content; max-width: min(84vw, 360px);
+    display: flex; align-items: center; gap: 8px; font-size: 13px; line-height: 1.5; padding: 9px 16px 9px 13px; border-radius: 16px; color: var(--text, #3a332b);
+    border: 1px solid var(--border, rgba(0,0,0,.08)); background: color-mix(in srgb, var(--surface, #fbf8f1) 88%, transparent);
+    -webkit-backdrop-filter: blur(16px) saturate(1.3); backdrop-filter: blur(16px) saturate(1.3); box-shadow: 0 8px 24px rgba(0,0,0,.16);
+    opacity: 0; pointer-events: none; transition: opacity .22s ease, transform .22s ease; }
+  #rv-toast.show { opacity: 1; transform: translate(-50%, 0); }
+  #rv-toast .ic { flex: none; width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; font-size: 12px; color: var(--accent, #c58b5e); background: color-mix(in srgb, var(--accent, #c58b5e) 16%, transparent); }
 </style>
 <!-- 预加载推送图标进浏览器缓存：配合服务端强缓存，推送时图标直接命中缓存、不再实时抓取回退 Chrome -->
 <link rel="preload" as="image" href="push-icon-192.png">
@@ -2346,11 +2351,14 @@ function rvRenderFull() {
   }
 })()
 
-function rvToast(text) {
+function rvToast(text, icon) {
   let el = document.getElementById('rv-toast')
   if (!el) { el = document.createElement('div'); el.id = 'rv-toast'; document.body.appendChild(el) }
-  el.textContent = text; el.classList.add('show')
-  clearTimeout(el._t); el._t = setTimeout(() => el.classList.remove('show'), 1800)
+  el.textContent = ''
+  const ic = document.createElement('span'); ic.className = 'ic'; ic.textContent = icon || '✦'
+  const tx = document.createElement('span'); tx.textContent = text
+  el.append(ic, tx); el.classList.add('show')
+  clearTimeout(el._t); el._t = setTimeout(() => el.classList.remove('show'), 2000)
 }
 
 // ── 记忆库：涟言点的歌 + 歌单（经桥 /raven/music 转发）──
@@ -5700,12 +5708,7 @@ async function toggleFavorite(msgEl, key, on) {
     showFavToast(on ? '收进收藏了，首页「收藏」里翻' : '取消收藏了')
   } catch { showFavToast('没收上，等会儿再试') }
 }
-function showFavToast(t) {
-  let el = document.getElementById('fav-toast')
-  if (!el) { el = document.createElement('div'); el.id = 'fav-toast'; el.style.cssText = 'position:fixed;left:50%;bottom:110px;transform:translateX(-50%);background:rgba(30,28,26,.86);color:#fff;font-size:13px;padding:8px 16px;border-radius:99px;z-index:9999;pointer-events:none;transition:opacity .3s'; document.body.appendChild(el) }
-  el.textContent = t; el.style.opacity = '1'
-  clearTimeout(el._t); el._t = setTimeout(() => { el.style.opacity = '0' }, 1800)
-}
+function showFavToast(t) { rvToast(t, t.startsWith('收进') ? '★' : t.startsWith('取消') ? '☆' : '✦') }
 loadFavKeys()
 
 function openReactPop(msgEl) {
