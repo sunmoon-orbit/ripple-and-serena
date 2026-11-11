@@ -22,6 +22,18 @@ export default function PasswordGate({ onUnlock }) {
   const [err, setErr] = useState('')
   const [out, setOut] = useState(false) // 解锁淡出中
   const [opening, setOpening] = useState(false) // 翻书开场：密码对了，封面先掀开
+  // 1111 她：数字一打，输入法就跳「相关搜索」，键盘还把小书顶出屏幕。
+  // 默认用页面自己的数字键，系统键盘不出来；密码改成带字母的，点「用键盘」换回文本框。
+  const [useKeys, setUseKeys] = useState(IS_ZHAOHUA)
+  const tap = (k) => {
+    if (out || opening) return
+    setErr('')
+    if (k === 'del') return setPw((v) => v.slice(0, -1))
+    const next = (pw + k).slice(0, 32)
+    setPw(next)
+    // 对上了就直接开，不用再点进入
+    if (hashPassword(next) === (passwordHash || DEFAULT_PW_HASH)) pass()
+  }
   const typedAt = useRef(0)
   // 兜底（1016）：刚打完字、又不是她自己点别处，焦点却丢了——立刻拿回来，输入法就不会缩回去
   const keepFocus = (e) => {
@@ -78,19 +90,33 @@ export default function PasswordGate({ onUnlock }) {
       {/* 输入区 */}
       <div className="gate-inputs">
         {err && <p className="gate-err-text gate-err-shake" key={err}>{err}</p>}
-        <div className="ink-field">
-          {/* 1021 她：「打第一个数字的时候还是会被弹一下」。type=password 在 vivo 上会把输入法换成「安全键盘」，
-              第一个字落下时键盘重载一次——改成普通文本框、用 CSS 把字遮成圆点，输入法就不换了 */}
-          <input
-            className="ink-input ink-masked" type="text"
-            autoComplete="off" autoCorrect="off" autoCapitalize="off" spellCheck={false}
-            value={pw} autoFocus
-            placeholder={IS_ZHAOHUA ? '昭华访问密码' : isSetup ? '设置访问密码' : '···'}
-            onChange={(e) => { typedAt.current = Date.now(); setPw(e.target.value); setErr('') }}
-            onBlur={keepFocus}
-            onKeyDown={(e) => e.key === 'Enter' && (isSetup ? null : submit())}
-          />
-        </div>
+        {useKeys ? (
+          <div className="ink-field">
+            {/* 1021 她：「打第一个数字的时候还是会被弹一下」。type=password 在 vivo 上会把输入法换成「安全键盘」，
+                第一个字落下时键盘重载一次——改成普通文本框、用 CSS 把字遮成圆点，输入法就不换了 */}
+            <input
+              className="ink-input ink-masked" type="text"
+              autoComplete="off" autoCorrect="off" autoCapitalize="off" spellCheck={false}
+              value={pw} autoFocus
+              placeholder={IS_ZHAOHUA ? '昭华访问密码' : isSetup ? '设置访问密码' : '···'}
+              onChange={(e) => { typedAt.current = Date.now(); setPw(e.target.value); setErr('') }}
+              onBlur={keepFocus}
+              onKeyDown={(e) => e.key === 'Enter' && (isSetup ? null : submit())}
+            />
+          </div>
+        ) : (
+          <>
+            <div className={'pad-dots' + (pw ? '' : ' empty')} aria-label="已输入的位数">
+              {pw ? pw.split('').map((_, i) => <i key={i} />) : <span>···</span>}
+            </div>
+            <div className="pad">
+              {['1','2','3','4','5','6','7','8','9'].map((k) => <button key={k} onClick={() => tap(k)}>{k}</button>)}
+              <button className="pad-side" onClick={() => { setPw(''); setUseKeys(true) }}>用键盘</button>
+              <button onClick={() => tap('0')}>0</button>
+              <button className="pad-side" onClick={() => tap('del')} aria-label="删除">⌫</button>
+            </div>
+          </>
+        )}
         {isSetup && (
           <>
             <div className="ink-field">

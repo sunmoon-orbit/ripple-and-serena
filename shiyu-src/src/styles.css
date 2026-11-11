@@ -1296,3 +1296,20 @@ input, textarea, select { font-family: inherit; font-size: 15px; color: var(--in
 @media (prefers-reduced-motion: reduce) {
   .book-flip .book-inner, .book-flip .book-cover, .book-flip .book-leaf, .book-open .book-inner, .book-open .book-cover { animation-duration: 0.01s; animation-delay: 0s; }
 }
+
+/* ── 密码门的数字键（1111）：系统键盘不出来，小书不会被顶出屏幕 ── */
+.pad-dots { height: 44px; display: flex; align-items: center; justify-content: center; gap: 12px; border-bottom: 1.5px solid var(--line); }
+.pad-dots i { width: 9px; height: 9px; border-radius: 50%; background: var(--ink); animation: pad-dot 0.18s ease; }
+.pad-dots span { color: var(--ink-faint); letter-spacing: 4px; }
+@keyframes pad-dot { from { transform: scale(0.3); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+.pad { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px 14px; margin-top: 10px; }
+.pad button {
+  height: 54px; border-radius: 16px; border: 1px solid var(--line); background: color-mix(in srgb, var(--bg-card, #fff) 55%, transparent);
+  color: var(--ink); font-size: 22px; font-variant-numeric: tabular-nums;
+  -webkit-tap-highlight-color: transparent; touch-action: manipulation; transition: transform 0.08s, background 0.15s;
+}
+.pad button:active { transform: scale(0.94); background: color-mix(in srgb, var(--olive-active) 22%, transparent); }
+.pad .pad-side { border-color: transparent; background: transparent; font-size: 13px; color: var(--ink-faint); }
+.pad .pad-side[aria-label] { font-size: 20px; }
+.gate-minimal { overflow-y: auto; }
+@media (max-height: 640px) { .gate-brand { margin-bottom: 20px; } .pad button { height: 46px; } }
