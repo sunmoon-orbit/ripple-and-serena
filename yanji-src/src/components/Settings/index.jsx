@@ -1257,6 +1257,17 @@ export default function Settings() {
                   <input className="form-input form-input-sm" type="number" min="0" max="2" step="0.1" value={generationConfig.temperature ?? 0.7} onChange={(e) => setGenerationConfig({ temperature: Number(e.target.value) })} />
                 </div>
                 <div className="card-row">
+                  <span className="card-row-label">发送温度</span>
+                  <select className="form-input form-input-sm" style={{ width: 'auto' }} value={generationConfig.sendTemperature || 'auto'} onChange={(e) => setGenerationConfig({ sendTemperature: e.target.value })}>
+                    <option value="auto">自动</option>
+                    <option value="always">总是发</option>
+                    <option value="never">不发</option>
+                  </select>
+                </div>
+                <div className="card-row" style={{ fontSize: 12, opacity: 0.65, lineHeight: 1.6 }}>
+                  自动：名字带 fable / mythos 的模型不带温度（官方线路带了会 400，表现为 Failed to fetch），其余照上面填的发。中转站不纯、想给它加温度选「总是发」；别的模型也报温度的错选「不发」。
+                </div>
+                <div className="card-row">
                   <span className="card-row-label">最大输出 Tokens</span>
                   <input className="form-input form-input-sm" type="number" min="256" max="32000" step="256" value={generationConfig.maxTokens ?? 4096} onChange={(e) => setGenerationConfig({ maxTokens: Number(e.target.value) })} />
                 </div>
