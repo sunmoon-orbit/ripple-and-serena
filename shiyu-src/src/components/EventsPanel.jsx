@@ -7,6 +7,15 @@ import { api } from '../api'
 import { showToast } from './Toast'
 import { ScrollText, BookOpen, X, Check } from 'lucide-react'
 
+// 现在它在干嘛，一句话（1111 她要的：不用猜）
+function consolidateStatus(c) {
+  if (!c.enabled) return '关着。打开之前，每周两次的整理都不会跑。'
+  if (c.pending >= 3) return `开着，但在等：有 ${c.pending} 个提案还没审，审完才会出新的。`
+  if (c.new_since != null && c.new_since < c.min_new) return `开着。上次整理后只多了 ${c.new_since} 条记忆，下一轮会自己跳过，攒到 ${c.min_new} 条再整理。`
+  const last = c.last?.at ? `上一轮（${new Date(c.last.at).toLocaleDateString('zh-CN', { month: 'numeric', day: 'numeric' })}）：${c.last.note}。` : ''
+  return `开着，下一轮照常整理。${last}`
+}
+
 export default function EventsPanel() {
   const [proposals, setProposals] = useState(null) // null=加载中
   const [scrolls, setScrolls] = useState([])
@@ -14,12 +23,19 @@ export default function EventsPanel() {
   const [openForm, setOpenForm] = useState(null) // 正在开卷的提案 id
   const [dismissing, setDismissing] = useState(null) // 正在驳回的提案 id
   const [busy, setBusy] = useState(false)
+  const [cfg, setCfg] = useState(null) // 整理开关和现状
+
+  async function toggleConsolidate() {
+    if (!cfg) return
+    try { setCfg(await api.setEventsConfig(!cfg.enabled)) } catch (e) { showToast(e.message) }
+  }
 
   async function load() {
     setError('')
     try {
       const [p, e] = await Promise.all([api.eventProposals('pending'), api.events()])
       setProposals(p); setScrolls(e)
+      api.eventsConfig().then(setCfg).catch(() => {})
     } catch (e) { setError(e.message); setProposals([]) }
   }
   useEffect(() => { load() }, [])
@@ -30,6 +46,16 @@ export default function EventsPanel() {
       <div className="heatmap-legend" style={{ margin: '0 4px 16px' }}>
         聚类管线每周三、周日凌晨整理碎片出提案，在这里点头开卷或驳回。正文要涟言亲笔——CC 在时喊他写，不在时让言叽的涟言写好贴进来。
       </div>
+
+      {cfg && (
+        <div className="stat-card" style={{ marginBottom: 16, padding: '4px 18px' }}>
+          <div className="row">
+            <span className="row-label">让模型整理碎片</span>
+            <button className={`toggle ${cfg.enabled ? 'on' : ''}`} onClick={toggleConsolidate} aria-label="整理开关" />
+          </div>
+          <div style={{ fontSize: 12.5, opacity: 0.65, lineHeight: 1.7, padding: '0 0 12px' }}>{consolidateStatus(cfg)}</div>
+        </div>
+      )}
 
       {error && <div className="error-box">{error}</div>}
 

@@ -68,4 +68,6 @@ export const api = {
   decideProposal: (id, action, punish_ids = []) =>
     req(`/events/proposals/${id}/decide`, { method: 'POST', body: JSON.stringify({ action, punish_ids }) }),
   createEvent: (body) => req('/events', { method: 'POST', body: JSON.stringify(body) }),
+  eventsConfig: () => req('/events/config'),
+  setEventsConfig: (enabled) => req('/events/config', { method: 'PUT', body: JSON.stringify({ enabled }) }),
 }
