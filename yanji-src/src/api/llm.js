@@ -22,6 +22,10 @@ export function normalizeProvider(raw) {
 }
 
 function isReasoningModel(m) { return /^o[1-9]|^o3-mini/.test(m || '') }
+// 新一代 Claude（fable / mythos）不收 temperature：带了就 400，而且那条 400 不带跨域头，
+// 浏览器里只剩一句 Failed to fetch。调成 0 没用，得整个字段不发（1111 阿颖的新渠道，
+// 群里说的是「温度需要消掉」不是调成 0）。
+function rejectsTemperature(m) { return /fable|mythos/i.test(m || '') }
 
 function buildApiUrl(baseUrl, provider) {
   let url = (baseUrl || '').trim().replace(/\/$/, '')
@@ -682,7 +686,8 @@ async function callWithTools({
       if (isReasoningModel(model)) {
         body.max_completion_tokens = maxTokens
       } else {
-        body.temperature = safeTemp; body.max_tokens = maxTokens
+        if (!rejectsTemperature(model)) body.temperature = safeTemp
+        body.max_tokens = maxTokens
       }
       if (formattedTools.length) { body.tools = formattedTools; body.tool_choice = 'auto' }
       const hdrs = { 'Content-Type': 'application/json', Authorization: 'Bearer ' + connection.apiKey }
@@ -804,7 +809,8 @@ async function callWithTools({
       // 中转站/代理/CDN 很容易按「空闲连接」把它掐掉——上游其实已经生成完并计了费，
       // 前端拿到的却是 Failed to fetch（0727 阿颖报的「后台有输出但前端报错」）。
       // 流式之后 SSE 一直有事件流过，连接不会被判死，她也能边看边等。
-      const body = { model, max_tokens: maxTokens, messages: bodyMsgs, temperature: safeTemp, stream: true }
+      const body = { model, max_tokens: maxTokens, messages: bodyMsgs, stream: true }
+      if (!rejectsTemperature(model)) body.temperature = safeTemp
       if (formattedTools.length) body.tools = formattedTools
       // ⚠️ 这里**绝对不要**加 metadata:{user_id}。openai 分支那个 body.user 是好的，
       // 但 Anthropic 原生格式的 metadata 会让阿颖用的中转站（goodreamapi）直接 503
@@ -946,7 +952,8 @@ async function callStream({ connection, messages, systemPrompt, dynamicContext, 
     if (isReasoningModel(model)) {
       body.max_completion_tokens = maxTokens
     } else {
-      body.temperature = safeTemp; body.max_tokens = maxTokens
+      if (!rejectsTemperature(model)) body.temperature = safeTemp
+      body.max_tokens = maxTokens
     }
     const hdrs = { 'Content-Type': 'application/json', Authorization: 'Bearer ' + connection.apiKey }
     let resp = await fetchOpenAiWithTpmWait(url, { method: 'POST', headers: hdrs, body: JSON.stringify(body) }, onStatus)
