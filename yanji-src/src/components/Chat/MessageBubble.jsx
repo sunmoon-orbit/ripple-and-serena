@@ -732,6 +732,17 @@ function MessageBubble({ msg, onEdit, onQuote, onDelete, isLast, presentationCon
           <AttachChip
             name="响应诊断（已脱敏）"
             content={(
+              <>
+              {/* 1111 她：「我们报错那个能不能加个复制键？」连正文那行 [错误] 一起复制 */}
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  const text = `${msg.content || ''}\n\n${msg.responseDiagnostic}`.trim()
+                  navigator.clipboard?.writeText(text).then(() => showToast('报错已复制', 'success')).catch(() => showToast('复制失败，请重试', 'error'))
+                }}
+                style={{ display: 'block', margin: '0 0 6px auto', padding: '3px 10px', fontSize: 11, borderRadius: 999, border: '1px solid var(--border-color, rgba(128,128,128,.35))', background: 'transparent', color: 'inherit', cursor: 'pointer' }}
+              >复制报错</button>
               <pre style={{
                 margin: 0,
                 maxHeight: 240,
@@ -742,6 +753,7 @@ function MessageBubble({ msg, onEdit, onQuote, onDelete, isLast, presentationCon
               }}>
                 {msg.responseDiagnostic}
               </pre>
+              </>
             )}
           />
         )}

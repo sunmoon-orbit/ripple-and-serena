@@ -1038,9 +1038,14 @@ export default function Chat() {
           responseDiagnostic,
         })
       } else {
+        // Failed to fetch＝浏览器没拿到任何回应，不是模型报的错：多半是这个渠道回报错时没带跨域头，
+        // 或者连接直接被掐。光一句英文她看不出该找谁（1111 新渠道）。
+        const netFail = /^(Failed to fetch|Load failed|NetworkError)/i.test(e.message || '')
         addMessage(chat.id, {
           role: 'assistant',
-          content: `[错误] ${e.message}`,
+          content: netFail
+            ? `[错误] ${e.message}\n（浏览器没收到中转站的任何回应：多半是这个渠道报错时没带跨域头，或连接被直接掐断。先换同站别的渠道/模型试一条，能通就是这个渠道的问题。）`
+            : `[错误] ${e.message}`,
           responseDiagnostic,
         })
       }
