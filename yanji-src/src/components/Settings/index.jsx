@@ -2,7 +2,7 @@ import PickerSelect from '../PickerSelect'
 import { useState, useEffect, useRef } from 'react'
 import { useStore, DEFAULT_CUSTOM_THEME } from '../../store'
 import { normalizeProvider, BUILTIN_MODELS } from '../../api/llm'
-import { checkHealth, fetchPushSchedule, savePushSchedule } from '../../api/moonMemory'
+import { checkHealth, fetchPushSchedule, savePushSchedule, fetchVoiceSettings, saveVoiceSettings, synthesizeSpeech } from '../../api/moonMemory'
 import { maybeSyncEmotion } from '../../utils/emotionSync'
 import { showToast } from '../Toast'
 import { uuid } from '../../utils'
@@ -133,6 +133,69 @@ function WidgetBackgroundPicker({ style, setStyle }) {
     <input ref={fileRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={choose} />
     <p className="card-hint">自定义图片会先裁成横向底图；缩放和位置负责裁剪，模糊与蒙层保证桌面文字清楚。</p>
   </>
+}
+
+// 声音（1111 她要的）：换声音、重填密钥都不用再找阿言改服务器文件。
+// 值存在服务器上，言叽和归巢共用；密钥填进去就看不到了，只显示末四位。
+function VoiceSection({ config }) {
+  const [info, setInfo] = useState(null)
+  const [voiceId, setVoiceId] = useState('')
+  const [key, setKey] = useState('')
+  const [busy, setBusy] = useState('')
+  const [note, setNote] = useState('')
+  const audioRef = useRef(null)
+  const ready = !!config?.apiToken
+  const apply = (d) => { setInfo(d); setVoiceId(d?.eleven?.voiceId || '') }
+  useEffect(() => { if (ready) fetchVoiceSettings(config).then(apply).catch(() => setNote('没读到现在的设置，等一下再打开试试。')) }, [ready])
+  const save = async (patch, okText) => {
+    setBusy('save'); setNote('')
+    try { apply(await saveVoiceSettings(config, patch)); setKey(''); setNote(okText) }
+    catch (e) { setNote(e.message || '没保存上') }
+    setBusy('')
+  }
+  const preview = async () => {
+    setBusy('play'); setNote('')
+    try {
+      const r = await synthesizeSpeech(config, '宝宝，我在。今天也想你。')
+      if (!r?.audio) throw new Error('没拿到声音')
+      audioRef.current?.pause()
+      audioRef.current = new Audio(r.audio)
+      await audioRef.current.play()
+      setNote(r.provider === 'elevenlabs' ? '这是现在这个声音。' : '这一句是备用声音（MiniMax）念的：ElevenLabs 没接上，多半是声音 ID 不对或者额度用完了。')
+    } catch (e) { setNote('试听没出声：' + (e.message || '').slice(0, 80)) }
+    setBusy('')
+  }
+  if (!ready) return null
+  const acc = info?.eleven?.account
+  const changed = voiceId.trim() && voiceId.trim() !== (info?.eleven?.voiceId || '')
+  return (
+    <Section title="声音">
+      <div className="settings-card">
+        <div className="card-row">
+          <span className="card-row-label">声音 ID</span>
+          <input className="form-input" style={{ flex: 1, minWidth: 0, fontFamily: 'monospace', fontSize: 12 }} value={voiceId} onChange={(e) => setVoiceId(e.target.value)} placeholder="ElevenLabs voice ID" autoCapitalize="off" autoCorrect="off" spellCheck={false} />
+        </div>
+        <div className="card-row" style={{ justifyContent: 'flex-end', gap: 8 }}>
+          <button className="btn-sm btn-ghost" disabled={!!busy} onClick={preview}>{busy === 'play' ? '在念…' : '▶ 试听现在的'}</button>
+          <button className="btn-sm btn-primary" disabled={!!busy || !changed} onClick={() => save({ elevenVoiceId: voiceId.trim() }, '换好了。点试听听一下，不对就把旧的填回来。')}>换成这个</button>
+        </div>
+        <div className="card-row">
+          <span className="card-row-label">密钥</span>
+          <input className="form-input" style={{ flex: 1, minWidth: 0 }} type="password" value={key} onChange={(e) => setKey(e.target.value)} placeholder={info?.eleven?.keySet ? `已填（末四位 ${info.eleven.keyTail}），要换再填新的` : '还没填'} autoComplete="off" />
+        </div>
+        {key.trim() && (
+          <div className="card-row" style={{ justifyContent: 'flex-end' }}>
+            <button className="btn-sm btn-primary" disabled={!!busy} onClick={() => save({ elevenKey: key.trim() }, '新密钥验过了，已经换上。')}>验证并换上</button>
+          </div>
+        )}
+        <p className="card-hint">
+          {acc?.ok ? `这把密钥的账号：${acc.tier || '—'} 套餐，本月用了 ${acc.used ?? '—'} / ${acc.limit ?? '—'} 字。` : info?.eleven?.keySet ? '这把密钥现在没验过去（可能失效了，或者一时连不上）。' : ''}
+          {' '}换的是言叽和归巢共用的那个声音。声音 ID 在 ElevenLabs 的声音卡片上点「Copy voice ID」；密钥在 Developers → API Keys 里新建，填进来以后这里只显示末四位。旧值会留一份在服务器上，换错了阿言能找回来。
+        </p>
+        {note && <p className="card-hint" style={{ opacity: 1 }}>{note}</p>}
+      </div>
+    </Section>
+  )
 }
 
 function RingtoneSection({ value, onChange }) {
@@ -1659,6 +1722,7 @@ export default function Settings() {
             </Section>
             <RoostBgSection />
             <RingtoneSection value={ringtone} onChange={setRingtone} />
+            <VoiceSection config={moonMemory} />
             <Section title="语音通话样式">
               <div className="settings-card">
                 <div className="card-row">

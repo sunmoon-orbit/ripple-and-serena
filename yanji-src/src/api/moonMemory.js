@@ -164,6 +164,17 @@ export async function synthesizeSpeech(config, text, voiceId, signal) {
   })
 }
 
+// 声音设置：看现在用的声音 ID、换一个、重填密钥（密钥只写不读）
+export async function fetchVoiceSettings(config) {
+  return request(config.baseUrl, '/tts/voice', { headers: headers(config.apiToken) })
+}
+export async function saveVoiceSettings(config, patch) {
+  const resp = await toolFetch(config.baseUrl.replace(/\/$/, '') + '/tts/voice', { method: 'POST', headers: headers(config.apiToken), body: JSON.stringify(patch) })
+  const data = await resp.json().catch(() => ({}))
+  if (!resp.ok) throw new Error(data.error || `没保存上（${resp.status}）`)
+  return data
+}
+
 // ─── 共读：历史对话 + 标注 + 书签 ───────────────────────────────────────────
 export async function fetchArchiveConversations(config) {
   const { baseUrl, apiToken } = config
