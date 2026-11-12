@@ -25,6 +25,8 @@ const DEFAULT_STATE = {
   connections: [],
   activeConnectionId: null,
   chats: [],
+  // 项目（1112）：侧边栏里收纳窗口的文件夹。chat.folderId 指向这里的 id；shelf 是自带的「收起来的」，删不掉。
+  chatFolders: [{ id: 'shelf', name: '收起来的', collapsed: true, builtin: true }],
   activeChatId: null,
   messagesByChatId: {},
   globalInstruction: '',
@@ -262,7 +264,7 @@ function savePersistedState(state) {
 }
 
 const persistedKeys = [
-  'connections', 'activeConnectionId', 'chats', 'activeChatId',
+  'connections', 'activeConnectionId', 'chats', 'chatFolders', 'activeChatId',
   'messagesByChatId', 'globalInstruction', 'summariesByChatId', 'summaryHistoryByChatId', 'draftsByChatId',
   'generationConfig', 'memoryItems', 'tokenStats', 'contextLimit',
   'searchConfig', 'avatarConfig', 'autoTools', 'imageDescriptions', 'moonMemory', 'mcpServers', 'theme', 'customTheme', 'glassOpacity',
@@ -278,6 +280,8 @@ function mergeWithDefaults(persisted) {
   }
   if (!Array.isArray(s.connections)) s.connections = []
   if (!Array.isArray(s.chats)) s.chats = []
+  if (!Array.isArray(s.chatFolders)) s.chatFolders = []
+  if (!s.chatFolders.some((f) => f.id === 'shelf')) s.chatFolders = [...s.chatFolders, { id: 'shelf', name: '收起来的', collapsed: true, builtin: true }]
   if (!s.messagesByChatId || typeof s.messagesByChatId !== 'object') s.messagesByChatId = {}
   if (!s.draftsByChatId || typeof s.draftsByChatId !== 'object') s.draftsByChatId = {}
   s.generationConfig = normalizeGenerationConfig(
@@ -415,8 +419,58 @@ export const useStore = create((set, get) => ({
     return s.connections.find((c) => c.id === s.activeConnectionId) || s.connections[0] || null
   },
 
+  // ─── 项目（窗口文件夹） ──────────────────────────────────────────
+  createFolder: (name) => {
+    const folder = { id: uuid(), name: String(name || '').trim().slice(0, 20) || '新项目', collapsed: false }
+    set((s) => {
+      const chatFolders = [folder, ...s.chatFolders]
+      savePersistedState({ ...s, chatFolders })
+      return { chatFolders }
+    })
+    return folder
+  },
+
+  renameFolder: (id, name) => {
+    const clean = String(name || '').trim().slice(0, 20)
+    if (!clean) return
+    set((s) => {
+      const chatFolders = s.chatFolders.map((f) => f.id === id ? { ...f, name: clean } : f)
+      savePersistedState({ ...s, chatFolders })
+      return { chatFolders }
+    })
+  },
+
+  // 删项目不删窗口：里面的窗口放回外面
+  deleteFolder: (id) => {
+    set((s) => {
+      if (s.chatFolders.find((f) => f.id === id)?.builtin) return {}
+      const chatFolders = s.chatFolders.filter((f) => f.id !== id)
+      const chats = s.chats.map((c) => c.folderId === id ? { ...c, folderId: null } : c)
+      savePersistedState({ ...s, chatFolders, chats })
+      return { chatFolders, chats }
+    })
+  },
+
+  toggleFolder: (id) => {
+    set((s) => {
+      const chatFolders = s.chatFolders.map((f) => f.id === id ? { ...f, collapsed: !f.collapsed } : f)
+      savePersistedState({ ...s, chatFolders })
+      return { chatFolders }
+    })
+  },
+
+  // 只换位置，不动 updatedAt，排序不跳
+  moveChatToFolder: (chatId, folderId) => {
+    set((s) => {
+      const target = folderId && s.chatFolders.some((f) => f.id === folderId) ? folderId : null
+      const chats = s.chats.map((c) => c.id === chatId ? { ...c, folderId: target } : c)
+      savePersistedState({ ...s, chats })
+      return { chats }
+    })
+  },
+
   // ─── chats ────────────────────────────────────────────────────────
-  createChat: (model) => {
+  createChat: (model, folderId) => {
     const s = get()
     const conn = s.connections.find((c) => c.id === s.activeConnectionId) || s.connections[0]
     if (!conn) return null
@@ -431,6 +485,7 @@ export const useStore = create((set, get) => ({
       compactedThrough: null,
       compactionVersion: 0,
     }
+    if (folderId && s.chatFolders.some((f) => f.id === folderId)) chat.folderId = folderId
     set((st) => {
       const chats = [chat, ...st.chats]
       const messagesByChatId = { ...st.messagesByChatId, [chat.id]: [] }

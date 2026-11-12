@@ -2007,6 +2007,32 @@ textarea.form-input { display: block; margin: 8px 16px 12px; }
   padding: 3px 7px; outline: none;
 }
 
+/* ===== 项目（窗口文件夹，1112） ===== */
+.conv-folder { margin-bottom: 2px; }
+.conv-folder-head {
+  display: flex; align-items: center; gap: 6px; position: relative;
+  padding: 7px 8px; border-radius: var(--r-sm); cursor: pointer; user-select: none;
+  transition: background 0.12s;
+}
+.conv-folder-head:hover { background: rgba(150,140,180,0.07); }
+.conv-folder-name { font-size: 12.5px; font-weight: 600; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.conv-folder-count { font-size: 11px; color: var(--text-faint); flex: 1; }
+.conv-folder-actions { display: none; gap: 2px; }
+.conv-folder-head:hover .conv-folder-actions { display: flex; }
+.conv-folder-body { margin-left: 9px; padding-left: 5px; border-left: 1px solid var(--border); }
+.conv-folder-empty { padding: 8px; font-size: 11.5px; color: var(--text-faint); }
+.move-modal { max-width: 340px; }
+.move-list { display: flex; flex-direction: column; gap: 4px; max-height: 44vh; overflow-y: auto; margin: 4px 0 10px; }
+.move-option {
+  text-align: left; font: inherit; font-size: 13.5px; color: var(--text);
+  background: rgba(150,140,180,0.06); border: 1px solid var(--border);
+  border-radius: var(--r-sm); padding: 9px 11px; cursor: pointer;
+}
+.move-option:hover { background: rgba(150,140,180,0.13); }
+.move-option.current { border-color: var(--accent); }
+.move-new { display: flex; gap: 6px; align-items: center; }
+.move-new .conv-rename-input { flex: 1; padding: 7px 9px; }
+
 /* ===== Sidebar sections ===== */
 .sb-section { border-bottom: 1px solid var(--border); }
 .sb-section-tools { flex: 0; }
@@ -5719,7 +5745,8 @@ body.mp-active .scroll-bottom-btn { bottom: 139px; }
    （0726 加接续笔记按钮时才发现重命名/删除在手机上也一直是这样） */
 @media (hover: none) {
   .conv-item-actions { display: flex; }
-  .conv-item-title { padding-right: 78px; }
+  .conv-folder-actions { display: flex; }
+  .conv-item-title { padding-right: 106px; }
   .conv-action-btn { width: 26px; height: 26px; }   /* 手指比鼠标粗，放大一点 */
 }
 

@@ -14,6 +14,13 @@ export default function ConversationList({ onClose, onOpenCrossing, onStartCall,
   const createChat = useStore((s) => s.createChat)
   const renameChat = useStore((s) => s.renameChat)
   const deleteChat = useStore((s) => s.deleteChat)
+  // 项目（1112）：收纳窗口的文件夹。只管放哪儿，不改对话内容，也不改上下文怎么带。
+  const chatFolders = useStore((s) => s.chatFolders)
+  const createFolder = useStore((s) => s.createFolder)
+  const renameFolder = useStore((s) => s.renameFolder)
+  const deleteFolder = useStore((s) => s.deleteFolder)
+  const toggleFolder = useStore((s) => s.toggleFolder)
+  const moveChatToFolder = useStore((s) => s.moveChatToFolder)
   const randomTool = useStore((s) => s.randomTool || 'fate')  // 抽随机槽位：命运牌阵 / 幸运轮盘，设置里切换
   // 接续笔记：上下文压缩时自动生成、每轮注入模型的那份背景笔记。
   // 它以前是个纯黑箱——写坏了（比如把早就做完的事一直挂在「未了结」里）她我都看不见，
@@ -27,6 +34,10 @@ export default function ConversationList({ onClose, onOpenCrossing, onStartCall,
   const [renameValue, setRenameValue] = useState('')
   const [noteChatId, setNoteChatId] = useState(null)   // 正在查看接续笔记的对话
   const [noteText, setNoteText] = useState('')
+  const [moveChatId, setMoveChatId] = useState(null)   // 正在挑「移到哪个项目」的对话
+  const [newFolderName, setNewFolderName] = useState('')
+  const [renamingFolderId, setRenamingFolderId] = useState(null)
+  const [folderRenameValue, setFolderRenameValue] = useState('')
   const [chatsOpen, setChatsOpen] = useState(true)
   const [toolsOpen, setToolsOpen] = useState(true)
   const [emotionOpen, setEmotionOpen] = useState(true)
@@ -89,6 +100,54 @@ export default function ConversationList({ onClose, onOpenCrossing, onStartCall,
     ? sorted.filter((c) => c.title?.toLowerCase().includes(search.toLowerCase()))
     : sorted
 
+  const folderIds = new Set(chatFolders.map((f) => f.id))
+  const inFolder = (id) => sorted.filter((c) => c.folderId === id)
+  const loose = sorted.filter((c) => !c.folderId || !folderIds.has(c.folderId))
+  // 自带的「收起来的」永远排最后
+  const orderedFolders = [...chatFolders.filter((f) => !f.builtin), ...chatFolders.filter((f) => f.builtin)]
+
+  function handleNewFolder() {
+    const folder = createFolder('新项目')
+    setRenamingFolderId(folder.id)
+    setFolderRenameValue(folder.name)
+  }
+
+  function handleNewInFolder(folderId, e) {
+    e.stopPropagation()
+    const chat = createChat(undefined, folderId)
+    if (chat) { setActiveChat(chat.id); onClose?.() }
+  }
+
+  function commitFolderRename(e) {
+    e.stopPropagation()
+    if (renamingFolderId && folderRenameValue.trim()) renameFolder(renamingFolderId, folderRenameValue.trim())
+    setRenamingFolderId(null)
+  }
+
+  async function handleDeleteFolder(folder, e) {
+    e.stopPropagation()
+    const n = inFolder(folder.id).length
+    if (n === 0 || await confirmAction({
+      kicker: '删除项目',
+      title: `删除「${folder.name}」？`,
+      description: `里面的 ${n} 个对话不会删，会放回外面。`,
+      cancelLabel: '先留着',
+      confirmLabel: '删除项目',
+    })) deleteFolder(folder.id)
+  }
+
+  function moveTo(folderId) {
+    if (moveChatId) moveChatToFolder(moveChatId, folderId)
+    setMoveChatId(null)
+    setNewFolderName('')
+  }
+
+  function moveToNewFolder() {
+    const name = newFolderName.trim()
+    if (!name) return
+    moveTo(createFolder(name).id)
+  }
+
   function handleNew() {
     const chat = createChat()
     if (chat) { setActiveChat(chat.id); onClose?.() }
@@ -147,6 +206,126 @@ export default function ConversationList({ onClose, onOpenCrossing, onStartCall,
     setNoteChatId(null)
   }
 
+  function renderChat(chat) {
+      const conn = connections.find((c) => c.id === chat.connectionId)
+      return (
+        <div
+          key={chat.id}
+          className={'conv-item' + (chat.id === activeChatId ? ' active' : '')}
+          onClick={() => handleSelect(chat.id)}
+        >
+          {renamingId === chat.id ? (
+            <input
+              className="conv-rename-input"
+              value={renameValue}
+              autoFocus
+              onChange={(e) => setRenameValue(e.target.value)}
+              onBlur={commitRename}
+              onKeyDown={(e) => { if (e.key === 'Enter') commitRename(e) }}
+              onClick={(e) => e.stopPropagation()}
+            />
+          ) : (
+            <>
+              <div className="conv-item-title">{chat.title || '新对话'}</div>
+              <div className="conv-item-meta">
+                {conn?.name && <span className="conv-conn-name">{conn.name}</span>}
+                <span className="conv-time">{formatTime(chat.updatedAt || chat.createdAt)}</span>
+              </div>
+              <div className="conv-item-actions">
+                {!!summariesByChatId?.[chat.id] && (
+                  <button className="conv-action-btn" onClick={(e) => openNote(chat, e)} title="接续笔记">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                      <polyline points="14 2 14 8 20 8" />
+                      <line x1="8" y1="13" x2="16" y2="13" /><line x1="8" y1="17" x2="13" y2="17" />
+                    </svg>
+                  </button>
+                )}
+                <button className="conv-action-btn" onClick={(e) => { e.stopPropagation(); setMoveChatId(chat.id) }} title="移到项目">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
+                  </svg>
+                </button>
+                <button className="conv-action-btn" onClick={(e) => startRename(chat, e)} title="重命名">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+                    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+                  </svg>
+                </button>
+                <button className="conv-action-btn danger" onClick={(e) => handleDelete(chat.id, e)} title="删除">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <polyline points="3 6 5 6 21 6" />
+                    <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
+                    <path d="M10 11v6M14 11v6" />
+                    <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
+                  </svg>
+                </button>
+              </div>
+            </>
+          )}
+        </div>
+      )
+  }
+
+  function renderFolder(folder) {
+    const items = inFolder(folder.id)
+    // 自带的那个空着就不占地方
+    if (folder.builtin && items.length === 0) return null
+    return (
+      <div key={folder.id} className={'conv-folder' + (folder.collapsed ? ' collapsed' : '')}>
+        <div className="conv-folder-head" onClick={() => toggleFolder(folder.id)}>
+          <svg className={'sb-chevron' + (folder.collapsed ? ' closed' : '')} width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+            <polyline points="6 9 12 15 18 9" />
+          </svg>
+          {renamingFolderId === folder.id ? (
+            <input
+              className="conv-rename-input"
+              value={folderRenameValue}
+              autoFocus
+              maxLength={20}
+              onFocus={(e) => e.target.select()}
+              onChange={(e) => setFolderRenameValue(e.target.value)}
+              onBlur={commitFolderRename}
+              onKeyDown={(e) => { if (e.key === 'Enter') commitFolderRename(e) }}
+              onClick={(e) => e.stopPropagation()}
+            />
+          ) : (
+            <>
+              <span className="conv-folder-name">{folder.name}</span>
+              <span className="conv-folder-count">{items.length}</span>
+              <div className="conv-folder-actions" onClick={(e) => e.stopPropagation()}>
+                <button className="conv-action-btn" onClick={(e) => handleNewInFolder(folder.id, e)} title="在这个项目里开新对话">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                    <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
+                  </svg>
+                </button>
+                <button className="conv-action-btn" onClick={(e) => { e.stopPropagation(); setRenamingFolderId(folder.id); setFolderRenameValue(folder.name) }} title="改名">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+                    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+                  </svg>
+                </button>
+                {!folder.builtin && (
+                  <button className="conv-action-btn danger" onClick={(e) => handleDeleteFolder(folder, e)} title="删除项目（对话留着）">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+                    </svg>
+                  </button>
+                )}
+              </div>
+            </>
+          )}
+        </div>
+        {!folder.collapsed && (
+          <div className="conv-folder-body">
+            {items.length === 0 && <div className="conv-folder-empty">还是空的。点对话上的文件夹图标移进来</div>}
+            {items.map(renderChat)}
+          </div>
+        )}
+      </div>
+    )
+  }
+
   const canCall = moonMemory?.enabled && moonMemory?.apiToken
 
   return (
@@ -163,6 +342,12 @@ export default function ConversationList({ onClose, onOpenCrossing, onStartCall,
         <div className="sb-section-header" onClick={() => setChatsOpen(v => !v)}>
           <span className="sb-section-title">对话</span>
           <div className="sb-section-actions" onClick={e => e.stopPropagation()}>
+            <button className="sb-icon-btn" onClick={() => { setChatsOpen(true); handleNewFolder() }} title="新建项目">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
+                <line x1="12" y1="11" x2="12" y2="17" /><line x1="9" y1="14" x2="15" y2="14" />
+              </svg>
+            </button>
             <button className="sb-icon-btn" onClick={handleNew} title="新对话">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
                 <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
@@ -189,64 +374,16 @@ export default function ConversationList({ onClose, onOpenCrossing, onStartCall,
             </div>
 
             <div className="conv-list">
-              {filtered.length === 0 && (
+              {(search ? filtered.length : chats.length) === 0 && (
                 <div className="conv-empty">暂无对话</div>
               )}
-              {filtered.map((chat) => {
-                const conn = connections.find((c) => c.id === chat.connectionId)
-                return (
-                  <div
-                    key={chat.id}
-                    className={'conv-item' + (chat.id === activeChatId ? ' active' : '')}
-                    onClick={() => handleSelect(chat.id)}
-                  >
-                    {renamingId === chat.id ? (
-                      <input
-                        className="conv-rename-input"
-                        value={renameValue}
-                        autoFocus
-                        onChange={(e) => setRenameValue(e.target.value)}
-                        onBlur={commitRename}
-                        onKeyDown={(e) => { if (e.key === 'Enter') commitRename(e) }}
-                        onClick={(e) => e.stopPropagation()}
-                      />
-                    ) : (
-                      <>
-                        <div className="conv-item-title">{chat.title || '新对话'}</div>
-                        <div className="conv-item-meta">
-                          {conn?.name && <span className="conv-conn-name">{conn.name}</span>}
-                          <span className="conv-time">{formatTime(chat.updatedAt || chat.createdAt)}</span>
-                        </div>
-                        <div className="conv-item-actions">
-                          {!!summariesByChatId?.[chat.id] && (
-                            <button className="conv-action-btn" onClick={(e) => openNote(chat, e)} title="接续笔记">
-                              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-                                <polyline points="14 2 14 8 20 8" />
-                                <line x1="8" y1="13" x2="16" y2="13" /><line x1="8" y1="17" x2="13" y2="17" />
-                              </svg>
-                            </button>
-                          )}
-                          <button className="conv-action-btn" onClick={(e) => startRename(chat, e)} title="重命名">
-                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                              <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
-                              <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
-                            </svg>
-                          </button>
-                          <button className="conv-action-btn danger" onClick={(e) => handleDelete(chat.id, e)} title="删除">
-                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                              <polyline points="3 6 5 6 21 6" />
-                              <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
-                              <path d="M10 11v6M14 11v6" />
-                              <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
-                            </svg>
-                          </button>
-                        </div>
-                      </>
-                    )}
-                  </div>
-                )
-              })}
+              {search ? filtered.map(renderChat) : (
+                <>
+                  {orderedFolders.filter((f) => !f.builtin).map(renderFolder)}
+                  {loose.map(renderChat)}
+                  {orderedFolders.filter((f) => f.builtin).map(renderFolder)}
+                </>
+              )}
             </div>
           </div>
         )}
@@ -445,6 +582,45 @@ export default function ConversationList({ onClose, onOpenCrossing, onStartCall,
           </div>
         )}
       </div>
+
+      {/* ── 移到项目 ─────────────────────────────────── */}
+      {moveChatId && (
+        <div className="note-modal-mask" onClick={() => setMoveChatId(null)}>
+          <div className="note-modal move-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="note-modal-head">
+              <span className="note-modal-title">移到哪儿</span>
+              <button className="note-modal-close" onClick={() => setMoveChatId(null)}>✕</button>
+            </div>
+            <div className="note-modal-hint">
+              只是换个地方放，对话内容和记忆都不变。
+            </div>
+            <div className="move-list">
+              {(() => {
+                const cur = chats.find((c) => c.id === moveChatId)?.folderId || null
+                return (
+                  <>
+                    <button className={'move-option' + (!cur ? ' current' : '')} onClick={() => moveTo(null)}>外面（不放进项目）</button>
+                    {orderedFolders.map((f) => (
+                      <button key={f.id} className={'move-option' + (cur === f.id ? ' current' : '')} onClick={() => moveTo(f.id)}>{f.name}</button>
+                    ))}
+                  </>
+                )
+              })()}
+            </div>
+            <div className="move-new">
+              <input
+                className="conv-rename-input"
+                placeholder="新建一个项目…"
+                maxLength={20}
+                value={newFolderName}
+                onChange={(e) => setNewFolderName(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter') moveToNewFolder() }}
+              />
+              <button className="note-btn primary" disabled={!newFolderName.trim()} onClick={moveToNewFolder}>建好移进去</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ── 接续笔记查看/编辑 ─────────────────────────── */}
       {noteChatId && (
