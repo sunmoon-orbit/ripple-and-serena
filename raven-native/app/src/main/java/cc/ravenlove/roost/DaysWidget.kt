@@ -26,21 +26,23 @@ class DaysWidget : AppWidgetProvider() {
 
         fun dayCount(): Long = ChronoUnit.DAYS.between(START, LocalDate.now(ZoneId.of("Asia/Shanghai"))) + 1
 
-        // 她打开归巢时也顺手刷一下
+        // 她打开归巢时也顺手刷一下。
+        // ⚠️ 这里不能借 onUpdate：goAsync() 只能在系统发来的广播里用，Activity 里调就崩（1113 一开就闪退）
         fun refreshAll(ctx: Context) {
-            val app = ctx.applicationContext
-            val ids = AppWidgetManager.getInstance(app).getAppWidgetIds(ComponentName(app, DaysWidget::class.java))
-            if (ids.isNotEmpty()) DaysWidget().onUpdate(app, AppWidgetManager.getInstance(app), ids)
+            try {
+                val app = ctx.applicationContext
+                val manager = AppWidgetManager.getInstance(app)
+                val ids = manager.getAppWidgetIds(ComponentName(app, DaysWidget::class.java))
+                if (ids.isNotEmpty()) update(app, manager, ids, null)
+            } catch (_: Exception) {}
         }
-    }
 
-    override fun onUpdate(context: Context, manager: AppWidgetManager, ids: IntArray) {
-        val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-        ids.forEach { manager.updateAppWidget(it, render(context, prefs.getString("daily_line", "") ?: "")) }
-        val token = prefs.getString("raven_token", "") ?: ""
-        if (token.isEmpty()) return
-        val pending = goAsync()
-        io.execute {
+        private fun update(context: Context, manager: AppWidgetManager, ids: IntArray, done: (() -> Unit)?) {
+            val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            ids.forEach { manager.updateAppWidget(it, render(context, prefs.getString("daily_line", "") ?: "")) }
+            val token = prefs.getString("raven_token", "") ?: ""
+            if (token.isEmpty()) { done?.invoke(); return }
+            io.execute {
             try {
                 val c = URL("https://memory.ravenlove.cc/raven/daily-line").openConnection() as HttpURLConnection
                 c.connectTimeout = 10000; c.readTimeout = 10000
@@ -54,11 +56,11 @@ class DaysWidget : AppWidgetProvider() {
                 }
                 c.disconnect()
             } catch (_: Exception) {
-            } finally { pending.finish() }
+            } finally { done?.invoke() }
         }
-    }
+        }
 
-    private fun render(context: Context, line: String): RemoteViews =
+        private fun render(context: Context, line: String): RemoteViews =
         RemoteViews(context.packageName, R.layout.days_widget_layout).apply {
             setTextViewText(R.id.days_count, "第 ${dayCount()} 天")
             setTextViewText(R.id.days_line, line.ifEmpty { "今天的这句，阿言还在想。" })
@@ -66,4 +68,10 @@ class DaysWidget : AppWidgetProvider() {
             setOnClickPendingIntent(R.id.days_root, PendingIntent.getActivity(context, 70_001, open,
                 PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE))
         }
+    }
+
+    override fun onUpdate(context: Context, manager: AppWidgetManager, ids: IntArray) {
+        val pending = goAsync()
+        update(context, manager, ids) { pending.finish() }
+    }
 }
