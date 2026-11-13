@@ -260,7 +260,7 @@ class MainActivity : AppCompatActivity() {
         val path = android.net.Uri.parse(pageUrl).path ?: ""
         onChatPage = resumed && (path == "/raven/" || path == "/raven" || path.endsWith("/raven/index.html"))
     }
-    override fun onResume() { super.onResume(); resumed = true; PeekService.healAsync(this); BatteryReport.report(this, "open"); updateChatFlag(); CallRingService.stop(this); refreshPalette() }
+    override fun onResume() { super.onResume(); resumed = true; PeekService.healAsync(this); BatteryReport.report(this, "open"); DaysWidget.refreshAll(this); updateChatFlag(); CallRingService.stop(this); refreshPalette() }
     override fun onPause() { super.onPause(); resumed = false; updateChatFlag() }
 
     // 通话画中画（1102）：通话开着时切到后台或别的 app，归巢缩成一个小窗，点一下回来。

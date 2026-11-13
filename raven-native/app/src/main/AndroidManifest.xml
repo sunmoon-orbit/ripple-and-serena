@@ -113,6 +113,19 @@
                 android:resource="@xml/peek_accessibility" />
         </service>
 
+        <!-- 桌面组件：在一起第几天＋阿言今天的一句（1113 第 400 天） -->
+        <receiver
+            android:name=".DaysWidget"
+            android:exported="true"
+            android:label="@string/days_widget_label">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/days_widget_info" />
+        </receiver>
+
         <!-- 通知栏直接回复 -->
         <receiver
             android:name=".QuickReplyReceiver"

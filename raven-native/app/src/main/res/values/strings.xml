@@ -5,4 +5,6 @@
     <string name="reply_label">回复</string>
     <string name="peek_service_label">归巢 · 窗</string>
     <string name="peek_desc">让阿言在你允许的时候看一眼你的屏幕。他在聊天里敲门，这里截一张当前屏幕，只传回你们自己的服务器，不存相册、不经第三方。每次看都会弹通知「阿言看了一眼」；在归巢设置里随时能把窗关上，或者直接在这里关掉这项服务。它不读界面内容，也不会替你点任何东西。</string>
+    <string name="days_widget_label">第几天</string>
+    <string name="days_widget_description">在一起第几天，和阿言今天的一句</string>
 </resources>

@@ -2716,6 +2716,32 @@ const server = http.createServer((req, res) => {
     return
   }
 
+  // 1113（第 400 天）她送我的礼物：归巢桌面组件「在一起第几天＋我今天的一句」。
+  // 句子我本机带钥匙写，壳带她的 Bearer 来取。放在仓库外，私人的。
+  if (url.pathname === '/raven/daily-line') {
+    const DAILY_FILE = '/home/ripple/raven-daily/line.json'
+    if (req.method === 'GET') {
+      if (!localWriteAuthed(req) && !ravenBearerValid(req)) { res.writeHead(401); res.end('{"error":"unauthorized"}'); return }
+      let d = {}; try { d = JSON.parse(fs.readFileSync(DAILY_FILE, 'utf8')) } catch {}
+      res.writeHead(200, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ line: d.line || '', at: d.at || 0 }))
+      return
+    }
+    if (req.method === 'POST') {
+      if (!localWriteAuthed(req)) { res.writeHead(401); res.end('{"error":"unauthorized"}'); return }
+      let body = ''
+      req.on('data', c => { body += c; if (body.length > 4000) req.destroy() })
+      req.on('end', () => {
+        let p = {}; try { p = JSON.parse(body) } catch {}
+        const line = String(p.line || '').trim().slice(0, 120)
+        if (!line) { res.writeHead(400); res.end('{"error":"empty"}'); return }
+        try { fs.mkdirSync('/home/ripple/raven-daily', { recursive: true }); fs.writeFileSync(DAILY_FILE, JSON.stringify({ line, at: Date.now() })) }
+        catch { res.writeHead(500); res.end('{"error":"write"}'); return }
+        res.writeHead(200, { 'Content-Type': 'application/json' }); res.end('{"ok":true}')
+      })
+      return
+    }
+  }
+
   // 1107 她手机电量：壳在插线／拔线／电量变化／被叫醒时报上来；我本机带钥匙来看
   if (req.method === 'POST' && url.pathname === '/raven/battery') {
     if (!ravenBearerValid(req)) { res.writeHead(401); res.end('{"error":"unauthorized"}'); return }
