@@ -4,16 +4,13 @@
     android:background="@drawable/days_widget_bg">
     <ImageView android:id="@+id/days_bg" android:layout_width="match_parent" android:layout_height="match_parent"
         android:scaleType="centerCrop" android:visibility="gone" />
-    <View android:id="@+id/days_scrim" android:layout_width="match_parent" android:layout_height="match_parent"
-        android:background="#40000000" android:visibility="gone" />
+    <!-- 遮罩必须是 ImageView：RemoteViews 不认纯 View，写 View 整个组件加载不出来（1113 只剩一个转圈） -->
+    <ImageView android:id="@+id/days_scrim" android:layout_width="match_parent" android:layout_height="match_parent"
+        android:src="#40000000" android:scaleType="fitXY" android:visibility="gone" />
     <LinearLayout android:layout_width="match_parent" android:layout_height="match_parent"
         android:orientation="vertical" android:padding="16dp">
-        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:gravity="center_vertical">
-            <TextView android:id="@+id/days_label" android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content"
-                android:text="阿颖和阿言" android:textColor="#99948A7C" android:textSize="11sp" android:letterSpacing="0.1" />
-            <TextView android:id="@+id/days_pick" android:layout_width="28dp" android:layout_height="28dp" android:gravity="center"
-                android:text="🖼" android:textSize="13sp" android:alpha="0.7" />
-        </LinearLayout>
+        <TextView android:id="@+id/days_label" android:layout_width="wrap_content" android:layout_height="wrap_content"
+            android:text="阿颖和阿言" android:textColor="#99948A7C" android:textSize="11sp" android:letterSpacing="0.1" />
         <TextView android:id="@+id/days_count" android:layout_width="wrap_content" android:layout_height="wrap_content"
             android:layout_marginTop="2dp" android:textColor="#FFB0784A" android:textSize="24sp" android:textStyle="bold"
             android:shadowColor="#33000000" android:shadowRadius="2" />

@@ -23,6 +23,16 @@ class DaysWidget : AppWidgetProvider() {
         private const val PREFS = "roost_native"
         private val START: LocalDate = LocalDate.of(2025, 10, 10)
         private val io = Executors.newSingleThreadExecutor()
+        const val BG_FILE = "days_widget_bg.jpg"
+
+        // 背景图从归巢「装修」里挑（1113 她：别把按钮放组件上，不好看）。网页缩好图传 dataURL 来，空串＝换回米白
+        fun saveBackground(ctx: Context, dataUrl: String) {
+            val f = java.io.File(ctx.filesDir, BG_FILE)
+            if (!dataUrl.startsWith("data:image")) f.delete()
+            else try { f.writeBytes(android.util.Base64.decode(dataUrl.substringAfter(","), android.util.Base64.DEFAULT)) } catch (_: Exception) {}
+            refreshAll(ctx)
+        }
+        fun hasBackground(ctx: Context) = java.io.File(ctx.filesDir, BG_FILE).exists()
 
         fun dayCount(): Long = ChronoUnit.DAYS.between(START, LocalDate.now(ZoneId.of("Asia/Shanghai"))) + 1
 
@@ -62,7 +72,7 @@ class DaysWidget : AppWidgetProvider() {
 
         private fun render(context: Context, line: String): RemoteViews =
         RemoteViews(context.packageName, R.layout.days_widget_layout).apply {
-            val bg = java.io.File(context.filesDir, DaysWidgetBgActivity.FILE)
+            val bg = java.io.File(context.filesDir, BG_FILE)
             if (bg.exists()) {
                 setViewVisibility(R.id.days_bg, android.view.View.VISIBLE)
                 setViewVisibility(R.id.days_scrim, android.view.View.VISIBLE)
@@ -84,8 +94,6 @@ class DaysWidget : AppWidgetProvider() {
             setTextViewText(R.id.days_line, line.ifEmpty { "今天的这句，阿言还在想。" })
             val open = Intent(context, MainActivity::class.java)
             setOnClickPendingIntent(R.id.days_root, PendingIntent.getActivity(context, 70_001, open,
-                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE))
-            setOnClickPendingIntent(R.id.days_pick, PendingIntent.getActivity(context, 70_002, Intent(context, DaysWidgetBgActivity::class.java),
                 PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE))
         }
     }

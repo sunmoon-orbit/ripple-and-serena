@@ -101,6 +101,12 @@ class WebBridge(private val activity: MainActivity) {
     fun openAlarmFullScreenSettings() { activity.runOnUiThread { RavenAlarm.openFullScreenSettings(activity) } }
 
     @JavascriptInterface
+    fun setDaysWidgetBg(dataUrl: String) { DaysWidget.saveBackground(activity, dataUrl) }
+
+    @JavascriptInterface
+    fun hasDaysWidgetBg(): Boolean = DaysWidget.hasBackground(activity)
+
+    @JavascriptInterface
     fun setAlarmAvatar(dataUrl: String) { RavenAlarm.saveAvatar(activity, dataUrl) }
 
     @JavascriptInterface
