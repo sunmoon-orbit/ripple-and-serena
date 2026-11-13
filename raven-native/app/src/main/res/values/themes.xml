@@ -7,4 +7,11 @@
         <!-- 归巢是深色底（#1a1a1f），状态栏图标要浅色 -->
         <item name="android:windowLightStatusBar">false</item>
     </style>
+    <!-- 组件换背景那个小窗：透明底，只露出对话框（ThemedDialog 用的是 appcompat 的 AlertDialog，主题得是 appcompat 系） -->
+    <style name="Theme.Roost.Translucent" parent="Theme.Material3.DayNight.NoActionBar">
+        <item name="android:windowIsTranslucent">true</item>
+        <item name="android:windowBackground">@android:color/transparent</item>
+        <item name="android:windowAnimationStyle">@null</item>
+        <item name="android:backgroundDimEnabled">false</item>
+    </style>
 </resources>

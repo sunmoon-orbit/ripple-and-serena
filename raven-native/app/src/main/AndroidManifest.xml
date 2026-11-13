@@ -126,6 +126,13 @@
                 android:resource="@xml/days_widget_info" />
         </receiver>
 
+        <activity
+            android:name=".DaysWidgetBgActivity"
+            android:exported="false"
+            android:excludeFromRecents="true"
+            android:taskAffinity="cc.ravenlove.roost.widgetbg"
+            android:theme="@style/Theme.Roost.Translucent" />
+
         <!-- 通知栏直接回复 -->
         <receiver
             android:name=".QuickReplyReceiver"

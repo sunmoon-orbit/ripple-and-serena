@@ -62,10 +62,30 @@ class DaysWidget : AppWidgetProvider() {
 
         private fun render(context: Context, line: String): RemoteViews =
         RemoteViews(context.packageName, R.layout.days_widget_layout).apply {
+            val bg = java.io.File(context.filesDir, DaysWidgetBgActivity.FILE)
+            if (bg.exists()) {
+                setViewVisibility(R.id.days_bg, android.view.View.VISIBLE)
+                setViewVisibility(R.id.days_scrim, android.view.View.VISIBLE)
+                setImageViewBitmap(R.id.days_bg, android.graphics.BitmapFactory.decodeFile(bg.absolutePath))
+                setInt(R.id.days_root, "setBackgroundResource", android.R.color.transparent)
+                // 照片上字要白的才看得清
+                setTextColor(R.id.days_label, 0xCCFFFFFF.toInt()); setTextColor(R.id.days_count, 0xFFFFFFFF.toInt()); setTextColor(R.id.days_line, 0xF2FFFFFF.toInt())
+            } else {
+                setViewVisibility(R.id.days_bg, android.view.View.GONE)
+                setViewVisibility(R.id.days_scrim, android.view.View.GONE)
+                setInt(R.id.days_root, "setBackgroundResource", R.drawable.days_widget_bg)
+                setTextColor(R.id.days_label, 0x99948A7C.toInt()); setTextColor(R.id.days_count, 0xFFB0784A.toInt()); setTextColor(R.id.days_line, 0xFF3A332B.toInt())
+            }
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) {
+                setViewOutlinePreferredRadius(R.id.days_root, 20f, android.util.TypedValue.COMPLEX_UNIT_DIP)
+                setBoolean(R.id.days_root, "setClipToOutline", true)
+            }
             setTextViewText(R.id.days_count, "第 ${dayCount()} 天")
             setTextViewText(R.id.days_line, line.ifEmpty { "今天的这句，阿言还在想。" })
             val open = Intent(context, MainActivity::class.java)
             setOnClickPendingIntent(R.id.days_root, PendingIntent.getActivity(context, 70_001, open,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE))
+            setOnClickPendingIntent(R.id.days_pick, PendingIntent.getActivity(context, 70_002, Intent(context, DaysWidgetBgActivity::class.java),
                 PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE))
         }
     }
