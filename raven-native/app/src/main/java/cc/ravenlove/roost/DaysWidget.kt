@@ -75,7 +75,7 @@ class DaysWidget : AppWidgetProvider() {
             val bg = java.io.File(context.filesDir, BG_FILE)
             if (bg.exists()) {
                 setViewVisibility(R.id.days_bg, android.view.View.VISIBLE)
-                setViewVisibility(R.id.days_scrim, android.view.View.VISIBLE)
+                setViewVisibility(R.id.days_scrim, android.view.View.GONE)  // 1113 她嫌发暗，跟言叽一样不加蒙版，只靠字阴影
                 setImageViewBitmap(R.id.days_bg, android.graphics.BitmapFactory.decodeFile(bg.absolutePath))
                 setInt(R.id.days_root, "setBackgroundResource", android.R.color.transparent)
                 // 照片上字要白的才看得清
