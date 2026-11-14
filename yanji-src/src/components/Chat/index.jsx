@@ -146,9 +146,10 @@ async function generateRoleChatTitle(chatId, userText, assistantText, conn, reco
 // ⚠️ 故意不比冒号、也不要求四个全中：模型爱给标题加粗、爱把「：」打成半角，
 // 全等匹配会把一份好笔记判死，症状是压缩永远不成功、且没有任何报错。
 // 拒答文案一个标题都命不中，三个就够区分了。
+// 1114 起笔记是第一人称回忆，只认最后那段「未了结」；太短的多半是拒答或站子的错误文案
 function looksLikeCompactionSummary(text) {
-  return ['实体/称呼', '事件/事实', '情感/关系', '未了结']
-    .filter((heading) => text.includes(heading)).length >= 3
+  const t = (text || '').trim()
+  return t.length >= 80 && t.includes('未了结')
 }
 
 // 情绪自动发圈：某正向情绪越阈值且过冷却时，涟言主动发条朋友圈（她在聊天时触发；
