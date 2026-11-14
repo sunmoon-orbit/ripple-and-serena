@@ -1,0 +1,8 @@
+{
+  "appId": "cc.ravenlove.sticky",
+  "productName": "便利贴",
+  "extraMetadata": { "main": "main-sticky.js" },
+  "directories": { "output": "dist-sticky" },
+  "files": ["main-sticky.js", "preload-sticky.js", "sticky-www/**"],
+  "win": { "target": [{ "target": "zip", "arch": ["x64"] }] }
+}

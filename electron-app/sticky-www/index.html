@@ -1,0 +1,330 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>便利贴</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/lxgw-wenkai-screen-webfont@1.7.0/style.css">
+<!--
+  桌面便利贴（1114）：阿颖第 400 天第二天的礼物。
+  两层互不串：「墙」跟 moon /board 同步；「小抄」只存这台电脑（localStorage），从不上传。
+-->
+<style>
+  :root { --bg:#f3ecdf; --paper:#fbf7ee; --ink:#3b332a; --dim:#968b7b; --line:#e4d9c6; --accent:#b0814f; --her:#e7b9a6; --mine:#9fb2c4; --note:#fff8e6; --shadow:rgba(80,55,30,.22); }
+  [data-theme="night"]  { --bg:#1d1f26; --paper:#262933; --ink:#e8e2d6; --dim:#8c8a86; --line:#363a46; --accent:#c9a46a; --her:#c48f7b; --mine:#6e86a3; --note:#2e313c; --shadow:rgba(0,0,0,.5); }
+  [data-theme="chestnut"]{ --bg:#efe2d2; --paper:#f8efe3; --ink:#4a3424; --dim:#9a8370; --line:#e0cdb6; --accent:#8b5a35; --her:#d9a27c; --mine:#a58b6f; --note:#fdf3e4; --shadow:rgba(90,55,25,.25); }
+  [data-theme="lava"]   { --bg:#2a1e1a; --paper:#352722; --ink:#f0e2d4; --dim:#a58f80; --line:#4a3830; --accent:#d6894a; --her:#c86e4b; --mine:#8f6e5c; --note:#3e2e28; --shadow:rgba(0,0,0,.5); }
+  [data-theme="daylight"]{ --bg:#e7edf2; --paper:#f6f8fa; --ink:#2f3a44; --dim:#83909b; --line:#d5dee6; --accent:#6f8aa0; --her:#e9c7b6; --mine:#9db3c6; --note:#ffffff; --shadow:rgba(40,60,80,.18); }
+  [data-theme="banyan"] { --bg:#e9f1e0; --paper:#f6faef; --ink:#2f3d28; --dim:#839273; --line:#d6e3c8; --accent:#93b077; --her:#e8c9a4; --mine:#b5cc9f; --note:#fbfdf4; --shadow:rgba(50,80,30,.18); }
+  [data-theme="gold"]   { --bg:#f2e9d4; --paper:#fbf5e6; --ink:#433522; --dim:#9a8a69; --line:#e6d6b0; --accent:#e8b647; --her:#e8bf9c; --mine:#f2d58e; --note:#fff9e8; --shadow:rgba(110,80,20,.22); }
+  [data-theme="fendai"] { --bg:#f6e6e6; --paper:#fdf4f3; --ink:#4b3337; --dim:#a38a8d; --line:#efd4d4; --accent:#d58f98; --her:#efb7bd; --mine:#c9a891; --note:#fff7f6; --shadow:rgba(120,60,70,.18); }
+  [data-theme="zixia"]  { --bg:#ece6f3; --paper:#f8f5fb; --ink:#3d3449; --dim:#958aa3; --line:#ddd3ea; --accent:#9c86c4; --her:#e5bfd2; --mine:#b3a5d6; --note:#fdfbff; --shadow:rgba(70,50,110,.18); }
+
+  * { box-sizing:border-box; }
+  html,body { margin:0; height:100%; background:transparent; overflow:hidden; }
+  body { font-family:'LXGW WenKai Screen','LXGW WenKai','KaiTi','Microsoft YaHei',sans-serif; color:var(--ink); user-select:none; }
+  button { font:inherit; color:inherit; cursor:pointer; }
+  svg { display:block; }
+
+  /* ── 收起：一截竖胶带，上面站只小乌鸦 ── */
+  #tab { position:fixed; inset:0; display:flex; align-items:flex-start; justify-content:flex-end; cursor:pointer; -webkit-app-region:no-drag; }
+  #tab .tape { position:absolute; right:0; top:34px; width:30px; height:112px; background:var(--her); opacity:.92;
+    border-radius:3px 0 0 3px; box-shadow:-2px 2px 6px var(--shadow);
+    background-image:repeating-linear-gradient(135deg, rgba(255,255,255,.22) 0 6px, transparent 6px 12px);
+    -webkit-mask: linear-gradient(#000,#000), radial-gradient(circle at 0 0, transparent 0, #000 0);
+    clip-path: polygon(0 3%, 12% 0, 25% 2%, 40% 0, 55% 3%, 70% 0, 85% 2%, 100% 0, 100% 100%, 85% 98%, 70% 100%, 55% 97%, 40% 100%, 25% 98%, 12% 100%, 0 97%); }
+  #tab .crow { position:absolute; right:-3px; top:-1px; width:44px; transform-origin:60% 90%; transition:transform .3s; }
+  #tab:hover .tape { width:36px; }
+  #tab.new .crow { animation:tilt 2.4s ease-in-out infinite; }
+  #tab.new .dot { display:block; }
+  #tab .dot { display:none; position:absolute; right:30px; top:10px; width:7px; height:7px; border-radius:50%; background:var(--accent); box-shadow:0 0 0 2px var(--paper); }
+  @keyframes tilt { 0%,55%,100%{transform:rotate(0)} 65%{transform:rotate(-16deg)} 80%{transform:rotate(-12deg)} }
+
+  /* ── 展开 ── */
+  #panel { display:none; position:fixed; inset:10px 0 10px 10px; background:var(--paper); border-radius:14px 0 0 14px;
+    box-shadow:-4px 6px 18px var(--shadow); flex-direction:column;
+    background-image: radial-gradient(rgba(0,0,0,.025) 1px, transparent 1px); background-size:4px 4px; }
+  body.open #tab { display:none; } body.open #panel { display:flex; }
+  .clip { position:absolute; left:22px; top:-14px; width:26px; z-index:3; filter:drop-shadow(1px 2px 1.5px rgba(0,0,0,.28)); pointer-events:none; }
+  header { display:flex; align-items:center; gap:4px; padding:14px 10px 8px 58px; -webkit-app-region:drag; }
+  header .tabs { display:flex; gap:2px; -webkit-app-region:no-drag; }
+  header .tabs button { background:none; border:0; padding:5px 10px; border-radius:8px; font-size:15px; color:var(--dim); letter-spacing:2px; }
+  header .tabs button.on { color:var(--ink); background:var(--bg); }
+  header .sp { flex:1; }
+  .ico { -webkit-app-region:no-drag; background:none; border:0; width:30px; height:30px; border-radius:8px; display:grid; place-items:center; color:var(--dim); }
+  .ico:hover { background:var(--bg); color:var(--ink); }
+  .ico svg { width:17px; height:17px; }
+  main { flex:1; overflow-y:auto; padding:6px 16px 12px; user-select:text; }
+  main::-webkit-scrollbar { width:5px } main::-webkit-scrollbar-thumb { background:var(--line); border-radius:3px }
+  .empty { color:var(--dim); text-align:center; font-size:13.5px; padding:50px 10px; line-height:1.9; }
+
+  /* 墙 */
+  .note { position:relative; background:var(--note); margin:20px 6px 14px; padding:16px 14px 10px; border-radius:2px;
+    box-shadow:0 1px 1px rgba(0,0,0,.05), 0 6px 12px -6px var(--shadow); font-size:15px; line-height:1.75; word-break:break-word; }
+  .note .tx { white-space:pre-wrap; }
+  .note .tp { position:absolute; top:-9px; width:58px; height:18px; opacity:.85;
+    background-image:repeating-linear-gradient(90deg, rgba(255,255,255,.25) 0 3px, transparent 3px 7px);
+    clip-path: polygon(0 10%, 6% 0, 12% 12%, 20% 0, 100% 0, 100% 90%, 94% 100%, 88% 88%, 80% 100%, 0 100%); }
+  .note.her .tp { background-color:var(--her); left:10px; transform:rotate(-6deg); }
+  .note.mine .tp { background-color:var(--mine); right:10px; transform:rotate(5deg); }
+  .note .meta { margin-top:6px; font-size:11.5px; color:var(--dim); display:flex; justify-content:space-between; }
+  .compose { border-top:1px dashed var(--line); padding:10px 12px 12px; display:flex; gap:8px; align-items:flex-end; }
+  textarea, input { font:inherit; color:var(--ink); background:var(--bg); border:1px solid var(--line); border-radius:9px; padding:8px 10px; outline:none; width:100%; }
+  textarea { resize:none; height:40px; font-size:14.5px; line-height:1.5; }
+  textarea:focus, input:focus { border-color:var(--accent); }
+  .btn { background:var(--accent); color:var(--paper); border:0; border-radius:9px; padding:8px 14px; font-size:14px; white-space:nowrap; }
+  .btn.ghost { background:none; color:var(--dim); border:1px solid var(--line); }
+  .btn.warn { background:#c0705f; }
+
+  /* 小抄 */
+  .cheat { background:var(--note); border:1px solid var(--line); border-radius:10px; padding:10px 12px; margin:10px 0; }
+  .cheat .t { display:flex; align-items:center; gap:6px; font-size:14px; }
+  .cheat .t b { flex:1; font-weight:600; }
+  .cheat .t > svg { width:14px; height:14px; flex:none; color:var(--dim); }
+  .cheat .t .ico { width:26px; height:26px; }
+  .cheat .t .ico svg { width:15px; height:15px; }
+  .cheat pre { margin:6px 0 0; font-family:'Cascadia Mono',Consolas,monospace; font-size:12.5px; line-height:1.55; background:var(--bg); border-radius:7px; padding:7px 9px; white-space:pre-wrap; word-break:break-all; }
+  .cheat pre.mask { letter-spacing:2px; color:var(--dim); }
+  .copied { color:var(--accent) !important; }
+  .row { display:flex; gap:8px; margin-top:8px; align-items:center; font-size:13px; color:var(--dim); }
+  .row label { display:flex; gap:5px; align-items:center; }
+  .form { border:1px dashed var(--accent); border-radius:10px; padding:10px; margin:10px 0; display:grid; gap:8px; }
+  .form textarea { height:80px; font-family:'Cascadia Mono',Consolas,monospace; font-size:12.5px; }
+  .link { background:none; border:0; color:var(--dim); font-size:12.5px; text-decoration:underline dotted; padding:4px 0; }
+
+  /* 设置 */
+  h3 { font-size:13px; letter-spacing:3px; color:var(--dim); font-weight:500; margin:14px 0 10px; }
+  .themes { display:grid; grid-template-columns:repeat(3,1fr); gap:10px; }
+  .th { background:none; border:0; padding:0; text-align:center; font-size:12.5px; color:var(--dim); }
+  .th .sw { position:relative; height:58px; border-radius:12px; border:2px solid transparent; overflow:hidden; display:flex; box-shadow:0 2px 6px rgba(0,0,0,.08); }
+  .th .sw i { flex:1; }
+  .th .sw i:last-child { flex:.55; }
+  .th.on .sw { border-color:var(--accent); }
+  .th.on { color:var(--ink); }
+  .th .ok { display:none; position:absolute; right:5px; bottom:5px; width:18px; height:18px; border-radius:50%; background:var(--accent); color:#fff; place-items:center; }
+  .th.on .ok { display:grid; }
+  .th span { display:block; margin-top:5px; }
+  .hint { font-size:12px; color:var(--dim); line-height:1.7; margin:6px 0; }
+
+  .confirm { position:fixed; inset:0; background:rgba(0,0,0,.25); display:grid; place-items:center; z-index:9; }
+  .confirm div { background:var(--paper); border-radius:12px; padding:16px; width:260px; box-shadow:0 10px 30px var(--shadow); font-size:14px; line-height:1.7; }
+  .confirm .row { justify-content:flex-end; }
+</style>
+</head>
+<body>
+
+<div id="tab" title="点开便利贴">
+  <div class="tape"></div>
+  <svg class="crow" viewBox="0 0 64 56" aria-hidden="true">
+    <path fill="#1d1d24" d="M22 30c-1-7 3-14 10-15 3-5 9-6 13-3l8 2-7 3c1 3 1 6 0 9 5 2 9 7 11 13-6-2-11-2-15 0l-4 5h-3l1-4c-3 0-6-1-8-3l-6 9h-3l5-10c-2-1-2-4-2-6z"/>
+    <circle cx="44" cy="17" r="1.6" fill="#f4efe6"/>
+    <path stroke="#1d1d24" stroke-width="1.6" stroke-linecap="round" d="M33 48v6M38 47v7"/>
+  </svg>
+  <i class="dot"></i>
+</div>
+
+<div id="panel">
+  <svg class="clip" viewBox="0 0 26 62" aria-hidden="true">
+    <defs>
+      <linearGradient id="metal" x1="0" x2="1">
+        <stop offset="0" stop-color="#7d8288"/><stop offset=".35" stop-color="#eef1f3"/><stop offset=".55" stop-color="#b4b9be"/><stop offset="1" stop-color="#6c7177"/>
+      </linearGradient>
+    </defs>
+    <path d="M17 18V8.5a5 5 0 0 0-10 0V46a8 8 0 0 0 16 0V14a11 11 0 0 0-22 0v30" fill="none" stroke="#4e5358" stroke-width="3.6" stroke-linecap="round"/>
+    <path d="M17 18V8.5a5 5 0 0 0-10 0V46a8 8 0 0 0 16 0V14a11 11 0 0 0-22 0v30" fill="none" stroke="url(#metal)" stroke-width="2.4" stroke-linecap="round"/>
+    <path d="M8.2 10V40" stroke="#fff" stroke-opacity=".7" stroke-width=".7" stroke-linecap="round"/>
+  </svg>
+  <header>
+    <div class="tabs"><button data-v="wall" class="on">墙</button><button data-v="cheat">小抄</button></div>
+    <div class="sp"></div>
+    <button class="ico" id="gear" title="外观和设置"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="12" cy="12" r="3"/><path d="M12 2.8v2.4M12 18.8v2.4M2.8 12h2.4M18.8 12h2.4M5.5 5.5l1.7 1.7M16.8 16.8l1.7 1.7M5.5 18.5l1.7-1.7M16.8 7.2l1.7-1.7"/></svg></button>
+    <button class="ico" id="fold" title="收起"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M9 6l6 6-6 6"/></svg></button>
+  </header>
+  <main id="main"></main>
+  <div id="foot"></div>
+</div>
+
+<script>
+const API = 'https://memory.ravenlove.cc'
+const THEMES = [
+  ['paper','米白纸','#fbf7ee','#b0814f'], ['night','深夜归巢','#262933','#c9a46a'], ['chestnut','举个栗子','#f8efe3','#8b5a35'],
+  ['lava','熔岩巧克力','#352722','#d6894a'], ['daylight','昼蓝','#f6f8fa','#6f8aa0'], ['banyan','榕树','#f6faef','#93b077'],
+  ['gold','金玉良缘','#fbf6e4','#e8b647'], ['fendai','粉黛','#fdf4f3','#d58f98'], ['zixia','紫霞','#f8f5fb','#9c86c4'],
+]
+const $ = s => document.querySelector(s)
+const store = {
+  get(k, d) { try { const v = localStorage.getItem('sticky-' + k); return v == null ? d : JSON.parse(v) } catch { return d } },
+  set(k, v) { try { localStorage.setItem('sticky-' + k, JSON.stringify(v)) } catch {} },
+}
+const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;' }[c]))
+const api = window.sticky || { open() {}, copy: t => navigator.clipboard.writeText(t), quit() {} }
+
+let view = 'wall', notes = [], editing = null
+document.documentElement.dataset.theme = store.get('theme', 'paper')
+
+function setOpen(open) {
+  document.body.classList.toggle('open', open)
+  api.open(open)
+  if (open) { render(); markSeen() }
+}
+$('#tab').onclick = () => setOpen(true)
+$('#fold').onclick = () => setOpen(false)
+$('#gear').onclick = () => { view = view === 'settings' ? 'wall' : 'settings'; render() }
+document.querySelectorAll('.tabs button').forEach(b => b.onclick = () => { view = b.dataset.v; render() })
+addEventListener('keydown', e => { if (e.key === 'Escape' && document.body.classList.contains('open')) setOpen(false) })
+
+function ask(text, okText, onOk) {
+  const d = document.createElement('div'); d.className = 'confirm'
+  d.innerHTML = `<div>${esc(text)}<div class="row"><button class="btn ghost">算了</button><button class="btn warn">${esc(okText)}</button></div></div>`
+  d.querySelector('.ghost').onclick = () => d.remove()
+  d.querySelector('.warn').onclick = () => { d.remove(); onOk() }
+  document.body.appendChild(d)
+}
+
+/* ── 墙 ── */
+async function loadWall() {
+  const token = store.get('token', '')
+  if (!token) return
+  try {
+    const r = await fetch(API + '/board?limit=60', { headers: { Authorization: 'Bearer ' + token } })
+    if (!r.ok) throw new Error(r.status)
+    const list = await r.json()
+    notes = (Array.isArray(list) ? list : list.messages || []).sort((a, b) => b.id - a.id)
+    const newest = notes.find(n => n.author === '涟言')
+    $('#tab').classList.toggle('new', !!newest && newest.id > store.get('seen', 0) && !document.body.classList.contains('open'))
+    if (document.body.classList.contains('open')) { markSeen(); if (view === 'wall') render() }
+  } catch { if (view === 'wall' && !notes.length) render('墙那边没连上，等一下再试。') }
+}
+function markSeen() {
+  const newest = notes.find(n => n.author === '涟言')
+  if (newest) store.set('seen', newest.id)
+  $('#tab').classList.remove('new')
+}
+const tilt = id => ((id * 37) % 7 - 3) * 0.45
+function when(s) {
+  const d = new Date(String(s).replace(' ', 'T') + (/[zZ+]/.test(s) ? '' : 'Z'))
+  return isNaN(d) ? '' : `${d.getMonth() + 1}月${d.getDate()}日 ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`
+}
+function wallHTML(err) {
+  if (!store.get('token', '')) return `<div class="empty">还没接上墙。<br>点右上角的齿轮，把记忆库的钥匙贴进去。</div>`
+  if (err) return `<div class="empty">${esc(err)}</div>`
+  if (!notes.length) return `<div class="empty">翻开中…</div>`
+  return notes.map(n => `<div class="note ${n.author === '涟言' ? 'mine' : 'her'}" style="transform:rotate(${tilt(n.id)}deg)">
+      <i class="tp"></i><div class="tx">${esc(n.text)}</div><div class="meta"><span>${n.author === '涟言' ? '阿言' : '阿颖'}</span><span>${when(n.created_at)}</span></div></div>`).join('')
+}
+function wallFoot() {
+  if (!store.get('token', '')) return ''
+  return `<div class="compose"><textarea id="say" placeholder="贴一张给他…"></textarea><button class="btn" id="post">贴上</button></div>`
+}
+async function post() {
+  const t = $('#say').value.trim(); if (!t) return
+  $('#post').disabled = true
+  try {
+    const r = await fetch(API + '/board', { method:'POST', headers:{ 'Content-Type':'application/json', Authorization:'Bearer ' + store.get('token','') },
+      body: JSON.stringify({ text:t, author:'阿颖', source:'desktop' }) })
+    if (!r.ok) throw new Error(r.status)
+    $('#say').value = ''; await loadWall()
+  } catch { alert('没贴上，网络或钥匙不对') }
+  $('#post').disabled = false
+}
+
+/* ── 小抄（只存本地） ── */
+const cheats = () => store.get('cheats', [])
+const trash = () => store.get('trash', [])
+const lock = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>`
+const eye = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M2 12s3.6-6.5 10-6.5S22 12 22 12s-3.6 6.5-10 6.5S2 12 2 12z"/><circle cx="12" cy="12" r="2.6"/></svg>`
+const copyI = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V5a1 1 0 0 0-1-1H5a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h3"/></svg>`
+const penI = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M4 20h4L19 9l-4-4L4 16v4z"/></svg>`
+const binI = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/></svg>`
+let peeking = new Set(), showTrash = false
+
+function formHTML(c) {
+  return `<div class="form"><input id="f-t" placeholder="名字，比如：连服务器" value="${esc(c?.title)}">
+    <textarea id="f-b" placeholder="命令、钥匙、步骤…">${esc(c?.body)}</textarea>
+    <div class="row"><label><input type="checkbox" id="f-s" ${c?.secret ? 'checked' : ''} style="width:auto">打码（钥匙这类）</label><span class="sp" style="flex:1"></span>
+    <button class="btn ghost" id="f-x">取消</button><button class="btn" id="f-ok">存</button></div></div>`
+}
+function cheatHTML() {
+  const list = cheats()
+  if (showTrash) {
+    const t = trash()
+    return `<button class="link" id="back">← 回小抄</button>` + (t.length ? t.map(c => `<div class="cheat"><div class="t"><b>${esc(c.title)}</b>
+      <button class="ico" data-restore="${c.id}" title="放回去">↩</button><button class="ico" data-purge="${c.id}" title="彻底删掉">${binI}</button></div></div>`).join('')
+      : `<div class="empty">回收站是空的。</div>`)
+  }
+  return `<div class="hint">这一页只存在这台电脑里，不上传、不同步。</div>`
+    + (editing === 'new' ? formHTML() : `<button class="btn ghost" id="add" style="width:100%">＋ 记一条</button>`)
+    + (list.length ? '' : `<div class="empty">还空着。<br>SSH 命令、钥匙、接我回来的步骤，都可以放这儿。</div>`)
+    + list.map(c => editing === c.id ? formHTML(c) : `<div class="cheat"><div class="t">${c.secret ? lock : ''}<b>${esc(c.title)}</b>
+        ${c.secret ? `<button class="ico" data-peek="${c.id}" title="看一眼">${eye}</button>` : ''}
+        <button class="ico" data-copy="${c.id}" title="复制">${copyI}</button><button class="ico" data-edit="${c.id}" title="改">${penI}</button>
+        <button class="ico" data-del="${c.id}" title="删">${binI}</button></div>
+        <pre class="${c.secret && !peeking.has(c.id) ? 'mask' : ''}">${c.secret && !peeking.has(c.id) ? '●'.repeat(Math.min(12, Math.max(6, c.body.length))) : esc(c.body)}</pre></div>`).join('')
+    + (trash().length ? `<button class="link" id="trash">回收站（${trash().length}）</button>` : '')
+}
+function bindCheat() {
+  const m = $('#main')
+  m.querySelector('#add')?.addEventListener('click', () => { editing = 'new'; render() })
+  m.querySelector('#back')?.addEventListener('click', () => { showTrash = false; render() })
+  m.querySelector('#trash')?.addEventListener('click', () => { showTrash = true; render() })
+  m.querySelector('#f-x')?.addEventListener('click', () => { editing = null; render() })
+  m.querySelector('#f-ok')?.addEventListener('click', () => {
+    const title = $('#f-t').value.trim() || '没起名的', body = $('#f-b').value, secret = $('#f-s').checked
+    const list = cheats()
+    if (editing === 'new') list.unshift({ id: Date.now(), title, body, secret })
+    else Object.assign(list.find(c => c.id === editing), { title, body, secret })
+    store.set('cheats', list); editing = null; render()
+  })
+  m.querySelectorAll('[data-copy]').forEach(b => b.onclick = async () => {
+    const c = cheats().find(x => x.id == b.dataset.copy); await api.copy(c.body)
+    b.classList.add('copied'); b.title = '复制好了'; setTimeout(() => { b.classList.remove('copied'); b.title = '复制' }, 1200)
+  })
+  m.querySelectorAll('[data-peek]').forEach(b => b.onclick = () => {
+    const id = +b.dataset.peek; peeking.has(id) ? peeking.delete(id) : peeking.add(id); render()
+    if (peeking.has(id)) setTimeout(() => { peeking.delete(id); render() }, 8000)
+  })
+  m.querySelectorAll('[data-edit]').forEach(b => b.onclick = () => { editing = +b.dataset.edit; render() })
+  m.querySelectorAll('[data-del]').forEach(b => b.onclick = () => {
+    const c = cheats().find(x => x.id == b.dataset.del)
+    ask(`把「${c.title}」放进回收站？`, '放进去', () => {
+      store.set('cheats', cheats().filter(x => x.id !== c.id)); store.set('trash', [c, ...trash()]); render()
+    })
+  })
+  m.querySelectorAll('[data-restore]').forEach(b => b.onclick = () => {
+    const c = trash().find(x => x.id == b.dataset.restore)
+    store.set('trash', trash().filter(x => x.id !== c.id)); store.set('cheats', [c, ...cheats()]); render()
+  })
+  m.querySelectorAll('[data-purge]').forEach(b => b.onclick = () => {
+    const c = trash().find(x => x.id == b.dataset.purge)
+    ask(`「${c.title}」彻底删掉就找不回来了。`, '删掉', () => { store.set('trash', trash().filter(x => x.id !== c.id)); render() })
+  })
+}
+
+/* ── 设置 ── */
+function settingsHTML() {
+  const cur = store.get('theme', 'paper')
+  return `<h3>外观</h3><div class="themes">${THEMES.map(([k, n, a, b]) => `<button class="th ${k === cur ? 'on' : ''}" data-th="${k}">
+      <div class="sw"><i style="background:${a}"></i><i style="background:${b}"></i><span class="ok"><svg viewBox="0 0 24 24" width="12" fill="none" stroke="#fff" stroke-width="3"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></span></div><span>${n}</span></button>`).join('')}</div>
+    <h3>墙的钥匙</h3><input id="tok" type="password" placeholder="记忆库的钥匙" value="${esc(store.get('token', ''))}">
+    <div class="hint">只存在这台电脑里，用来读写我们的便利贴墙。</div>
+    <div class="row"><button class="btn" id="save-tok">存</button><span style="flex:1"></span><button class="link" id="quit">关掉便利贴</button></div>`
+}
+function bindSettings() {
+  document.querySelectorAll('[data-th]').forEach(b => b.onclick = () => { store.set('theme', b.dataset.th); document.documentElement.dataset.theme = b.dataset.th; render() })
+  $('#save-tok').onclick = () => { store.set('token', $('#tok').value.trim()); notes = []; view = 'wall'; render(); loadWall() }
+  $('#quit').onclick = () => api.quit()
+}
+
+function render(err) {
+  document.querySelectorAll('.tabs button').forEach(b => b.classList.toggle('on', b.dataset.v === view))
+  $('#main').innerHTML = view === 'wall' ? wallHTML(err) : view === 'cheat' ? cheatHTML() : settingsHTML()
+  $('#foot').innerHTML = view === 'wall' ? wallFoot() : ''
+  if (view === 'cheat') bindCheat()
+  if (view === 'settings') bindSettings()
+  $('#post')?.addEventListener('click', post)
+  $('#say')?.addEventListener('keydown', e => { if (e.key === 'Enter' && e.ctrlKey) post() })
+}
+
+render(); loadWall(); setInterval(loadWall, 60000)
+</script>
+</body>
+</html>
