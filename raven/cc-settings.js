@@ -42,13 +42,20 @@
   }
   // keepSelection：只有「刷新列表」保留她手上正在挑的那项；
   // 每次打开面板都回到「实际在跑的那个」，不然勾选和（当前）会指着两行（0926 阿颖：怪怪的）
+  // 1114 她说切模型「要点好几下」：/model 敲进终端就生效了，但状态栏要等下一条回复才报新模型，
+  // 确认时读到的还是旧的，勾选又跳回旧模型，看着像没切成，她只好再点一遍。
+  // 记下刚切的那个，状态栏跟上之前（最多 15 分钟）都按它显示
+  let pendingSwitch = null
+  let pickedAt = 0
   function applyModelData(data, keepSelection = false) {
+    if (pendingSwitch && (modelMatchesSelection(data.currentModel, pendingSwitch.model) || Date.now() - pendingSwitch.at > 15 * 60000)) pendingSwitch = null
     const age = Number(data.currentModelAgeSeconds)
     currentModel.textContent = data.currentModel
       ? prettyModel(data.currentModel) + (prettyModel(data.currentModel) !== data.currentModel ? '（' + data.currentModel + '）' : '')
-        + (age > 120 ? ' · ' + Math.round(age / 60) + ' 分钟前的状态，刚切换的话等下一条回复后刷新' : '')
+        + (pendingSwitch ? ' → 已切到 ' + prettyModel(pendingSwitch.model) + '，下一条回复起用它'
+          : age > 120 ? ' · ' + Math.round(age / 60) + ' 分钟前的状态，刚切换的话等下一条回复后刷新' : '')
       : '未知'
-    const selected = keepSelection ? modelSelect.value : ''
+    const selected = pendingSwitch ? pendingSwitch.model : keepSelection ? modelSelect.value : ''
     modelSelect.replaceChildren()
     for (const model of Array.isArray(data.models) ? data.models : []) {
       const option = document.createElement('option')
@@ -92,8 +99,9 @@
         if (o.value === modelSelect.value) b.classList.add('on')
         const name = document.createElement('span'); name.textContent = shortLabel(o)
         b.append(name)
-        if (o.value === current) { const tag = document.createElement('em'); tag.textContent = '正在用'; b.append(tag) }
-        b.onclick = () => { modelSelect.value = o.value; modelSelect.onchange && modelSelect.onchange(); renderModelList(current) }
+        const tagText = pendingSwitch ? (o.value === pendingSwitch.model ? '已切到' : '') : (o.value === current ? '正在用' : '')
+        if (tagText) { const tag = document.createElement('em'); tag.textContent = tagText; b.append(tag) }
+        b.onclick = () => { pickedAt = Date.now(); modelSelect.value = o.value; modelSelect.onchange && modelSelect.onchange(); renderModelList(current) }
         g.append(b)
       }
       return g
@@ -167,7 +175,7 @@
         applyModelData(data)
         if (modelMatchesSelection(data.currentModel, expected)) { say('已切换到 ' + expected); return }
         if (attempt < 2) { confirmModelSwitch(expected, attempt + 1); return }
-        say('切换指令已发送；状态栏还没确认，下一条消息前可再刷新一次。')
+        say('已经切到 ' + expected + ' 了，不用再点。状态栏要等下一条回复才会跟上。')
       } catch (e) { say(e.message) }
     }, attempt === 0 ? 1800 : 2500)
   }
@@ -185,7 +193,8 @@
   document.getElementById('cc-settings-open').onclick = () => {
     dialog.showModal()
     // 模型状态每次打开都重读（以前只读第一次，关了再开永远是旧的）；文档草稿不动
-    if (revision !== null) { run(async () => { applyModelData(await api({ kind: 'model' })) }); return }
+    const openedAt = Date.now()
+    if (revision !== null) { run(async () => { applyModelData(await api({ kind: 'model' }), pickedAt > openedAt) }); return }
     run(async () => {
       say('正在读取…')
       const data = await api({ kind: 'model' })
@@ -201,6 +210,7 @@
     run(async () => {
       say('正在切换模型…')
       await api({}, { kind: 'model-switch', model })
+      pendingSwitch = { model, at: Date.now() }
       // 别名也要等确认：以前别名直接说「已选择」就收工，指令被吞了也看不出来（0926）
       say('切换指令已发送，正在等 Claude Code 确认…')
       confirmModelSwitch(model)
