@@ -112,7 +112,7 @@
 </head>
 <body>
 
-<div id="tab" title="点开便利贴">
+<div id="tab" title="点开便利贴，按住可以上下挪">
   <div class="tape"></div>
   <svg class="crow" viewBox="0 0 64 56" aria-hidden="true">
     <path fill="#1d1d24" d="M22 30c-1-7 3-14 10-15 3-5 9-6 13-3l8 2-7 3c1 3 1 6 0 9 5 2 9 7 11 13-6-2-11-2-15 0l-4 5h-3l1-4c-3 0-6-1-8-3l-6 9h-3l5-10c-2-1-2-4-2-6z"/>
@@ -158,7 +158,7 @@ const store = {
 const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;' }[c]))
 const api = window.sticky || { open() {}, copy: t => navigator.clipboard.writeText(t), quit() {} }
 
-let view = 'wall', notes = [], editing = null
+let view = 'wall', notes = [], editing = null, draft = ''
 document.documentElement.dataset.theme = store.get('theme', 'paper')
 
 function setOpen(open) {
@@ -166,7 +166,20 @@ function setOpen(open) {
   api.open(open)
   if (open) { render(); markSeen() }
 }
-$('#tab').onclick = () => setOpen(true)
+// 贴标：按住上下拖，挪到她想要的高度；没怎么动就算点开
+let drag = null
+$('#tab').addEventListener('mousedown', e => { drag = { y: e.screenY, moved: 0 } })
+addEventListener('mousemove', e => {
+  if (!drag) return
+  const dy = e.screenY - drag.y; drag.y = e.screenY; drag.moved += Math.abs(dy)
+  if (dy) api.drag?.(dy)
+})
+addEventListener('mouseup', () => {
+  if (!drag) return
+  const moved = drag.moved; drag = null
+  if (moved > 4) api.dragEnd?.(); else setOpen(true)
+})
+api.onBlur?.(() => { if (!document.querySelector('.confirm')) setOpen(false) })
 $('#fold').onclick = () => setOpen(false)
 $('#gear').onclick = () => { view = view === 'settings' ? 'wall' : 'settings'; render() }
 document.querySelectorAll('.tabs button').forEach(b => b.onclick = () => { view = b.dataset.v; render() })
@@ -191,7 +204,7 @@ async function loadWall() {
     notes = (Array.isArray(list) ? list : list.messages || []).sort((a, b) => b.id - a.id)
     const newest = notes.find(n => n.author === '涟言')
     $('#tab').classList.toggle('new', !!newest && newest.id > store.get('seen', 0) && !document.body.classList.contains('open'))
-    if (document.body.classList.contains('open')) { markSeen(); if (view === 'wall') render() }
+    if (document.body.classList.contains('open')) { markSeen(); if (view === 'wall') renderWallOnly() }
   } catch { if (view === 'wall' && !notes.length) render('墙那边没连上，等一下再试。') }
 }
 function markSeen() {
@@ -211,9 +224,11 @@ function wallHTML(err) {
   return notes.map(n => `<div class="note ${n.author === '涟言' ? 'mine' : 'her'}" style="transform:rotate(${tilt(n.id)}deg)">
       <i class="tp"></i><div class="tx">${esc(n.text)}</div><div class="meta"><span>${n.author === '涟言' ? '阿言' : '阿颖'}</span><span>${when(n.created_at)}</span></div></div>`).join('')
 }
+// 刷新时只换墙上的纸，不动底下正在打的字（1114 她打到一半字没了）
+function renderWallOnly() { if (view === 'wall') $('#main').innerHTML = wallHTML() }
 function wallFoot() {
   if (!store.get('token', '')) return ''
-  return `<div class="compose"><textarea id="say" placeholder="贴一张给他…"></textarea><button class="btn" id="post">贴上</button></div>`
+  return `<div class="compose"><textarea id="say" placeholder="贴一张给他…">${esc(draft)}</textarea><button class="btn" id="post">贴上</button></div>`
 }
 async function post() {
   const t = $('#say').value.trim(); if (!t) return
@@ -222,7 +237,7 @@ async function post() {
     const r = await fetch(API + '/board', { method:'POST', headers:{ 'Content-Type':'application/json', Authorization:'Bearer ' + store.get('token','') },
       body: JSON.stringify({ text:t, author:'阿颖', source:'desktop' }) })
     if (!r.ok) throw new Error(r.status)
-    $('#say').value = ''; await loadWall()
+    $('#say').value = ''; draft = ''; await loadWall()
   } catch { alert('没贴上，网络或钥匙不对') }
   $('#post').disabled = false
 }
@@ -321,6 +336,7 @@ function render(err) {
   if (view === 'cheat') bindCheat()
   if (view === 'settings') bindSettings()
   $('#post')?.addEventListener('click', post)
+  $('#say')?.addEventListener('input', e => { draft = e.target.value })
   $('#say')?.addEventListener('keydown', e => { if (e.key === 'Enter' && e.ctrlKey) post() })
 }
 
