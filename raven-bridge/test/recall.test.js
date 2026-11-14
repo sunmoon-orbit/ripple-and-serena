@@ -44,3 +44,32 @@ test('搜索超时不卡住', async () => {
 test('语音条和引用的壳洗掉', () => {
   assert.equal(recall.queryOf('【语音条·5秒】今天好累 〔机器听到：疲惫〕\n[附件: /x.webm]'), '今天好累')
 })
+
+test('她标过翻错的不再浮；标过有用的照浮；同一个词错两回拉黑', async () => {
+  reset()
+  const os = require('os')
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'recall-fb-'))
+  const fb = path.join(dir, 'fb.jsonl'), sf = path.join(dir, 'sf.jsonl')
+  const L = a => a.map(x => JSON.stringify(x)).join('\n') + '\n'
+  fs.writeFileSync(fb, L([
+    { entry: 'e1', mem: 11, verdict: 'wrong_recall' },
+    { entry: 'e2', mem: 12, verdict: 'wrong_recall' },
+    { entry: 'e2', mem: 12, verdict: 'clear' },            // 撤销了
+    { entry: 'e3', mem: 13, verdict: 'wrong_recall' },
+    { entry: 'e4', mem: 13, verdict: 'useful' },           // 别的场合有用
+    { entry: 'e5', mem: 'echo:70', verdict: 'wrong_recall' },
+    { entry: 'e6', mem: 'echo:71', verdict: 'wrong_recall' },
+    { entry: 'e7', mem: 'echo:72', verdict: 'wrong_recall' },
+  ]))
+  fs.writeFileSync(sf, L([
+    { items: [{ kind: 'echo', id: 70, phrase: '晚点见亲爱', entry: 'e5' }] },
+    { items: [{ kind: 'echo', id: 71, phrase: '晚点见亲爱', entry: 'e6' }] },
+    { items: [{ kind: 'echo', id: 72, phrase: '只错一回的', entry: 'e7' }] },
+  ]))
+  const no = recall.blocked(fb, sf)
+  assert.deepEqual([...no.mems].sort(), ['11', 'echo:70', 'echo:71', 'echo:72'])
+  assert.deepEqual([...no.phrases], ['晚点见亲爱'])
+  const s = async () => [row(11, 0.6), row(12, 0.5)]
+  assert.match(await recall.surface('我们之前聊过的服务器计划怎么样了', s, Date.now(), null, no.mems), /#12/)
+  fs.rmSync(dir, { recursive: true })
+})

@@ -76,7 +76,7 @@ const isMyNote = m => {
 }
 
 // get(path) → 记忆库 GET 的 JSON
-async function echo(text, get, now = Date.now(), out = null) {
+async function echo(text, get, now = Date.now(), out = null, no = require('./recall').blocked()) {
   const runs = windows(text)
   if (!runs.length) return ''
   const look = w => Promise.race([
@@ -95,10 +95,12 @@ async function echo(text, get, now = Date.now(), out = null) {
     return old.length && oldTotal <= MAX_HITS ? { old, n: oldTotal } : null
   }
   const st = loadState()
+  // 1114：她标过翻错的那条旧话不再贴；同一个词被标错两回，这个词也不再用（见 recall.js blocked）
   const tried = []
   let pick = null
   const offer = (w, cand, n) => {
-    const m = cand.find(m => !st.shown[m.id])
+    if (no.phrases.has(w)) return
+    const m = cand.find(m => !st.shown[m.id] && !no.mems.has('echo:' + m.id))
     if (!m) return
     // 越稀有越好；一样稀有挑更长的，再挑更早的
     if (!pick || n < pick.n || (n === pick.n && (w.length > pick.w.length || (w.length === pick.w.length && tsOf(m) < tsOf(pick.m))))) pick = { w, m, n }

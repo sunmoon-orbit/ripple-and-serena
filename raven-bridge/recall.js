@@ -9,6 +9,7 @@
 //   4. 新鲜：两天内写的多半还在我上下文里，不浮
 //   5. 冷却：同一条 6 小时内不重复浮；一轮只浮一条
 //   6. 分数：相似度够高才浮
+//   7. 她的打分（1114）：她标过「翻错了／记忆本身错了」的那一条不再浮
 // 每一轮都记一行日志（recall-log.jsonl），我隔几天翻一遍调门槛。
 const fs = require('fs')
 const path = require('path')
@@ -66,7 +67,7 @@ function clip(s, n) {
 }
 
 // 返回要贴在她那句话后面的一行（没有就返回 ''）。search(q) 要给出 moon 语义搜索的结果数组。
-async function surface(text, search, now = Date.now(), out = null) {
+async function surface(text, search, now = Date.now(), out = null, no = blocked().mems) {
   const q = queryOf(text)
   if (!worthLooking(q)) return ''
   let rows
@@ -86,6 +87,7 @@ async function surface(text, search, now = Date.now(), out = null) {
   for (const r of rows) {
     if (SKIP_TYPES.has(r.type)) { why = 'type'; continue }
     if (r.deleted_at) continue
+    if (no.has(String(r.id))) { why = 'marked'; continue }
     const created = new Date(String(r.created_at || '').replace(' ', 'T')).getTime()
     if (Number.isFinite(created) && now - created < FRESH_MS) { why = 'fresh'; continue }
     if (st.surfaced[r.id] && now - st.surfaced[r.id] < COOLDOWN_MS) { why = 'cooldown'; continue }
@@ -141,4 +143,43 @@ function feedbackFor(entryAt) {
   return out
 }
 
-module.exports = { surface, queryOf, worthLooking, MIN_SIM, findEntry, whyNot, addFeedback, feedbackFor, SKIP_TYPES }
+// 1114 她问「按照我的反馈推荐记忆」：打的分以前只存不用，现在拿来挡。
+// 每个（那一轮, 那一条）只认最后一次标的（clear 就是撤销）。
+//   mems：标过翻错／记忆错、而且没有哪一轮标过有用的 → 不再浮（聊天原文那种记成 echo:<消息 id>）
+//   phrases：聊天原文是靠一个稀有词勾出来的，同一个词在两轮里都被标错 → 这个词不再拿去翻
+const SURFACED_FILE = path.join(__dirname, 'surfaced-log.jsonl')
+const WRONG = new Set(['wrong_recall', 'wrong_memory'])
+function blocked(feedbackFile = FEEDBACK_FILE, surfacedFile = SURFACED_FILE) {
+  const last = new Map()
+  try {
+    for (const l of fs.readFileSync(feedbackFile, 'utf8').trim().split('\n')) {
+      let d; try { d = JSON.parse(l) } catch { continue }
+      if (!d.entry || d.mem == null) continue
+      last.set(d.entry + '|' + d.mem, d)
+    }
+  } catch {}
+  const bad = new Map(), good = new Set()
+  for (const d of last.values()) {
+    const k = String(d.mem)
+    if (WRONG.has(d.verdict)) { if (!bad.has(k)) bad.set(k, []); bad.get(k).push(d.entry) }
+    else if (d.verdict === 'useful') good.add(k)
+  }
+  const mems = new Set([...bad.keys()].filter(k => !good.has(k)))
+  const phrases = new Set()
+  const wrongEchoEntries = new Set([...bad].filter(([k]) => k.startsWith('echo:')).flatMap(([, es]) => es))
+  if (wrongEchoEntries.size) {
+    const n = new Map()
+    try {
+      for (const l of fs.readFileSync(surfacedFile, 'utf8').trim().split('\n')) {
+        let d; try { d = JSON.parse(l) } catch { continue }
+        for (const it of d.items || []) {
+          if (it.kind === 'echo' && it.phrase && wrongEchoEntries.has(it.entry)) n.set(it.phrase, (n.get(it.phrase) || 0) + 1)
+        }
+      }
+    } catch {}
+    for (const [w, c] of n) if (c >= 2) phrases.add(w)
+  }
+  return { mems, phrases }
+}
+
+module.exports = { blocked, surface, queryOf, worthLooking, MIN_SIM, findEntry, whyNot, addFeedback, feedbackFor, SKIP_TYPES }
