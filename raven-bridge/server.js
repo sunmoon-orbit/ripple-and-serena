@@ -1323,7 +1323,7 @@ const server = http.createServer((req, res) => {
     })
     return
   }
-  const TOKEN_REQUIRED = ['/raven/status', '/raven/last-thinking', '/raven/memory-random', '/raven/journal', '/raven/journal/unlock', '/raven/journal/write', '/raven/journal/attempts', '/raven/journal/reveal', '/raven/cards/unseen', '/raven/cards/seen', '/raven/archive/days', '/raven/archive/day', '/raven/receipt', '/raven/translate-thinking', '/raven/on-this-day', '/raven/echo', '/raven/memory-count', '/raven/crow-weather', '/raven/activity', '/raven/upload', '/raven/push/subscribe', '/raven/push/unsubscribe', '/raven/usage']
+  const TOKEN_REQUIRED = ['/raven/status', '/raven/last-thinking', '/raven/memory-random', '/raven/journal', '/raven/journal/unlock', '/raven/journal/write', '/raven/journal/attempts', '/raven/journal/reveal', '/raven/cards/unseen', '/raven/cards/seen', '/raven/archive/days', '/raven/archive/day', '/raven/receipt', '/raven/translate-thinking', '/raven/on-this-day', '/raven/echo', '/raven/memory-count', '/raven/crow-weather', '/raven/activity', '/raven/upload', '/raven/push/subscribe', '/raven/push/unsubscribe', '/raven/usage', '/raven/footprint']
   if (TOKEN_REQUIRED.includes(url.pathname) && !externalAuthed(req, url)) {
     res.writeHead(401, { 'Content-Type': 'application/json' })
     res.end(JSON.stringify({ error: 'unauthorized' }))
@@ -3088,6 +3088,23 @@ const server = http.createServer((req, res) => {
   }
   // 用了几次（1116，她要按使用次数整理贴图架）：从聊天存档里数，她发的是 [sticker:文件]，我发的是 /raven/stickers/文件。
   // 存档在记忆库的 sqlite 里，直接只读查；数一遍不到一秒，缓存十分钟。
+  // 爪印（1117，改自 wave2234/ai-footprint）：先把会话记录里新的工具调用抽进库，再按日/周/月/年排出来
+  if (req.method === 'GET' && url.pathname === '/raven/footprint') {
+    const span = ['day', 'week', 'month', 'year'].includes(url.searchParams.get('span')) ? url.searchParams.get('span') : 'day'
+    const d = /^\d{4}-\d{2}-\d{2}$/.test(url.searchParams.get('date') || '') ? url.searchParams.get('date') : ''
+    const FP = '/home/ripple/opt/ai-footprint'
+    const env = { ...process.env, FOOTPRINT_DB: '/home/ripple/raven-footprint/footprint.db' }
+    const cp = require('child_process')
+    cp.execFile('flock', ['-w', '30', '/home/ripple/raven-footprint/.lock', 'python3', FP + '/cc_extract.py'], { env, timeout: 60000 }, () => {
+      cp.execFile('python3', [FP + '/footprint.py', 'aiyan', span, d], { env, timeout: 30000, maxBuffer: 32 * 1024 * 1024 }, (err, out) => {
+        if (err) { res.writeHead(500, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ detail: '爪印没排出来' })); return }
+        res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' })
+        res.end(out)
+      })
+    })
+    return
+  }
+
   if (req.method === 'GET' && url.pathname === '/raven/stickers/usage') {
     if (isExternal(req) && !externalAuthed(req, url)) { res.writeHead(401); res.end('{}'); return }
     stickerUsage().then(d => {
