@@ -1383,7 +1383,10 @@ textarea.form-input { display: block; margin: 8px 16px 12px; }
 }
 .topbar-btn:hover { background: rgba(150,140,180,0.10); color: var(--text); }
 .topbar-btn.active { background: color-mix(in srgb, var(--accent) 15%, transparent); color: var(--accent); }
-.topbar-info { flex: 1; min-width: 0; display: flex; align-items: center; gap: 8px; }
+/* 1116：顶栏图标多了以后窗口名被挤得只剩一个字（她截图「测」）。模型名挪到标题下面一行小字，标题独占一行 */
+.topbar-info { flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: flex-start; justify-content: center; gap: 0; }
+.topbar-info .topbar-title { max-width: 100%; line-height: 1.3; }
+.topbar-info .topbar-model-btn { padding: 0 6px 0 0; background: none; font-size: 10.5px; line-height: 1.3; }
 .topbar-title {
   font-size: 14px; font-weight: 500; color: var(--text);
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
