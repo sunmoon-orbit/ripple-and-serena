@@ -5960,7 +5960,7 @@ fillStickerPicker(STICKERS)
 function refreshStickers() {
   return fetch('/raven/stickers/index.json', { cache: 'no-store' })
     .then(r => r.ok ? r.json() : null)
-    .then(d => { if (d && Array.isArray(d.stickers) && d.stickers.length) fillStickerPicker(d.stickers) })
+    .then(d => { if (d && Array.isArray(d.stickers) && d.stickers.length) fillStickerPicker(d.stickers.filter(x => !x.hid)) })  // hid：她在贴图架里藏起来的（1116）
     .catch(() => {})
 }
 // 贴图架（1011）：她自己传图、起名、开关「他能用」。在聊天页里开一个整页浮层，关掉时把抽屉里的贴图重新读一遍

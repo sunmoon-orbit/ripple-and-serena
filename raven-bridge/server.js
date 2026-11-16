@@ -482,8 +482,8 @@ const SHELF_FILE = path.join(SHELF_DIR, 'shelf.json')
 const SHELF_ID = /^u-[a-f0-9]{10}\.(png|jpg|gif|webp)$/
 const SHELF_MAX = 300
 function readShelf() {
-  try { const d = JSON.parse(fs.readFileSync(SHELF_FILE, 'utf8')); return { stickers: d.stickers || [], overrides: d.overrides || {} } }
-  catch { return { stickers: [], overrides: {} } }
+  try { const d = JSON.parse(fs.readFileSync(SHELF_FILE, 'utf8')); return { stickers: d.stickers || [], overrides: d.overrides || {}, hidden: d.hidden || [], removed: d.removed || [] } }
+  catch { return { stickers: [], overrides: {}, hidden: [], removed: [] } }
 }
 function writeShelf(d) {
   fs.mkdirSync(SHELF_DIR, { recursive: true })
@@ -506,11 +506,35 @@ function mergedStickers() {
   let base = []
   try { base = JSON.parse(fs.readFileSync(STICKER_INDEX, 'utf8')).stickers || [] } catch {}
   const shelf = readShelf(), kept = readCrowKept()
-  const mine = [...shelf.stickers].sort((x, y) => (y.ts || 0) - (x.ts || 0)).map(x => ({ file: x.file, name: x.name || '', use: '', ai: kept.has(x.file), kept: kept.has(x.file), mine: true }))
-  const rest = base.map(x => { const o = shelf.overrides[x.file] || {}; return { file: x.file, name: o.name ?? x.name ?? '', use: x.use || '', ai: o.ai ?? (x.ai !== false) } })
+  // 1116：hid＝她在自己那边藏起来（只是她的选择面板里不出现，我照样能发）；removed＝原来就有的、她删掉的（仓库里的图不动，只是从总账里拿掉）
+  const hid = new Set(shelf.hidden), gone = new Set(shelf.removed)
+  const mine = [...shelf.stickers].sort((x, y) => (y.ts || 0) - (x.ts || 0)).map(x => ({ file: x.file, name: x.name || '', use: '', ai: kept.has(x.file), kept: kept.has(x.file), mine: true, hid: hid.has(x.file) }))
+  const rest = base.filter(x => !gone.has(x.file)).map(x => { const o = shelf.overrides[x.file] || {}; return { file: x.file, name: o.name ?? x.name ?? '', use: x.use || '', ai: o.ai ?? (x.ai !== false), hid: hid.has(x.file) } })
   const list = [...mine, ...rest]
   stickerCache = { key: k, list, map: new Map(list.map(x => [x.file, cleanStickerName(x.name)])) }
   return stickerCache
+}
+let usageCache = { at: 0, data: null }
+function stickerUsage() {
+  if (usageCache.data && Date.now() - usageCache.at < 10 * 60 * 1000) return Promise.resolve(usageCache.data)
+  const sql = "select role, content from conversation_messages where (role='human' and content like '%[sticker:%') or (role='assistant' and content like '%/raven/stickers/%')"
+  return new Promise((resolve, reject) => {
+    require('child_process').execFile('sqlite3', ['-readonly', '-json', '/home/ripple/moon-memory/data/memory.db', sql], { maxBuffer: 64 * 1024 * 1024 }, (err, out) => {
+      if (err) return reject(err)
+      let rows = []; try { rows = JSON.parse(out || '[]') } catch {}
+      // 有的旧消息后缀写得不一样（m-cuole 没后缀、.png/.jpg 混着），按去掉后缀的名字对
+      const stem = f => f.replace(/\.(png|jpe?g|gif|webp)$/i, '')
+      const files = new Map(mergedStickers().list.map(x => [stem(x.file), x.file]))
+      const counts = {}
+      const bump = (f, who) => { const k = files.get(stem(f)); if (!k) return; (counts[k] = counts[k] || { her: 0, me: 0 })[who]++ }
+      for (const r of rows) {
+        if (r.role === 'human') for (const m of r.content.matchAll(/\[sticker:([^\]｜\s]+)/g)) bump(m[1], 'her')
+        else for (const m of r.content.matchAll(/\/raven\/stickers\/([A-Za-z0-9_.-]+)/g)) bump(m[1], 'me')
+      }
+      usageCache = { at: Date.now(), data: { counts } }
+      resolve(usageCache.data)
+    })
+  })
 }
 function stickerName(file) {
   const m = mergedStickers().map
@@ -3062,6 +3086,15 @@ const server = http.createServer((req, res) => {
     res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-cache', 'Content-Length': Buffer.byteLength(body) })
     res.end(req.method === 'HEAD' ? undefined : body); return
   }
+  // 用了几次（1116，她要按使用次数整理贴图架）：从聊天存档里数，她发的是 [sticker:文件]，我发的是 /raven/stickers/文件。
+  // 存档在记忆库的 sqlite 里，直接只读查；数一遍不到一秒，缓存十分钟。
+  if (req.method === 'GET' && url.pathname === '/raven/stickers/usage') {
+    if (isExternal(req) && !externalAuthed(req, url)) { res.writeHead(401); res.end('{}'); return }
+    stickerUsage().then(d => {
+      res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-cache' }); res.end(JSON.stringify(d))
+    }, e => { res.writeHead(500, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ error: e.message })) })
+    return
+  }
   // 她传的图：u-<十位十六进制>.<后缀>，内容定了名字就定了，所以可以长期缓存
   if ((req.method === 'GET' || req.method === 'HEAD') && url.pathname.startsWith('/raven/stickers/u-')) {
     const name = path.basename(url.pathname)
@@ -3141,9 +3174,16 @@ const server = http.createServer((req, res) => {
         const shelf = readShelf()
         const own = shelf.stickers.find(x => x.file === file)
         if (p.remove) {
-          if (!own) throw new Error('这张是原来就有的，删不了，可以关掉「他能用」')
-          shelf.stickers = shelf.stickers.filter(x => x.file !== file)
-          try { fs.unlinkSync(path.join(SHELF_DIR, file)) } catch {}
+          // c-* 是我们俩的 Q 版情侣贴图（1115 说好的）：删之前要我也点头，所以只有本机（我）能删
+          if (/^c-/.test(file) && isExternal(req)) throw new Error('这是我们俩的那套，跟他说一声，他点头了他来删')
+          if (own) {
+            shelf.stickers = shelf.stickers.filter(x => x.file !== file)
+            try { fs.unlinkSync(path.join(SHELF_DIR, file)) } catch {}
+          } else if (!shelf.removed.includes(file)) shelf.removed.push(file)
+          shelf.hidden = shelf.hidden.filter(x => x !== file)
+        } else if (p.hide !== undefined) {
+          shelf.hidden = shelf.hidden.filter(x => x !== file)
+          if (p.hide) shelf.hidden.push(file)
         } else {
           const target = own || (shelf.overrides[file] = shelf.overrides[file] || {})
           if (p.name !== undefined) { const n = cleanStickerName(p.name); if (!n) throw new Error('名字不能空'); target.name = n }
