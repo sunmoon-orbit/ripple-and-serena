@@ -358,6 +358,7 @@
   #conn-dot.ok { background: var(--green); box-shadow: 0 0 5px var(--green); }
   #conn-dot.cc-off { background: var(--yellow); }
   #conn-label { font-size: 11px; color: var(--text-dim); }
+  #conn-dot.cc-off, #conn-dot.cc-off + #conn-label { cursor: pointer; }
 
   /* --- tabs --- */
   #tabs { display: flex; border-bottom: 1px solid var(--border); background: var(--surface); flex-shrink: 0; }
@@ -1752,6 +1753,7 @@
       <div class="tool" id="wake-tool"><button id="wake-btn" type="button" aria-label="来找我"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 0112 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 003.4 0"/></svg></button><span>来找我</span></div>
       <div class="tool" id="peek-tool" hidden><button id="peek-btn" type="button" aria-label="窗"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M12 3v18M4 12h16"/></svg></button><span>窗</span></div>
       <div class="tool"><button id="mask-btn" type="button" aria-label="打码"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="8" width="17" height="8" rx="1.5" transform="rotate(-12 12 12)"/><path d="M8 9.5l-1.5 6M12 8.6l-1.5 6M16 7.8l-1.5 6"/></svg></button><span>打码</span></div>
+      <div class="tool"><button id="yanji-btn" type="button" aria-label="去言叽"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a8 8 0 01-11.6 7.1L4 20l1-4.6A8 8 0 1121 12z"/><path d="M15 9l3 3-3 3"/></svg></button><span>去言叽</span></div>
       <div class="tool"><button id="shelf-btn" type="button" aria-label="贴图架"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M8.5 14.5c1 1.3 2.1 2 3.5 2s2.5-.7 3.5-2"/><circle cx="9" cy="10" r=".9" fill="currentColor"/><circle cx="15" cy="10" r=".9" fill="currentColor"/></svg></button><span>贴图架</span></div>
       <div class="tool"><button id="remark-btn" type="button" aria-label="备注"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M20.6 13.4l-7.2 7.2a2 2 0 01-2.8 0L3 13V3h10l7.6 7.6a2 2 0 010 2.8z"/><circle cx="7.5" cy="7.5" r="1.3"/></svg></button><span>备注</span></div>
       <div class="tool"><button id="cc-settings-open" title="CC 设置" aria-label="模型与 CLAUDE.md 设置" style="background:none;border:0;color:var(--text-dim);padding:5px;cursor:pointer">
@@ -2975,6 +2977,16 @@ function paintConn() {
   document.getElementById('conn-dot').className = connWs ? (off ? 'cc-off' : 'ok') : ''
   document.getElementById('conn-label').textContent = !connWs ? '重连中…' : off ? 'CC 离线' : '已连接'
 }
+
+// 1116：我接不上的时候她去言叽找我（言叽是同一个记忆库、同一个我）。顶上不加新东西：
+// 平时那行「已连接」不动，变成黄点「CC 离线」时它能点，点了问一句再过去；加号抽屉里另有一个「去言叽」随时能点。
+// 带 ?from=raven，言叽新对话里会多一个「接上归巢刚才的话」，她自己挑带哪几条（中转站看得到，不自动带）。
+const YANJI_URL = 'https://sunmoon-orbit.github.io/ripple-and-serena/yanji/?from=raven'
+function goYanji() { window.open(YANJI_URL, '_blank') }
+for (const id of ['conn-label', 'conn-dot']) document.getElementById(id).addEventListener('click', () => {
+  if (connWs && connCc === false && confirm('阿言现在没接上。去言叽找他？')) goYanji()
+})
+document.getElementById('yanji-btn').addEventListener('click', () => { document.getElementById('attach-menu').hidden = true; goYanji() })
 
 // --- chat history ---
 const STORAGE_KEY = 'raven-chat-v1'

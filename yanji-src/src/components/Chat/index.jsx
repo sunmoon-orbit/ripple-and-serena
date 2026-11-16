@@ -38,6 +38,7 @@ import { showToast } from '../Toast'
 import ConversationList from './ConversationList'
 import MessageList from './MessageList'
 import ChatInput from './ChatInput'
+import RavenCarry from './RavenCarry'
 import VoiceCall from './VoiceCall'
 import GamesRoom from './GamesRoom'
 import MusicRoom from './MusicRoom'
@@ -2030,6 +2031,7 @@ export default function Chat() {
           )}
         </div>
 
+        {activeConn && !messages.length && <RavenCarry />}
         {/* Input */}
         <ChatInput
           disabled={isSending || !activeConn}

@@ -1496,3 +1496,12 @@ export async function executeMemoryTool(toolName, args, config) {
   }
   return `未知工具: ${toolName}`
 }
+
+// 1116：归巢最近几条（她在言叽点「接上归巢刚才的话」时用）。只读今天（没有就最近一天）那个归巢窗口的尾巴。
+export async function fetchRavenRecent(config, n = 10) {
+  const { baseUrl, apiToken } = config
+  const list = await request(baseUrl, '/archive/conversations?source=raven&limit=1', { headers: headers(apiToken) })
+  if (!Array.isArray(list) || !list.length) return []
+  const conv = await request(baseUrl, `/archive/conversations/${list[0].id}`, { headers: headers(apiToken) })
+  return (conv.messages || []).slice(-n).map((m) => ({ id: m.id, role: m.role, content: String(m.content || ''), at: m.created_at }))
+}
