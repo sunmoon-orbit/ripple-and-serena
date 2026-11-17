@@ -2870,6 +2870,7 @@ function connect() {
     if (reconnectTimer) { clearTimeout(reconnectTimer); reconnectTimer = null }
     // 先认证：服务端在认证通过前不会推送任何数据（防偷听加固 2026-07-03）
     sock.send(JSON.stringify({ type: 'auth', token: localStorage.getItem('raven-token') || '' }))
+    sock.send(JSON.stringify({ type: 'visibility', hidden: document.hidden }))
     // 重连后补发积压的消息（同样要等回执，补发路上再断一次也不会丢）
     while (pendingOutbox.length) {
       wsSendWithAck(pendingOutbox.shift())
@@ -4199,6 +4200,8 @@ function showNextHeartCard() {
 }
 setTimeout(checkHeartCards, 1500)
 document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') checkHeartCards() })
+// 1117：告诉桥我藏起来了没有。切后台时连接还挂着，桥要靠这个才知道该发通知
+document.addEventListener('visibilitychange', () => { try { if (ws && ws.readyState === 1) ws.send(JSON.stringify({ type: 'visibility', hidden: document.hidden })) } catch {} })
 
 // --- tabs ---
 document.querySelectorAll('.tab').forEach(tab => {

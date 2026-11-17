@@ -999,7 +999,9 @@ function remarkName() {
   try { return JSON.parse(fs.readFileSync(path.join(__dirname, 'remark.json'), 'utf8')).name || '阿言' } catch { return '阿言' }
 }
 function pushReplyNotif(text) {
-  if (clients.size > 0) return  // 有人在线，不需要推送
+  // 1117：切到后台时连接常常还挂着，以前一看 clients 有人就不推，她在后台什么都收不到。
+  // 页面会报自己藏没藏（visibility），只有亮着的页面才算「她在看」；没报过的老页面照旧算在看。
+  if ([...clients].some(c => !c.pageHidden)) return
   const snippet = text.length > 60 ? text.slice(0, 60) + '…' : text
   // icon 必须用绝对 URL：系统级通知渲染不在 SW 上下文里，相对路径解析不到会回退 Chrome 图标
   moonPost('/push/send-fixed', { title: remarkName(), body: snippet, icon: 'https://memory.ravenlove.cc/raven/push-icon-192.png', target: 'raven' })
@@ -3281,6 +3283,7 @@ wss.on('connection', (ws) => {
   ws.on('message', async (raw) => {
     try {
       const msg = JSON.parse(raw)
+      if (msg.type === 'visibility') { ws.pageHidden = !!msg.hidden; return }
       // 言叽·渡口使用和归巢分离的 WebSocket namespace。凭据沿用言叽已经
       // 配置的记忆库会话凭据；通过后仅加入 crossingClients，绝不复用归巢广播。
       if (msg.type === 'crossing/auth') {
