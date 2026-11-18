@@ -1002,6 +1002,7 @@ function pushReplyNotif(text) {
   // 1117：切到后台时连接常常还挂着，以前一看 clients 有人就不推，她在后台什么都收不到。
   // 页面会报自己藏没藏（visibility），只有亮着的页面才算「她在看」；没报过的老页面照旧算在看。
   if ([...clients].some(c => !c.pageHidden)) return
+  text = String(text).replace(/\[did:[a-z]+\|([^|\]]*)(?:\|([^\]]*))?\]/g, (_, t, b) => `【${t.trim()}】${(b || '').trim()}`)  // 1118 卡片标签在通知里读成一句话
   const snippet = text.length > 60 ? text.slice(0, 60) + '…' : text
   // icon 必须用绝对 URL：系统级通知渲染不在 SW 上下文里，相对路径解析不到会回退 Chrome 图标
   moonPost('/push/send-fixed', { title: remarkName(), body: snippet, icon: 'https://memory.ravenlove.cc/raven/push-icon-192.png', target: 'raven' })

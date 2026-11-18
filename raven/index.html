@@ -1285,6 +1285,17 @@
   .rv-egg.out { animation: rv-egg-out 600ms ease-in forwards; }
   @keyframes rv-egg-in { from { opacity: 0; transform: translateY(20px) scale(.7); } }
   @keyframes rv-egg-out { to { opacity: 0; transform: translateY(8px) scale(.92); } }
+  /* 1118 她转来「工具卡片」的帖子：我动了手，聊天里当场冒一张小卡片。[did:种类|一句话标题|内容] */
+  .rv-did { margin: 8px 0 2px; max-width: 320px; border: 1px solid var(--border); border-radius: 14px; overflow: hidden;
+    background: color-mix(in srgb, var(--surface) 92%, transparent); }
+  .rv-did-top { display: flex; align-items: center; gap: 7px; padding: 9px 13px 0; font-size: 11.5px; letter-spacing: .5px; color: var(--text-dim); }
+  .rv-did-top svg { width: 15px; height: 15px; flex-shrink: 0; color: var(--accent); }
+  .rv-did-kind { margin-left: auto; font-size: 10.5px; letter-spacing: 2px; text-transform: uppercase; opacity: .7; }
+  .rv-did-title { padding: 6px 13px 0; font-size: 14.5px; font-weight: 600; line-height: 1.45; }
+  .rv-did-body { margin: 8px 13px 12px; padding: 9px 11px; border-left: 2px solid color-mix(in srgb, var(--accent) 55%, transparent);
+    background: color-mix(in srgb, var(--bg) 60%, transparent); border-radius: 0 8px 8px 0;
+    font-family: 'Noto Serif SC', 'Songti SC', serif; font-size: 13.5px; line-height: 1.65; white-space: pre-wrap; }
+  .rv-did-go { display: block; padding: 0 13px 10px; font-size: 11.5px; color: var(--accent); text-decoration: none; }
   .rv-alarm-tip { font-size: 11.5px; color: var(--text-dim); margin-top: 4px; }
   .rv-alarm-fs { display: block; background: none; border: 0; padding: 0; color: var(--accent); text-decoration: underline; cursor: pointer; font-family: inherit; text-align: left; }
   .rv-ask { margin: 8px 0 2px; padding: 10px 12px 8px; border: 1px solid var(--border); border-radius: 14px; background: color-mix(in srgb, var(--surface) 88%, transparent); max-width: 360px; }
@@ -1997,7 +2008,7 @@ const PURIFY_OPTS = {
   ALLOWED_ATTR: [
     'src', 'alt', 'title', 'href', 'target', 'rel', 'class', 'style', 'align', 'loading',
     'data-name', 'data-artist', 'data-reason', 'aria-label', 'points', 'x', 'y', 'viewBox', 'width', 'height', 'fill',
-    'stroke', 'stroke-width', 'stroke-linecap', 'stroke-linejoin', 'd', 'cx', 'cy', 'r',
+    'stroke', 'stroke-width', 'stroke-linecap', 'stroke-linejoin', 'd', 'cx', 'cy', 'r', 'rx',
     'controls', 'preload',
   ],
   ALLOWED_URI_REGEXP: /^(?:https?:|data:image\/|blob:|#|\/)/i,
@@ -2458,6 +2469,25 @@ function renderAlarmCards(html) {
     const cut = msg.lastIndexOf('|')
     if (cut >= 0 && /^[\w.-]{1,80}$/.test(msg.slice(cut + 1).trim())) { tone = msg.slice(cut + 1).trim(); msg = msg.slice(0, cut) }
     return `<div class="rv-alarm" data-h="${+h}" data-m="${+m}" data-tone="${escHtml(tone)}" data-msg="${encodeURIComponent(msg.trim())}"></div>`
+  })
+}
+// 1118 她转来别人家「调用工具后渲染成卡片」的帖子，问有没有必要。我挑了跟她有关的几样：
+// 我在回复里写 [did:board|贴了一张便利贴|那句话]，画成一张小卡片。种类不认识的按 note 画。
+const DID_KINDS = {
+  board: { label: '便利贴', icon: '<path d="M5 4h14v11l-5 5H5z"/><path d="M14 20v-5h5"/>' },
+  fav:   { label: '收藏',   icon: '<path d="M12 3.5l2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.9l-5.2 2.7 1-5.8L3.5 9.7l5.9-.9z"/>', go: 'favorites.html' },
+  mem:   { label: '记住了', icon: '<path d="M20 4c-6 0-11 4-13 11l-2 5"/><path d="M8 13c3 0 6-1 8-4"/>' },
+  daily: { label: '第几天', icon: '<rect x="4" y="5" width="16" height="15" rx="2"/><path d="M4 10h16M9 3v4M15 3v4"/>' },
+  draw:  { label: '画室',   icon: '<path d="M4 20c2 0 4-1 4-3s-2-2-2-2l9-9 3 3-9 9"/><path d="M14 7l3 3"/>' },
+  note:  { label: '小事',   icon: '<circle cx="12" cy="12" r="8"/><path d="M12 8v4l3 2"/>' },
+}
+function renderDidCards(html) {
+  return html.replace(/\[did:([a-z]+)\|([^|\]]*)(?:\|([^\]]*))?\]/g, (_, kind, title, body) => {
+    const k = DID_KINDS[kind] || DID_KINDS.note
+    return `<div class="rv-did"><div class="rv-did-top"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">${k.icon}</svg>阿言<span class="rv-did-kind">${k.label}</span></div>`
+      + `<div class="rv-did-title">${escHtml(title.trim())}</div>`
+      + (body && body.trim() ? `<div class="rv-did-body">${escHtml(body.trim())}</div>` : '<div style="height:10px"></div>')
+      + (k.go ? `<a class="rv-did-go" href="${k.go}">去看看 ›</a>` : '') + '</div>'
   })
 }
 const ALARM_DONE_KEY = 'raven-alarm-done'
@@ -3307,7 +3337,7 @@ function appendMsg(text, role, save = true, ts = Date.now(), msgId = null, suppl
         `<img src="/raven/stickers/${stickerFile(name)}" style="max-width:220px;border-radius:8px;display:block;margin:4px 0;" alt="${name}">`)
       // 语气标签（[whispers]、[soft breath close to your ear]）给朗读用，气泡里画成淡色小字（1002）
       const withTags = withStickers.replace(VOICE_TAG_RE, (_, t) => `<span class="vtag">${t}</span>`)
-      const rendered = renderAlarmCards(renderAskCards(renderMusicCards(marked.parse(cjkBold(withTags)))))
+      const rendered = renderDidCards(renderAlarmCards(renderAskCards(renderMusicCards(marked.parse(cjkBold(withTags))))))
       body.innerHTML = DOMPurify.sanitize(rendered, PURIFY_OPTS)
       fillMusicIcons(body)
       fillAskCards(body)
