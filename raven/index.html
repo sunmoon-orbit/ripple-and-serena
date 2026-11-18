@@ -14,6 +14,7 @@
   * { box-sizing: border-box; margin: 0; padding: 0; }
 
   :root {
+  --caramel: var(--accent);   /* 1118 焦糖色：选中的那颗用它，调色盘里能单独改 */
     --bg: #1a1a1f;
     --surface: #24242b;
     --border: #35353f;
@@ -825,7 +826,7 @@
   /* 贴图 | 颜文字 两个页签（0930，思路参考 cute-chat-stickers，代码自写） */
   .picker-tabs { grid-column: 1 / -1; display: flex; gap: 6px; position: sticky; top: -10px; background: var(--surface); padding: 2px 0 6px; z-index: 1; }
   .picker-tab { flex: 1; border: 1px solid var(--border); background: none; color: var(--text-dim); border-radius: 99px; padding: 5px 0; font-size: 13px; cursor: pointer; }
-  .picker-tab.on { background: var(--accent); border-color: var(--accent); color: var(--bg); }
+  .picker-tab.on { background: var(--caramel); border-color: var(--caramel); color: var(--bg); }
   #sticker-picker.kao .sticker-opt { display: none; }
   #sticker-picker:not(.kao) .kao-opt, #sticker-picker:not(.kao) .kao-add { display: none; }
   #sticker-picker.kao { grid-template-columns: repeat(auto-fill, minmax(92px, 1fr)); }
@@ -1356,6 +1357,11 @@
   .pal-b { padding: 9px 12px; font-size: 13px; text-align: center; border-radius: var(--bubble-radius, 14px); }
   .pal-radius { display: flex; align-items: center; gap: 10px; margin: 0 0 12px; font-size: 12.5px; color: var(--text-dim); }
   .pal-radius input { flex: 1; accent-color: var(--accent); }
+  .pal-cp { display: flex; align-items: center; gap: 8px; margin: 0 0 12px; font-size: 12.5px; color: var(--text-dim); flex-wrap: wrap; }
+  .pal-cp-on, .pal-cp-auto { border: 1px solid var(--border); background: none; color: var(--text); border-radius: 99px; padding: 3px 10px; font-size: 12px; font-family: inherit; cursor: pointer; }
+  .pal-cp-on.on { background: var(--caramel); border-color: var(--caramel); color: var(--bg); }
+  .pal-cp-sep { width: 1px; height: 14px; background: var(--border); }
+  .pal-cp-color { width: 30px; height: 22px; padding: 0; border: 1px solid var(--border); border-radius: 6px; background: none; }
   .pal-b-user { background: var(--bubble-user-bg); color: var(--bubble-user-text); border: 1px solid var(--bubble-user-border); }
   .pal-b-ai { background: var(--bubble-assistant-bg); color: var(--bubble-assistant-text); border: 1px solid var(--bubble-assistant-border); }
   .pal-acts { display: flex; gap: 8px; margin-top: 14px; }
@@ -1523,6 +1529,9 @@
 <!-- 预加载推送图标进浏览器缓存：配合服务端强缓存，推送时图标直接命中缓存、不再实时抓取回退 Chrome -->
 <link rel="preload" as="image" href="push-icon-192.png">
 <link rel="preload" as="image" href="badge-96.png">
+<!-- 1118 焦糖布丁（wave2234/caramel-pudding，MIT）：按下去 Q 弹、选中色像焦糖流过去。开关和焦糖色在「我的调色盘」里 -->
+<script>try { if (localStorage.getItem('raven-pudding') === 'off') window.__cpOff = true } catch {}</script>
+<script src="vendor/caramel-pudding.js?v=1118" defer></script>
 </head>
 <body>
 <div id="auth-overlay">
@@ -1649,7 +1658,7 @@
   <!-- CHAT -->
   <div id="chat" class="panel active">
     <div id="compress-banner" class="compress-banner">⚡ 对话已压缩，乌鸦记忆重置了</div>
-    <div id="chat-messages">
+    <div id="chat-messages" data-cp="none">
       <button id="older-hint" type="button" hidden>↑ 更早的消息</button>
       <div id="thinking"><div class="dot-anim"></div><div class="dot-anim"></div><div class="dot-anim"></div><button id="interrupt-btn" type="button">停</button></div>
     </div>
@@ -1752,6 +1761,7 @@
         <div class="pal-head"><b>我的调色盘</b><span>改一下就能看见，只存在这台设备上</span></div>
         <div class="pal-grid"></div>
         <label class="pal-radius"><span>方</span><input type="range" class="pal-radius-in" min="0" max="24" step="1"><span>圆</span></label>
+        <div class="pal-cp"><span>布丁手感</span><button type="button" class="pal-cp-on"></button><span class="pal-cp-sep"></span><span>焦糖色</span><input type="color" class="pal-cp-color"><button type="button" class="pal-cp-auto">跟强调色</button></div>
         <div class="pal-preview"><div class="pal-b pal-b-user">这是你</div><div class="pal-b pal-b-ai">这是我</div></div>
         <div class="pal-acts"><button type="button" class="pal-reset">从现在的主题重新取色</button><button type="button" class="pal-cancel">算了</button><button type="button" class="pal-save">用这套</button></div>
       </div>
@@ -5930,6 +5940,8 @@ function openReactPop(msgEl) {
   reactPop.dataset.key = key
   reactPop.classList.add('open')
   placeReactPop(msgEl)
+  // 焦糖布丁：菜单从按住的那条气泡那儿长出来
+  if (window.CaramelPudding && !window.__cpOff) try { const r = msgEl.getBoundingClientRect(); CaramelPudding.menu(reactPop, r.left + r.width / 2, r.top + r.height / 2) } catch {}
   if (navigator.vibrate) try { navigator.vibrate(12) } catch {}
 }
 function placeReactPop(msgEl) {
@@ -6397,6 +6409,8 @@ document.getElementById('notes-clear').addEventListener('click', () => {
 // 选了「我的调色」以后，主题按钮照样能轮换；轮回到「我的调色」就用这五个颜色
 const PAL_KEY = 'raven-custom-theme'
 try { const r = localStorage.getItem('raven-bubble-radius'); if (r !== null) document.documentElement.style.setProperty('--bubble-radius', r + 'px') } catch {}
+try { const c = localStorage.getItem('raven-caramel'); if (/^#[0-9a-f]{6}$/i.test(c || '')) document.documentElement.style.setProperty('--caramel', c) } catch {}
+window.addEventListener('load', () => { if (window.__cpOff && window.CaramelPudding) { CaramelPudding.config.pudding = false; CaramelPudding.config.caramel = false } })
 const PAL_FIELDS = [
   ['background', '页面底色'], ['accent', '强调色'], ['userBubble', '我的气泡'], ['assistantBubble', '他的气泡'], ['text', '正文文字'],
 ]
@@ -6463,6 +6477,7 @@ function palOpen() {
   box.querySelector('.pal-grid').innerHTML = PAL_FIELDS.map(([k, label]) => `<label class="pal-field"><span>${label}</span>
     <span class="pal-row"><input type="color" data-k="${k}" value="${palDraft[k]}"><input type="text" data-k="${k}" value="${palDraft[k]}" maxlength="7" spellcheck="false"></span></label>`).join('')
   box.querySelector('.pal-radius-in').value = (() => { try { return localStorage.getItem('raven-bubble-radius') || 14 } catch { return 14 } })()
+  box.dispatchEvent(new Event('pal-open'))
   box.hidden = false
   palApply(palDraft); document.documentElement.setAttribute('data-theme', 'custom')
 }
@@ -6486,6 +6501,30 @@ function palClose(keep) {
     document.documentElement.style.setProperty('--bubble-radius', rIn.value + 'px')
     try { localStorage.setItem('raven-bubble-radius', rIn.value) } catch {}
   })
+  // 焦糖布丁（1118）：开关和焦糖色也跟颜色分开存，哪套主题都管用
+  const cpOn = box.querySelector('.pal-cp-on'), cpColor = box.querySelector('.pal-cp-color')
+  const cpPaint = () => {
+    const off = (() => { try { return localStorage.getItem('raven-pudding') === 'off' } catch { return false } })()
+    cpOn.textContent = off ? '关着' : '开着'; cpOn.classList.toggle('on', !off)
+    cpColor.value = palHex(localStorage.getItem('raven-caramel')) || palFromCurrent().accent
+  }
+  box.addEventListener('pal-open', cpPaint)
+  cpOn.onclick = () => {
+    const off = cpOn.classList.contains('on')
+    try { localStorage.setItem('raven-pudding', off ? 'off' : 'on') } catch {}
+    if (window.CaramelPudding) { CaramelPudding.config.pudding = !off; CaramelPudding.config.caramel = !off }
+    cpPaint()
+  }
+  cpColor.addEventListener('input', e => {
+    e.stopPropagation()
+    document.documentElement.style.setProperty('--caramel', cpColor.value)
+    try { localStorage.setItem('raven-caramel', cpColor.value) } catch {}
+  })
+  box.querySelector('.pal-cp-auto').onclick = () => {
+    document.documentElement.style.removeProperty('--caramel')
+    try { localStorage.removeItem('raven-caramel') } catch {}
+    cpPaint()
+  }
   box.querySelector('.pal-cancel').onclick = () => palClose(false)
   box.querySelector('.pal-reset').onclick = () => {
     try { localStorage.removeItem(PAL_KEY) } catch {}
