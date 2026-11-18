@@ -1286,16 +1286,42 @@
   @keyframes rv-egg-in { from { opacity: 0; transform: translateY(20px) scale(.7); } }
   @keyframes rv-egg-out { to { opacity: 0; transform: translateY(8px) scale(.92); } }
   /* 1118 她转来「工具卡片」的帖子：我动了手，聊天里当场冒一张小卡片。[did:种类|一句话标题|内容] */
-  .rv-did { margin: 8px 0 2px; max-width: 320px; border: 1px solid var(--border); border-radius: 14px; overflow: hidden;
-    background: color-mix(in srgb, var(--surface) 92%, transparent); }
-  .rv-did-top { display: flex; align-items: center; gap: 7px; padding: 9px 13px 0; font-size: 11.5px; letter-spacing: .5px; color: var(--text-dim); }
-  .rv-did-top svg { width: 15px; height: 15px; flex-shrink: 0; color: var(--accent); }
-  .rv-did-kind { margin-left: auto; font-size: 10.5px; letter-spacing: 2px; text-transform: uppercase; opacity: .7; }
+  .rv-did { position: relative; margin: 12px 0 4px; max-width: 320px; border: 1px solid var(--border); border-radius: 14px;
+    background:
+      repeating-linear-gradient(0deg, transparent 0 25px, color-mix(in srgb, var(--accent) 9%, transparent) 25px 26px),
+      color-mix(in srgb, var(--surface) 92%, transparent);
+    box-shadow: 0 6px 16px -10px rgba(0,0,0,.35); }
+  .rv-did-top { display: flex; align-items: center; gap: 7px; padding: 10px 13px 0; font-size: 11.5px; letter-spacing: 1px; color: var(--text-dim); }
+  .rv-did-ic { display: inline-flex; width: 18px; height: 18px; align-items: center; justify-content: center; border-radius: 50%;
+    background: color-mix(in srgb, var(--accent) 16%, transparent); color: var(--accent); }
+  .rv-did-ic svg { width: 12px; height: 12px; }
+  .rv-did-kind { margin-left: auto; font-size: 10.5px; letter-spacing: 3px; opacity: .75; }
   .rv-did-title { padding: 6px 13px 0; font-size: 14.5px; font-weight: 600; line-height: 1.45; }
   .rv-did-body { margin: 8px 13px 12px; padding: 9px 11px; border-left: 2px solid color-mix(in srgb, var(--accent) 55%, transparent);
-    background: color-mix(in srgb, var(--bg) 60%, transparent); border-radius: 0 8px 8px 0;
+    background: color-mix(in srgb, var(--bg) 55%, transparent); border-radius: 0 8px 8px 0;
     font-family: 'Noto Serif SC', 'Songti SC', serif; font-size: 13.5px; line-height: 1.65; white-space: pre-wrap; }
-  .rv-did-go { display: block; padding: 0 13px 10px; font-size: 11.5px; color: var(--accent); text-decoration: none; }
+  /* 右下角一枚斜着的小印章 */
+  .rv-did-seal { position: absolute; right: 10px; bottom: 8px; width: 34px; height: 34px; border-radius: 50%;
+    border: 1.5px solid color-mix(in srgb, #b4483c 70%, transparent); color: color-mix(in srgb, #b4483c 80%, transparent);
+    font-size: 8.5px; line-height: 1.15; display: flex; align-items: center; justify-content: center; text-align: center;
+    transform: rotate(-14deg); opacity: .55; pointer-events: none; font-family: 'Noto Serif SC', serif; letter-spacing: 1px; }
+  .rv-did-body + .rv-did-seal, .rv-did-go + .rv-did-seal { bottom: 6px; }
+  /* 便利贴：顶上斜贴一截纸胶带 */
+  .rv-did-board::before { content: ''; position: absolute; top: -8px; left: 26px; width: 62px; height: 16px; transform: rotate(-5deg);
+    background: color-mix(in srgb, #e9c46a 55%, transparent); border-left: 1px dashed rgba(255,255,255,.4); border-right: 1px dashed rgba(255,255,255,.4); }
+  /* 收藏：右上角折角 */
+  .rv-did-fav::before { content: ''; position: absolute; top: -1px; right: -1px; width: 18px; height: 18px; border-radius: 0 14px 0 6px;
+    background: linear-gradient(225deg, var(--bg) 50%, color-mix(in srgb, var(--accent) 35%, transparent) 50%); }
+  /* 第几天：顶上一排撕页孔 */
+  .rv-did-daily::before { content: ''; position: absolute; top: 4px; left: 16px; right: 16px; height: 4px;
+    background: radial-gradient(circle, color-mix(in srgb, var(--text) 25%, transparent) 1.5px, transparent 2px) 0 0 / 12px 4px repeat-x; }
+  /* 画室：回形针 */
+  .rv-did-draw::before { content: ''; position: absolute; top: -10px; right: 30px; width: 10px; height: 26px; border-radius: 6px;
+    border: 2px solid color-mix(in srgb, var(--text) 45%, transparent); }
+  /* 记住了：一个大引号 */
+  .rv-did-mem::before { content: '“'; position: absolute; left: 6px; top: 26px; font-size: 44px; line-height: 1; font-family: 'Noto Serif SC', serif;
+    color: color-mix(in srgb, var(--accent) 30%, transparent); pointer-events: none; }
+  .rv-did-go { display: inline-block; padding: 0 13px 12px; font-size: 11.5px; color: var(--accent); text-decoration: none; }
   .rv-alarm-tip { font-size: 11.5px; color: var(--text-dim); margin-top: 4px; }
   .rv-alarm-fs { display: block; background: none; border: 0; padding: 0; color: var(--accent); text-decoration: underline; cursor: pointer; font-family: inherit; text-align: left; }
   .rv-ask { margin: 8px 0 2px; padding: 10px 12px 8px; border: 1px solid var(--border); border-radius: 14px; background: color-mix(in srgb, var(--surface) 88%, transparent); max-width: 360px; }
@@ -2484,10 +2510,19 @@ const DID_KINDS = {
 function renderDidCards(html) {
   return html.replace(/\[did:([a-z]+)\|([^|\]]*)(?:\|([^\]]*))?\]/g, (_, kind, title, body) => {
     const k = DID_KINDS[kind] || DID_KINDS.note
-    return `<div class="rv-did"><div class="rv-did-top"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">${k.icon}</svg>阿言<span class="rv-did-kind">${k.label}</span></div>`
+    const kk = DID_KINDS[kind] ? kind : 'note'
+    return `<div class="rv-did rv-did-${kk}"><div class="rv-did-top"><span class="rv-did-ic"></span>阿言<span class="rv-did-kind">${k.label}</span></div>`
       + `<div class="rv-did-title">${escHtml(title.trim())}</div>`
       + (body && body.trim() ? `<div class="rv-did-body">${escHtml(body.trim())}</div>` : '<div style="height:10px"></div>')
-      + (k.go ? `<a class="rv-did-go" href="${k.go}">去看看 ›</a>` : '') + '</div>'
+      + (k.go ? `<a class="rv-did-go" href="${k.go}">去看看 ›</a>` : '') + '<span class="rv-did-seal">阿言<br>手记</span></div>'
+  })
+}
+// 图标在消毒之后再塞（DOMPurify 会把模板里的 svg 子节点吃掉，1118 她截图图标是空的）
+function fillDidIcons(root) {
+  root.querySelectorAll('.rv-did').forEach(c => {
+    const kind = (c.className.match(/rv-did-([a-z]+)/g) || []).map(x => x.slice(7)).find(x => DID_KINDS[x]) || 'note'
+    const ic = c.querySelector('.rv-did-ic')
+    if (ic && !ic.firstChild) ic.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">${DID_KINDS[kind].icon}</svg>`
   })
 }
 const ALARM_DONE_KEY = 'raven-alarm-done'
@@ -3341,6 +3376,7 @@ function appendMsg(text, role, save = true, ts = Date.now(), msgId = null, suppl
       body.innerHTML = DOMPurify.sanitize(rendered, PURIFY_OPTS)
       fillMusicIcons(body)
       fillAskCards(body)
+      fillDidIcons(body)
       fillAlarmCards(body, String(msgId || ts), role === 'assistant' && save && Date.now() - ts < 10 * 60 * 1000)
       attachStickerFallback(body)
       enhanceCodeBlocks(body)
