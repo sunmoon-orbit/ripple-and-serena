@@ -4970,7 +4970,9 @@ function renderAutoToggle() {
 let quietTimer = null, quietCount = 0, quietSince = 0
 function armQuiet(reset) {
   clearTimeout(quietTimer); quietTimer = null
-  if (reset) { quietCount = 0; quietSince = Date.now() }
+  if (reset) quietCount = 0
+  // 1119：她打来、我先开口时 firstAfterHer 是 false，quietSince 还是上一通电话留下的，报成「900 秒没出声」。没起点就从现在算
+  if (reset || !quietSince) quietSince = Date.now()
   if (!callActive || quietCount >= 2) return
   quietTimer = setTimeout(() => {
     quietTimer = null
@@ -4982,7 +4984,7 @@ function armQuiet(reset) {
     ws.send(JSON.stringify({ type: 'call-silence', secs: Math.round((Date.now() - quietSince) / 1000), nth: quietCount, bilingual: voiceBilingual, token: localStorage.getItem('raven-token') || '' }))
   }, quietCount === 0 ? 45000 : 120000)
 }
-function stopQuiet() { clearTimeout(quietTimer); quietTimer = null; quietCount = 0 }
+function stopQuiet() { clearTimeout(quietTimer); quietTimer = null; quietCount = 0; quietSince = 0 }
 let waitingReply = false   // 她的话已经发给他、他还没回
 
 // 盯着麦克风：onEnd(reason) 只叫一次。reason: 'spoke' 说完了 / 'silent' 一直没出声 / 'long' 说太久
