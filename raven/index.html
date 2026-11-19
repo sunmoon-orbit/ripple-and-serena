@@ -2511,7 +2511,7 @@ function renderAlarmCards(html) {
 // 我在回复里写 [did:board|贴了一张便利贴|那句话]，画成一张小卡片。种类不认识的按 note 画。
 const DID_KINDS = {
   board: { label: '便利贴', icon: '<path d="M5 4h14v11l-5 5H5z"/><path d="M14 20v-5h5"/>' },
-  fav:   { label: '收藏',   icon: '<path d="M12 3.5l2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.9l-5.2 2.7 1-5.8L3.5 9.7l5.9-.9z"/>', go: 'favorites.html' },
+  fav:   { label: '收藏',   icon: '<path d="M12 3.5l2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.9l-5.2 2.7 1-5.8L3.5 9.7l5.9-.9z"/>', go: '/raven/favorites.html' },
   mem:   { label: '记住了', icon: '<path d="M20 4c-6 0-11 4-13 11l-2 5"/><path d="M8 13c3 0 6-1 8-4"/>' },
   daily: { label: '第几天', icon: '<rect x="4" y="5" width="16" height="15" rx="2"/><path d="M4 10h16M9 3v4M15 3v4"/>' },
   draw:  { label: '画室',   icon: '<path d="M4 20c2 0 4-1 4-3s-2-2-2-2l9-9 3 3-9 9"/><path d="M14 7l3 3"/>' },
@@ -2527,6 +2527,7 @@ function renderDidCards(html) {
       + (k.go ? `<a class="rv-did-go" href="${k.go}">去看看 ›</a>` : '') + '<span class="rv-did-seal">阿言<br>手记</span></div>'
   })
 }
+// 1119：go 要写成 /raven/… 绝对路径，PURIFY 的 ALLOWED_URI_REGEXP 不认相对路径，href 会被吃掉，「去看看」点了没反应
 // 图标在消毒之后再塞（DOMPurify 会把模板里的 svg 子节点吃掉，1118 她截图图标是空的）
 function fillDidIcons(root) {
   root.querySelectorAll('.rv-did').forEach(c => {
