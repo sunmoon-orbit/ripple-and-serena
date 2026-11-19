@@ -34,7 +34,7 @@ class RoostFCMService : FirebaseMessagingService() {
         // 1022：我打给她。归巢正开在聊天页（网页自己会弹来电）就不响；否则前台服务响铃＋全屏来电
         if (message.data["type"] == "raven_call") {
             val id = message.data["callId"] ?: return
-            if (MainActivity.onChatPage) return
+            if (MainActivity.onChatPage || !Dedup.first("call", id)) return
             val i = Intent(this, CallRingService::class.java).putExtra("callId", id)
             try { startForegroundService(i) } catch (_: Exception) {}
             return
@@ -42,7 +42,7 @@ class RoostFCMService : FirebaseMessagingService() {
         // 1101 窗：我敲门要看一眼屏幕
         if (message.data["type"] == "raven_peek") {
             val id = message.data["peekId"] ?: return
-            PeekService.knock(this, id)
+            if (Dedup.first("peek", id)) PeekService.knock(this, id)
             return
         }
         val title = message.data["title"] ?: message.notification?.title ?: "归巢"

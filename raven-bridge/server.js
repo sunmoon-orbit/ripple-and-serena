@@ -893,6 +893,7 @@ function ravenPeekStart() {
   st.count++; try { fs.writeFileSync(PEEK_STATE, JSON.stringify(st)) } catch {}
   const id = 'p' + Date.now().toString(36)
   ravenPeek = { id, at: Date.now(), timer: setTimeout(() => ravenPeekEnd(id, 'timeout'), 45000) }
+  broadcast({ type: 'peek-knock', id })   // 1119：开着归巢（哪怕在后台）就先走 ws，谷歌推送睡死也敲得进去；推送照发当备用
   moonPost('/push/send-fixed', { title: remarkName(), body: '敲了敲窗', target: 'raven', ttl: 40, data: { type: 'raven_peek', peekId: id } })
     .catch(e => console.error('[peek] 推送失败:', e.message))
   console.log('[peek] 敲门', id)

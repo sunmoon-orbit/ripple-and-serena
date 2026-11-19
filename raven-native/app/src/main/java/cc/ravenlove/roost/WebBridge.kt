@@ -128,6 +128,16 @@ class WebBridge(private val activity: MainActivity) {
     @JavascriptInterface
     fun hasCallTone(): Boolean = java.io.File(activity.filesDir, "call_tone.mp3").exists()
 
+    // 1119：页面在后台从桥的 ws 收到敲窗／来电，直接叫壳，不用等谷歌推送（它常睡死）。推送晚到时按 id 去重
+    @JavascriptInterface
+    fun peekKnock(id: String) { if (Dedup.first("peek", id)) PeekService.knock(activity, id) }
+
+    @JavascriptInterface
+    fun ringCall(id: String) {
+        if (MainActivity.onChatPage || !Dedup.first("call", id)) return
+        try { activity.startForegroundService(android.content.Intent(activity, CallRingService::class.java).putExtra("callId", id)) } catch (_: Exception) {}
+    }
+
     @JavascriptInterface
     fun cancelAlarm(hour: Int, minute: Int): String = RavenAlarm.cancel(activity, hour, minute)
 

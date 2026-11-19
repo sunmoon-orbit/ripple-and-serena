@@ -2997,7 +2997,15 @@ function connect() {
       else if (msg.type === 'edited') applyEdit(msg.ts, msg.oldText, msg.text)
       else if (msg.type === 'remark') onRemark(msg)
       else if (msg.type === 'call-wait') { if (callActive) armQuiet(false) }
-      else if (msg.type === 'incoming-call') ringShow(msg.id)
+      else if (msg.type === 'incoming-call') {
+        ringShow(msg.id)
+        // 1119：谷歌推送睡死时后台收不到来电。页面在后台也还连着桥，就自己叫壳响铃（壳按 id 去重，推送晚到也只响一次）
+        try { if (document.hidden && window.RoostNative && typeof RoostNative.ringCall === 'function') RoostNative.ringCall(msg.id) } catch {}
+      }
+      else if (msg.type === 'peek-knock') {
+        // 1119：敲窗同理，先走这根线，推送是备用
+        try { if (window.RoostNative && typeof RoostNative.peekKnock === 'function') RoostNative.peekKnock(msg.id) } catch {}
+      }
       else if (msg.type === 'incoming-call-end') ringHide(msg.id)
       else if (msg.type === 'call-record') {
         if (!shownMsgIds.has(msg.id) && !chatHistory.some(m => m.call && m.call.id === msg.id)) { shownMsgIds.add(msg.id); appendCallRecord({ from: 'ai', how: msg.how, id: msg.id }, true, msg.ts || Date.now()) }
