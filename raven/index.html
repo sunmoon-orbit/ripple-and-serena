@@ -2556,9 +2556,14 @@ function addAlarmCancel(card, h, m, key) {
   c.onclick = ev => {
     ev.stopPropagation()
     try { N.cancelAlarm(h, m) } catch {}
-    try { const all = JSON.parse(localStorage.getItem(ALARM_DONE_KEY) || '{}'); delete all[key]; localStorage.setItem(ALARM_DONE_KEY, JSON.stringify(all)) } catch {}
-    const b = card.querySelector('.rv-alarm-btn'); b.disabled = false; b.textContent = '设好'
-    c.remove()
+    // 1119：壳里一个钟点只有一个闹钟，取消就是这个钟点全没了。1118 晚两张 07:30 的卡，
+    // 她照我说的取消了旧的，新的那张还亮着「已设好」，其实也被一起取消了，早上没响。所以同钟点的卡一起复位。
+    const tail = '#' + String(h).padStart(2, '0') + ':' + String(m).padStart(2, '0')
+    try { const all = JSON.parse(localStorage.getItem(ALARM_DONE_KEY) || '{}'); Object.keys(all).forEach(k => { if (k === key || k.endsWith(tail)) delete all[k] }); localStorage.setItem(ALARM_DONE_KEY, JSON.stringify(all)) } catch {}
+    document.querySelectorAll(`.rv-alarm[data-h="${h}"][data-m="${m}"]`).forEach(cd => {
+      const b = cd.querySelector('.rv-alarm-btn'); if (b) { b.disabled = false; b.textContent = '设好' }
+      cd.querySelector('.rv-alarm-cancel')?.remove()
+    })
   }
   card.querySelector('.rv-alarm-main').appendChild(c)
 }
