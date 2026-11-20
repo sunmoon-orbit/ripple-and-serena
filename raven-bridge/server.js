@@ -554,6 +554,7 @@ const battery = require('./battery')   // 1107 她手机电量，见 battery.js
 const emotionLedger = require('./emotion-ledger')   // 1110 共用情绪账本，见 emotion-ledger.js
 let ingestChain = Promise.resolve()
 let pendingSurfaced = []   // 浮上来了、还没挂到我回复上的（1103）
+let turnMem = null   // 1120：这一轮浮上来的记忆，回复里用上了就记激活（见 /raven/reply）
 const SURFACED_LOG = path.join(__dirname, 'surfaced-log.jsonl')
 function surfacedFor(id) {
   try {
@@ -2499,6 +2500,18 @@ const server = http.createServer((req, res) => {
           if (pendingSurfaced.length) {
             msg.surfaced = pendingSurfaced.slice(-4); pendingSurfaced = []
             try { fs.appendFileSync(SURFACED_LOG, JSON.stringify({ id: msg.id, ts: msg.ts, items: msg.surfaced }) + '\n') } catch {}
+            turnMem = { ts: msg.ts, items: msg.surfaced.filter(it => it.kind === 'memory'), touched: new Set() }
+          }
+          // 1120：这一轮浮上来的记忆，我回复里真用上了（字面重合）就记一次激活，不用等她点「有用」
+          if (turnMem && Date.now() - turnMem.ts < 10 * 60e3) {
+            for (const it of turnMem.items) {
+              if (turnMem.touched.has(it.id)) continue
+              const n = recall.usedIn(it.text, text)
+              if (!n) continue
+              turnMem.touched.add(it.id)
+              moonPost(`/memories/${Number(it.id)}/touch`, {}).catch(() => {})
+              try { fs.appendFileSync(path.join(__dirname, 'recall-used.jsonl'), JSON.stringify({ at: new Date().toISOString(), mem: it.id, reply: msg.id, overlap: n }) + '\n') } catch {}
+            }
           }
           lastReplyMsgs.push(msg); if (lastReplyMsgs.length > 50) lastReplyMsgs.shift()
           broadcast(msg)

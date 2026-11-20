@@ -182,4 +182,23 @@ function blocked(feedbackFile = FEEDBACK_FILE, surfacedFile = SURFACED_FILE) {
   return { mems, phrases }
 }
 
-module.exports = { blocked, surface, queryOf, worthLooking, MIN_SIM, findEntry, whyNot, addFeedback, feedbackFor, SKIP_TYPES }
+
+// 1120 借鉴 amber-heart-memory（琥珀之心）的「真正用上了才算被想起」：她不点「有用」也能记。
+// 浮上来的那条记忆，和我这一轮回复比字面：连续四个汉字的小段，重合三段以上（虚词段不算）就当我真用上了。
+// 只认字面重合，换了说法的会漏算；宁可漏，不可把「浮上来」当「用上了」（防被动浮现自我强化）。
+const USED_FILLER = /^[的了是我你他她它们在有就也都还和跟吗呢吧啊呀哦嗯这那个一不没要会能想说到去来看好]|[的了吗呢吧啊呀哦嗯]$|一下|什么|这个|那个|就是|然后|但是|因为|所以|可以|觉得|感觉/
+function grams(text) {
+  const out = new Set()
+  for (const run of String(text || '').match(/[一-鿿]{4,}/g) || []) {
+    for (let i = 0; i + 4 <= run.length; i++) { const g = run.slice(i, i + 4); if (!USED_FILLER.test(g)) out.add(g) }
+  }
+  return out
+}
+function usedIn(memText, reply, min = 3) {
+  const a = grams(memText); if (a.size < min) return 0
+  const b = grams(reply); let n = 0
+  for (const g of a) if (b.has(g)) n++
+  return n >= min ? n : 0
+}
+
+module.exports = { usedIn, blocked, surface, queryOf, worthLooking, MIN_SIM, findEntry, whyNot, addFeedback, feedbackFor, SKIP_TYPES }
