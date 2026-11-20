@@ -3375,6 +3375,12 @@ wss.on('connection', (ws) => {
         tmuxSend(`【通话·她打来${msg.bilingual ? '·双语' : ''}】她打电话给你，通话刚接通。你先开口，照通话的规矩说一句短的。　〔${bjHm()}〕`)
         return
       }
+      // 1120：页面连上时报「没在通话」。上一通的挂断丢了的话，这里悄悄清掉，不来报【通话·挂断】
+      if (msg.type === 'call-idle') {
+        if (!tokenIsValid(msg.token)) return
+        if (callOnSince) { console.log('[call] 页面说没在通话，清掉残留', Math.round((Date.now() - callOnSince) / 1000)); callOnSince = 0 }
+        return
+      }
       if (msg.type === 'call-end') {
         if (!tokenIsValid(msg.token)) return
         callOnSince = 0

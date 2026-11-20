@@ -2952,6 +2952,10 @@ function connect() {
     // 先认证：服务端在认证通过前不会推送任何数据（防偷听加固 2026-07-03）
     sock.send(JSON.stringify({ type: 'auth', token: localStorage.getItem('raven-token') || '' }))
     sock.send(JSON.stringify({ type: 'visibility', hidden: document.hidden }))
+    // 1120：页面被系统重载过、通话没走 closeCall，壳和桥都还以为在通话（切走就缩小窗、醒一下也不敲）。连上时不在通话就各自复位
+    if (pendingCallEnd) { sock.send(JSON.stringify({ ...pendingCallEnd, token: localStorage.getItem('raven-token') || '' })); pendingCallEnd = null }
+    else if (!callActive) sock.send(JSON.stringify({ type: 'call-idle', token: localStorage.getItem('raven-token') || '' }))
+    if (!callActive) pipCall(false)
     // 重连后补发积压的消息（同样要等回执，补发路上再断一次也不会丢）
     while (pendingOutbox.length) {
       wsSendWithAck(pendingOutbox.shift())
@@ -4955,6 +4959,7 @@ let recordingForCall = false
 let discardRecording = false
 let activeSttController = null
 let callActive = false
+let pendingCallEnd = null
 let callStartedAt = 0
 let callTimerId = null
 let callHadInteraction = false
@@ -5226,8 +5231,10 @@ function closeCall(by) {
   callOverlay.classList.remove('show', 'speaking')
   callBar(false)
   pipCall(false)
-  if (record.status === 'ended' && ws && ws.readyState === 1) {      // 告诉我她挂了（只是点开又关掉的不说）
-    try { ws.send(JSON.stringify({ type: 'call-end', duration, by: by === 'ai' ? 'ai' : 'her', token: localStorage.getItem('raven-token') || '' })) } catch {}
+  if (record.status === 'ended') {      // 告诉我她挂了（只是点开又关掉的不说）
+    // 1120：挂断那一刻连接正好断着，这条就丢了，桥一直以为还在通话。先存着，连上再补发
+    pendingCallEnd = { type: 'call-end', duration, by: by === 'ai' ? 'ai' : 'her' }
+    if (ws && ws.readyState === 1) try { ws.send(JSON.stringify({ ...pendingCallEnd, token: localStorage.getItem('raven-token') || '' })); pendingCallEnd = null } catch {}
   }
   syncMicState('idle')
   appendCallRecord(record)
