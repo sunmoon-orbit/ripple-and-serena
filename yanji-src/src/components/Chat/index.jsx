@@ -62,7 +62,8 @@ import HeartCardAlbum from './HeartCardAlbum'
 import PhotoAlbum, { AlbumIcon } from './PhotoAlbum'
 import Favorites, { StarIcon } from './Favorites'
 import { surfaceMemory } from '../../utils/autoRecall'
-import { fetchAnniversaryToday, fetchUnseenHeartCards, markHeartCardSeen, formatWeatherLine, fetchContactLastSeen, fetchEmotionLedger, fetchEmotionLedgerContext, ackEmotionLedger, applyEmotionLedger, postEmotionAway } from '../../api/moonMemory'
+import { archiveEcho } from '../../utils/archiveEcho'
+import { moonGet, fetchAnniversaryToday, fetchUnseenHeartCards, markHeartCardSeen, formatWeatherLine, fetchContactLastSeen, fetchEmotionLedger, fetchEmotionLedgerContext, ackEmotionLedger, applyEmotionLedger, postEmotionAway } from '../../api/moonMemory'
 import CompletionEgg, { pickEgg } from './CompletionEgg'
 import QuestionCard from './QuestionCard'
 import { ThemedConfirmDialog, useThemedConfirm } from '../ThemedConfirmDialog'
@@ -771,8 +772,15 @@ export default function Chat() {
       // 自动浮上来（1029）：拿她最新这句去翻一下记忆库，最多一条；主动开口那轮不翻
       if (!proactive && moonMemory?.apiToken) {
         const lastUser = [...merged].reverse().find((m) => m.role === 'user')
-        const line = await surfaceMemory({ baseUrl: moonMemory.baseUrl, apiToken: moonMemory.apiToken }, typeof lastUser?.content === 'string' ? lastUser.content : '')
+        const mmCfg = { baseUrl: moonMemory.baseUrl, apiToken: moonMemory.apiToken }
+        const lastText = typeof lastUser?.content === 'string' ? lastUser.content : ''
+        const line = await surfaceMemory(mmCfg, lastText)
         if (line) dynParts.push(line)
+        // 1120：记忆库之外再翻聊天原文找「以前说过」（和归巢同一套），带前后各一句；出错就算了
+        try {
+          const echo = await archiveEcho(lastText, (p) => moonGet(mmCfg, p))
+          if (echo) dynParts.push(echo)
+        } catch { /* 翻不到不拖她的消息 */ }
       }
 
       // inject compaction summary if available

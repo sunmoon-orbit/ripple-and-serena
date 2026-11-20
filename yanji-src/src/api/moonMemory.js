@@ -49,6 +49,11 @@ export async function recallSearchMemories(config, q) {
   return request(baseUrl, `/memories/semantic?${qs.toString()}`, { headers: headers(apiToken) })
 }
 
+// 「以前说过」（1120）翻聊天原文用：只读 GET
+export async function moonGet(config, path) {
+  return request(config.baseUrl, path, { headers: headers(config.apiToken) })
+}
+
 export async function createMemory(config, body) {
   const { baseUrl, apiToken } = config
   return request(baseUrl, '/memories', {
