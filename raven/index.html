@@ -3399,7 +3399,9 @@ function appendMsg(text, role, save = true, ts = Date.now(), msgId = null, suppl
       const withStickers = withAttach.replace(/\[sticker:([^\]]+)\]/g, (_, name) =>
         `<img src="/raven/stickers/${stickerFile(name)}" style="max-width:220px;border-radius:8px;display:block;margin:4px 0;" alt="${name}">`)
       // 语气标签（[whispers]、[soft breath close to your ear]）给朗读用，气泡里画成淡色小字（1002）
-      const withTags = withStickers.replace(VOICE_TAG_RE, (_, t) => `<span class="vtag">${t}</span>`)
+      // 1120：代码框里的 [endpoints] 之类也被画成了 vtag，她复制命令时把 <span class="vtag"> 原样带进了配置文件。代码里不动
+      const withTags = withStickers.split(/(```[\s\S]*?```|`[^`\n]*`)/).map((seg, i) =>
+        i % 2 ? seg : seg.replace(VOICE_TAG_RE, (_, t) => `<span class="vtag">${t}</span>`)).join('')
       const rendered = renderDidCards(renderAlarmCards(renderAskCards(renderMusicCards(marked.parse(cjkBold(withTags))))))
       body.innerHTML = DOMPurify.sanitize(rendered, PURIFY_OPTS)
       fillMusicIcons(body)
