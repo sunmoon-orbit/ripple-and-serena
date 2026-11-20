@@ -3862,7 +3862,9 @@ async function openSurfaced(msgEl) {
   list.innerHTML = ''
   if (!items.length) empty('回这条之前，什么都没浮上来。')
   for (const it of items) {
-    if (it.kind === 'echo') rcItem(list, { tag: '翻聊天原文', pick: true, meta: `「${it.phrase}」· ${it.date} · ${it.who}说的`, text: it.text,
+    if (it.kind === 'echo') rcItem(list, { tag: '翻聊天原文', pick: true, meta: `「${it.phrase}」· ${it.date} · ${it.who}说的`,
+      // 1120：带上前后各一句（借鉴 Resurface 的邻句），看得出当时在聊什么
+      text: (it.before ? '前一句 · ' + it.before + '\n\n' : '') + it.text + (it.after ? '\n\n后一句 · ' + it.after : ''),
       btns: [['useful', '有用'], ['wrong_recall', '翻错了']], mark: it.mark, send: v => rcFeedback(it.entry, 'echo:' + it.id, v, String(it.q || '').slice(0, 80)) })
     else rcItem(list, { tag: '记忆库', pick: true, meta: `#${it.id}` + (it.date ? ' · ' + it.date : '') + ` · 相似度 ${it.sim}`, text: it.text,
       btns: [['useful', '有用'], ['wrong_recall', '翻错了'], ['wrong_memory', '记忆本身错了']], mark: it.mark, send: v => rcFeedback(it.entry, it.id, v, String(it.q || '').slice(0, 80)) })

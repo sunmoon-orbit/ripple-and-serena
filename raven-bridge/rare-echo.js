@@ -130,8 +130,24 @@ async function echo(text, get, now = Date.now(), out = null, no = require('./rec
   const who = pick.m.role === 'human' ? '她' : '我'
   const at = new Date().toISOString()
   log({ at, q: clip(clean(text), 50), pick: pick.m.id, w: pick.w, n: pick.n })
-  if (out) out.echo = { kind: 'echo', id: pick.m.id, phrase: pick.w, date: bjDate(tsOf(pick.m)), who, text: clip(pick.m.content.replace(/^【[^】]*】/, ''), 600), entry: at }
-  return `〔以前说过「${pick.w}」·${bjDate(tsOf(pick.m))}，${who}说的（翻聊天原文翻到的，会挂在你这条回复底下给她看、打分，用不用你定）：${clip(pick.m.content.replace(/^【[^】]*】/, ''), 160)}〕`
+  // 1120 借鉴 Resurface 的「邻句」：孤零零一句常看不出在说什么（「摸着良心说」那条），带上前后各一句。
+  // 拿不到就照旧只给这一句；我自己的思考笔记、英文碎句不带。
+  let before = '', after = ''
+  try {
+    const ctx = await Promise.race([
+      get(`/archive/conversations/${pick.m.conversation_id}/context?message_id=${pick.m.id}&n=1`),
+      new Promise(ok => setTimeout(() => ok(null), TIMEOUT_MS)),
+    ])
+    const ms = (ctx && Array.isArray(ctx.messages)) ? ctx.messages : []
+    const i = ms.findIndex(m => m.id === pick.m.id)
+    const side = m => (m && cjkRatio(m.content) > 0.3 && !isMyNote(m))
+      ? `${m.role === 'human' ? '她' : '我'}：${clip(String(m.content).replace(/^【[^】]*】/, '').replace(/〔[^〕]*〕/g, ''), 60)}` : ''
+    if (i >= 0) { before = side(ms[i - 1]); after = side(ms[i + 1]) }
+  } catch {}
+  const body = clip(pick.m.content.replace(/^【[^】]*】/, ''), 160)
+  if (out) out.echo = { kind: 'echo', id: pick.m.id, phrase: pick.w, date: bjDate(tsOf(pick.m)), who, text: clip(pick.m.content.replace(/^【[^】]*】/, ''), 600), before, after, entry: at }
+  const ctxNote = (before || after) ? `（前一句 ${before || '—'}；后一句 ${after || '—'}）` : ''
+  return `〔以前说过「${pick.w}」·${bjDate(tsOf(pick.m))}，${who}说的（翻聊天原文翻到的，会挂在你这条回复底下给她看、打分，用不用你定）：${body}${ctxNote}〕`
 }
 
 module.exports = { echo, windows }
