@@ -35,5 +35,6 @@ raven-bridge/peek-state.json
 raven-bridge/wake-state.json
 raven-bridge/rare-echo-state.json
 raven-bridge/rare-echo-log.jsonl
+raven-bridge/recall-used.jsonl
 raven-bridge/battery.json*
 electron-app/dist-sticky/
