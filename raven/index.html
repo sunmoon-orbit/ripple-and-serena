@@ -413,7 +413,8 @@
   .msg.sticker-msg .msg-body img { margin: 0 !important; }
   .msg.img-msg .msg-body img { border-radius: 12px; }
   /* 照片叠成一摞（1101 晚） */
-  .pstack { position: relative; width: min(62vw, 240px); height: min(80vw, 310px); touch-action: pan-y; user-select: none; -webkit-user-select: none; margin: 4px 18px 4px 0; }
+  /* 1120：isolation 把牌堆里的 z-index 关在自己里面，不然盖到加号抽屉上面 */
+  .pstack { position: relative; isolation: isolate; width: min(62vw, 240px); height: min(80vw, 310px); touch-action: pan-y; user-select: none; -webkit-user-select: none; margin: 4px 18px 4px 0; }
   .pstack-card { position: absolute; inset: 0; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 14px rgba(0,0,0,.22); background: var(--surface); will-change: transform; }
   .pstack-card img { width: 100%; height: 100%; object-fit: cover; display: block; margin: 0 !important; -webkit-user-drag: none; pointer-events: auto; }
   .pstack-n { position: absolute; right: 8px; top: 8px; z-index: 200; font-size: 11px; color: #fff; background: rgba(0,0,0,.45); border-radius: 999px; padding: 1px 8px; pointer-events: none; }
