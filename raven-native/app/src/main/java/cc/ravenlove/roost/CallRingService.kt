@@ -36,7 +36,7 @@ class CallRingService : Service() {
         private const val CHANNEL = "roost_call"
         // 1122：亮屏横幅专用。vivo 上「无铃声无振动」的类别不弹悬浮横幅（四个开关全开也只进通知栏），
         // 所以给横幅单开一个带一下短振动的类别；铃声照旧我们自己放
-        private const val CHANNEL_BANNER = "roost_call_banner"
+        private const val CHANNEL_BANNER = "roost_call_banner2"   // 1122 第 56 版：换新 id 才能改声音（类别建好后声音改不了）
         private const val NOTIF_ID = 12
         private const val BANNER_ID = 13
         private const val CHANNEL_SVC = "roost_call_svc"
@@ -131,8 +131,11 @@ class CallRingService : Service() {
         }
         val full = PendingIntent.getActivity(this, 5, activityIntent(), PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
         if (!locked && nm.getNotificationChannel(CHANNEL_BANNER) == null) {
+            nm.deleteNotificationChannel("roost_call_banner")
             nm.createNotificationChannel(NotificationChannel(CHANNEL_BANNER, "阿言来电（亮屏横幅）", NotificationManager.IMPORTANCE_HIGH).apply {
-                setSound(null, null)
+                // vivo 实测：无铃声的类别四个开关全开也不弹悬浮（文字消息那类有声音就弹），所以给横幅一声系统提示音
+                setSound(RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION),
+                    AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_NOTIFICATION_COMMUNICATION_INSTANT).build())
                 enableVibration(true)
                 vibrationPattern = longArrayOf(0, 300)
                 lockscreenVisibility = Notification.VISIBILITY_PUBLIC
