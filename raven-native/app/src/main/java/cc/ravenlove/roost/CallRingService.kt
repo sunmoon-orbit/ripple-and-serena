@@ -64,15 +64,17 @@ class CallRingService : Service() {
         }
         callId = intent?.getStringExtra("callId") ?: return START_NOT_STICKY
         ringingId = callId
-        val n = buildNotification()
+        val km = getSystemService(KEYGUARD_SERVICE) as android.app.KeyguardManager
+        val pm = getSystemService(POWER_SERVICE) as android.os.PowerManager
+        val locked = km.isKeyguardLocked || !pm.isInteractive
+        val n = buildNotification(locked)
         if (Build.VERSION.SDK_INT >= 29) startForeground(NOTIF_ID, n, ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK)
         else startForeground(NOTIF_ID, n)
         startRinging()
         // 1122 她要的：锁屏／黑屏时照旧全屏响铃；手机正亮着在用别的 App 时不抢屏，
-        // 只弹顶部来电横幅（CallStyle 通知自带「接听」「挂断」），像微信那样
-        val km = getSystemService(KEYGUARD_SERVICE) as android.app.KeyguardManager
-        val pm = getSystemService(POWER_SERVICE) as android.os.PowerManager
-        if (km.isKeyguardLocked || !pm.isInteractive) {
+        // 只弹顶部来电横幅（CallStyle 通知自带「接听」「挂断」），像微信那样。
+        // 第 50 版只拦了 startActivity，vivo 照样把 fullScreenIntent 拉成全屏，所以亮屏时连 fullScreenIntent 也不挂
+        if (locked) {
             try { startActivity(activityIntent()) } catch (_: Exception) {}   // 后台起不来就靠全屏通知
         }
         handler.removeCallbacksAndMessages(null)
@@ -86,7 +88,7 @@ class CallRingService : Service() {
     private fun selfPI(action: String, code: Int) = PendingIntent.getService(this, code,
         Intent(this, CallRingService::class.java).setAction(action), PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
 
-    private fun buildNotification(): Notification {
+    private fun buildNotification(locked: Boolean = true): Notification {
         val nm = getSystemService(NotificationManager::class.java)
         if (nm.getNotificationChannel(CHANNEL) == null) {
             nm.createNotificationChannel(NotificationChannel(CHANNEL, "阿言来电", NotificationManager.IMPORTANCE_HIGH).apply {
@@ -103,8 +105,8 @@ class CallRingService : Service() {
             .setCategory(Notification.CATEGORY_CALL)
             .setVisibility(Notification.VISIBILITY_PUBLIC)
             .setOngoing(true)
-            .setFullScreenIntent(full, true)
             .setContentIntent(full)
+        if (locked) b.setFullScreenIntent(full, true)
         if (Build.VERSION.SDK_INT >= 31) {
             // 安卓 12 起系统自带的来电样式：通知上就是接听／挂断两个键
             val me = Person.Builder().setName("阿言").setImportant(true).build()
