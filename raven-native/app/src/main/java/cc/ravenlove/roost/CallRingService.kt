@@ -38,6 +38,8 @@ class CallRingService : Service() {
         // 所以给横幅单开一个带一下短振动的类别；铃声照旧我们自己放
         private const val CHANNEL_BANNER = "roost_call_banner"
         private const val NOTIF_ID = 12
+        private const val BANNER_ID = 13
+        private const val CHANNEL_SVC = "roost_call_svc"
         var ringingId: String? = null
 
         fun stop(ctx: Context) {
@@ -70,9 +72,12 @@ class CallRingService : Service() {
         val km = getSystemService(KEYGUARD_SERVICE) as android.app.KeyguardManager
         val pm = getSystemService(POWER_SERVICE) as android.os.PowerManager
         val locked = km.isKeyguardLocked || !pm.isInteractive
-        val n = buildNotification(locked)
+        // 1122 第 54 版实测：亮屏时前台服务那条通知 vivo 怎么都不弹横幅（悬浮开关全开、加振动也不行）。
+        // 所以亮屏时拆成两条：前台服务挂一条几乎看不见的，横幅另外用普通通知发（普通通知 vivo 会弹）
+        val n = if (locked) buildNotification(true) else serviceNotification()
         if (Build.VERSION.SDK_INT >= 29) startForeground(NOTIF_ID, n, ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK)
         else startForeground(NOTIF_ID, n)
+        if (!locked) try { getSystemService(NotificationManager::class.java).notify(BANNER_ID, buildNotification(false)) } catch (_: Exception) {}
         startRinging()
         // 1122 她要的：锁屏／黑屏时照旧全屏响铃；手机正亮着在用别的 App 时不抢屏，
         // 只弹顶部来电横幅（CallStyle 通知自带「接听」「挂断」），像微信那样。
@@ -101,6 +106,20 @@ class CallRingService : Service() {
         }
     } catch (_: Exception) { null }
 
+    private fun serviceNotification(): Notification {
+        val nm = getSystemService(NotificationManager::class.java)
+        if (nm.getNotificationChannel(CHANNEL_SVC) == null) {
+            nm.createNotificationChannel(NotificationChannel(CHANNEL_SVC, "来电铃声服务", NotificationManager.IMPORTANCE_MIN).apply {
+                setSound(null, null); enableVibration(false); setShowBadge(false)
+            })
+        }
+        return Notification.Builder(this, CHANNEL_SVC)
+            .setSmallIcon(R.drawable.ic_notification)
+            .setContentTitle("阿言来电")
+            .setOngoing(true)
+            .build()
+    }
+
     private fun buildNotification(locked: Boolean = true): Notification {
         val nm = getSystemService(NotificationManager::class.java)
         if (nm.getNotificationChannel(CHANNEL) == null) {
@@ -128,7 +147,7 @@ class CallRingService : Service() {
             .setOngoing(true)
             .setContentIntent(full)
         if (locked) b.setFullScreenIntent(full, true)
-        if (Build.VERSION.SDK_INT >= 31) {
+        if (locked && Build.VERSION.SDK_INT >= 31) {
             // 安卓 12 起系统自带的来电样式：通知上就是接听／挂断两个键
             // 1122：通知上用我的头像（跟全屏来电页同一张 alarm_avatar.img），没有就退回字母「阿」
             val pb = Person.Builder().setName("阿言").setImportant(true)
@@ -136,6 +155,7 @@ class CallRingService : Service() {
             val me = pb.build()
             b.setStyle(Notification.CallStyle.forIncomingCall(me, selfPI(ACTION_DECLINE, 6), selfPI(ACTION_ACCEPT, 7)))
         } else {
+            avatarIcon()?.let { b.setLargeIcon(it) }
             b.addAction(Notification.Action.Builder(null as android.graphics.drawable.Icon?, "挂断", selfPI(ACTION_DECLINE, 6)).build())
             b.addAction(Notification.Action.Builder(null as android.graphics.drawable.Icon?, "接听", selfPI(ACTION_ACCEPT, 7)).build())
         }
@@ -193,6 +213,7 @@ class CallRingService : Service() {
             (getSystemService(Context.VIBRATOR_SERVICE) as Vibrator).cancel()
         } catch (_: Exception) {}
         IncomingCallActivity.current?.finish()
+        try { getSystemService(NotificationManager::class.java).cancel(BANNER_ID) } catch (_: Exception) {}
         stopForeground(STOP_FOREGROUND_REMOVE)
         stopSelf()
     }
