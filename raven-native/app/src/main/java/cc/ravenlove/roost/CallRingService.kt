@@ -88,6 +88,16 @@ class CallRingService : Service() {
     private fun selfPI(action: String, code: Int) = PendingIntent.getService(this, code,
         Intent(this, CallRingService::class.java).setAction(action), PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
 
+    private fun avatarIcon(): android.graphics.drawable.Icon? = try {
+        val f = java.io.File(filesDir, "alarm_avatar.img")
+        val bm = if (f.exists()) android.graphics.BitmapFactory.decodeFile(f.path) else null
+        if (bm == null) null else {
+            val side = minOf(bm.width, bm.height)
+            val sq = android.graphics.Bitmap.createBitmap(bm, (bm.width - side) / 2, (bm.height - side) / 2, side, side)
+            android.graphics.drawable.Icon.createWithAdaptiveBitmap(android.graphics.Bitmap.createScaledBitmap(sq, 192, 192, true))
+        }
+    } catch (_: Exception) { null }
+
     private fun buildNotification(locked: Boolean = true): Notification {
         val nm = getSystemService(NotificationManager::class.java)
         if (nm.getNotificationChannel(CHANNEL) == null) {
@@ -109,7 +119,10 @@ class CallRingService : Service() {
         if (locked) b.setFullScreenIntent(full, true)
         if (Build.VERSION.SDK_INT >= 31) {
             // 安卓 12 起系统自带的来电样式：通知上就是接听／挂断两个键
-            val me = Person.Builder().setName("阿言").setImportant(true).build()
+            // 1122：通知上用我的头像（跟全屏来电页同一张 alarm_avatar.img），没有就退回字母「阿」
+            val pb = Person.Builder().setName("阿言").setImportant(true)
+            avatarIcon()?.let { pb.setIcon(it); b.setLargeIcon(it) }
+            val me = pb.build()
             b.setStyle(Notification.CallStyle.forIncomingCall(me, selfPI(ACTION_DECLINE, 6), selfPI(ACTION_ACCEPT, 7)))
         } else {
             b.addAction(Notification.Action.Builder(null as android.graphics.drawable.Icon?, "挂断", selfPI(ACTION_DECLINE, 6)).build())
