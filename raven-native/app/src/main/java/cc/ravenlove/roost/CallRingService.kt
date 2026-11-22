@@ -34,6 +34,9 @@ class CallRingService : Service() {
         const val ACTION_DECLINE = "roost.call.DECLINE"
         const val ACTION_STOP = "roost.call.STOP"
         private const val CHANNEL = "roost_call"
+        // 1122：亮屏横幅专用。vivo 上「无铃声无振动」的类别不弹悬浮横幅（四个开关全开也只进通知栏），
+        // 所以给横幅单开一个带一下短振动的类别；铃声照旧我们自己放
+        private const val CHANNEL_BANNER = "roost_call_banner"
         private const val NOTIF_ID = 12
         var ringingId: String? = null
 
@@ -108,7 +111,15 @@ class CallRingService : Service() {
             })
         }
         val full = PendingIntent.getActivity(this, 5, activityIntent(), PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
-        val b = Notification.Builder(this, CHANNEL)
+        if (!locked && nm.getNotificationChannel(CHANNEL_BANNER) == null) {
+            nm.createNotificationChannel(NotificationChannel(CHANNEL_BANNER, "阿言来电（亮屏横幅）", NotificationManager.IMPORTANCE_HIGH).apply {
+                setSound(null, null)
+                enableVibration(true)
+                vibrationPattern = longArrayOf(0, 300)
+                lockscreenVisibility = Notification.VISIBILITY_PUBLIC
+            })
+        }
+        val b = Notification.Builder(this, if (locked) CHANNEL else CHANNEL_BANNER)
             .setSmallIcon(R.drawable.ic_notification)
             .setContentTitle("阿言来电")
             .setContentText("乌鸦想听听你的声音")
