@@ -68,7 +68,13 @@ class CallRingService : Service() {
         if (Build.VERSION.SDK_INT >= 29) startForeground(NOTIF_ID, n, ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK)
         else startForeground(NOTIF_ID, n)
         startRinging()
-        try { startActivity(activityIntent()) } catch (_: Exception) {}   // 后台起不来就靠全屏通知
+        // 1122 她要的：锁屏／黑屏时照旧全屏响铃；手机正亮着在用别的 App 时不抢屏，
+        // 只弹顶部来电横幅（CallStyle 通知自带「接听」「挂断」），像微信那样
+        val km = getSystemService(KEYGUARD_SERVICE) as android.app.KeyguardManager
+        val pm = getSystemService(POWER_SERVICE) as android.os.PowerManager
+        if (km.isKeyguardLocked || !pm.isInteractive) {
+            try { startActivity(activityIntent()) } catch (_: Exception) {}   // 后台起不来就靠全屏通知
+        }
         handler.removeCallbacksAndMessages(null)
         handler.postDelayed({ stopAll() }, 40_000L)
         return START_NOT_STICKY
