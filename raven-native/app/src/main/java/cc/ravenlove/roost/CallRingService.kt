@@ -94,7 +94,7 @@ class CallRingService : Service() {
         if (bm == null) null else {
             val side = minOf(bm.width, bm.height)
             val sq = android.graphics.Bitmap.createBitmap(bm, (bm.width - side) / 2, (bm.height - side) / 2, side, side)
-            android.graphics.drawable.Icon.createWithAdaptiveBitmap(android.graphics.Bitmap.createScaledBitmap(sq, 192, 192, true))
+            android.graphics.drawable.Icon.createWithBitmap(android.graphics.Bitmap.createScaledBitmap(sq, 192, 192, true))
         }
     } catch (_: Exception) { null }
 
