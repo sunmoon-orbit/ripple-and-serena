@@ -175,6 +175,7 @@ export default function BookRead({ onClose }) {
   const [composing, setComposing] = useState(false)
   const [annoColor, setAnnoColor] = useState('yellow')
   const [annoNote, setAnnoNote] = useState('')
+  const [annoSaving, setAnnoSaving] = useState(false)
   const [annoAuthor, setAnnoAuthor] = useState('阿颖')
   const [focusAnno, setFocusAnno] = useState(null) // 点了正文划线 → 高亮下方对应批注卡
   // 页边回复成串＋书架上的「新回音」（1029 她：我回了第 15 页的批注，她读到第 20 页还得翻回去找）
@@ -641,8 +642,13 @@ export default function BookRead({ onClose }) {
     }
   }
 
+  // 1122：11-21 她点「留下」没反应、连点了二十几下，请求全挂着，网一通同一秒落库 26 条。
+  // 现在：在存的时候锁住按钮、再点不发；超过 15 秒没回就提示，别让她以为没点上
+  const annoBusy = useRef(false)
   async function submitAnno() {
-    if (!pending) return
+    if (!pending || annoBusy.current) return
+    annoBusy.current = true; setAnnoSaving(true)
+    const slow = setTimeout(() => showToast('网有点慢，还在存，别再点啦'), 15000)
     try {
       const created = await createBookAnnotation(cfg, active.id, {
         chapter_idx: chapter.idx,
@@ -658,6 +664,7 @@ export default function BookRead({ onClose }) {
       window.getSelection()?.removeAllRanges()
       showToast('划下了这一句')
     } catch { showToast('批注失败', 'error') }
+    finally { clearTimeout(slow); annoBusy.current = false; setAnnoSaving(false) }
   }
 
   function openExcerptCard(excerpt, note = '') {
@@ -1660,7 +1667,7 @@ export default function BookRead({ onClose }) {
             />
             <div className="coread-anno-actions">
               <button className="roost-btn roost-btn-ghost roost-btn-sm" onClick={() => { setPending(null); setComposing(false); window.getSelection()?.removeAllRanges() }}>取消</button>
-              <button className="roost-btn roost-btn-sm" onClick={submitAnno}>留下</button>
+              <button className="roost-btn roost-btn-sm" onClick={submitAnno} disabled={annoSaving}>{annoSaving ? '存着呢…' : '留下'}</button>
             </div>
           </div>
         )}
