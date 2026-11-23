@@ -48,6 +48,22 @@ function queryOf(text) {
   return t.replace(/\s+/g, ' ').trim()
 }
 
+// 1123 称呼转译（借 memory-palace-gateway）：她说「小桃」「淘淘」「阿糖」，记忆里多写的是「阿桃」，
+// 字面一换就搜不到。她这句里出现任一别名、本名又没出现，就把本名补进搜的那句里。
+// 别名表在仓库外 ~/raven-aliases.json（有她的小名，不进公开仓库），改了不用重启，每次现读。
+const ALIAS_FILE = path.join(process.env.HOME || '/home/ripple', 'raven-aliases.json')
+function expandAliases(q) {
+  let groups = []
+  try { groups = JSON.parse(fs.readFileSync(ALIAS_FILE, 'utf8')).groups || [] } catch { return q }
+  const add = []
+  for (const g of groups) {
+    if (!g || !g.name || !Array.isArray(g.aliases)) continue
+    if (q.includes(g.name)) continue
+    if (g.aliases.some(a => a && q.includes(a))) add.push(g.name)
+  }
+  return add.length ? `${q} ${add.join(' ')}` : q
+}
+
 // 闸门 1：值不值得翻
 function worthLooking(q) {
   const meaningful = q.replace(/[\s\p{P}\p{S}]/gu, '')
@@ -73,7 +89,7 @@ async function surface(text, search, now = Date.now(), out = null, no = blocked(
   let rows
   try {
     rows = await Promise.race([
-      search(q.slice(0, 300)),
+      search(expandAliases(q.slice(0, 300))),
       new Promise((_, bad) => setTimeout(() => bad(new Error('timeout')), TIMEOUT_MS)),
     ])
   } catch (e) {
@@ -201,4 +217,4 @@ function usedIn(memText, reply, min = 3) {
   return n >= min ? n : 0
 }
 
-module.exports = { usedIn, blocked, surface, queryOf, worthLooking, MIN_SIM, findEntry, whyNot, addFeedback, feedbackFor, SKIP_TYPES }
+module.exports = { expandAliases, usedIn, blocked, surface, queryOf, worthLooking, MIN_SIM, findEntry, whyNot, addFeedback, feedbackFor, SKIP_TYPES }
