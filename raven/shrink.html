@@ -96,6 +96,11 @@
           <button class="chip" data-v="1.3333">4:3</button>
           <button class="chip" data-v="0.5625">9:16</button>
         </div>
+        <div class="lbl">图放不满一格时</div>
+        <div class="row" id="st-fit">
+          <button class="chip on" data-v="cover">裁满（照片用）</button>
+          <button class="chip" data-v="contain">完整显示，留边（截图用）</button>
+        </div>
       </div>
       <div class="lbl">图和图之间的缝</div>
       <div class="row" id="st-gap">
@@ -231,7 +236,7 @@ document.querySelectorAll('.tab').forEach((t) => t.onclick = () => {
   $('pane-shrink').classList.toggle('hide', t.dataset.tab !== 'shrink')
   $('pane-stitch').classList.toggle('hide', t.dataset.tab !== 'stitch')
 })
-const st = { mode: 'v', ratio: 1, gap: 0, bg: '#ffffff', files: [] }
+const st = { mode: 'v', ratio: 1, gap: 0, bg: '#ffffff', fit: 'cover', files: [] }
 function chips(id, key, conv) {
   $(id).addEventListener('click', (e) => {
     const b = e.target.closest('.chip'); if (!b) return
@@ -240,7 +245,7 @@ function chips(id, key, conv) {
     if (key === 'mode') $('st-ratio-box').classList.toggle('hide', !st.mode.startsWith('g'))
   })
 }
-chips('st-mode', 'mode', (v) => v); chips('st-ratio', 'ratio', Number); chips('st-gap', 'gap', Number); chips('st-bg', 'bg', (v) => v)
+chips('st-mode', 'mode', (v) => v); chips('st-ratio', 'ratio', Number); chips('st-gap', 'gap', Number); chips('st-bg', 'bg', (v) => v); chips('st-fit', 'fit', (v) => v)
 function drawThumbs() {
   $('st-thumbs').innerHTML = st.files.map((f, i) => `<div class="th"><img src="${f.url}" alt=""><span class="no">${i + 1}</span><div class="mv"><button data-i="${i}" data-d="-1">←</button><button data-i="${i}" data-d="x">✕</button><button data-i="${i}" data-d="1">→</button></div></div>`).join('')
   $('st-go').classList.toggle('hide', st.files.length < 2)
@@ -258,6 +263,11 @@ $('st-file').onchange = (e) => {
   e.target.value = ''; drawThumbs()
 }
 // 宫格每格按比例「铺满再居中裁」
+// 1124 加「完整显示」：截图宫格别裁字，整张缩进格子里，空的地方是底色
+function drawContain(x, img, dx, dy, dw, dh) {
+  const s = Math.min(dw / img.width, dh / img.height), w = img.width * s, h = img.height * s
+  x.drawImage(img, dx + (dw - w) / 2, dy + (dh - h) / 2, w, h)
+}
 function drawCover(x, img, dx, dy, dw, dh) {
   const s = Math.max(dw / img.width, dh / img.height)
   const sw = dw / s, sh = dh / s
@@ -293,7 +303,7 @@ $('st-go').onclick = async () => {
       const cw = cols === 3 ? 480 : 720, ch = Math.round(cw / st.ratio)
       c.width = cols * cw + g * (cols + 1); c.height = rows * ch + g * (rows + 1)
       x.fillStyle = st.bg; x.fillRect(0, 0, c.width, c.height); x.imageSmoothingQuality = 'high'
-      imgs.forEach((im, n) => drawCover(x, im, g + (n % cols) * (cw + g), g + Math.floor(n / cols) * (ch + g), cw, ch))
+      imgs.forEach((im, n) => (st.fit === 'contain' ? drawContain : drawCover)(x, im, g + (n % cols) * (cw + g), g + Math.floor(n / cols) * (ch + g), cw, ch))
     }
     imgs.forEach((i) => i.close?.())
     const blob = await new Promise((ok) => c.toBlob(ok, 'image/jpeg', 0.9))
