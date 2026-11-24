@@ -3,11 +3,13 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>压图</title>
+<title>图片工具</title>
 <!--
   压图（1111）：她的话：「微信那个小程序……每天只有免费一次，后续再传图片，压缩就要看广告……非常非常之麻烦，
   我们能不能自己做一个小网页之类的自己用呢？」
   全在她手机上算（canvas），图不上传、不经过服务器，没网也能用。
+  1124 改名「图片工具」，加「拼图」：她嫌醒图拼多张图时选了 1:1 还按它自己的预设走，用得迷糊，
+  「要不自己来一个？」——竖拼（聊天记录长图）、横拼、宫格；宫格每格按选的比例居中裁。
 -->
 <style>
   :root { --bg: #efe9df; --paper: #fbf8f1; --ink: #3a332b; --dim: #948a7c; --line: #e2d8c8; --accent: #b0705a; --chip: #e7dccb; --shadow: rgba(70,50,30,.14); }
@@ -41,10 +43,27 @@
   .acts { grid-column: 1 / -1; display: flex; gap: 8px; }
   .acts a, .acts button { flex: 1; text-align: center; text-decoration: none; font: inherit; font-size: 13.5px; color: var(--ink); background: var(--chip); border: 0; border-radius: 999px; padding: 9px 0; cursor: pointer; }
   .err { color: var(--accent); font-size: 13px; }
+  .tabs { display: flex; gap: 8px; margin: 0 0 14px; }
+  .tab { flex: 1; font: inherit; font-size: 15px; letter-spacing: 2px; color: var(--ink); background: var(--chip); border: 1.5px solid transparent; border-radius: 999px; padding: 10px; cursor: pointer; }
+  .tab.on { border-color: var(--accent); color: var(--accent); }
+  .row { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 10px; }
+  .chip { font: inherit; font-size: 13.5px; color: var(--ink); background: var(--chip); border: 1.5px solid transparent; border-radius: 999px; padding: 7px 13px; cursor: pointer; }
+  .chip.on { border-color: var(--accent); color: var(--accent); }
+  .lbl { font-size: 12.5px; color: var(--dim); margin: 4px 0 6px; }
+  .thumbs { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-top: 12px; }
+  .th { position: relative; }
+  .th img { width: 100%; aspect-ratio: 1; object-fit: cover; border-radius: 10px; display: block; background: var(--chip); }
+  .th .no { position: absolute; left: 4px; top: 4px; background: rgba(0,0,0,.55); color: #fff; font-size: 11px; border-radius: 999px; padding: 1px 6px; }
+  .th .mv { display: flex; gap: 4px; margin-top: 4px; }
+  .th .mv button { flex: 1; font: inherit; font-size: 12px; color: var(--ink); background: var(--chip); border: 0; border-radius: 8px; padding: 3px 0; cursor: pointer; }
+  #st-out img { width: 100%; border-radius: 10px; display: block; margin-top: 12px; border: 1px solid var(--line); }
+  .hide { display: none !important; }
 </style>
 </head>
 <body>
 <div class="wrap">
+  <div class="tabs"><button class="tab on" data-tab="shrink">压图</button><button class="tab" data-tab="stitch">拼图</button></div>
+  <div id="pane-shrink">
   <div class="card">
     <h2>压成什么样</h2>
     <div class="presets" id="presets"></div>
@@ -57,6 +76,47 @@
   <input id="file" type="file" accept="image/*" multiple hidden>
   <p class="hint">可以一次挑好几张。图只在你手机上处理，不上传。</p>
   <div id="list" style="margin-top:14px"></div>
+  </div>
+
+  <div id="pane-stitch" class="hide">
+    <div class="card">
+      <h2>怎么拼</h2>
+      <div class="lbl">排法</div>
+      <div class="row" id="st-mode">
+        <button class="chip on" data-v="v">竖着拼（聊天记录）</button>
+        <button class="chip" data-v="h">横着拼</button>
+        <button class="chip" data-v="g2">宫格·两列</button>
+        <button class="chip" data-v="g3">宫格·三列</button>
+      </div>
+      <div id="st-ratio-box" class="hide">
+        <div class="lbl">每一格的比例（多出来的居中裁掉）</div>
+        <div class="row" id="st-ratio">
+          <button class="chip on" data-v="1">1:1</button>
+          <button class="chip" data-v="0.75">3:4</button>
+          <button class="chip" data-v="1.3333">4:3</button>
+          <button class="chip" data-v="0.5625">9:16</button>
+        </div>
+      </div>
+      <div class="lbl">图和图之间的缝</div>
+      <div class="row" id="st-gap">
+        <button class="chip on" data-v="0">不留</button>
+        <button class="chip" data-v="12">细缝</button>
+        <button class="chip" data-v="32">宽缝</button>
+      </div>
+      <div class="lbl">缝和底的颜色</div>
+      <div class="row" id="st-bg">
+        <button class="chip on" data-v="#ffffff">白</button>
+        <button class="chip" data-v="#000000">黑</button>
+        <button class="chip" data-v="#fbf8f1">米色</button>
+      </div>
+    </div>
+    <button class="pick" id="st-pick">挑要拼的图</button>
+    <input id="st-file" type="file" accept="image/*" multiple hidden>
+    <p class="hint">按挑的顺序拼，下面可以左右挪顺序。图只在你手机上处理，不上传。</p>
+    <div class="thumbs" id="st-thumbs"></div>
+    <button class="pick hide" id="st-go" style="margin-top:14px">拼起来</button>
+    <div id="st-out"></div>
+  </div>
 </div>
 <script>
 // edge＝长边上限；kb＝目标体积上限（0 不限）；q＝起始画质
@@ -162,6 +222,91 @@ $('file').onchange = async (e) => {
     } catch (err) {
       card.querySelector('.sz').innerHTML = '<span class="err">这张没压成，可能不是图片或者格式认不出。</span>'
     }
+  }
+}
+
+// ───── 拼图（1124）─────
+document.querySelectorAll('.tab').forEach((t) => t.onclick = () => {
+  document.querySelectorAll('.tab').forEach((x) => x.classList.toggle('on', x === t))
+  $('pane-shrink').classList.toggle('hide', t.dataset.tab !== 'shrink')
+  $('pane-stitch').classList.toggle('hide', t.dataset.tab !== 'stitch')
+})
+const st = { mode: 'v', ratio: 1, gap: 0, bg: '#ffffff', files: [] }
+function chips(id, key, conv) {
+  $(id).addEventListener('click', (e) => {
+    const b = e.target.closest('.chip'); if (!b) return
+    $(id).querySelectorAll('.chip').forEach((x) => x.classList.toggle('on', x === b))
+    st[key] = conv(b.dataset.v)
+    if (key === 'mode') $('st-ratio-box').classList.toggle('hide', !st.mode.startsWith('g'))
+  })
+}
+chips('st-mode', 'mode', (v) => v); chips('st-ratio', 'ratio', Number); chips('st-gap', 'gap', Number); chips('st-bg', 'bg', (v) => v)
+function drawThumbs() {
+  $('st-thumbs').innerHTML = st.files.map((f, i) => `<div class="th"><img src="${f.url}" alt=""><span class="no">${i + 1}</span><div class="mv"><button data-i="${i}" data-d="-1">←</button><button data-i="${i}" data-d="x">✕</button><button data-i="${i}" data-d="1">→</button></div></div>`).join('')
+  $('st-go').classList.toggle('hide', st.files.length < 2)
+}
+$('st-thumbs').addEventListener('click', (e) => {
+  const b = e.target.closest('button'); if (!b) return
+  const i = +b.dataset.i, d = b.dataset.d, a = st.files
+  if (d === 'x') { URL.revokeObjectURL(a[i].url); a.splice(i, 1) }
+  else { const j = i + (+d); if (j < 0 || j >= a.length) return; [a[i], a[j]] = [a[j], a[i]] }
+  drawThumbs()
+})
+$('st-pick').onclick = () => $('st-file').click()
+$('st-file').onchange = (e) => {
+  for (const f of e.target.files) st.files.push({ file: f, url: URL.createObjectURL(f) })
+  e.target.value = ''; drawThumbs()
+}
+// 宫格每格按比例「铺满再居中裁」
+function drawCover(x, img, dx, dy, dw, dh) {
+  const s = Math.max(dw / img.width, dh / img.height)
+  const sw = dw / s, sh = dh / s
+  x.drawImage(img, (img.width - sw) / 2, (img.height - sh) / 2, sw, sh, dx, dy, dw, dh)
+}
+$('st-go').onclick = async () => {
+  $('st-out').innerHTML = '<p class="hint">拼着呢…</p>'
+  try {
+    const imgs = []
+    for (const f of st.files) imgs.push(await decode(f.file))
+    const g = st.gap, c = document.createElement('canvas'), x = c.getContext('2d')
+    const MAXPX = 16000 // 太长的长图手机画布会画不出来，超了就整体缩
+    if (st.mode === 'v') {
+      const W = Math.min(1440, Math.max(...imgs.map((i) => i.width)))
+      const hs = imgs.map((i) => Math.round(i.height * W / i.width))
+      let H = hs.reduce((a, b) => a + b, 0) + g * (imgs.length - 1)
+      const k = H > MAXPX ? MAXPX / H : 1
+      c.width = Math.round(W * k); c.height = Math.round(H * k)
+      x.fillStyle = st.bg; x.fillRect(0, 0, c.width, c.height); x.imageSmoothingQuality = 'high'
+      let y = 0
+      imgs.forEach((im, n) => { x.drawImage(im, 0, Math.round(y * k), c.width, Math.round(hs[n] * k)); y += hs[n] + g })
+    } else if (st.mode === 'h') {
+      const H = Math.min(1440, Math.max(...imgs.map((i) => i.height)))
+      const ws = imgs.map((i) => Math.round(i.width * H / i.height))
+      let W = ws.reduce((a, b) => a + b, 0) + g * (imgs.length - 1)
+      const k = W > MAXPX ? MAXPX / W : 1
+      c.width = Math.round(W * k); c.height = Math.round(H * k)
+      x.fillStyle = st.bg; x.fillRect(0, 0, c.width, c.height); x.imageSmoothingQuality = 'high'
+      let xx = 0
+      imgs.forEach((im, n) => { x.drawImage(im, Math.round(xx * k), 0, Math.round(ws[n] * k), c.height); xx += ws[n] + g })
+    } else {
+      const cols = st.mode === 'g3' ? 3 : 2, rows = Math.ceil(imgs.length / cols)
+      const cw = cols === 3 ? 480 : 720, ch = Math.round(cw / st.ratio)
+      c.width = cols * cw + g * (cols + 1); c.height = rows * ch + g * (rows + 1)
+      x.fillStyle = st.bg; x.fillRect(0, 0, c.width, c.height); x.imageSmoothingQuality = 'high'
+      imgs.forEach((im, n) => drawCover(x, im, g + (n % cols) * (cw + g), g + Math.floor(n / cols) * (ch + g), cw, ch))
+    }
+    imgs.forEach((i) => i.close?.())
+    const blob = await new Promise((ok) => c.toBlob(ok, 'image/jpeg', 0.9))
+    const url = URL.createObjectURL(blob), name = '拼图-' + new Date().toISOString().slice(0, 16).replace(/[-:T]/g, '') + '.jpg'
+    $('st-out').innerHTML = `<img src="${url}" alt=""><p class="hint">${c.width}×${c.height}，${kb(blob.size)}</p><div class="acts"><a href="${url}" download="${name}">保存</a></div>`
+    const file = new File([blob], name, { type: 'image/jpeg' })
+    if (navigator.canShare?.({ files: [file] })) {
+      const b = document.createElement('button'); b.textContent = '分享／发出去'
+      b.onclick = () => navigator.share({ files: [file] }).catch(() => {})
+      $('st-out').querySelector('.acts').appendChild(b)
+    }
+  } catch (err) {
+    $('st-out').innerHTML = '<p class="hint err">没拼成，可能图太大或者格式认不出。</p>'
   }
 }
 </script>

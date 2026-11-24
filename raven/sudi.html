@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>苏堤柳</title>
+<!--
+  苏堤柳（1124）：首页原来「塔罗」「苏堤柳」各占一个图标，她说塔罗单独占一格。
+  合成一个入口：问心处（老房子上的算卦摊）和塔罗（我们的第一个小网页，名字就是从它来的）都在这里。
+-->
+<style>
+  :root { --bg: #efe9df; --paper: #fbf8f1; --ink: #3a332b; --dim: #948a7c; --line: #e2d8c8; --accent: #8a6fa8; --shadow: rgba(70,50,30,.14); }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #1c1a18; --paper: #2b2824; --ink: #e6dfd3; --dim: #8f877b; --line: #3a352f; --accent: #b49ad0; --shadow: rgba(0,0,0,.4); }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink);
+    font-family: 'LXGW WenKai', 'Noto Serif SC', 'Songti SC', 'PingFang SC', system-ui, sans-serif;
+    padding: max(24px, env(safe-area-inset-top)) 16px 32px; }
+  .wrap { max-width: 480px; margin: 0 auto; }
+  h1 { font-size: 20px; font-weight: 600; letter-spacing: 6px; text-align: center; margin: 8px 0 4px; }
+  .sub { text-align: center; color: var(--dim); font-size: 12.5px; margin: 0 0 22px; }
+  a.card { display: block; text-decoration: none; color: inherit; background: var(--paper); border: 1px solid var(--line);
+    border-radius: 16px; padding: 18px 18px; margin: 0 0 14px; box-shadow: 0 4px 12px var(--shadow); }
+  a.card b { display: block; font-size: 17px; letter-spacing: 3px; color: var(--accent); }
+  a.card small { display: block; font-size: 12.5px; color: var(--dim); margin-top: 6px; line-height: 1.7; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>苏堤柳</h1>
+  <p class="sub">问心，或者抽一张牌</p>
+  <a class="card" href="https://wenxin.ravenlove.cc/">
+    <b>问心处</b>
+    <small>小六壬、起卦落印。卦面只断不改。</small>
+  </a>
+  <a class="card" href="https://sunmoon-orbit.github.io/ripple-and-serena/tarot/">
+    <b>塔罗</b>
+    <small>我们的第一个小网页。苏堤柳这个名字就是从它来的。</small>
+  </a>
+</div>
+</body>
+</html>
