@@ -220,6 +220,7 @@ export default function BookRead({ onClose }) {
   const cardImageRef = useRef(null)
   const bodyRef = useRef(null)          // 阅读视图的滚动容器
   const pageViewportRef = useRef(null)
+  const restoreTimerRef = useRef(null)
   const restorePositionRef = useRef(null) // 章节渲染完后要恢复的位置（兼容旧版 scroll）
   const scrollTimerRef = useRef(null)
   const chatEndRef = useRef(null)
@@ -288,6 +289,7 @@ export default function BookRead({ onClose }) {
         fetchBookChapter(cfg, book.id, idx),
         fetchBookChat(cfg, book.id, idx, 40).catch(() => []),
       ])
+      clearTimeout(restoreTimerRef.current); restoreTimerRef.current = null
       restorePositionRef.current = restorePosition
       setChapter(ch)
       setChapterViewKey((key) => key + 1)
@@ -467,17 +469,25 @@ export default function BookRead({ onClose }) {
         // 只有从翻页模式恢复时才沿用绝对页码。滚动模式保存的 page 可能是
         // 上一次多栏布局留下的旧值（常见是 pageCount=1 时的 0），切回翻页
         // 必须以正文比例按当前屏幕重新换算。
+        // 1124 她：看到 21 页退出，第二天进来跳到 18、19 页。原因：第一次量的时候字体、批注还没排完，
+        // 页数偏少，存的页码被夹到末页，紧接着就把恢复目标清掉了，等排版长全也回不去。
+        // 现在：存页时一并存当时的总页数；总页数对不上就按比例换算；恢复目标保留 1.5 秒，
+        // 这期间排版再变（字体加载、批注渲染）都重新按目标算一次；她自己翻页就立刻作废。
         const savedPage = Number(saved?.page)
         const savedRatio = Math.min(1, Math.max(0, Number(saved?.ratio) || 0))
-        const requested = saved?.mode === 'page' && Number.isFinite(savedPage)
+        const sameLayout = !saved?.count || Number(saved.count) === count
+        const requested = saved?.mode === 'page' && Number.isFinite(savedPage) && sameLayout
           ? savedPage
           : Math.round(savedRatio * Math.max(0, count - 1))
         setPageCount(count)
         setPageIndex((current) => Math.max(0, Math.min(count - 1, saved ? requested : current)))
-        if (saved) restorePositionRef.current = null
+        if (saved && !restoreTimerRef.current) {
+          restoreTimerRef.current = setTimeout(() => { restorePositionRef.current = null; restoreTimerRef.current = null }, 1500)
+        }
       })
     }
     measure()
+    document.fonts?.ready?.then(() => measure())
     const observer = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(measure) : null
     if (pageViewportRef.current) observer?.observe(pageViewportRef.current)
     window.addEventListener('resize', measure)
@@ -502,11 +512,14 @@ export default function BookRead({ onClose }) {
 
   function rememberPage(nextPage) {
     if (!active || !chapter || peekRef.current) return
+    restorePositionRef.current = null   // 她自己翻了页，之前的恢复目标作废
+    clearTimeout(restoreTimerRef.current); restoreTimerRef.current = null
     savePos(active.id, chapter.idx, {
       page: nextPage,
       scroll: 0,
       mode: 'page',
       ratio: nextPage / Math.max(1, pageCount - 1),
+      count: pageCount,
     })
   }
 
@@ -532,6 +545,7 @@ export default function BookRead({ onClose }) {
     const ratio = readingMode === 'page'
       ? pageIndex / Math.max(1, pageCount - 1)
       : (el?.scrollTop || 0) / Math.max(1, (el?.scrollHeight || 1) - (el?.clientHeight || 0))
+    clearTimeout(restoreTimerRef.current); restoreTimerRef.current = null
     restorePositionRef.current = next === 'page'
       ? { mode: next, ratio }
       : { mode: next, ratio, page: pageIndex }
@@ -574,6 +588,7 @@ export default function BookRead({ onClose }) {
     if (selection && !selection.isCollapsed) return
     // 菜单收放会改变书页高度。留下比例而非旧页码，让 ResizeObserver
     // 按新的每页容量把当前位置换算回来，不让正文突然跳段。
+    clearTimeout(restoreTimerRef.current); restoreTimerRef.current = null
     restorePositionRef.current = {
       mode: 'layout',
       ratio: pageIndex / Math.max(1, pageCount - 1),
