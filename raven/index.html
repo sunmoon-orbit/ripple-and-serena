@@ -4964,6 +4964,7 @@ let recordingForCall = false
 let discardRecording = false
 let activeSttController = null
 let callActive = false
+let callSeq = 0   // 1125：每通电话一个号。上一通 [hangup] 的 60 秒保底计时器没清，她马上打回来，第二通 38 秒就被当成「阿言挂的」挂掉了
 let pendingCallEnd = null
 let callStartedAt = 0
 let callTimerId = null
@@ -5179,7 +5180,7 @@ function openCall(fromAi = false) {
   callFromAi = !!fromAi
   const audioCtx = getSharedAudioContext()
   if (audioCtx?.state === 'suspended') audioCtx.resume().catch(() => {})
-  callActive = true
+  callActive = true; callSeq++
   if (callAuto && !vadBroken) loadVad().catch(() => {})   // 先把断句模型拉着，第一句就用得上
   voiceReplyUntil = 0
   callStartedAt = Date.now()
@@ -5282,6 +5283,7 @@ function splitCallReply(text) {
 
 function handleCallReply(text, msgEl, hangup = false) {
   callHadInteraction = true
+  const seq = callSeq, live = () => callActive && callSeq === seq   // 只挂这一通
   const firstAfterHer = waitingReply; waitingReply = false
   // 自动开着的麦还在等她出声，他的下一句就来了：这一段不要了，免得把他的朗读当成她说的
   if (mediaRecorder && recordingAuto && mediaRecorder.state === 'recording') { discardRecording = true; try { mediaRecorder.stop() } catch {} }
@@ -5294,8 +5296,8 @@ function handleCallReply(text, msgEl, hangup = false) {
     const state = event.detail?.state
     if (state === 'loading') setCallStatus('乌鸦准备开口…')
     else if (state === 'playing') setCallStatus('乌鸦正在说话，点麦克风可以打断', true)
-    else if (state === 'error') { setCallStatus('这句没能读出来，再点一次麦克风继续说'); if (hangup) setTimeout(() => closeCall('ai'), 1500) }
-    else if (hangup) { if (wasPlaying) setTimeout(() => { if (callActive) closeCall('ai') }, 700) }   // 他说了这句就挂：念完再挂
+    else if (state === 'error') { setCallStatus('这句没能读出来，再点一次麦克风继续说'); if (hangup) setTimeout(() => { if (live()) closeCall('ai') }, 1500) }
+    else if (hangup) { if (wasPlaying) setTimeout(() => { if (live()) closeCall('ai') }, 700) }   // 他说了这句就挂：念完再挂
     else if (!mediaRecorder && !activeSttController) {
       setCallStatus('点麦克风，接着说')
       // 刚才是在念、现在停了：要是她点麦克风掐断的，那边已经在开麦了，autoListen 里会看见并让开
@@ -5304,8 +5306,8 @@ function handleCallReply(text, msgEl, hangup = false) {
     wasPlaying = state === 'playing'
   })
   if (parts.main) autoReadReply(msgEl)
-  else if (hangup) setTimeout(() => { if (callActive) closeCall('ai') }, 700)
-  if (hangup) setTimeout(() => { if (callActive) closeCall('ai') }, 60000)   // 念卡住了也别一直挂着
+  else if (hangup) setTimeout(() => { if (live()) closeCall('ai') }, 700)
+  if (hangup) setTimeout(() => { if (live()) closeCall('ai') }, 60000)   // 念卡住了也别一直挂着
 }
 
 function syncMicState(state) {
