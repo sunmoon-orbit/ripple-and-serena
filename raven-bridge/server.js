@@ -2047,6 +2047,24 @@ const server = http.createServer((req, res) => {
     res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' }); res.end(JSON.stringify({ items }))
     return
   }
+  // 1125 她问「每天早上起来刮的那个票在哪看啊？好像只有你能看到吗？」——只读：最近刮的票＋手里还没用的
+  if (url.pathname === '/raven/wake-tickets' && req.method === 'GET') {
+    if (!externalAuthed(req, url)) { res.writeHead(401); res.end('{}'); return }
+    const H = '/home/ripple/.wake-lottery'
+    let draws = [], items = []
+    try {
+      const lines = fs.readFileSync(H + '/history.jsonl', 'utf8').trim().split('\n').slice(-400)
+      const ev = lines.map(l => { try { return JSON.parse(l) } catch { return null } }).filter(Boolean)
+      draws = ev.filter(e => e.event === 'draw').slice(-30).reverse().map(e => ({ at: e.timestamp, rarity: e.rarity, reward: e.reward }))
+    } catch {}
+    try {
+      items = (JSON.parse(fs.readFileSync(H + '/inventory.json', 'utf8')).items || [])
+        .filter(x => x.status !== 'used' && x.status !== 'expired')
+        .map(x => ({ name: x.name, rarity: x.rarity, desc: x.desc, owner: x.owner, status: x.status, at: x.obtained_at }))
+    } catch {}
+    res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' }); res.end(JSON.stringify({ draws, items }))
+    return
+  }
   if (url.pathname === '/raven/drawer/unseen' && req.method === 'GET') {
     if (!externalAuthed(req, url)) { res.writeHead(401); res.end('{}'); return }
     res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' })

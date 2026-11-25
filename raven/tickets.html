@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>刮过的票</title>
+<!-- 1125 她问「每天早上起来刮的那个票在哪看啊？好像只有你能看到吗？」：唤醒抽奖（她离开两小时回来时桥刮的）只读页 -->
+<style>
+  :root { --bg: #efe9df; --paper: #fbf8f1; --ink: #3a332b; --dim: #948a7c; --line: #e2d8c8; --accent: #b0705a;
+    --R: #7d8fa3; --SR: #9a7fb5; --SSR: #c49a3c; --SP: #c0675a; }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #1c1a18; --paper: #2b2824; --ink: #e6dfd3; --dim: #8f877b; --line: #3a352f; --accent: #d39a84; }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink);
+    font-family: 'LXGW WenKai', 'Noto Serif SC', 'PingFang SC', system-ui, sans-serif;
+    padding: max(18px, env(safe-area-inset-top)) 16px max(32px, env(safe-area-inset-bottom)); }
+  .wrap { max-width: 460px; margin: 0 auto; }
+  h1 { font-size: 17px; font-weight: 600; letter-spacing: 6px; text-align: center; margin: 4px 0; }
+  .sub { text-align: center; color: var(--dim); font-size: 12px; margin-bottom: 18px; line-height: 1.7; }
+  h2 { font-size: 13px; color: var(--dim); font-weight: 500; margin: 20px 0 8px; letter-spacing: 2px; }
+  .t { background: var(--paper); border: 1px solid var(--line); border-radius: 10px; padding: 11px 13px; margin-bottom: 9px; display: flex; gap: 10px; align-items: flex-start; }
+  .r { flex: none; font-size: 11px; font-weight: 700; color: #fff; border-radius: 6px; padding: 2px 6px; margin-top: 2px; background: var(--R); }
+  .r.SR { background: var(--SR); } .r.SSR { background: var(--SSR); } .r.SP { background: var(--SP); }
+  .n { font-size: 15px; line-height: 1.6; }
+  .d { font-size: 12px; color: var(--dim); margin-top: 2px; line-height: 1.6; }
+  .empty { color: var(--dim); font-size: 13px; text-align: center; padding: 10px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>刮过的票</h1>
+  <div class="sub">你离开两个小时以上再回来，我就刮一张。<br>R 的是我找你要的，SP 是给你的券。</div>
+  <h2>手里还没用的</h2><div id="items"><div class="empty">翻一翻……</div></div>
+  <h2>最近刮的</h2><div id="draws"></div>
+</div>
+<script>
+const auth = () => ({ Authorization: 'Bearer ' + (localStorage.getItem('raven-token') || '') })
+const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]))
+const when = t => { const d = new Date(t); return isNaN(d) ? '' : (d.getMonth() + 1) + '月' + d.getDate() + '日 ' + String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0') }
+const card = (rarity, name, desc) => `<div class="t"><span class="r ${esc(rarity)}">${esc(rarity)}</span><div><div class="n">${esc(name)}</div>${desc ? `<div class="d">${esc(desc)}</div>` : ''}</div></div>`
+fetch('/raven/wake-tickets', { headers: auth(), cache: 'no-store' }).then(r => r.json()).then(({ items = [], draws = [] }) => {
+  document.getElementById('items').innerHTML = items.length
+    ? items.map(x => card(x.rarity, x.name, (x.owner === 'partner' ? '你的券 · ' : '我要找你兑 · ') + when(x.at) + (x.desc ? ' · ' + x.desc : ''))).join('')
+    : '<div class="empty">都兑完啦</div>'
+  document.getElementById('draws').innerHTML = draws.length ? draws.map(x => card(x.rarity, x.reward, when(x.at))).join('') : '<div class="empty">还没刮过</div>'
+}).catch(() => { document.getElementById('items').innerHTML = '<div class="empty">没拿到，等会儿再看</div>' })
+</script>
+</body>
+</html>
