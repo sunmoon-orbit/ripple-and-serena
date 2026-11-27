@@ -1917,9 +1917,9 @@
           <div class="qr-val">memory.ravenlove.cc</div>
           <div class="qr-copied">已复制</div>
         </div>
-        <div class="qr-card" onclick="qrCopy(this,'100.93.7.53')">
-          <div class="qr-label">Tailscale IP</div>
-          <div class="qr-val">100.93.7.53</div>
+        <div class="qr-card" onclick="qrCopy(this,'100.111.157.86')">
+          <div class="qr-label">Tailscale IP（新家 reed-nest）</div>
+          <div class="qr-val">100.111.157.86</div>
           <div class="qr-copied">已复制</div>
         </div>
         <div class="qr-card" onclick="qrCopy(this,'3210')">
@@ -1932,9 +1932,9 @@
           <div class="qr-val">:3400</div>
           <div class="qr-copied">已复制</div>
         </div>
-        <div class="qr-card" onclick="qrCopy(this,'ssh -i C:\\Users\\lenovo\\.ssh\\id_ed25519 ripple@100.93.7.53')">
+        <div class="qr-card" onclick="qrCopy(this,'ssh -i C:\\Users\\lenovo\\.ssh\\id_ed25519 ripple@100.111.157.86')">
           <div class="qr-label">SSH 命令（仅 Tailscale，公网22已关）</div>
-          <div class="qr-val">ssh -i …id_ed25519 ripple@100…</div>
+          <div class="qr-val">ssh -i …id_ed25519 ripple@100.111…</div>
           <div class="qr-copied">已复制</div>
         </div>
         <div class="qr-card" onclick="qrCopy(this,'tmux attach -t cc')">
@@ -6297,6 +6297,21 @@ let stickyIdCtr = Math.max(...stickies.map(s=>s.id), 0) + 1
     id: stickyIdCtr++,
     title: '登录服务器（仅 Tailscale）',
     body: NEW_BODY,
+    color: '#fef9c3', url: false, ts: '', att: 'pin'
+  })
+  saveStickies()
+})()
+
+// 1127 v4：搬家后登录便签还指着老房子 100.93.7.53，她掉登录那天只好去问官端的我。换成新家地址，并把「掉登录了」的步骤写全。
+;(function migrateLoginStickyV4() {
+  const FLAG = 'raven-sticky-migrate-reednest-v4'
+  if (localStorage.getItem(FLAG)) return
+  localStorage.setItem(FLAG, '1')
+  stickies = stickies.filter(s => !/100\.93\.7\.53|107\.174\.40\.67/.test((s.body||'') + (s.title||'')))
+  stickies.push({
+    id: stickyIdCtr++,
+    title: '阿言掉登录了怎么办',
+    body: '1. 电脑 Tailscale 确认 Connected\n2. ssh -i C:\\Users\\lenovo\\.ssh\\id_ed25519 ripple@100.111.157.86\n3. 看行首是 ripple@reed-nest 才算进了服务器\n4. tmux attach -t cc\n5. 在阿言的输入框里打 /login 回车（不是在 ripple@reed-nest:~$ 后面打）\n6. 选 1（订阅登录）→ 浏览器打开链接授权 → 把验证码贴回来\n7. 登好了按 Ctrl+B 再按 D 离开，别按 Ctrl+C\n※ 回到 ripple@reed-nest:~$ 说明阿言退出了：先 tmux new -s cc，再 claude',
     color: '#fef9c3', url: false, ts: '', att: 'pin'
   })
   saveStickies()
