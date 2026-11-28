@@ -21,7 +21,9 @@ export function normalizeProvider(raw) {
   return 'openai'
 }
 
-function isReasoningModel(m) { return /^o[1-9]|^o3-mini/.test(m || '') }
+// 1127：GPT-5 系列（5 / 5.1 / 5.2…）也只认 max_completion_tokens、不收 temperature，带 max_tokens 直接 400。
+// 以前只认 o 系列，她换到 5.1、5.2 全报 Unsupported parameter: 'max_tokens'。允许带「openai/」这类前缀（OpenRouter 等）。
+function isReasoningModel(m) { return /^(?:[\w.-]+\/)?(?:o[1-9]|gpt-5)/i.test(m || '') }
 // 新一代 Claude（fable / mythos）不收 temperature：带了就 400，而且那条 400 不带跨域头，
 // 浏览器里只剩一句 Failed to fetch。调成 0 没用，得整个字段不发（1111 阿颖的新渠道，
 // 群里说的是「温度需要消掉」不是调成 0）。
