@@ -24,6 +24,21 @@ export function normalizeProvider(raw) {
 // 1127：GPT-5 系列（5 / 5.1 / 5.2…）也只认 max_completion_tokens、不收 temperature，带 max_tokens 直接 400。
 // 以前只认 o 系列，她换到 5.1、5.2 全报 Unsupported parameter: 'max_tokens'。允许带「openai/」这类前缀（OpenRouter 等）。
 function isReasoningModel(m) { return /^(?:[\w.-]+\/)?(?:o[1-9]|gpt-5)/i.test(m || '') }
+// 1128 她问「以后 GPT-6 是不是还得改」：不再只靠名字猜。哪个模型回 400 点名要 max_completion_tokens，
+// 就自动换参数重试一次，并记在本机，下次直接发对的。新模型出来也不用改代码。
+const COMPLETION_TOKENS_KEY = 'yanji-max-completion-models'
+function needsCompletionTokens(m) {
+  if (isReasoningModel(m)) return true
+  try { return JSON.parse(localStorage.getItem(COMPLETION_TOKENS_KEY) || '[]').includes(m) } catch { return false }
+}
+function rememberCompletionTokens(m) {
+  try {
+    const list = JSON.parse(localStorage.getItem(COMPLETION_TOKENS_KEY) || '[]')
+    if (m && !list.includes(m)) { list.push(m); localStorage.setItem(COMPLETION_TOKENS_KEY, JSON.stringify(list.slice(-50))) }
+  } catch {}
+}
+const isMaxTokensParamError = t => /max_tokens/.test(t || '') && /max_completion_tokens/.test(t || '')
+const isTemperatureParamError = t => /temperature/i.test(t || '') && /unsupported|not supported|does not support|only the default/i.test(t || '')
 // 新一代 Claude（fable / mythos）不收 temperature：带了就 400，而且那条 400 不带跨域头，
 // 浏览器里只剩一句 Failed to fetch。调成 0 没用，得整个字段不发（1111 阿颖的新渠道，
 // 群里说的是「温度需要消掉」不是调成 0）。
@@ -693,7 +708,7 @@ async function callWithTools({
       // GPT-5.6+ 关闭「最后一条动态 user」上的隐式写点，只写上面明确标记的
       // 稳定历史。Claude 兼容线路使用 block 里的 cache_control，无此根字段。
       if (cacheHintMode === 'openai') body.prompt_cache_options = { mode: 'explicit' }
-      if (isReasoningModel(model)) {
+      if (needsCompletionTokens(model)) {
         body.max_completion_tokens = maxTokens
       } else {
         if (!skipTemperature(model, generationConfig)) body.temperature = safeTemp
@@ -708,7 +723,14 @@ async function callWithTools({
         // 自动重试只用于错误正文明确点名的不兼容字段。笼统 400（例如
         // bad_response_status_code / 内容审查）不能猜着连发，否则一条消息会在后台
         // 变成 2～5 个请求，最后的 429 还会把真正的首个 400 盖掉。
-        if (cacheHintMode && isPromptCacheHintCompatibilityError(firstErrText)) {
+        if (body.max_tokens != null && isMaxTokensParamError(firstErrText)) {
+          body.max_completion_tokens = body.max_tokens; delete body.max_tokens; delete body.temperature
+          rememberCompletionTokens(model)
+          fallbackReason = 'max_tokens→max_completion_tokens'
+        } else if (body.temperature != null && isTemperatureParamError(firstErrText)) {
+          delete body.temperature
+          fallbackReason = 'temperature'
+        } else if (cacheHintMode && isPromptCacheHintCompatibilityError(firstErrText)) {
           body.messages = baseMsgs
           delete body.prompt_cache_options
           fallbackReason = 'prompt cache hints'
@@ -959,7 +981,7 @@ async function callStream({ connection, messages, systemPrompt, dynamicContext, 
         body.prompt_cache_key = cacheKey
       } // 粘性路由
     if (cacheHintMode === 'openai') body.prompt_cache_options = { mode: 'explicit' }
-    if (isReasoningModel(model)) {
+    if (needsCompletionTokens(model)) {
       body.max_completion_tokens = maxTokens
     } else {
       if (!skipTemperature(model, generationConfig)) body.temperature = safeTemp
@@ -972,7 +994,14 @@ async function callStream({ connection, messages, systemPrompt, dynamicContext, 
       // 无工具分支同样只对明确点名的不兼容缓存字段做一次回退；通用 400
       // 原样抛出，避免自动重试触发 429、也避免把首个错误证据吃掉。
       let fallbackReason = ''
-      if (cacheHintMode && isPromptCacheHintCompatibilityError(firstErrText)) {
+      if (body.max_tokens != null && isMaxTokensParamError(firstErrText)) {
+        body.max_completion_tokens = body.max_tokens; delete body.max_tokens; delete body.temperature
+        rememberCompletionTokens(model)
+        fallbackReason = 'max_tokens→max_completion_tokens'
+      } else if (body.temperature != null && isTemperatureParamError(firstErrText)) {
+        delete body.temperature
+        fallbackReason = 'temperature'
+      } else if (cacheHintMode && isPromptCacheHintCompatibilityError(firstErrText)) {
         body.messages = baseMsgs
         delete body.prompt_cache_options
         fallbackReason = 'prompt cache hints'
